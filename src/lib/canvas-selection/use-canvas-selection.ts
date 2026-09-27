@@ -1,5 +1,6 @@
 import { useEffect, useRef } from 'react'
 import { selectionFromEventTarget, type CanvasSelection, type DataIdResolver } from './data-id'
+import { addEdgeHitAreas } from './edge-hit-area'
 import { applyHighlight, clearHighlight } from './highlight'
 
 /**
@@ -28,9 +29,11 @@ export function useCanvasSelection({ svg, resolver, selectedDataId, onSelect }: 
 
   // 高亮：SVG 重新注入（dangerouslySetInnerHTML 换子树）或选中变化时重新标记。
   // 放在 ref 所指容器上而非 svg 节点本身，兼容容器内其它静态内容。
+  // 先补连线命中区域（工单 01，幂等）：边描边过窄点不中，需在点击链路前注入宽命中路径。
   useEffect(() => {
     const root = containerRef.current
     if (root === null) return
+    addEdgeHitAreas(root)
     if (selectedDataId === null) {
       clearHighlight(root)
     } else {
