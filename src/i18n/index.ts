@@ -35,6 +35,7 @@ export const zhDict = {
       flowchart: '流程图',
       sequence: '时序图',
       class: '类图',
+      mindmap: '思维导图',
     },
     seqArrows: {
       '->>': '实线箭头',
@@ -201,6 +202,18 @@ export const zhDict = {
       addMemberTitle: '添加成员',
       addRelationTitle: '添加关系',
       classDefHint: '仅常用样式项可表单化编辑，其余属性请直接在代码面板修改。',
+      // ---- mindmap（工单 08） ----
+      addChild: '添加子节点',
+      addSibling: '添加同级节点',
+      addRootNode: '添加根节点',
+      deleteMindmapNode: '删除节点（含子级）',
+      mindmapNodeIcon: '图标',
+      mindmapIconHint: '图标类名（如 fa fa-book），留空移除图标',
+      mindmapAddText: '节点文本',
+      mindmapHint: '思维导图：在上方结构树中点选节点，即可在此编辑文本、形状与图标，或增删层级节点。',
+      mindmapEmpty: '（暂无节点）',
+      mindmapEmptyHint: '思维导图为空：先添加一个根节点，即可在结构树中逐层搭建。',
+      cancel: '取消',
     },
     shapes: {
       rectangle: '矩形',
@@ -240,6 +253,15 @@ export const zhDict = {
       BT: '从下到上（BT）',
       LR: '从左到右（LR）',
       RL: '从右到左（RL）',
+    },
+    mindmapShapes: {
+      default: '默认（无形状）',
+      square: '方形 [ ]',
+      rounded: '圆角 ( )',
+      circle: '圆 (( ))',
+      bang: '爆炸 ))((',
+      cloud: '云 )(',
+      hexagon: '六边形 {{ }}',
     },
   },
 } as const

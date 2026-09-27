@@ -20,6 +20,8 @@ export type Selection =
   | { kind: 'class-member'; elementId: string }
   | { kind: 'class-relation'; elementId: string }
   | { kind: 'class-note'; elementId: string }
+  // mindmap（工单 08）
+  | { kind: 'mindmap-node'; elementId: string }
 
 export const DIAGRAM_SELECTION: Selection = { kind: 'diagram' }
 
@@ -51,6 +53,8 @@ export function selectionKey(sel: Selection): string {
       return `class-relation:${sel.elementId}`
     case 'class-note':
       return `class-note:${sel.elementId}`
+    case 'mindmap-node':
+      return `mindmap-node:${sel.elementId}`
   }
 }
 

@@ -23,11 +23,14 @@ interface CanvasPanelProps {
   projection: AnyProjection | null
 }
 
-/** 图种 → data-id resolver（工单 06/07）：flowchart 全套适配；sequence 参与者与
- * class 类的 data-id 即其 id（尽力而为，无法匹配时不选中） */
+/** 图种 → data-id resolver（工单 06/07/08）：flowchart 全套适配；sequence 参与者与
+ * class 类的 data-id 即其 id（尽力而为，无法匹配时不选中）。
+ * mindmap（工单 08）：mermaid 渲染的 mindmap 节点无可靠 data-id 映射，
+ * 画布侧不做选中（结构树即该图种的主编辑入口）。 */
 function resolverOf(projection: AnyProjection): DataIdResolver {
   if (projection.type === 'flowchart') return flowchartDataIdResolver(projection.flowchart)
   if (projection.type === 'sequence') return nodeDataIdResolver(projection.sequence.participants.map((p) => p.actorId))
+  if (projection.type === 'mindmap') return () => null
   return nodeDataIdResolver(projection.class.classes.map((c) => c.name))
 }
 

@@ -45,6 +45,8 @@ import {
   MemberForm,
   RelationForm,
 } from './class-forms'
+import { MindmapNodeForm, MindmapRootForm } from './mindmap-forms'
+import { resolveMindmapSelection, type MindmapProjection } from '../lib/projection/mindmap-projection'
 
 /**
  * 属性面板（工单 04/06）：上半为结构树、下半为选中元素属性表单。
@@ -217,9 +219,41 @@ function ClassSelectionForm({
   }
 }
 
+function MindmapSelectionForm({
+  projection,
+  selection,
+}: {
+  projection: MindmapProjection
+  selection: Selection | null
+}) {
+  const { t } = useTranslation()
+  if (selection === null) {
+    return (
+      <Text size="sm" c="dimmed" px="xs">
+        {t('app:propertyPanel.nothingSelected')}
+      </Text>
+    )
+  }
+  switch (selection.kind) {
+    case 'diagram':
+      return (
+        <Text size="sm" c="dimmed" px="xs">
+          {t('app:propertyPanel.mindmapHint')}
+        </Text>
+      )
+    case 'mindmap-node': {
+      const node = projection.nodes.find((n) => n.elementId === selection.elementId)
+      return node !== undefined ? <MindmapNodeForm node={node} /> : null
+    }
+    default:
+      return null
+  }
+}
+
 function resolveProjectionSelection(projection: AnyProjection, selection: Selection | null): Selection | null {
   if (projection.type === 'flowchart') return resolveSelection(projection.flowchart, selection)
   if (projection.type === 'sequence') return resolveSequenceSelection(projection.sequence, selection)
+  if (projection.type === 'mindmap') return resolveMindmapSelection(projection.mindmap, selection)
   return resolveClassSelection(projection.class, selection)
 }
 
@@ -294,6 +328,14 @@ function AddElementsBox({
           <AddNoteInlineForm participants={sequence.participants} onDone={() => setAddKind(null)} />
         )}
         {addKind === 'block' && <AddBlockInlineForm onDone={() => setAddKind(null)} />}
+      </Box>
+    )
+  }
+  if (projection.type === 'mindmap') {
+    // mindmap（工单 08）：树形结构树即主编辑界面，添加入口只保留根节点起步
+    return (
+      <Box px="xs">
+        {projection.mindmap.nodes.length === 0 && <MindmapRootForm />}
       </Box>
     )
   }
@@ -387,6 +429,8 @@ export function PropertyPanel({ projection, parseError }: PropertyPanelProps) {
                 <FlowchartSelectionForm projection={projection.flowchart} selection={effectiveSelection} />
               ) : projection.type === 'sequence' ? (
                 <SequenceSelectionForm projection={projection.sequence} selection={effectiveSelection} />
+              ) : projection.type === 'mindmap' ? (
+                <MindmapSelectionForm projection={projection.mindmap} selection={effectiveSelection} />
               ) : (
                 <ClassSelectionForm projection={projection.class} selection={effectiveSelection} />
               ))}

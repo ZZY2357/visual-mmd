@@ -1,14 +1,17 @@
 import { Stack, Text, UnstyledButton } from '@mantine/core'
+import type { ReactNode } from 'react'
 import { useTranslation } from 'react-i18next'
 import { DIAGRAM_SELECTION, type Selection, sameSelection } from '../lib/projection/selection'
 import type { AnyProjection } from '../lib/diagram-registry'
 import type { FlowchartProjection } from '../lib/projection/flowchart-projection'
+import type { MindmapProjection, ProjectionMindmapNode } from '../lib/projection/mindmap-projection'
 import { useEditorStore } from '../store/editor'
 
 /**
  * 结构树（工单 04）：属性面板上半区，展示图中全部元素，
  * 点击选中并定位到下半区的属性表单。
  * sequence 分支（工单 06）：参与者 / 消息 / note / 逻辑块按嵌套深度展示。
+ * mindmap 分支（工单 08）：树形缩进即主编辑界面——层级节点直接在树中增删。
  */
 
 function TreeItem({
@@ -53,6 +56,7 @@ function TreeItem({
 export function StructureTree({ projection }: { projection: AnyProjection }) {
   if (projection.type === 'flowchart') return <FlowchartTree projection={projection.flowchart} />
   if (projection.type === 'sequence') return <SequenceTree projection={projection.sequence} />
+  if (projection.type === 'mindmap') return <MindmapTree projection={projection.mindmap} />
   return <ClassTree projection={projection.class} />
 }
 
@@ -294,6 +298,64 @@ function ClassTree({ projection }: { projection: Extract<AnyProjection, { type: 
           onSelect={() => select({ kind: 'classdef', name: cd.name })}
         />
       ))}
+    </Stack>
+  )
+}
+
+// ---------- mindmap（工单 08）：树形缩进即主编辑界面 ----------
+
+function MindmapTree({ projection }: { projection: MindmapProjection }) {
+  const { t } = useTranslation()
+  const selection = useEditorStore((s) => s.selection)
+  const select = useEditorStore((s) => s.select)
+  const is = (sel: Selection) => selection !== null && sameSelection(selection, sel)
+
+  const childrenOf = new Map<string | null, ProjectionMindmapNode[]>()
+  for (const node of projection.nodes) {
+    const list = childrenOf.get(node.parentId) ?? []
+    list.push(node)
+    childrenOf.set(node.parentId, list)
+  }
+
+  const renderNode = (node: ProjectionMindmapNode): ReactNode => {
+    const children = childrenOf.get(node.elementId) ?? []
+    const shapeLabel =
+      node.shapeType !== null ? t(`app:mindmapShapes.${node.shapeType}`) : undefined
+    return (
+      <Stack key={node.elementId} gap={0}>
+        <TreeItem
+          label={node.text}
+          detail={[shapeLabel, node.icon !== null ? `::icon(${node.icon})` : undefined]
+            .filter((x) => x !== undefined)
+            .join(' · ') || undefined}
+          active={is({ kind: 'mindmap-node', elementId: node.elementId })}
+          depth={node.depth}
+          onSelect={() => select({ kind: 'mindmap-node', elementId: node.elementId })}
+        />
+        {children.map(renderNode)}
+      </Stack>
+    )
+  }
+
+  return (
+    <Stack gap={4} aria-label={t('app:propertyPanel.structureTree')}>
+      <TreeItem
+        label={t('app:propertyPanel.diagram')}
+        detail="mindmap"
+        active={is(DIAGRAM_SELECTION)}
+        depth={0}
+        onSelect={() => select(DIAGRAM_SELECTION)}
+      />
+      <Text size="xs" c="dimmed" px="xs">
+        {t('app:propertyPanel.mindmapHint')}
+      </Text>
+      {projection.nodes.length === 0 ? (
+        <Text size="xs" c="dimmed" px="xs">
+          {t('app:propertyPanel.mindmapEmpty')}
+        </Text>
+      ) : (
+        (childrenOf.get(null) ?? []).map(renderNode)
+      )}
     </Stack>
   )
 }

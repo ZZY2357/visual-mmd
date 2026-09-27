@@ -3,9 +3,11 @@ import type { DiagramParser } from './pipeline/parser'
 import { flowchartParser } from './pipeline/flowchart'
 import { sequenceParser } from './pipeline/sequence'
 import { classParser } from './pipeline/class'
+import { mindmapParser } from './pipeline/mindmap'
 import { buildFlowchartProjection, type FlowchartProjection } from './projection/flowchart-projection'
 import { buildSequenceProjection, type SequenceProjection } from './projection/sequence-projection'
 import { buildClassProjection, type ClassProjection } from './projection/class-projection'
+import { buildMindmapProjection, type MindmapProjection } from './projection/mindmap-projection'
 import { DEFAULT_DIAGRAM_SOURCE } from './storage'
 
 /**
@@ -14,12 +16,13 @@ import { DEFAULT_DIAGRAM_SOURCE } from './storage'
  * store 的 commitIntent 与 App 的投影派生都经此分发，新图种接入只需在此注册。
  */
 
-export type DiagramTypeId = 'flowchart' | 'sequence' | 'class'
+export type DiagramTypeId = 'flowchart' | 'sequence' | 'class' | 'mindmap'
 
 export type AnyProjection =
   | { type: 'flowchart'; flowchart: FlowchartProjection }
   | { type: 'sequence'; sequence: SequenceProjection }
   | { type: 'class'; class: ClassProjection }
+  | { type: 'mindmap'; mindmap: MindmapProjection }
 
 export interface DiagramTypeRegistration {
   id: DiagramTypeId
@@ -74,6 +77,23 @@ export const CLASS_TEMPLATE = `classDiagram
     classDef highlight fill:#fff3bf,stroke:#f08c00
 `
 
+export const MINDMAP_TEMPLATE = `mindmap
+  root((Visual MMD))
+    双面板同步
+      代码面板
+        源码是唯一真相源
+      画布
+        实时渲染预览
+    属性面板
+      结构树
+        树形缩进编辑
+      属性表单
+    图表库
+      ::icon(fa fa-database)
+      localStorage 自动保存
+      导出 mmd / svg / png
+`
+
 export const DIAGRAM_TYPES: Record<DiagramTypeId, DiagramTypeRegistration> = {
   flowchart: {
     id: 'flowchart',
@@ -96,12 +116,20 @@ export const DIAGRAM_TYPES: Record<DiagramTypeId, DiagramTypeRegistration> = {
     detect: (source) => /^classDiagram\b/i.test(firstStatementLine(source)),
     buildProjection: (doc) => ({ type: 'class', class: buildClassProjection(doc) }),
   },
+  mindmap: {
+    id: 'mindmap',
+    parser: mindmapParser,
+    template: MINDMAP_TEMPLATE,
+    detect: (source) => /^mindmap\b/i.test(firstStatementLine(source)),
+    buildProjection: (doc) => ({ type: 'mindmap', mindmap: buildMindmapProjection(doc) }),
+  },
 }
 
 /** 识别当前源码的图表类型；无法识别时默认 flowchart（保持工单 04 行为） */
 export function detectDiagramType(source: string): DiagramTypeRegistration {
   if (DIAGRAM_TYPES.sequence.detect(source)) return DIAGRAM_TYPES.sequence
   if (DIAGRAM_TYPES.class.detect(source)) return DIAGRAM_TYPES.class
+  if (DIAGRAM_TYPES.mindmap.detect(source)) return DIAGRAM_TYPES.mindmap
   return DIAGRAM_TYPES.flowchart
 }
 
@@ -109,4 +137,5 @@ export const DIAGRAM_TYPE_LIST: DiagramTypeRegistration[] = [
   DIAGRAM_TYPES.flowchart,
   DIAGRAM_TYPES.sequence,
   DIAGRAM_TYPES.class,
+  DIAGRAM_TYPES.mindmap,
 ]
