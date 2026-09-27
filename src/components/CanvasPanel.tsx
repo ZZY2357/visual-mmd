@@ -1,4 +1,4 @@
-import { Alert, Box, Stack, Text, Title } from '@mantine/core'
+import { Alert, Box, Button, Stack, Text, Title } from '@mantine/core'
 import { useTranslation } from 'react-i18next'
 import type { MermaidPreview } from '../lib/use-mermaid-preview'
 import { flowchartDataIdResolver, toEditorSelection } from '../lib/canvas-selection/flowchart-adapter'
@@ -6,6 +6,7 @@ import type { CanvasSelection, DataIdResolver } from '../lib/canvas-selection/da
 import { nodeDataIdResolver } from '../lib/canvas-selection/data-id'
 import type { Selection } from '../lib/projection/selection'
 import { useCanvasSelection } from '../lib/canvas-selection/use-canvas-selection'
+import { useCanvasView } from '../lib/canvas-view/use-canvas-view'
 import type { AnyProjection } from '../lib/diagram-registry'
 import { useEditorStore } from '../store/editor'
 
@@ -16,6 +17,9 @@ import { useEditorStore } from '../store/editor'
  * 画布选中（工单 05）：点击渲染 SVG 中带 data-id 的元素选中（ADR-0007 事实约定）。
  * 匹配与高亮是图种无关的通用能力（src/lib/canvas-selection/），flowchart 经
  * flowchartDataIdResolver 适配；data-id 无法匹配时安静地不选中，不崩溃。
+ *
+ * 视图（工单 03）：fit / 滚轮锚点缩放 / 背景拖拽平移见 src/lib/canvas-view/；
+ * 变换只落在 DOM 上，导出走 preview.svg 原始字符串，不受视图影响。
  */
 
 interface CanvasPanelProps {
@@ -65,8 +69,13 @@ export function CanvasPanel({ preview, projection }: CanvasPanelProps) {
   const selection = useEditorStore((s) => s.selection)
   const { svg, error } = preview
 
-  const { containerRef, onClick } = useCanvasSelection({
+  // 视图（工单 03）：fit / 滚轮锚点缩放 / 背景拖拽平移；SVG 换新即重新 fit，
+  // 切换图表自然重置，无需持久化
+  const { containerRef, fit, onPointerDown, onPointerMove, onPointerUp } = useCanvasView(svg)
+
+  const { containerRef: selectionRef, onClick } = useCanvasSelection({
     svg,
+    containerRef,
     resolver: projection !== null ? resolverOf(projection) : null,
     selectedDataId: selection !== null ? selectedDataIdOf(selection) : null,
     onSelect: (canvasSelection) => {
@@ -89,29 +98,39 @@ export function CanvasPanel({ preview, projection }: CanvasPanelProps) {
         </Alert>
       )}
       <Box
-        ref={containerRef}
+        ref={selectionRef}
         h="100%"
         style={{
+          position: 'relative',
           flex: 1,
           minHeight: 0,
-          overflow: 'auto',
-          display: 'flex',
-          alignItems: 'flex-start',
-          justifyContent: 'center',
+          overflow: 'hidden',
           background: 'var(--mantine-color-gray-0)',
           borderRadius: 'var(--mantine-radius-sm)',
+          cursor: 'grab',
         }}
         onClick={onClick}
+        onPointerDown={onPointerDown}
+        onPointerMove={onPointerMove}
+        onPointerUp={onPointerUp}
+        onPointerCancel={onPointerUp}
       >
         {svg === null ? (
-          <Text c="dimmed" mt="xl">
+          <Text c="dimmed" mt="xl" ta="center">
             {error === null ? t('canvas.emptySource') : error.message}
           </Text>
         ) : (
-          <Box
-            style={{ padding: 16, width: '100%' }}
-            dangerouslySetInnerHTML={{ __html: svg }}
-          />
+          <Box dangerouslySetInnerHTML={{ __html: svg }} style={{ position: 'absolute', inset: 0 }} />
+        )}
+        {svg !== null && (
+          <Button
+            size="compact-xs"
+            variant="default"
+            style={{ position: 'absolute', top: 8, right: 8, zIndex: 10 }}
+            onClick={fit}
+          >
+            {t('canvas.fitView')}
+          </Button>
         )}
       </Box>
     </Stack>

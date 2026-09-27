@@ -20,10 +20,13 @@ export interface CanvasSelectionOptions {
   selectedDataId: string | null
   /** 点击命中选中时回调 */
   onSelect: (selection: CanvasSelection) => void
+  /** 外部已有的容器 ref（工单 03：画布视图与选中共享同一容器）；缺省自建 */
+  containerRef?: React.RefObject<HTMLDivElement | null>
 }
 
-export function useCanvasSelection({ svg, resolver, selectedDataId, onSelect }: CanvasSelectionOptions) {
-  const containerRef = useRef<HTMLDivElement | null>(null)
+export function useCanvasSelection({ svg, resolver, selectedDataId, onSelect, containerRef: externalRef }: CanvasSelectionOptions) {
+  const ownRef = useRef<HTMLDivElement | null>(null)
+  const containerRef = externalRef ?? ownRef
   const onSelectRef = useRef(onSelect)
   onSelectRef.current = onSelect
 
