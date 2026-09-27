@@ -106,6 +106,8 @@ export const zhDict = {
     propertyPanel: {
       title: '属性面板',
       ariaLabel: '结构与属性面板',
+      collapse: '折叠属性面板',
+      expand: '展开属性面板',
       theme: '主题',
       themeAria: '选择图表主题',
       themeDefault: '默认（default）',
