@@ -376,7 +376,10 @@ function parseArrowAt(
     p++
   }
 
-  const pipe = parsePipeLabel(line, p)
+  // 管道标签允许与箭头之间有空白（mermaid 接受 `--> |label|`）；无标签时 token 止于箭头
+  let pipePos = p
+  while (line[pipePos] === ' ' || line[pipePos] === '\t') pipePos++
+  const pipe = parsePipeLabel(line, pipePos)
   const plainEnd = pipe !== null ? pipe.end : p
   const plainSpec: LinkSpec = {
     lineStyle,
