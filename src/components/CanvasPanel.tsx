@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
-import { Alert, Box, Button, Stack, Text, TextInput, Title } from '@mantine/core'
+import { Alert, Box, Button, ColorInput, Group, Stack, Text, TextInput, Title, UnstyledButton } from '@mantine/core'
 import { useTranslation } from 'react-i18next'
 import type { MermaidPreview } from '../lib/use-mermaid-preview'
 import { flowchartDataIdResolver, toEditorSelection } from '../lib/canvas-selection/flowchart-adapter'
@@ -11,6 +11,8 @@ import { useCanvasSelection } from '../lib/canvas-selection/use-canvas-selection
 import { useCanvasKeyboard } from '../lib/editing/use-canvas-keyboard'
 import { useCanvasInlineEdit, inlineEditTextOf } from '../lib/editing/use-canvas-inline-edit'
 import type { Rect } from '../lib/editing/inline-edit'
+import { useCanvasContextMenu } from '../lib/editing/use-canvas-context-menu'
+import type { ContextMenuItemId } from '../lib/editing/context-menu'
 import { useCanvasView } from '../lib/canvas-view/use-canvas-view'
 import type { AnyProjection } from '../lib/diagram-registry'
 import { useEditorStore } from '../store/editor'
@@ -28,6 +30,10 @@ import { useEditorStore } from '../store/editor'
  *
  * 内联编辑（工单 05）：双击节点（flowchart + mindmap）原位浮出输入框，回车/失焦
  * 提交、Esc 取消；Tab/Enter 新建节点后经 onNodeCreated 自动进入同一输入框。
+ *
+ * 右键菜单（工单 07）：单一菜单随右键目标变化（空白/节点/连线/mindmap 节点），
+ * 挂在画布容器上阻止浏览器默认菜单，代码面板不受影响；连线模式光标十字，
+ * 依次单击起点终点创建连线；「添加样式」在菜单位置浮出小表单，提交才落码。
  */
 
 interface CanvasPanelProps {
@@ -119,6 +125,162 @@ function InlineEditInput(props: { rect: Rect | null; initialText: string; onComm
   )
 }
 
+/** 菜单项标签（i18n key 与菜单项 id 同名） */
+function menuItemLabel(t: (k: string) => string, id: ContextMenuItemId): string {
+  return t(`app:canvas.menu.${id}`)
+}
+
+/** 右键菜单浮层（工单 07）：绝对定位在右键点，应用样式为原地展开的子列表 */
+function ContextMenuOverlay(props: {
+  x: number
+  y: number
+  items: ContextMenuItemId[]
+  /** flowchart 投影中的全部样式名（应用样式子列表；空列表显示占位项） */
+  classDefNames: string[]
+  onItem: (id: ContextMenuItemId) => void
+  onApplyStyle: (className: string) => void
+}) {
+  const { t } = useTranslation()
+  const [stylesOpen, setStylesOpen] = useState(false)
+  const itemSx = {
+    display: 'block',
+    width: '100%',
+    textAlign: 'left' as const,
+    padding: '4px 10px',
+    fontSize: 12,
+    borderRadius: 4,
+  }
+  return (
+    <Box
+      style={{
+        position: 'absolute',
+        left: props.x,
+        top: props.y,
+        zIndex: 30,
+        minWidth: 140,
+        background: 'var(--mantine-color-body)',
+        border: '1px solid var(--mantine-color-gray-3)',
+        borderRadius: 'var(--mantine-radius-sm)',
+        boxShadow: 'var(--mantine-shadow-md)',
+        padding: 4,
+      }}
+      onClick={(e) => e.stopPropagation()}
+      onContextMenu={(e) => e.preventDefault()}
+    >
+      {props.items.map((id) =>
+        id === 'apply-style' ? (
+          <Box key={id}>
+            <UnstyledButton
+              style={itemSx}
+              onClick={() => setStylesOpen((open) => !open)}
+              onMouseOver={(e) => (e.currentTarget.style.background = 'var(--mantine-color-gray-1)')}
+              onMouseOut={(e) => (e.currentTarget.style.background = '')}
+            >
+              {menuItemLabel(t, id)} {props.classDefNames.length > 0 ? (stylesOpen ? '▾' : '▸') : ''}
+            </UnstyledButton>
+            {stylesOpen && (
+              <Box pl={12}>
+                {props.classDefNames.length === 0 ? (
+                  <Text size="xs" c="dimmed" px={10} py={2}>
+                    {t('app:canvas.menu.applyStyleEmpty')}
+                  </Text>
+                ) : (
+                  props.classDefNames.map((name) => (
+                    <UnstyledButton
+                      key={name}
+                      style={itemSx}
+                      onClick={() => props.onApplyStyle(name)}
+                      onMouseOver={(e) => (e.currentTarget.style.background = 'var(--mantine-color-gray-1)')}
+                      onMouseOut={(e) => (e.currentTarget.style.background = '')}
+                    >
+                      {name}
+                    </UnstyledButton>
+                  ))
+                )}
+              </Box>
+            )}
+          </Box>
+        ) : (
+          <UnstyledButton
+            key={id}
+            style={{ ...itemSx, color: id === 'delete' ? 'var(--mantine-color-red-filled)' : undefined }}
+            onClick={() => props.onItem(id)}
+            onMouseOver={(e) => (e.currentTarget.style.background = 'var(--mantine-color-gray-1)')}
+            onMouseOut={(e) => (e.currentTarget.style.background = '')}
+          >
+            {menuItemLabel(t, id)}
+          </UnstyledButton>
+        ),
+      )}
+    </Box>
+  )
+}
+
+/** 「添加样式」小表单浮层（工单 07）：名称 + 颜色，提交才落码 */
+function AddStyleForm(props: {
+  x: number
+  y: number
+  onSubmit: (name: string, color: string) => boolean
+  onClose: () => void
+}) {
+  const { t } = useTranslation()
+  const [name, setName] = useState('')
+  const [color, setColor] = useState('')
+  const invalid = name.trim() === '' || /[\s,]/.test(name.trim())
+  return (
+    <Box
+      style={{
+        position: 'absolute',
+        left: props.x,
+        top: props.y,
+        zIndex: 30,
+        width: 200,
+        background: 'var(--mantine-color-body)',
+        border: '1px solid var(--mantine-color-gray-3)',
+        borderRadius: 'var(--mantine-radius-sm)',
+        boxShadow: 'var(--mantine-shadow-md)',
+        padding: 8,
+      }}
+      onClick={(e) => e.stopPropagation()}
+      onContextMenu={(e) => e.preventDefault()}
+    >
+      <Stack gap={6}>
+        <TextInput
+          size="xs"
+          label={t('app:canvas.menu.styleName')}
+          value={name}
+          onChange={(e) => setName(e.currentTarget.value)}
+          onKeyDown={(e) => {
+            if (e.key === 'Enter' && !invalid && props.onSubmit(name, color)) props.onClose()
+          }}
+          error={invalid && name.trim() !== '' ? t('app:canvas.menu.styleNameInvalid') : undefined}
+        />
+        <ColorInput
+          size="xs"
+          label={t('app:canvas.menu.styleColor')}
+          value={color}
+          onChange={setColor}
+          closeOnColorSwatchClick
+        />
+        <Group gap="xs" justify="flex-end">
+          <Button size="compact-xs" variant="default" onClick={props.onClose}>
+            {t('app:propertyPanel.cancel')}
+          </Button>
+          <Button
+            size="compact-xs"
+            disabled={invalid}
+            onClick={() => {
+              if (props.onSubmit(name, color)) props.onClose()
+            }}
+          >
+            {t('app:propertyPanel.add')}
+          </Button>
+        </Group>
+      </Stack>
+    </Box>
+  )
+}
+
 export function CanvasPanel({ preview, projection }: CanvasPanelProps) {
   const { t } = useTranslation()
   const select = useEditorStore((s) => s.select)
@@ -160,6 +322,32 @@ export function CanvasPanel({ preview, projection }: CanvasPanelProps) {
       newNodeText: t('app:propertyPanel.mindmapNewNode'),
     },
   )
+
+  // 右键菜单（工单 07）：菜单/连线模式/添加样式表单三个状态托管在 hook 中，
+  // 编辑文本与新建节点的内联命名同样走 beginEdit
+  const ctx = useCanvasContextMenu({
+    projection,
+    resolver: projection !== null ? resolverOf(projection) : null,
+    containerRef,
+    onNodeCreated: beginEdit,
+    newNodeText: t('app:propertyPanel.mindmapNewNode'),
+  })
+  const classDefNames = projection?.type === 'flowchart' ? projection.flowchart.classDefs.map((c) => c.name) : []
+
+  // 菜单项 → 动作分发（编辑标签：右键时已选中该连线，EdgeForm 承接）
+  const onMenuItem = (id: ContextMenuItemId): void => {
+    if (id === 'add-node') ctx.addNode()
+    else if (id === 'link-mode') ctx.enterLinkMode()
+    else if (id === 'add-style') ctx.openStyleForm()
+    else if (id === 'add-subgraph') ctx.addSubgraph()
+    else if (id === 'link-from-here') {
+      const target = ctx.menu?.target
+      if (target !== undefined && target.kind === 'flowchart-node') ctx.enterLinkMode(target.nodeId)
+    } else if (id === 'edit-text') ctx.beginEditText()
+    else if (id === 'edit-label') ctx.beginEditLabel()
+    else if (id === 'delete') ctx.deleteTarget()
+    else if (id === 'add-child') ctx.addChildToMindmap()
+  }
 
   // 结构树键盘（工单 06）添加节点后的内联命名请求：画布侧消费（gotoLine 同款 nonce 模式）
   const pendingInlineEdit = useEditorStore((s) => s.pendingInlineEdit)
@@ -207,14 +395,23 @@ export function CanvasPanel({ preview, projection }: CanvasPanelProps) {
           overflow: 'hidden',
           background: 'var(--mantine-color-gray-0)',
           borderRadius: 'var(--mantine-radius-sm)',
-          cursor: 'grab',
+          // 连线模式光标十字（工单 07），其余保持背景拖拽的抓手
+          cursor: ctx.linkMode.stage !== 'idle' ? 'crosshair' : 'grab',
           outline: 'none', // 画布聚焦即键盘生效，不要浏览器默认焦点圈
         }}
         onClick={(e) => {
           // 点击画布（含节点）把焦点收进容器：Tab/Enter/Del 随即可用
           selectionRef.current?.focus()
+          // 打开的菜单先收起（点击画布任意处关闭菜单）
+          if (ctx.menu !== null) {
+            ctx.closeMenu()
+            return
+          }
+          // 连线模式优先消费单击（工单 07）：节点 = 推进，空白 = 取消
+          if (ctx.onCanvasClick(e)) return
           onClick(e)
         }}
+        onContextMenu={ctx.onContextMenu}
         onDoubleClick={onDoubleClick}
         onPointerDown={(e) => {
           // 内联编辑期间不让背景拖拽抢走指针（输入框上的按下要留给文本选择）
@@ -248,6 +445,24 @@ export function CanvasPanel({ preview, projection }: CanvasPanelProps) {
             initialText={inlineEditTextOf(projection, editing.target)}
             onCommit={commit}
             onCancel={cancel}
+          />
+        )}
+        {ctx.menu !== null && (
+          <ContextMenuOverlay
+            x={ctx.menu.x}
+            y={ctx.menu.y}
+            items={ctx.menu.items}
+            classDefNames={classDefNames}
+            onItem={onMenuItem}
+            onApplyStyle={ctx.applyStyle}
+          />
+        )}
+        {ctx.styleForm !== null && (
+          <AddStyleForm
+            x={ctx.styleForm.x}
+            y={ctx.styleForm.y}
+            onSubmit={ctx.submitStyleForm}
+            onClose={ctx.closeStyleForm}
           />
         )}
       </Box>

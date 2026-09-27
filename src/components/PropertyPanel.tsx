@@ -1,5 +1,4 @@
-import { useState } from 'react'
-import { Alert, Box, Button, Divider, Group, ScrollArea, Stack, Text, Title } from '@mantine/core'
+import { Alert, Box, Button, Divider, ScrollArea, Stack, Text, Title } from '@mantine/core'
 import { useTranslation } from 'react-i18next'
 import type { SourceParseError } from '../lib/mermaid-error'
 import { DIAGRAM_SELECTION, resolveSelection, type FlowchartProjection, type Selection } from '../lib/projection/flowchart-projection'
@@ -13,38 +12,9 @@ import { resolveClassSelection, type ClassProjection } from '../lib/projection/c
 import type { AnyProjection } from '../lib/diagram-registry'
 import { useEditorStore } from '../store/editor'
 import { StructureTree } from './StructureTree'
-import {
-  AddClassDefInlineForm,
-  AddEdgeInlineForm,
-  AddNodeInlineForm,
-  AddSubgraphInlineForm,
-  ClassDefForm,
-  DiagramForm,
-  EdgeForm,
-  NodeForm,
-  SubgraphForm,
-} from './property-forms'
-import {
-  AddBlockInlineForm,
-  AddMessageInlineForm,
-  AddNoteInlineForm,
-  AddParticipantInlineForm,
-  BlockForm,
-  MessageForm,
-  NoteForm,
-  ParticipantForm,
-  SequenceDiagramForm,
-} from './sequence-forms'
-import {
-  AddClassInlineForm,
-  AddClassNoteInlineForm,
-  AddMemberInlineForm,
-  AddRelationInlineForm,
-  ClassForm,
-  ClassNoteForm,
-  MemberForm,
-  RelationForm,
-} from './class-forms'
+import { ClassDefForm, DiagramForm, EdgeForm, NodeForm, SubgraphForm } from './property-forms'
+import { BlockForm, MessageForm, NoteForm, ParticipantForm, SequenceDiagramForm } from './sequence-forms'
+import { ClassForm, ClassNoteForm, MemberForm, RelationForm } from './class-forms'
 import { MindmapNodeForm, MindmapRootForm } from './mindmap-forms'
 import { resolveMindmapSelection, type MindmapProjection } from '../lib/projection/mindmap-projection'
 import { ThemePicker } from './ThemePicker'
@@ -53,22 +23,8 @@ import { ThemePicker } from './ThemePicker'
  * 属性面板（工单 04/06）：上半为结构树、下半为选中元素属性表单。
  * 源码有语法错误时整体禁用，提示并可跳转到错误行（代码面板滚动并高亮）。
  * 图种分支按投影类型分发（工单 06，07/08 复用此模式）。
+ * 元素的添加入口在画布右键菜单（工单 07），属性面板不再有「添加」按钮组。
  */
-
-type AddKind =
-  | 'node'
-  | 'edge'
-  | 'subgraph'
-  | 'classdef'
-  | 'participant'
-  | 'message'
-  | 'note'
-  | 'block'
-  | 'class'
-  | 'class-member'
-  | 'class-relation'
-  | 'class-note'
-  | null
 
 interface PropertyPanelProps {
   projection: AnyProjection | null
@@ -260,125 +216,10 @@ function resolveProjectionSelection(projection: AnyProjection, selection: Select
   return resolveClassSelection(projection.class, selection)
 }
 
-function AddElementsBox({
-  projection,
-  addKind,
-  setAddKind,
-}: {
-  projection: AnyProjection
-  addKind: AddKind
-  setAddKind: (kind: AddKind) => void
-}) {
-  const { t } = useTranslation()
-  if (projection.type === 'flowchart') {
-    const flowchart = projection.flowchart
-    return (
-      <Box px="xs">
-        <Group gap="xs">
-          {(
-            [
-              ['node', t('app:propertyPanel.addNodeTitle')],
-              ['edge', t('app:propertyPanel.addEdgeTitle')],
-              ['subgraph', t('app:propertyPanel.addSubgraphTitle')],
-              ['classdef', t('app:propertyPanel.addClassDefTitle')],
-            ] as const
-          ).map(([kind, label]) => (
-            <Button
-              key={kind}
-              size="compact-xs"
-              variant={addKind === kind ? 'light' : 'default'}
-              onClick={() => setAddKind(addKind === kind ? null : kind)}
-            >
-              + {label}
-            </Button>
-          ))}
-        </Group>
-        {addKind === 'node' && <AddNodeInlineForm onDone={() => setAddKind(null)} />}
-        {addKind === 'edge' && <AddEdgeInlineForm nodes={flowchart.nodes} onDone={() => setAddKind(null)} />}
-        {addKind === 'subgraph' && <AddSubgraphInlineForm onDone={() => setAddKind(null)} />}
-        {addKind === 'classdef' && <AddClassDefInlineForm onDone={() => setAddKind(null)} />}
-      </Box>
-    )
-  }
-  if (projection.type === 'sequence') {
-    const sequence = projection.sequence
-    return (
-      <Box px="xs">
-        <Group gap="xs">
-          {(
-            [
-              ['participant', t('app:propertyPanel.addParticipantTitle')],
-              ['message', t('app:propertyPanel.addMessageTitle')],
-              ['note', t('app:propertyPanel.addNoteTitle')],
-              ['block', t('app:propertyPanel.addBlockTitle')],
-            ] as const
-          ).map(([kind, label]) => (
-            <Button
-              key={kind}
-              size="compact-xs"
-              variant={addKind === kind ? 'light' : 'default'}
-              onClick={() => setAddKind(addKind === kind ? null : kind)}
-            >
-              + {label}
-            </Button>
-          ))}
-        </Group>
-        {addKind === 'participant' && <AddParticipantInlineForm onDone={() => setAddKind(null)} />}
-        {addKind === 'message' && (
-          <AddMessageInlineForm participants={sequence.participants} onDone={() => setAddKind(null)} />
-        )}
-        {addKind === 'note' && (
-          <AddNoteInlineForm participants={sequence.participants} onDone={() => setAddKind(null)} />
-        )}
-        {addKind === 'block' && <AddBlockInlineForm onDone={() => setAddKind(null)} />}
-      </Box>
-    )
-  }
-  if (projection.type === 'mindmap') {
-    // mindmap（工单 08）：树形结构树即主编辑界面，添加入口只保留根节点起步
-    return (
-      <Box px="xs">
-        {projection.mindmap.nodes.length === 0 && <MindmapRootForm />}
-      </Box>
-    )
-  }
-  const classes = projection.class.classes
-  return (
-    <Box px="xs">
-      <Group gap="xs">
-        {(
-          [
-            ['class', t('app:propertyPanel.addClassTitle')],
-            ['class-member', t('app:propertyPanel.addMemberTitle')],
-            ['class-relation', t('app:propertyPanel.addRelationTitle')],
-            ['class-note', t('app:propertyPanel.addNoteTitle')],
-            ['classdef', t('app:propertyPanel.addClassDefTitle')],
-          ] as const
-        ).map(([kind, label]) => (
-          <Button
-            key={kind}
-            size="compact-xs"
-            variant={addKind === kind ? 'light' : 'default'}
-            onClick={() => setAddKind(addKind === kind ? null : kind)}
-          >
-            + {label}
-          </Button>
-        ))}
-      </Group>
-      {addKind === 'class' && <AddClassInlineForm onDone={() => setAddKind(null)} />}
-      {addKind === 'class-member' && <AddMemberInlineForm classes={classes} onDone={() => setAddKind(null)} />}
-      {addKind === 'class-relation' && <AddRelationInlineForm classes={classes} onDone={() => setAddKind(null)} />}
-      {addKind === 'class-note' && <AddClassNoteInlineForm classes={classes} onDone={() => setAddKind(null)} />}
-      {addKind === 'classdef' && <AddClassDefInlineForm onDone={() => setAddKind(null)} />}
-    </Box>
-  )
-}
-
 export function PropertyPanel({ projection, parseError }: PropertyPanelProps) {
   const { t } = useTranslation()
   const selection = useEditorStore((s) => s.selection)
   const requestGotoLine = useEditorStore((s) => s.requestGotoLine)
-  const [addKind, setAddKind] = useState<AddKind>(null)
   const disabled = parseError !== null || projection === null
 
   // 源码变化后选中元素可能已不存在：回落到图表级
@@ -426,8 +267,12 @@ export function PropertyPanel({ projection, parseError }: PropertyPanelProps) {
 
         <Divider />
 
-        {/* 添加元素 */}
-        {projection !== null && <AddElementsBox projection={projection} addKind={addKind} setAddKind={setAddKind} />}
+        {/* mindmap 空图起步：树形结构树无法右键空画布添加根节点，保留根节点表单 */}
+        {projection !== null && projection.type === 'mindmap' && projection.mindmap.nodes.length === 0 && (
+          <Box px="xs">
+            <MindmapRootForm />
+          </Box>
+        )}
 
         {/* 下半：选中元素属性表单 */}
         <ScrollArea style={{ flex: '1 1 60%', minHeight: 0 }} type="auto">
