@@ -8,7 +8,7 @@ import { keyToNodeAction, nodeActionIntents } from './canvas-keyboard'
  * 天然只在画布持有焦点时触发——焦点在代码面板或任何输入框时事件根本不会到达
  * 容器，完全不拦截。容器内若嵌有输入控件（防御性保留），也不触发画布操作。
  * Del / Tab / Enter 映射为编辑意图，经 commitIntent 手术式落码（可撤销）。
- * 添加动作成功后自动选中新节点并回调 onNodeCreated（工单 05 接内联命名的占位钩子）。
+ * 添加动作成功后自动选中新节点并回调 onNodeCreated（工单 05 已接线：内联命名）。
  */
 
 /** 容器内焦点落在这类控件上时不触发画布键盘操作 */
@@ -18,7 +18,7 @@ const FOCUS_EXCLUDE_SELECTOR =
 export interface CanvasKeyboardOptions {
   /** 画布容器（tabindex=0、点击后持有焦点的元素）；keydown 监听就挂在其上 */
   containerRef: React.RefObject<HTMLElement | null>
-  /** 工单 05 预留：新节点落码成功并选中后回调（内联命名入口），本单为占位 */
+  /** 新节点落码成功并选中后回调（工单 05：进入内联命名输入框） */
   onNodeCreated?: (nodeId: string) => void
 }
 

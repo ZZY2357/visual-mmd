@@ -1,4 +1,5 @@
-import { Alert, Box, Button, Stack, Text, Title } from '@mantine/core'
+import { useEffect, useRef, useState } from 'react'
+import { Alert, Box, Button, Stack, Text, TextInput, Title } from '@mantine/core'
 import { useTranslation } from 'react-i18next'
 import type { MermaidPreview } from '../lib/use-mermaid-preview'
 import { flowchartDataIdResolver, toEditorSelection } from '../lib/canvas-selection/flowchart-adapter'
@@ -7,6 +8,8 @@ import { nodeDataIdResolver } from '../lib/canvas-selection/data-id'
 import type { Selection } from '../lib/projection/selection'
 import { useCanvasSelection } from '../lib/canvas-selection/use-canvas-selection'
 import { useCanvasKeyboard } from '../lib/editing/use-canvas-keyboard'
+import { useCanvasInlineEdit, inlineEditTextOf } from '../lib/editing/use-canvas-inline-edit'
+import type { Rect } from '../lib/editing/inline-edit'
 import { useCanvasView } from '../lib/canvas-view/use-canvas-view'
 import type { AnyProjection } from '../lib/diagram-registry'
 import { useEditorStore } from '../store/editor'
@@ -21,13 +24,14 @@ import { useEditorStore } from '../store/editor'
  *
  * 视图（工单 03）：fit / 滚轮锚点缩放 / 背景拖拽平移见 src/lib/canvas-view/；
  * 变换只落在 DOM 上，导出走 preview.svg 原始字符串，不受视图影响。
+ *
+ * 内联编辑（工单 05）：双击节点（flowchart + mindmap）原位浮出输入框，回车/失焦
+ * 提交、Esc 取消；Tab/Enter 新建节点后经 onNodeCreated 自动进入同一输入框。
  */
 
 interface CanvasPanelProps {
   preview: MermaidPreview
   projection: AnyProjection | null
-  /** 工单 05 预留：键盘/菜单新建节点后的内联命名入口；本单为占位，未接线 */
-  onNodeCreated?: (nodeId: string) => void
 }
 
 /** 图种 → data-id resolver（工单 06/07/08）：flowchart 全套适配；sequence 参与者与
@@ -66,7 +70,48 @@ function selectedDataIdOf(selection: Selection): string | null {
   }
 }
 
-export function CanvasPanel({ preview, projection, onNodeCreated }: CanvasPanelProps) {
+/** 内联编辑浮层输入框（工单 05）：预填当前显示文本，回车/失焦提交、Esc 取消 */
+function InlineEditInput(props: { rect: Rect | null; initialText: string; onCommit: (text: string) => void; onCancel: () => void }) {
+  const { t } = useTranslation()
+  const [value, setValue] = useState(props.initialText)
+  const inputRef = useRef<HTMLInputElement>(null)
+  // 挂载即聚焦并全选：新建节点命名时直接输入即替换默认名
+  useEffect(() => {
+    inputRef.current?.focus()
+    inputRef.current?.select()
+  }, [])
+  const rect = props.rect
+  return (
+    <TextInput
+      ref={inputRef}
+      variant="unstyled"
+      aria-label={t('canvas.inlineEditAria')}
+      value={value}
+      onChange={(e) => setValue(e.currentTarget.value)}
+      onKeyDown={(e) => {
+        if (e.key === 'Enter') props.onCommit(value)
+        else if (e.key === 'Escape') props.onCancel()
+      }}
+      onBlur={() => props.onCommit(value)}
+      style={{
+        position: 'absolute',
+        // 节点尚未渲染出来（新建节点等 SVG 重渲染）时先不显示
+        display: rect === null ? 'none' : undefined,
+        left: rect?.left,
+        top: rect?.top,
+        width: Math.max(rect?.width ?? 0, 40),
+        height: rect?.height,
+        zIndex: 20,
+        background: 'var(--mantine-color-body)',
+        outline: '1px solid var(--mantine-color-blue-filled)',
+        paddingInline: 4,
+        fontSize: 12,
+      }}
+    />
+  )
+}
+
+export function CanvasPanel({ preview, projection }: CanvasPanelProps) {
   const { t } = useTranslation()
   const select = useEditorStore((s) => s.select)
   const selection = useEditorStore((s) => s.selection)
@@ -74,14 +119,30 @@ export function CanvasPanel({ preview, projection, onNodeCreated }: CanvasPanelP
 
   // 视图（工单 03）：fit / 滚轮锚点缩放 / 背景拖拽平移；SVG 换新即重新 fit，
   // 切换图表自然重置，无需持久化
-  const { containerRef, fit, onPointerDown, onPointerMove, onPointerUp } = useCanvasView(svg)
+  const { containerRef, view, fit, onPointerDown, onPointerMove, onPointerUp } = useCanvasView(svg)
+
+  // 内联编辑（工单 05）：双击 flowchart/mindmap 节点原位浮出输入框
+  const { editing, onDoubleClick, beginEdit, commit, cancel } = useCanvasInlineEdit({
+    projection,
+    resolver:
+      projection !== null && (projection.type === 'flowchart' || projection.type === 'mindmap')
+        ? resolverOf(projection)
+        : null,
+    svg,
+    containerRef,
+    view,
+  })
 
   // 键盘焦点体系（工单 04）：容器 tabindex=0，点击画布即持有焦点；keydown 挂在
   // 容器上，Tab/Enter/Del 仅在画布聚焦时拦截，焦点在代码面板/输入框时完全不干扰。
   // flowchart 才有画布键盘语义；其它图种接线见后续工单
   useCanvasKeyboard(
     projection !== null && projection.type === 'flowchart' ? projection.flowchart : null,
-    { containerRef, onNodeCreated },
+    {
+      containerRef,
+      // 工单 05 接线：新建节点落码后立即进入内联命名
+      onNodeCreated: (nodeId) => beginEdit({ kind: 'flowchart', nodeId }),
+    },
   )
 
   const { containerRef: selectionRef, onClick } = useCanvasSelection({
@@ -127,7 +188,12 @@ export function CanvasPanel({ preview, projection, onNodeCreated }: CanvasPanelP
           selectionRef.current?.focus()
           onClick(e)
         }}
-        onPointerDown={onPointerDown}
+        onDoubleClick={onDoubleClick}
+        onPointerDown={(e) => {
+          // 内联编辑期间不让背景拖拽抢走指针（输入框上的按下要留给文本选择）
+          if (editing !== null) return
+          onPointerDown(e)
+        }}
         onPointerMove={onPointerMove}
         onPointerUp={onPointerUp}
         onPointerCancel={onPointerUp}
@@ -148,6 +214,14 @@ export function CanvasPanel({ preview, projection, onNodeCreated }: CanvasPanelP
           >
             {t('canvas.fitView')}
           </Button>
+        )}
+        {editing !== null && (
+          <InlineEditInput
+            rect={editing.rect}
+            initialText={inlineEditTextOf(projection, editing.target)}
+            onCommit={commit}
+            onCancel={cancel}
+          />
         )}
       </Box>
     </Stack>

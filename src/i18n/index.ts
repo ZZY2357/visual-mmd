@@ -26,6 +26,7 @@ export const zhDict = {
       keyboardHint: '点击节点选中后：Delete 删除 · Tab 添加子节点 · Enter 添加同级节点',
       fitView: '适应窗口',
       selectHint: '点击图中的节点可在属性面板查看其属性',
+      inlineEditAria: '编辑节点文本',
     },
     history: {
       undo: '撤销',
