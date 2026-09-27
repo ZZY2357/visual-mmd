@@ -6,6 +6,7 @@ import type { CanvasSelection, DataIdResolver } from '../lib/canvas-selection/da
 import { nodeDataIdResolver } from '../lib/canvas-selection/data-id'
 import type { Selection } from '../lib/projection/selection'
 import { useCanvasSelection } from '../lib/canvas-selection/use-canvas-selection'
+import { useCanvasKeyboard } from '../lib/editing/use-canvas-keyboard'
 import { useCanvasView } from '../lib/canvas-view/use-canvas-view'
 import type { AnyProjection } from '../lib/diagram-registry'
 import { useEditorStore } from '../store/editor'
@@ -25,6 +26,8 @@ import { useEditorStore } from '../store/editor'
 interface CanvasPanelProps {
   preview: MermaidPreview
   projection: AnyProjection | null
+  /** 工单 05 预留：键盘/菜单新建节点后的内联命名入口；本单为占位，未接线 */
+  onNodeCreated?: (nodeId: string) => void
 }
 
 /** 图种 → data-id resolver（工单 06/07/08）：flowchart 全套适配；sequence 参与者与
@@ -63,7 +66,7 @@ function selectedDataIdOf(selection: Selection): string | null {
   }
 }
 
-export function CanvasPanel({ preview, projection }: CanvasPanelProps) {
+export function CanvasPanel({ preview, projection, onNodeCreated }: CanvasPanelProps) {
   const { t } = useTranslation()
   const select = useEditorStore((s) => s.select)
   const selection = useEditorStore((s) => s.selection)
@@ -72,6 +75,14 @@ export function CanvasPanel({ preview, projection }: CanvasPanelProps) {
   // 视图（工单 03）：fit / 滚轮锚点缩放 / 背景拖拽平移；SVG 换新即重新 fit，
   // 切换图表自然重置，无需持久化
   const { containerRef, fit, onPointerDown, onPointerMove, onPointerUp } = useCanvasView(svg)
+
+  // 键盘焦点体系（工单 04）：容器 tabindex=0，点击画布即持有焦点；keydown 挂在
+  // 容器上，Tab/Enter/Del 仅在画布聚焦时拦截，焦点在代码面板/输入框时完全不干扰。
+  // flowchart 才有画布键盘语义；其它图种接线见后续工单
+  useCanvasKeyboard(
+    projection !== null && projection.type === 'flowchart' ? projection.flowchart : null,
+    { containerRef, onNodeCreated },
+  )
 
   const { containerRef: selectionRef, onClick } = useCanvasSelection({
     svg,
@@ -99,6 +110,7 @@ export function CanvasPanel({ preview, projection }: CanvasPanelProps) {
       )}
       <Box
         ref={selectionRef}
+        tabIndex={0}
         h="100%"
         style={{
           position: 'relative',
@@ -108,8 +120,13 @@ export function CanvasPanel({ preview, projection }: CanvasPanelProps) {
           background: 'var(--mantine-color-gray-0)',
           borderRadius: 'var(--mantine-radius-sm)',
           cursor: 'grab',
+          outline: 'none', // 画布聚焦即键盘生效，不要浏览器默认焦点圈
         }}
-        onClick={onClick}
+        onClick={(e) => {
+          // 点击画布（含节点）把焦点收进容器：Tab/Enter/Del 随即可用
+          selectionRef.current?.focus()
+          onClick(e)
+        }}
         onPointerDown={onPointerDown}
         onPointerMove={onPointerMove}
         onPointerUp={onPointerUp}

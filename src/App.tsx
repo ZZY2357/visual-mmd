@@ -11,7 +11,6 @@ import { CanvasPanel } from './components/CanvasPanel'
 import { PropertyPanel } from './components/PropertyPanel'
 import { ThreePaneLayout } from './components/ThreePaneLayout'
 import { DiagramLibraryDrawer } from './components/DiagramLibraryDrawer'
-import { useCanvasKeyboard } from './lib/editing/use-canvas-keyboard'
 import {
   downloadBlob,
   readFileText,
@@ -84,8 +83,8 @@ export default function App() {
     [diagramType, parseResult],
   )
 
-  // 画布键盘操作（工单 05）：flowchart 选中节点后 Del/Tab/Enter，经管线落码可撤销
-  useCanvasKeyboard(projection !== null && projection.type === 'flowchart' ? projection.flowchart : null)
+  // 画布键盘操作（工单 04）：移入 CanvasPanel —— keydown 挂在画布容器上，
+  // 仅画布聚焦时拦截 Tab/Enter/Del，焦点在代码面板/输入框时完全不干扰
 
   // 图表库自动保存（工单 09）：整库序列化为一个 key，活跃图表随编辑更新；
   // 连续输入合并为一次写入（防抖），卸载/隐藏时立即冲刷

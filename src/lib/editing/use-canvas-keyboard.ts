@@ -1,23 +1,38 @@
-import { useEffect } from 'react'
+import { useEffect, useRef } from 'react'
 import type { FlowchartProjection } from '../projection/flowchart-projection'
 import { useEditorStore } from '../../store/editor'
 import { keyToNodeAction, nodeActionIntents } from './canvas-keyboard'
 
 /**
- * 画布键盘操作 Hook（工单 05）：window 级 keydown，仅当
- * - 焦点不在代码面板（CodeMirror）或任何文本输入控件上（不干扰打字）
- * - 当前选中是节点
- * 时把 Del / Tab / Enter 映射为编辑意图，经 commitIntent 手术式落码（可撤销）。
- * 添加动作成功后自动选中新节点，支持连续键入搭建结构。
+ * 画布键盘操作 Hook（工单 04 焦点体系）：keydown 挂在画布容器上（而非 window），
+ * 天然只在画布持有焦点时触发——焦点在代码面板或任何输入框时事件根本不会到达
+ * 容器，完全不拦截。容器内若嵌有输入控件（防御性保留），也不触发画布操作。
+ * Del / Tab / Enter 映射为编辑意图，经 commitIntent 手术式落码（可撤销）。
+ * 添加动作成功后自动选中新节点并回调 onNodeCreated（工单 05 接内联命名的占位钩子）。
  */
 
-/** 焦点在这些控件内时不触发画布键盘操作 */
+/** 容器内焦点落在这类控件上时不触发画布键盘操作 */
 const FOCUS_EXCLUDE_SELECTOR =
   '.cm-editor, input, textarea, select, [contenteditable="true"], [contenteditable=""]'
 
-export function useCanvasKeyboard(projection: FlowchartProjection | null): void {
+export interface CanvasKeyboardOptions {
+  /** 画布容器（tabindex=0、点击后持有焦点的元素）；keydown 监听就挂在其上 */
+  containerRef: React.RefObject<HTMLElement | null>
+  /** 工单 05 预留：新节点落码成功并选中后回调（内联命名入口），本单为占位 */
+  onNodeCreated?: (nodeId: string) => void
+}
+
+export function useCanvasKeyboard(
+  projection: FlowchartProjection | null,
+  { containerRef, onNodeCreated }: CanvasKeyboardOptions,
+): void {
+  const onNodeCreatedRef = useRef(onNodeCreated)
+  onNodeCreatedRef.current = onNodeCreated
+
   useEffect(() => {
-    if (projection === null) return
+    const container = containerRef.current
+    if (projection === null || container === null) return
+
     const onKeyDown = (e: KeyboardEvent) => {
       if (e.ctrlKey || e.metaKey || e.altKey) return
       const target = e.target
@@ -37,9 +52,11 @@ export function useCanvasKeyboard(projection: FlowchartProjection | null): void 
       }
       if (plan.newNodeId !== null) {
         select({ kind: 'node', nodeId: plan.newNodeId })
+        onNodeCreatedRef.current?.(plan.newNodeId)
       }
     }
-    window.addEventListener('keydown', onKeyDown)
-    return () => window.removeEventListener('keydown', onKeyDown)
-  }, [projection])
+
+    container.addEventListener('keydown', onKeyDown)
+    return () => container.removeEventListener('keydown', onKeyDown)
+  }, [projection, containerRef])
 }
