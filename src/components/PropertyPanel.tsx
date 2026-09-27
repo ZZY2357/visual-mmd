@@ -3,6 +3,13 @@ import { Alert, Box, Button, Divider, Group, ScrollArea, Stack, Text, Title } fr
 import { useTranslation } from 'react-i18next'
 import type { SourceParseError } from '../lib/mermaid-error'
 import { DIAGRAM_SELECTION, resolveSelection, type FlowchartProjection, type Selection } from '../lib/projection/flowchart-projection'
+import {
+  resolveSequenceSelection,
+  type ProjectionBlock,
+  type ProjectionElse,
+  type SequenceProjection,
+} from '../lib/projection/sequence-projection'
+import type { AnyProjection } from '../lib/diagram-registry'
 import { useEditorStore } from '../store/editor'
 import { StructureTree } from './StructureTree'
 import {
@@ -16,20 +23,47 @@ import {
   NodeForm,
   SubgraphForm,
 } from './property-forms'
+import {
+  AddBlockInlineForm,
+  AddMessageInlineForm,
+  AddNoteInlineForm,
+  AddParticipantInlineForm,
+  BlockForm,
+  MessageForm,
+  NoteForm,
+  ParticipantForm,
+  SequenceDiagramForm,
+} from './sequence-forms'
 
 /**
- * 属性面板（工单 04）：上半为结构树、下半为选中元素属性表单。
+ * 属性面板（工单 04/06）：上半为结构树、下半为选中元素属性表单。
  * 源码有语法错误时整体禁用，提示并可跳转到错误行（代码面板滚动并高亮）。
+ * 图种分支按投影类型分发（工单 06，07/08 复用此模式）。
  */
 
-type AddKind = 'node' | 'edge' | 'subgraph' | 'classdef' | null
+type AddKind =
+  | 'node'
+  | 'edge'
+  | 'subgraph'
+  | 'classdef'
+  | 'participant'
+  | 'message'
+  | 'note'
+  | 'block'
+  | null
 
 interface PropertyPanelProps {
-  projection: FlowchartProjection | null
+  projection: AnyProjection | null
   parseError: SourceParseError | null
 }
 
-function SelectionForm({ projection, selection }: { projection: FlowchartProjection; selection: Selection | null }) {
+function FlowchartSelectionForm({
+  projection,
+  selection,
+}: {
+  projection: FlowchartProjection
+  selection: Selection | null
+}) {
   const { t } = useTranslation()
   if (selection === null) {
     return (
@@ -62,6 +96,141 @@ function SelectionForm({ projection, selection }: { projection: FlowchartProject
   }
 }
 
+function isBlockOpen(b: ProjectionBlock | ProjectionElse): b is ProjectionBlock {
+  return b.keyword !== 'else' && b.keyword !== 'and'
+}
+
+/** 收集某逻辑块直属的 else/and 分支：blocks 中该块之后、遇到下一个 open 之前的所有分支行 */
+function elseBranchesOf(projection: SequenceProjection, blockId: string): ProjectionElse[] {
+  const index = projection.blocks.findIndex((b) => b.elementId === blockId)
+  if (index === -1) return []
+  const branches: ProjectionElse[] = []
+  for (const b of projection.blocks.slice(index + 1)) {
+    if (!('keyword' in b)) continue
+    if (b.keyword === 'else' || b.keyword === 'and') branches.push(b)
+    else break
+  }
+  return branches
+}
+
+function SequenceSelectionForm({
+  projection,
+  selection,
+}: {
+  projection: SequenceProjection
+  selection: Selection | null
+}) {
+  const { t } = useTranslation()
+  if (selection === null) {
+    return (
+      <Text size="sm" c="dimmed" px="xs">
+        {t('app:propertyPanel.nothingSelected')}
+      </Text>
+    )
+  }
+  switch (selection.kind) {
+    case 'diagram':
+      return <SequenceDiagramForm projection={projection} />
+    case 'participant': {
+      const p = projection.participants.find((x) => x.actorId === selection.actorId)
+      return p !== undefined ? <ParticipantForm participant={p} /> : null
+    }
+    case 'message': {
+      const m = projection.messages.find((x) => x.elementId === selection.elementId)
+      return m !== undefined ? <MessageForm message={m} /> : null
+    }
+    case 'note': {
+      const n = projection.notes.find((x) => x.elementId === selection.elementId)
+      return n !== undefined ? <NoteForm note={n} /> : null
+    }
+    case 'block': {
+      const b = projection.blocks.find((x) => x.elementId === selection.elementId)
+      if (b === undefined || !isBlockOpen(b)) return null
+      return <BlockForm block={b} elseBranches={elseBranchesOf(projection, b.elementId)} />
+    }
+  }
+}
+
+function resolveProjectionSelection(projection: AnyProjection, selection: Selection | null): Selection | null {
+  return projection.type === 'flowchart'
+    ? resolveSelection(projection.flowchart, selection)
+    : resolveSequenceSelection(projection.sequence, selection)
+}
+
+function AddElementsBox({
+  projection,
+  addKind,
+  setAddKind,
+}: {
+  projection: AnyProjection
+  addKind: AddKind
+  setAddKind: (kind: AddKind) => void
+}) {
+  const { t } = useTranslation()
+  if (projection.type === 'flowchart') {
+    const flowchart = projection.flowchart
+    return (
+      <Box px="xs">
+        <Group gap="xs">
+          {(
+            [
+              ['node', t('app:propertyPanel.addNodeTitle')],
+              ['edge', t('app:propertyPanel.addEdgeTitle')],
+              ['subgraph', t('app:propertyPanel.addSubgraphTitle')],
+              ['classdef', t('app:propertyPanel.addClassDefTitle')],
+            ] as const
+          ).map(([kind, label]) => (
+            <Button
+              key={kind}
+              size="compact-xs"
+              variant={addKind === kind ? 'light' : 'default'}
+              onClick={() => setAddKind(addKind === kind ? null : kind)}
+            >
+              + {label}
+            </Button>
+          ))}
+        </Group>
+        {addKind === 'node' && <AddNodeInlineForm onDone={() => setAddKind(null)} />}
+        {addKind === 'edge' && <AddEdgeInlineForm nodes={flowchart.nodes} onDone={() => setAddKind(null)} />}
+        {addKind === 'subgraph' && <AddSubgraphInlineForm onDone={() => setAddKind(null)} />}
+        {addKind === 'classdef' && <AddClassDefInlineForm onDone={() => setAddKind(null)} />}
+      </Box>
+    )
+  }
+  const sequence = projection.sequence
+  return (
+    <Box px="xs">
+      <Group gap="xs">
+        {(
+          [
+            ['participant', t('app:propertyPanel.addParticipantTitle')],
+            ['message', t('app:propertyPanel.addMessageTitle')],
+            ['note', t('app:propertyPanel.addNoteTitle')],
+            ['block', t('app:propertyPanel.addBlockTitle')],
+          ] as const
+        ).map(([kind, label]) => (
+          <Button
+            key={kind}
+            size="compact-xs"
+            variant={addKind === kind ? 'light' : 'default'}
+            onClick={() => setAddKind(addKind === kind ? null : kind)}
+          >
+            + {label}
+          </Button>
+        ))}
+      </Group>
+      {addKind === 'participant' && <AddParticipantInlineForm onDone={() => setAddKind(null)} />}
+      {addKind === 'message' && (
+        <AddMessageInlineForm participants={sequence.participants} onDone={() => setAddKind(null)} />
+      )}
+      {addKind === 'note' && (
+        <AddNoteInlineForm participants={sequence.participants} onDone={() => setAddKind(null)} />
+      )}
+      {addKind === 'block' && <AddBlockInlineForm onDone={() => setAddKind(null)} />}
+    </Box>
+  )
+}
+
 export function PropertyPanel({ projection, parseError }: PropertyPanelProps) {
   const { t } = useTranslation()
   const selection = useEditorStore((s) => s.selection)
@@ -71,7 +240,7 @@ export function PropertyPanel({ projection, parseError }: PropertyPanelProps) {
 
   // 源码变化后选中元素可能已不存在：回落到图表级
   const effectiveSelection =
-    projection !== null ? (resolveSelection(projection, selection) ?? DIAGRAM_SELECTION) : DIAGRAM_SELECTION
+    projection !== null ? (resolveProjectionSelection(projection, selection) ?? DIAGRAM_SELECTION) : DIAGRAM_SELECTION
 
   return (
     <Stack gap="xs" h="100%" style={{ minHeight: 0 }} aria-label={t('app:propertyPanel.ariaLabel')}>
@@ -82,12 +251,7 @@ export function PropertyPanel({ projection, parseError }: PropertyPanelProps) {
           <Stack gap="xs">
             <Text size="sm">{t('app:propertyPanel.disabledHint')}</Text>
             {parseError.line !== null && (
-              <Button
-                size="compact-sm"
-                variant="light"
-                color="red"
-                onClick={() => requestGotoLine(parseError.line as number)}
-              >
+              <Button size="compact-sm" variant="light" color="red" onClick={() => requestGotoLine(parseError.line as number)}>
                 {t('app:propertyPanel.gotoError')}（第 {parseError.line} 行）
               </Button>
             )}
@@ -115,40 +279,17 @@ export function PropertyPanel({ projection, parseError }: PropertyPanelProps) {
         <Divider />
 
         {/* 添加元素 */}
-        {projection !== null && (
-          <Box px="xs">
-            <Group gap="xs">
-              {(
-                [
-                  ['node', t('app:propertyPanel.addNodeTitle')],
-                  ['edge', t('app:propertyPanel.addEdgeTitle')],
-                  ['subgraph', t('app:propertyPanel.addSubgraphTitle')],
-                  ['classdef', t('app:propertyPanel.addClassDefTitle')],
-                ] as const
-              ).map(([kind, label]) => (
-                <Button
-                  key={kind}
-                  size="compact-xs"
-                  variant={addKind === kind ? 'light' : 'default'}
-                  onClick={() => setAddKind(addKind === kind ? null : kind)}
-                >
-                  + {label}
-                </Button>
-              ))}
-            </Group>
-            {addKind === 'node' && <AddNodeInlineForm onDone={() => setAddKind(null)} />}
-            {addKind === 'edge' && (
-              <AddEdgeInlineForm nodes={projection.nodes} onDone={() => setAddKind(null)} />
-            )}
-            {addKind === 'subgraph' && <AddSubgraphInlineForm onDone={() => setAddKind(null)} />}
-            {addKind === 'classdef' && <AddClassDefInlineForm onDone={() => setAddKind(null)} />}
-          </Box>
-        )}
+        {projection !== null && <AddElementsBox projection={projection} addKind={addKind} setAddKind={setAddKind} />}
 
         {/* 下半：选中元素属性表单 */}
         <ScrollArea style={{ flex: '1 1 60%', minHeight: 0 }} type="auto">
           <Box px="xs" pb="md">
-            {projection !== null && <SelectionForm projection={projection} selection={effectiveSelection} />}
+            {projection !== null &&
+              (projection.type === 'flowchart' ? (
+                <FlowchartSelectionForm projection={projection.flowchart} selection={effectiveSelection} />
+              ) : (
+                <SequenceSelectionForm projection={projection.sequence} selection={effectiveSelection} />
+              ))}
           </Box>
         </ScrollArea>
       </Box>

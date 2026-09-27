@@ -3,7 +3,7 @@ import { DEFAULT_DIAGRAM_SOURCE, loadDiagram } from '../lib/storage'
 import { SnapshotStack } from '../lib/pipeline/snapshot-stack'
 import { applyEdit } from '../lib/pipeline/pipeline'
 import type { EditIntent } from '../lib/pipeline/parser'
-import { flowchartParser } from '../lib/pipeline/flowchart'
+import { detectDiagramType, DIAGRAM_TYPES, type DiagramTypeId } from '../lib/diagram-registry'
 import { DIAGRAM_SELECTION, type Selection } from '../lib/projection/flowchart-projection'
 
 /**
@@ -71,6 +71,11 @@ export function resetEditorHistory(source: string): void {
   })
 }
 
+/** 新建指定类型的图表：套用该类型的模板并清空历史（图种注册表，工单 06） */
+export function newDiagram(typeId: DiagramTypeId): void {
+  resetEditorHistory(DIAGRAM_TYPES[typeId].template)
+}
+
 export const useEditorStore = create<EditorState>((set) => ({
   source: snapshotStack.current,
   ...historyOf(snapshotStack),
@@ -86,7 +91,7 @@ export const useEditorStore = create<EditorState>((set) => ({
   },
   commitIntent: (intent) => {
     const current = useEditorStore.getState().source
-    const result = applyEdit(current, flowchartParser, intent)
+    const result = applyEdit(current, detectDiagramType(current).parser, intent)
     if (!result.ok) return false
     snapshotStack.commit(result.source)
     set({ source: result.source, ...historyOf(snapshotStack) })

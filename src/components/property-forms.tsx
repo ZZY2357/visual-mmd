@@ -54,8 +54,8 @@ function useCommitIntent() {
   return useEditorStore((s) => s.commitIntent)
 }
 
-/** 受控草稿输入：外部值变化时同步，失焦/回车时提交 */
-function useDraft(value: string, onCommit: (next: string) => void) {
+/** 受控草稿输入：外部值变化时同步，失焦/回车时提交（sequence 表单复用） */
+export function useDraft(value: string, onCommit: (next: string) => void) {
   const [draft, setDraft] = useState(value)
   useEffect(() => setDraft(value), [value])
   const commit = () => {

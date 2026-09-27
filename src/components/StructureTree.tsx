@@ -1,16 +1,14 @@
 import { Stack, Text, UnstyledButton } from '@mantine/core'
 import { useTranslation } from 'react-i18next'
-import {
-  DIAGRAM_SELECTION,
-  type FlowchartProjection,
-  type Selection,
-  sameSelection,
-} from '../lib/projection/flowchart-projection'
+import { DIAGRAM_SELECTION, type Selection, sameSelection } from '../lib/projection/selection'
+import type { AnyProjection } from '../lib/diagram-registry'
+import type { FlowchartProjection } from '../lib/projection/flowchart-projection'
 import { useEditorStore } from '../store/editor'
 
 /**
- * 结构树（工单 04）：属性面板上半区，展示图中全部节点、连线、子图与样式，
+ * 结构树（工单 04）：属性面板上半区，展示图中全部元素，
  * 点击选中并定位到下半区的属性表单。
+ * sequence 分支（工单 06）：参与者 / 消息 / note / 逻辑块按嵌套深度展示。
  */
 
 function TreeItem({
@@ -51,7 +49,16 @@ function TreeItem({
   )
 }
 
-export function StructureTree({ projection }: { projection: FlowchartProjection }) {
+/** 图种无关的结构树入口（工单 06）：按投影类型分发到各图种分支 */
+export function StructureTree({ projection }: { projection: AnyProjection }) {
+  return projection.type === 'flowchart' ? (
+    <FlowchartTree projection={projection.flowchart} />
+  ) : (
+    <SequenceTree projection={projection.sequence} />
+  )
+}
+
+function FlowchartTree({ projection }: { projection: FlowchartProjection }) {
   const { t } = useTranslation()
   const selection = useEditorStore((s) => s.selection)
   const select = useEditorStore((s) => s.select)
@@ -119,6 +126,85 @@ export function StructureTree({ projection }: { projection: FlowchartProjection 
           active={is({ kind: 'classdef', name: cd.name })}
           depth={1}
           onSelect={() => select({ kind: 'classdef', name: cd.name })}
+        />
+      ))}
+    </Stack>
+  )
+}
+
+function SequenceTree({ projection }: { projection: Extract<AnyProjection, { type: 'sequence' }>['sequence'] }) {
+  const { t } = useTranslation()
+  const selection = useEditorStore((s) => s.selection)
+  const select = useEditorStore((s) => s.select)
+  const is = (sel: Selection) => selection !== null && sameSelection(selection, sel)
+
+  return (
+    <Stack gap={4} aria-label={t('app:propertyPanel.structureTree')}>
+      <TreeItem
+        label={t('app:propertyPanel.diagram')}
+        detail={projection.autonumber ? 'autonumber' : undefined}
+        active={is(DIAGRAM_SELECTION)}
+        depth={0}
+        onSelect={() => select(DIAGRAM_SELECTION)}
+      />
+
+      <Text size="xs" c="dimmed" mt={4} px="xs">
+        {t('app:propertyPanel.participants')}（{projection.participants.length}）
+      </Text>
+      {projection.participants.map((p) => (
+        <TreeItem
+          key={p.actorId}
+          label={p.alias ?? p.actorId}
+          detail={p.alias !== null ? p.actorId : p.active ? 'activate' : undefined}
+          active={is({ kind: 'participant', actorId: p.actorId })}
+          depth={1}
+          onSelect={() => select({ kind: 'participant', actorId: p.actorId })}
+        />
+      ))}
+
+      <Text size="xs" c="dimmed" mt={4} px="xs">
+        {t('app:propertyPanel.messages')}（{projection.messages.length}）
+      </Text>
+      {projection.messages.map((m) => (
+        <TreeItem
+          key={m.elementId}
+          label={`${m.from} → ${m.to}`}
+          detail={m.text || undefined}
+          active={is({ kind: 'message', elementId: m.elementId })}
+          depth={1}
+          onSelect={() => select({ kind: 'message', elementId: m.elementId })}
+        />
+      ))}
+
+      <Text size="xs" c="dimmed" mt={4} px="xs">
+        {t('app:propertyPanel.notes')}（{projection.notes.length}）
+      </Text>
+      {projection.notes.map((n) => (
+        <TreeItem
+          key={n.elementId}
+          label={t(`app:notePos.${n.pos}`)}
+          detail={n.text || undefined}
+          active={is({ kind: 'note', elementId: n.elementId })}
+          depth={1}
+          onSelect={() => select({ kind: 'note', elementId: n.elementId })}
+        />
+      ))}
+
+      <Text size="xs" c="dimmed" mt={4} px="xs">
+        {t('app:propertyPanel.blocks')}（{projection.blocks.length}）
+      </Text>
+      {projection.blocks.map((b) => (
+        <TreeItem
+          key={b.elementId}
+          label={
+            b.keyword === 'else' || b.keyword === 'and'
+              ? t(`app:elseKeywords.${b.keyword}`)
+              : t(`app:blockKeywords.${b.keyword}`)
+          }
+          detail={b.label ?? undefined}
+          active={is({ kind: 'block', elementId: b.elementId })}
+          depth={b.depth}
+          onSelect={() => select({ kind: 'block', elementId: b.elementId })}
         />
       ))}
     </Stack>

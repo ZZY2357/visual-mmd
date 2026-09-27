@@ -1,12 +1,11 @@
 import { useEffect, useMemo, useRef } from 'react'
-import { AppShell, Button, Group, Title, Text } from '@mantine/core'
+import { AppShell, Button, Group, Menu, Title, Text } from '@mantine/core'
 import { useTranslation } from 'react-i18next'
-import { useEditorStore } from './store/editor'
+import { newDiagram, useEditorStore } from './store/editor'
 import { useMermaidPreview } from './lib/use-mermaid-preview'
 import { saveDiagram } from './lib/storage'
 import { debounce } from './lib/debounce'
-import { flowchartParser } from './lib/pipeline/flowchart'
-import { buildFlowchartProjection } from './lib/projection/flowchart-projection'
+import { detectDiagramType } from './lib/diagram-registry'
 import { CodePanel } from './components/CodePanel'
 import { CanvasPanel } from './components/CanvasPanel'
 import { PropertyPanel } from './components/PropertyPanel'
@@ -27,15 +26,16 @@ export default function App() {
   const redo = useEditorStore((s) => s.redo)
   const preview = useMermaidPreview(source)
 
-  // 投影：源码 → 自研解析器 → 只读结构视图（属性面板）
-  const parseResult = useMemo(() => flowchartParser.parse(source), [source])
+  // 投影：源码 → 图种注册表分发解析器 → 只读结构视图（属性面板，工单 06 起）
+  const diagramType = useMemo(() => detectDiagramType(source), [source])
+  const parseResult = useMemo(() => diagramType.parser.parse(source), [diagramType, source])
   const projection = useMemo(
-    () => (parseResult.ok ? buildFlowchartProjection(parseResult.doc) : null),
-    [parseResult],
+    () => (parseResult.ok ? diagramType.buildProjection(parseResult.doc) : null),
+    [diagramType, parseResult],
   )
 
-  // 画布键盘操作（工单 05）：选中节点后 Del/Tab/Enter，经管线落码可撤销
-  useCanvasKeyboard(projection)
+  // 画布键盘操作（工单 05）：flowchart 选中节点后 Del/Tab/Enter，经管线落码可撤销
+  useCanvasKeyboard(projection !== null && projection.type === 'flowchart' ? projection.flowchart : null)
 
   // 自动保存：连续输入合并为一次写入（防抖），卸载/隐藏时立即冲刷
   const debouncedSaveRef = useRef(debounce((src: string) => saveDiagram(src), 500))
@@ -68,6 +68,17 @@ export default function App() {
             </Text>
           </Group>
           <Group gap="xs">
+            <Menu shadow="md" withinPortal>
+              <Menu.Target>
+                <Button variant="default" size="compact-sm" aria-label={t('newDiagram.title')}>
+                  {t('newDiagram.title')}
+                </Button>
+              </Menu.Target>
+              <Menu.Dropdown>
+                <Menu.Item onClick={() => newDiagram('flowchart')}>{t('newDiagram.flowchart')}</Menu.Item>
+                <Menu.Item onClick={() => newDiagram('sequence')}>{t('newDiagram.sequence')}</Menu.Item>
+              </Menu.Dropdown>
+            </Menu>
             <Button
               variant="default"
               size="compact-sm"

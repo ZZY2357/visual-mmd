@@ -1,0 +1,106 @@
+import { describe, expect, it } from 'vitest'
+import mermaid from 'mermaid'
+import { applyEdit } from '../pipeline'
+import { SEQUENCE_TEMPLATE } from '../../diagram-registry'
+import { sequenceParser } from '../sequence'
+
+/**
+ * 金样合法性（工单 06）：sequence 管线产出的源码必须能被 mermaid v12
+ * 实际 parse 通过；模板本身也必须是能跑通的示例图。
+ */
+
+describe('金样合法性（sequence）', () => {
+  it('模板本身 parse 通过', async () => {
+    await expect(mermaid.parse(SEQUENCE_TEMPLATE)).resolves.toBeTruthy()
+  })
+
+  it('set-message 文本产物 parse 通过', async () => {
+    const result = applyEdit(SEQUENCE_TEMPLATE, sequenceParser, {
+      type: 'set-message',
+      elementId: 'message:1',
+      text: '你好，时序图',
+    })
+    expect(result.ok).toBe(true)
+    if (!result.ok) return
+    expect(result.source).toContain('使用者->>系统: 你好，时序图')
+    await expect(mermaid.parse(result.source)).resolves.toBeTruthy()
+  })
+
+  it('add-message / add-note / add-block / add-else 链式编辑全程 parse 通过', async () => {
+    const step1 = applyEdit(SEQUENCE_TEMPLATE, sequenceParser, {
+      type: 'add-message',
+      from: '系统',
+      to: '使用者',
+      arrow: '-x',
+      act: '+',
+      text: '丢失的消息',
+    })
+    expect(step1.ok).toBe(true)
+    if (!step1.ok) return
+    expect(step1.source).toContain('系统-x+使用者: 丢失的消息')
+    await expect(mermaid.parse(step1.source)).resolves.toBeTruthy()
+
+    const step2 = applyEdit(step1.source, sequenceParser, {
+      type: 'add-note',
+      pos: 'over',
+      actors: ['使用者', '系统'],
+      text: '全程表单操作',
+    })
+    expect(step2.ok).toBe(true)
+    if (!step2.ok) return
+    await expect(mermaid.parse(step2.source)).resolves.toBeTruthy()
+
+    const step3 = applyEdit(step2.source, sequenceParser, {
+      type: 'add-block',
+      keyword: 'alt',
+      label: '有网',
+    })
+    expect(step3.ok).toBe(true)
+    if (!step3.ok) return
+    const parsed = sequenceParser.parse(step3.source)
+    expect(parsed.ok).toBe(true)
+    if (!parsed.ok) return
+    const block = parsed.doc.elements.filter((p) => p.element.kind === 'block-open').pop()
+    expect(block).toBeDefined()
+    const step4 = applyEdit(step3.source, sequenceParser, {
+      type: 'add-else',
+      blockId: (block as { id: string }).id,
+      label: '离线',
+    })
+    expect(step4.ok).toBe(true)
+    if (!step4.ok) return
+    expect(step4.source).toContain('    alt 有网\n    else 离线\n    end')
+    await expect(mermaid.parse(step4.source)).resolves.toBeTruthy()
+  })
+
+  it('rename-participant 后产物 parse 通过（虚线箭头 -->> 与激活简写保留）', async () => {
+    const result = applyEdit(SEQUENCE_TEMPLATE, sequenceParser, {
+      type: 'rename-participant',
+      actorId: '使用者',
+      newId: 'Client',
+    })
+    expect(result.ok).toBe(true)
+    if (!result.ok) return
+    expect(result.source).toContain('actor Client')
+    expect(result.source).toContain('Client->>系统: 打开图表')
+    await expect(mermaid.parse(result.source)).resolves.toBeTruthy()
+  })
+
+  it('清单外语法（--x 虚线叉头）不被解析为消息，参与者改名不触碰它', async () => {
+    const source = `sequenceDiagram
+    participant A
+    A->>B: 正常
+    A--xB: 清单外虚线叉头
+`
+    const parsed = sequenceParser.parse(source)
+    expect(parsed.ok).toBe(true)
+    if (!parsed.ok) return
+    expect(parsed.doc.elements.filter((p) => p.element.kind === 'message')).toHaveLength(1)
+
+    const result = applyEdit(source, sequenceParser, { type: 'rename-participant', actorId: 'A', newId: 'Client' })
+    expect(result.ok).toBe(true)
+    if (!result.ok) return
+    expect(result.source).toContain('A--xB: 清单外虚线叉头')
+    await expect(mermaid.parse(result.source)).resolves.toBeTruthy()
+  })
+})

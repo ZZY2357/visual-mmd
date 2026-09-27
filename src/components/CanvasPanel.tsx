@@ -2,8 +2,11 @@ import { Alert, Box, Stack, Text, Title } from '@mantine/core'
 import { useTranslation } from 'react-i18next'
 import type { MermaidPreview } from '../lib/use-mermaid-preview'
 import { flowchartDataIdResolver, toEditorSelection } from '../lib/canvas-selection/flowchart-adapter'
+import type { CanvasSelection, DataIdResolver } from '../lib/canvas-selection/data-id'
+import { nodeDataIdResolver } from '../lib/canvas-selection/data-id'
+import type { Selection } from '../lib/projection/selection'
 import { useCanvasSelection } from '../lib/canvas-selection/use-canvas-selection'
-import type { FlowchartProjection } from '../lib/projection/flowchart-projection'
+import type { AnyProjection } from '../lib/diagram-registry'
 import { useEditorStore } from '../store/editor'
 
 /**
@@ -17,7 +20,32 @@ import { useEditorStore } from '../store/editor'
 
 interface CanvasPanelProps {
   preview: MermaidPreview
-  projection: FlowchartProjection | null
+  projection: AnyProjection | null
+}
+
+/** 图种 → data-id resolver（工单 06）：flowchart 全套适配；sequence 参与者的 data-id 即 actorId */
+function resolverOf(projection: AnyProjection): DataIdResolver {
+  if (projection.type === 'flowchart') return flowchartDataIdResolver(projection.flowchart)
+  return nodeDataIdResolver(projection.sequence.participants.map((p) => p.actorId))
+}
+
+/** 图种无关的画布选中 → 编辑器选中 */
+function canvasToEditorSelection(projection: AnyProjection, canvasSelection: CanvasSelection): Selection | null {
+  if (projection.type === 'flowchart') return toEditorSelection(canvasSelection)
+  if (canvasSelection.kind === 'node') return { kind: 'participant', actorId: canvasSelection.id }
+  return null
+}
+
+/** 当前编辑器选中对应的 data-id（高亮用） */
+function selectedDataIdOf(selection: Selection): string | null {
+  switch (selection.kind) {
+    case 'node':
+      return selection.nodeId
+    case 'participant':
+      return selection.actorId
+    default:
+      return null
+  }
 }
 
 export function CanvasPanel({ preview, projection }: CanvasPanelProps) {
@@ -28,9 +56,14 @@ export function CanvasPanel({ preview, projection }: CanvasPanelProps) {
 
   const { containerRef, onClick } = useCanvasSelection({
     svg,
-    resolver: projection !== null ? flowchartDataIdResolver(projection) : null,
-    selectedDataId: selection !== null && selection.kind === 'node' ? selection.nodeId : null,
-    onSelect: (canvasSelection) => select(toEditorSelection(canvasSelection)),
+    resolver: projection !== null ? resolverOf(projection) : null,
+    selectedDataId: selection !== null ? selectedDataIdOf(selection) : null,
+    onSelect: (canvasSelection) => {
+      if (projection !== null) {
+        const editorSelection = canvasToEditorSelection(projection, canvasSelection)
+        if (editorSelection !== null) select(editorSelection)
+      }
+    },
   })
 
   return (

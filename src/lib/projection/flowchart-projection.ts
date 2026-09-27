@@ -8,6 +8,7 @@ import {
   type NodeShapeType,
   type SubgraphOpenData,
 } from '../pipeline/flowchart'
+import { type Selection } from './selection'
 
 /**
  * flowchart 投影（ADR-0008）：从解析产物派生的只读结构视图，
@@ -100,35 +101,10 @@ export function buildFlowchartProjection(doc: SourceDocument): FlowchartProjecti
   return { direction, nodes, edges, subgraphs, classDefs }
 }
 
-// ---------- 选中状态 ----------
+// ---------- 选中状态（类型共享自 ./selection，工单 06 起） ----------
 
-export type Selection =
-  | { kind: 'diagram' }
-  | { kind: 'node'; nodeId: string }
-  | { kind: 'edge'; from: string; to: string; occurrence: number }
-  | { kind: 'subgraph'; elementId: string }
-  | { kind: 'classdef'; name: string }
-
-export const DIAGRAM_SELECTION: Selection = { kind: 'diagram' }
-
-export function selectionKey(sel: Selection): string {
-  switch (sel.kind) {
-    case 'diagram':
-      return 'diagram'
-    case 'node':
-      return `node:${sel.nodeId}`
-    case 'edge':
-      return `edge:${sel.from}->${sel.to}#${sel.occurrence}`
-    case 'subgraph':
-      return `subgraph:${sel.elementId}`
-    case 'classdef':
-      return `classdef:${sel.name}`
-  }
-}
-
-export function sameSelection(a: Selection, b: Selection): boolean {
-  return selectionKey(a) === selectionKey(b)
-}
+export type { Selection }
+export { DIAGRAM_SELECTION, sameSelection, selectionKey } from './selection'
 
 /**
  * 选中目标在投影中仍存在则原样返回，否则回落到图表级（diagram）。
@@ -157,5 +133,8 @@ export function resolveSelection(
       return projection.subgraphs.some((s) => s.elementId === selection.elementId) ? selection : null
     case 'classdef':
       return projection.classDefs.some((c) => c.name === selection.name) ? selection : null
+    default:
+      // sequence 等其他图种的选中种类不归本投影解析
+      return null
   }
 }

@@ -4,9 +4,9 @@
 
 **Blocked by:** 04 — Flowchart 可视化编辑端到端（复用其建立的三栏 UI 与表单框架）。
 
-**Status:** ready-for-agent
+**Status:** done
 
-- [ ] 解析器三类用例（verbatim identity / 手术式改写 / 金样）全绿
-- [ ] 表单增删改参与者、消息、note、逻辑块，手术式落码可撤销
-- [ ] 新建时序图从模板起步
-- [ ] 清单外语法（create/destroy、rect、box）原样保留
+- [x] 解析器三类用例（verbatim identity / 手术式改写 / 金样）全绿
+- [x] 表单增删改参与者、消息、note、逻辑块，手术式落码可撤销
+- [x] 新建时序图从模板起步
+- [x] 清单外语法（create/destroy、rect、box）原样保留
