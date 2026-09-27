@@ -1,6 +1,6 @@
 # 03 画布视图（缩放/平移/fit）
 
-Status: ready-for-agent
+Status: resolved
 
 ## 需求
 
@@ -16,3 +16,11 @@ Status: ready-for-agent
 
 - 滚轮缩放以光标为中心；拖拽背景平移；适应窗口按钮恢复整图居中。
 - 导出的 SVG/PNG 与缩放平移前一致。
+
+## Comments
+
+- 2026-09-27 实现完成。新增 `src/lib/canvas-view/`：`view-state.ts` 纯换算（fit / 锚点缩放 / 0.25–4 clamp，fit 上限 1 避免小图放大失真），`use-canvas-view.ts` Hook（SVG 换新即重新 fit → 切换图表自然重置；`passive: false` 滚轮以鼠标为锚点缩放并 preventDefault；`setPointerCapture` 背景拖拽平移）。
+- 变换只落在渲染 SVG 元素的 CSS transform 上，不改 SVG 内容；导出（App.tsx）走 `preview.svg` 原始字符串，产物与视图无关。
+- `useCanvasSelection` 增加可选 `containerRef` 参数，选中链路与视图共享同一容器（工单 01 命中路径注入不受影响）。
+- 画布容器改 `overflow: hidden`，右上角浮动「适应窗口」按钮（i18n `canvas.fitView`）一键回 fit。
+- 单测：`src/lib/canvas-view/__tests__/view-state.test.ts`（fit / clamp / 锚点不变性 / svgIntrinsicSize）。npm test 328 通过，typecheck 通过。
