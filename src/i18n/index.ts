@@ -22,6 +22,10 @@ export const zhDict = {
       errorTitle: '源码存在语法错误，画布已停留在最近一次合法状态',
       emptySource: '暂无内容，请在左侧代码面板输入 Mermaid 源码',
     },
+    history: {
+      undo: '撤销',
+      redo: '重做',
+    },
   },
 } as const
 

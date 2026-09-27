@@ -1,7 +1,7 @@
 import { useEffect, useRef } from 'react'
 import { EditorView, basicSetup } from 'codemirror'
 import { Decoration, keymap, type DecorationSet } from '@codemirror/view'
-import { EditorState, StateEffect, StateField, type Extension } from '@codemirror/state'
+import { EditorState, Prec, StateEffect, StateField, type Extension } from '@codemirror/state'
 import { indentWithTab } from '@codemirror/commands'
 import { useTranslation } from 'react-i18next'
 import { Box, Stack, Title } from '@mantine/core'
@@ -41,7 +41,7 @@ interface CodePanelProps {
 export function CodePanel({ error }: CodePanelProps) {
   const { t } = useTranslation()
   const source = useEditorStore((s) => s.source)
-  const setSource = useEditorStore((s) => s.setSource)
+  const commitTypedSource = useEditorStore((s) => s.commitTypedSource)
   const hostRef = useRef<HTMLDivElement | null>(null)
   const viewRef = useRef<EditorView | null>(null)
   // 代码面板是源码的编辑入口；store 的外部变更（如恢复存档）才需要回写视图
@@ -54,12 +54,22 @@ export function CodePanel({ error }: CodePanelProps) {
     const updateListener = EditorView.updateListener.of((update) => {
       if (update.docChanged) {
         isInternalUpdate.current = true
-        setSource(update.state.doc.toString())
+        commitTypedSource(update.state.doc.toString())
       }
     })
 
+    // 撤销/重做走代码快照单栈（store），压过 basicSetup 自带的文本级历史
+    const snapshotHistoryKeymap = Prec.high(
+      keymap.of([
+        { key: 'Mod-z', run: () => (useEditorStore.getState().undo(), true) },
+        { key: 'Shift-Mod-z', run: () => (useEditorStore.getState().redo(), true) },
+        { key: 'Mod-y', run: () => (useEditorStore.getState().redo(), true) },
+      ]),
+    )
+
     const extensions: Extension[] = [
       basicSetup,
+      snapshotHistoryKeymap,
       keymap.of([indentWithTab]),
       errorLineField,
       updateListener,

@@ -1,5 +1,5 @@
 import { useEffect, useRef } from 'react'
-import { AppShell, Group, Title, Text } from '@mantine/core'
+import { AppShell, Button, Group, Title, Text } from '@mantine/core'
 import { useTranslation } from 'react-i18next'
 import { useEditorStore } from './store/editor'
 import { useMermaidPreview } from './lib/use-mermaid-preview'
@@ -17,6 +17,10 @@ import { CanvasPanel } from './components/CanvasPanel'
 export default function App() {
   const { t } = useTranslation()
   const source = useEditorStore((s) => s.source)
+  const canUndo = useEditorStore((s) => s.canUndo)
+  const canRedo = useEditorStore((s) => s.canRedo)
+  const undo = useEditorStore((s) => s.undo)
+  const redo = useEditorStore((s) => s.redo)
   const preview = useMermaidPreview(source)
 
   // 自动保存：连续输入合并为一次写入（防抖），卸载/隐藏时立即冲刷
@@ -48,6 +52,26 @@ export default function App() {
             <Text size="sm" c="dimmed">
               {t('subtitle')}
             </Text>
+          </Group>
+          <Group gap="xs">
+            <Button
+              variant="default"
+              size="compact-sm"
+              disabled={!canUndo}
+              onClick={undo}
+              aria-label={t('history.undo')}
+            >
+              {t('history.undo')}
+            </Button>
+            <Button
+              variant="default"
+              size="compact-sm"
+              disabled={!canRedo}
+              onClick={redo}
+              aria-label={t('history.redo')}
+            >
+              {t('history.redo')}
+            </Button>
           </Group>
         </Group>
       </AppShell.Header>
