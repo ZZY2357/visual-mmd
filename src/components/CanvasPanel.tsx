@@ -89,11 +89,16 @@ function InlineEditInput(props: { rect: Rect | null; initialText: string; onComm
   const { t } = useTranslation()
   const [value, setValue] = useState(props.initialText)
   const inputRef = useRef<HTMLInputElement>(null)
-  // 挂载即聚焦并全选：新建节点命名时直接输入即替换默认名
+  const focusRef = useRef(false)
+  // 聚焦并全选：新建节点命名时直接输入即替换默认名。
+  // 输入框在节点渲染出来前是 display:none（rect === null），对隐藏元素 focus() 无效
+  // ——等浮层定位就绪（rect 首次非空）再聚焦（工单 08 浏览器实测发现）
   useEffect(() => {
+    if (props.rect === null || focusRef.current) return
+    focusRef.current = true
     inputRef.current?.focus()
     inputRef.current?.select()
-  }, [])
+  }, [props.rect])
   const rect = props.rect
   return (
     <TextInput
@@ -400,7 +405,12 @@ export function CanvasPanel({ preview, projection }: CanvasPanelProps) {
           outline: 'none', // 画布聚焦即键盘生效，不要浏览器默认焦点圈
         }}
         onClick={(e) => {
-          // 点击画布（含节点）把焦点收进容器：Tab/Enter/Del 随即可用
+          // 点击画布（含节点）把焦点收进容器：Tab/Enter/Del 随即可用。
+          // 点击的是输入控件（内联编辑浮层）时不抢焦点——否则输入框失焦，
+          // 回车/文本输入都落不到浮层（工单 08 浏览器实测发现）
+          if ((e.target as Element).closest('input, textarea, .cm-editor') === null) {
+            selectionRef.current?.focus()
+          }
           selectionRef.current?.focus()
           // 打开的菜单先收起（点击画布任意处关闭菜单）
           if (ctx.menu !== null) {

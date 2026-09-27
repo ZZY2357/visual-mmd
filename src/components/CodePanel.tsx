@@ -44,8 +44,9 @@ export function CodePanel({ error }: CodePanelProps) {
   const commitTypedSource = useEditorStore((s) => s.commitTypedSource)
   const hostRef = useRef<HTMLDivElement | null>(null)
   const viewRef = useRef<EditorView | null>(null)
-  // 代码面板是源码的编辑入口；store 的外部变更（如恢复存档）才需要回写视图
-  const isInternalUpdate = useRef(false)
+  // 最新 store 源码：区分「用户键入」与「外部同步的回声」，避免回声污染撤销历史
+  const sourceRef = useRef(source)
+  sourceRef.current = source
 
   useEffect(() => {
     const host = hostRef.current
@@ -53,8 +54,11 @@ export function CodePanel({ error }: CodePanelProps) {
 
     const updateListener = EditorView.updateListener.of((update) => {
       if (update.docChanged) {
-        isInternalUpdate.current = true
-        commitTypedSource(update.state.doc.toString())
+        const doc = update.state.doc.toString()
+        // 外部同步（画布落码等）造成的 doc 变化与 store 一致，不上报——
+        // 否则回声会写入撤销快照；且旧实现用布尔标记配对回声与外部变更，
+        // 会交替吞掉外部同步，代码面板停在旧源码（工单 08 浏览器实测发现）
+        if (doc !== sourceRef.current) commitTypedSource(doc)
       }
     })
 
@@ -89,14 +93,10 @@ export function CodePanel({ error }: CodePanelProps) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
-  // 外部源码变更（如恢复存档）回写 CodeMirror；避免编辑自身触发的回环
+  // 外部源码变更（画布落码、恢复存档等）回写 CodeMirror；doc 已一致时无事发生
   useEffect(() => {
     const view = viewRef.current
     if (view === null) return
-    if (isInternalUpdate.current) {
-      isInternalUpdate.current = false
-      return
-    }
     const currentDoc = view.state.doc.toString()
     if (currentDoc !== source) {
       view.dispatch({
