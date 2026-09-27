@@ -1,6 +1,7 @@
 import { useEffect, useRef } from 'react'
 import { selectionFromEventTarget, type CanvasSelection, type DataIdResolver } from './data-id'
 import { addEdgeHitAreas } from './edge-hit-area'
+import { annotateNodeDataIds } from './node-data-ids'
 import { applyHighlight, clearHighlight } from './highlight'
 
 /**
@@ -32,10 +33,12 @@ export function useCanvasSelection({ svg, resolver, selectedDataId, onSelect, co
 
   // 高亮：SVG 重新注入（dangerouslySetInnerHTML 换子树）或选中变化时重新标记。
   // 放在 ref 所指容器上而非 svg 节点本身，兼容容器内其它静态内容。
-  // 先补连线命中区域（工单 01，幂等）：边描边过窄点不中，需在点击链路前注入宽命中路径。
+  // 先补节点 data-id（工单 08：mermaid v12 节点 g 不带 data-id，从 DOM id 反注）
+  // 与连线命中区域（工单 01，幂等）：均为点击链路前的渲染后处理。
   useEffect(() => {
     const root = containerRef.current
     if (root === null) return
+    annotateNodeDataIds(root)
     addEdgeHitAreas(root)
     if (selectedDataId === null) {
       clearHighlight(root)

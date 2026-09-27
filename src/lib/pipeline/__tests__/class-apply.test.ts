@@ -84,6 +84,44 @@ describe('apply-class：勾选样式落码为 class 语句', () => {
   })
 })
 
+describe('新节点落码位置（工单 08 补充）', () => {
+  it('节点行位于 classDef 之后时，class 语句仍插在该 classDef 行后', () => {
+    const src = 'flowchart TD\n    A --> B\n    classDef 高亮 fill:#f9f\n    C(新)\n'
+    const result = applyEdit(src, flowchartParser, { type: 'apply-class', nodeId: 'C', className: '高亮' })
+    expect(result.ok).toBe(true)
+    if (!result.ok) return
+    expect(result.source).toBe(
+      'flowchart TD\n    A --> B\n    classDef 高亮 fill:#f9f\n    class C 高亮\n    C(新)\n',
+    )
+  })
+
+  it('已存在 class 语句时，add-node 落在节点区（目标行后），class 语句区不动', () => {
+    const src = 'flowchart TD\n    A --> B\n    class A 高亮\n    classDef 高亮 fill:#f9f\n'
+    const withNode = applyEdit(src, flowchartParser, { type: 'add-node', nodeId: 'n1', text: '新节点', afterElementId: 'node:B' })
+    expect(withNode.ok).toBe(true)
+    if (!withNode.ok) return
+    expect(withNode.source).toBe(
+      'flowchart TD\n    A --> B\n    n1[新节点]\n    class A 高亮\n    classDef 高亮 fill:#f9f\n',
+    )
+    // 新节点随后应用样式：语句仍落到 classDef 行后，而非新节点行后
+    const applied = applyEdit(withNode.source, flowchartParser, { type: 'apply-class', nodeId: 'n1', className: '高亮' })
+    expect(applied.ok).toBe(true)
+    if (!applied.ok) return
+    expect(applied.source).toBe(
+      'flowchart TD\n    A --> B\n    n1[新节点]\n    class A, n1 高亮\n    classDef 高亮 fill:#f9f\n',
+    )
+  })
+
+  it('键盘/菜单新增节点（连线意图）落在目标行后，与既有 class 语句互不干扰', () => {
+    const src = 'flowchart TD\n    A --> B\n    class A 高亮\n    classDef 高亮 fill:#f9f\n'
+    const result = applyEdit(src, flowchartParser, { type: 'add-node', nodeId: 'n1', text: 'n1', afterElementId: 'node:A' })
+    expect(result.ok).toBe(true)
+    if (!result.ok) return
+    expect(result.source).toContain('    A --> B\n    n1[n1]\n    class A 高亮')
+    expect(appliedOf(result.source)).toEqual({ A: ['高亮'] })
+  })
+})
+
 describe('unapply-class：取消勾选摘除节点 id 或整行删除', () => {
   it('语句只服务这一对时整行删除', () => {
     const result = applyEdit(SOURCE + '    class B 高亮\n', flowchartParser, {
