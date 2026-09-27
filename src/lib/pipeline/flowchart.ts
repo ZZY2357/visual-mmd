@@ -14,9 +14,10 @@ import { lineAtOffset, type Span } from './span'
  *   标签（行内 `-- 标签 -->` 与管道 `|标签|`）、长度（重复符号加长）、链式连线（A --> B --> C）
  * - subgraph（含嵌套与标题）与 subgraph 内 direction
  * - classDef（属性逐项解析：fill/stroke/stroke-width/stroke-dasharray/color 等任意 k:v）
+ * - class 语句（`class 节点 样式名`，工单 02：多节点逗号共享、行尾残留均逐字保留）
  * - 图方向声明（flowchart TD / graph LR 等）
  *
- * 不解析、原样保留（清单外语法不报错，ADR-0008）：linkStyle、click 回调、class 语句、
+ * 不解析、原样保留（清单外语法不报错，ADR-0008）：linkStyle、click 回调、
  * 注释、空行、以及一切无法识别的行。
  *
  * span 约定：元素 span 从该行首个非空白字符（或行内 token）起、到行尾（不含换行）；
@@ -663,6 +664,74 @@ export function parseClassDefLine(line: string, start: number): ClassDefData | n
   return { kind: 'classdef', name, gap, items }
 }
 
+// ---------- class 语句（工单 02：classDef 应用到节点） ----------
+
+export interface ClassStatementData {
+  kind: 'class-statement'
+  /** 目标节点 id（按源码顺序，可多个共享同一语句） */
+  nodeIds: string[]
+  /** nodeIds[i] 之前的分隔原文（首项为 class 关键字后的空白，其余含逗号如 ', '） */
+  seps: string[]
+  /** 样式名之前的空白 */
+  gapBeforeClass: string
+  className: string
+  /** 行尾残留（空白/注释）；逐字保留 */
+  trailing: string
+}
+
+export function renderClassStatement(d: ClassStatementData): string {
+  return (
+    'class' +
+    d.nodeIds.map((id, i) => d.seps[i] + id).join('') +
+    d.gapBeforeClass +
+    d.className +
+    d.trailing
+  )
+}
+
+/** 解析 `class A 样式名` / `class A, B 样式名` 行；格式不符返回 null（整行原样保留） */
+export function parseClassLine(line: string, start: number): ClassStatementData | null {
+  let pos = start + 'class'.length
+  const rest0 = line.slice(pos)
+  if (rest0 !== '' && !/^[ \t]/.test(rest0)) return null
+  const seps: string[] = []
+  const nodeIds: string[] = []
+  let sep = /^[ \t]*/.exec(rest0)?.[0] ?? ''
+  pos += sep.length
+  for (;;) {
+    ID_RE.lastIndex = pos
+    const m = ID_RE.exec(line)
+    if (m === null || m.index !== pos) return null
+    seps.push(sep)
+    nodeIds.push(m[0])
+    pos = ID_RE.lastIndex
+
+    const wsAt = /^[ \t]*/.exec(line.slice(pos))?.[0] ?? ''
+    if (line[pos + wsAt.length] === ',') {
+      // 逗号分隔的下一个节点 id：分隔原文（含两侧空白）逐字记录
+      pos += wsAt.length + 1
+      const lead = /^[ \t]*/.exec(line.slice(pos))?.[0] ?? ''
+      sep = wsAt + ',' + lead
+      pos += lead.length
+      continue
+    }
+    // 最后一个 token 是样式名
+    pos += wsAt.length
+    const NAME_RE = /[^\s,]+/y
+    NAME_RE.lastIndex = pos
+    const cn = NAME_RE.exec(line)
+    if (cn === null) return null
+    return {
+      kind: 'class-statement',
+      nodeIds,
+      seps,
+      gapBeforeClass: wsAt,
+      className: cn[0],
+      trailing: line.slice(pos + cn[0].length),
+    }
+  }
+}
+
 export const linkElementId = (from: string, to: string, occurrence: number): string =>
   occurrence <= 1 ? `link:${from}:${to}` : `link:${from}:${to}#${occurrence}`
 
@@ -718,6 +787,12 @@ export type FlowchartIntent =
   | { type: 'set-classdef-prop'; name: string; prop: string; value: string }
   /** 新增 classDef 行 */
   | { type: 'add-classdef'; name: string; props?: Record<string, string>; afterElementId?: string }
+  /** 应用样式：确保存在覆盖 nodeId+className 的 class 语句（共享语句追加节点 id，否则新增整行） */
+  | { type: 'apply-class'; nodeId: string; className: string }
+  /** 取消应用：从该样式的 class 语句中摘除节点 id；语句只服务该节点时整行删除 */
+  | { type: 'unapply-class'; nodeId: string; className: string }
+  /** 删除 classDef 及引用它的全部 class 语句 */
+  | { type: 'delete-classdef'; name: string }
   /** 改 subgraph 标题（elementId = `subgraph:N`） */
   | { type: 'set-subgraph-title'; elementId: string; title: string }
   /** 新增空 subgraph（open + end 两行） */
@@ -874,6 +949,15 @@ export class FlowchartParser implements DiagramParser {
       return
     }
 
+    if (trimmed === 'class' || trimmed.startsWith('class ') || trimmed.startsWith('class\t')) {
+      const data = parseClassLine(line, firstChar)
+      if (data !== null) {
+        entries.push({ span: { start: lineStart + firstChar, end: lineStart + line.length }, id: `class#${entries.length}`, data })
+        return
+      }
+      return // 解析不了：原样保留
+    }
+
     // 语句行（节点 / 连线 / 链式）
     const statement = tryStatement(line, firstChar, lineNo)
     if (statement !== null) {
@@ -894,7 +978,7 @@ export class FlowchartParser implements DiagramParser {
       return
     }
 
-    // 注释、空行已在上层过滤；其余行（linkStyle、click、class、看不懂的语法）不解析，
+    // 注释、空行已在上层过滤；其余行（linkStyle、click、看不懂的语法）不解析，
     // 作为 verbatim 逐字保留（ADR-0008）
   }
 
@@ -926,6 +1010,12 @@ export class FlowchartParser implements DiagramParser {
         return this.resolveSetClassDefProp(doc, intent as Extract<FlowchartIntent, { type: 'set-classdef-prop' }>)
       case 'add-classdef':
         return this.resolveAddClassDef(doc, intent as Extract<FlowchartIntent, { type: 'add-classdef' }>)
+      case 'apply-class':
+        return this.resolveApplyClass(doc, intent as Extract<FlowchartIntent, { type: 'apply-class' }>)
+      case 'unapply-class':
+        return this.resolveUnapplyClass(doc, intent as Extract<FlowchartIntent, { type: 'unapply-class' }>)
+      case 'delete-classdef':
+        return this.resolveDeleteClassDef(doc, intent as Extract<FlowchartIntent, { type: 'delete-classdef' }>)
       case 'set-subgraph-title':
         return this.resolveSetSubgraphTitle(doc, intent as Extract<FlowchartIntent, { type: 'set-subgraph-title' }>)
       case 'add-subgraph':
@@ -1175,6 +1265,81 @@ export class FlowchartParser implements DiagramParser {
     return this.insertAfter(doc, intent.afterElementId, () => [
       renderClassDefRaw({ kind: 'classdef', name: intent.name, gap: ' ', items }),
     ])
+  }
+
+  private classStatements(doc: SourceDocument, className: string) {
+    return doc.elements.filter(
+      (part) =>
+        part.element.kind === 'class-statement' &&
+        (part.element as ClassStatementData).className === className,
+    )
+  }
+
+  private resolveApplyClass(
+    doc: SourceDocument,
+    intent: Extract<FlowchartIntent, { type: 'apply-class' }>,
+  ): Map<string, string> | null {
+    const stmts = this.classStatements(doc, intent.className)
+    if (stmts.some((p) => (p.element as ClassStatementData).nodeIds.includes(intent.nodeId))) {
+      return new Map() // 已应用：幂等，不改源码
+    }
+    if (stmts.length > 0) {
+      // 共享语句：节点 id 追加到最后一个该样式语句（新项用 mermaid 常规写法 ', '）
+      const target = stmts[stmts.length - 1]
+      const d = target.element as ClassStatementData
+      const next: ClassStatementData = {
+        ...d,
+        nodeIds: [...d.nodeIds, intent.nodeId],
+        seps: [...d.seps, ', '],
+      }
+      return new Map([[target.id, renderClassStatement(next)]])
+    }
+    // 无同样式语句：新增独立行，跟随该样式 classDef 行（缺省落在文档末尾）
+    const cd = this.classDefPart(doc, intent.className)
+    return this.insertAfter(doc, cd?.id, () => [`class ${intent.nodeId} ${intent.className}`])
+  }
+
+  private resolveUnapplyClass(
+    doc: SourceDocument,
+    intent: Extract<FlowchartIntent, { type: 'unapply-class' }>,
+  ): Map<string, string> | null {
+    const stmts = this.classStatements(doc, intent.className).filter((p) =>
+      (p.element as ClassStatementData).nodeIds.includes(intent.nodeId),
+    )
+    if (stmts.length === 0) return new Map() // 未应用：幂等
+    const rewrites = new Map<string, string>()
+    for (const part of stmts) {
+      const d = part.element as ClassStatementData
+      const kept = d.nodeIds
+        .map((id, i) => (id === intent.nodeId ? -1 : i))
+        .filter((i) => i >= 0)
+      if (kept.length === 0) {
+        rewrites.set(part.id, '') // 语句只服务这一对：整行删除
+        continue
+      }
+      // 多节点共享：只摘除该节点 id；首个剩余项继承原首项缩进，其余分隔原文不动
+      const lead = /^[ \t]*/.exec(d.seps[0])?.[0] ?? ''
+      const seps = kept.map((orig, k) => (k === 0 && orig !== 0 ? lead : d.seps[orig]))
+      rewrites.set(
+        part.id,
+        renderClassStatement({ ...d, nodeIds: kept.map((i) => d.nodeIds[i]), seps }),
+      )
+    }
+    return rewrites
+  }
+
+  private resolveDeleteClassDef(
+    doc: SourceDocument,
+    intent: Extract<FlowchartIntent, { type: 'delete-classdef' }>,
+  ): Map<string, string> | null {
+    const part = this.classDefPart(doc, intent.name)
+    if (part === undefined) return null
+    const rewrites = new Map<string, string>([[part.id, '']])
+    // 同步清理引用该样式的 class 语句（spec 惯例决定）
+    for (const stmt of this.classStatements(doc, intent.name)) {
+      rewrites.set(stmt.id, '')
+    }
+    return rewrites
   }
 
   private resolveSetSubgraphTitle(

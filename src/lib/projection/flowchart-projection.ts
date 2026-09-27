@@ -1,6 +1,7 @@
 import type { SourceDocument } from '../pipeline/document'
 import {
   type ClassDefData,
+  type ClassStatementData,
   type HeaderData,
   type LinkOccData,
   type LinkSpec,
@@ -53,6 +54,8 @@ export interface FlowchartProjection {
   edges: ProjectionEdge[]
   subgraphs: ProjectionSubgraph[]
   classDefs: ProjectionClassDef[]
+  /** 节点 id → 已应用的样式名列表（工单 02，来自 class 语句） */
+  appliedStyles: Record<string, string[]>
 }
 
 /** 从解析产物构建 flowchart 投影（纯函数） */
@@ -67,6 +70,7 @@ export function buildFlowchartProjection(doc: SourceDocument): FlowchartProjecti
   const edges: ProjectionEdge[] = []
   const subgraphs: ProjectionSubgraph[] = []
   const classDefs: ProjectionClassDef[] = []
+  const appliedStyles: Record<string, string[]> = {}
 
   for (const part of doc.elements) {
     const data = part.element
@@ -95,10 +99,15 @@ export function buildFlowchartProjection(doc: SourceDocument): FlowchartProjecti
       const props: Record<string, string> = {}
       for (const item of cd.items) props[item.key] = item.value
       classDefs.push({ name: cd.name, props })
+    } else if (data.kind === 'class-statement') {
+      const cs = data as ClassStatementData
+      for (const nodeId of cs.nodeIds) {
+        ;(appliedStyles[nodeId] ??= []).push(cs.className)
+      }
     }
   }
 
-  return { direction, nodes, edges, subgraphs, classDefs }
+  return { direction, nodes, edges, subgraphs, classDefs, appliedStyles }
 }
 
 // ---------- 选中状态（类型共享自 ./selection，工单 06 起） ----------

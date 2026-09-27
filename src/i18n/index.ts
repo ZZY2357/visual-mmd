@@ -159,6 +159,8 @@ export const zhDict = {
       styleDash: '边框线型',
       styleColor: '文字色',
       deleteClassDef: '删除样式项',
+      applyStyles: '应用样式',
+      applyStylesEmpty: '暂无样式',
       // ---- 添加表单 ----
       addNodeTitle: '添加节点',
       addNodeId: '节点 ID',

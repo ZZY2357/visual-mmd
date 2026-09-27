@@ -3,6 +3,7 @@ import {
   Button,
   ColorInput,
   Group,
+  MultiSelect,
   NumberInput,
   Select,
   Stack,
@@ -22,7 +23,9 @@ import {
   addEdgeIntent,
   addNodeIntent,
   addSubgraphIntent,
+  applyClassIntent,
   classDefStyleIntents,
+  deleteClassDefIntent,
   deleteEdgeIntent,
   deleteNodeIntent,
   deleteSubgraphIntent,
@@ -33,6 +36,7 @@ import {
   setNodeShapeIntent,
   setNodeTextIntent,
   setSubgraphTitleIntent,
+  unapplyClassIntent,
   type BorderDashStyle,
 } from '../lib/editing/flowchart-forms'
 import type {
@@ -88,7 +92,17 @@ export function DiagramForm({ direction }: { direction: string | null }) {
 
 // ---------- 节点 ----------
 
-export function NodeForm({ node }: { node: ProjectionNode }) {
+export function NodeForm({
+  node,
+  classDefs,
+  appliedStyles,
+}: {
+  node: ProjectionNode
+  /** 当前图的全部 classDef（应用样式下拉的选项来源） */
+  classDefs: ProjectionClassDef[]
+  /** 全部节点的已应用样式（节点 id → 样式名列表） */
+  appliedStyles: Record<string, string[]>
+}) {
   const t = useTranslation().t
   const commitIntent = useCommitIntent()
   const textDraft = useDraft(node.text ?? '', (next) => {
@@ -101,6 +115,7 @@ export function NodeForm({ node }: { node: ProjectionNode }) {
       useEditorStore.getState().select({ kind: 'node', nodeId: next })
     }
   })
+  const applied = appliedStyles[node.nodeId] ?? []
 
   return (
     <Stack gap="sm">
@@ -121,6 +136,24 @@ export function NodeForm({ node }: { node: ProjectionNode }) {
           if (v !== null) commitIntent(setNodeShapeIntent(node.nodeId, v as NodeShapeType))
         }}
         allowDeselect={false}
+      />
+      <MultiSelect
+        label={t('app:propertyPanel.applyStyles')}
+        data={classDefs.map((c) => ({ value: c.name, label: c.name }))}
+        value={applied}
+        placeholder={
+          classDefs.length === 0 ? t('app:propertyPanel.applyStylesEmpty') : undefined
+        }
+        searchable
+        onChange={(values) => {
+          // 勾选落码为 class 语句，取消勾选摘除；一个节点可挂多个样式
+          for (const name of values) {
+            if (!applied.includes(name)) commitIntent(applyClassIntent(node.nodeId, name))
+          }
+          for (const name of applied) {
+            if (!values.includes(name)) commitIntent(unapplyClassIntent(node.nodeId, name))
+          }
+        }}
       />
       <TextInput
         label={t('app:propertyPanel.nodeId')}
@@ -301,6 +334,18 @@ export function ClassDefForm({ classDef }: { classDef: ProjectionClassDef }) {
         onBlur={colorDraft.commit}
         closeOnColorSwatchClick
       />
+      <Button
+        variant="light"
+        color="red"
+        onClick={() => {
+          // 删除 classDef 同步清理引用它的 class 语句（工单 02）
+          if (commitIntent(deleteClassDefIntent(classDef.name))) {
+            useEditorStore.getState().select(null)
+          }
+        }}
+      >
+        {t('app:propertyPanel.deleteClassDef')}
+      </Button>
     </Stack>
   )
 }

@@ -95,7 +95,9 @@ function FlowchartSelectionForm({
       return <DiagramForm direction={projection.direction} />
     case 'node': {
       const node = projection.nodes.find((n) => n.nodeId === selection.nodeId)
-      return node !== undefined ? <NodeForm node={node} /> : null
+      return node !== undefined ? (
+        <NodeForm node={node} classDefs={projection.classDefs} appliedStyles={projection.appliedStyles} />
+      ) : null
     }
     case 'edge': {
       const edge = projection.edges.find(

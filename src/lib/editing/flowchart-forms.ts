@@ -213,3 +213,20 @@ export function addClassDefIntent(form: AddClassDefForm): FlowchartIntent | null
   if (form.color !== '') props[CLASSDEF_STYLE_PROPS.color] = form.color
   return { type: 'add-classdef', name: form.name, props }
 }
+
+// ---------- 节点样式应用（工单 02） ----------
+
+/** 勾选样式 → apply-class 意图（落码为 `class 节点 样式名` 语句） */
+export function applyClassIntent(nodeId: string, className: string): FlowchartIntent {
+  return { type: 'apply-class', nodeId, className }
+}
+
+/** 取消勾选 → unapply-class 意图（摘除节点 id 或整行删除） */
+export function unapplyClassIntent(nodeId: string, className: string): FlowchartIntent {
+  return { type: 'unapply-class', nodeId, className }
+}
+
+/** 删除样式 → delete-classdef 意图（同步清理引用它的 class 语句） */
+export function deleteClassDefIntent(name: string): FlowchartIntent {
+  return { type: 'delete-classdef', name }
+}
