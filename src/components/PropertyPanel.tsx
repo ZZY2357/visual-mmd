@@ -9,6 +9,7 @@ import {
   type ProjectionElse,
   type SequenceProjection,
 } from '../lib/projection/sequence-projection'
+import { resolveClassSelection, type ClassProjection } from '../lib/projection/class-projection'
 import type { AnyProjection } from '../lib/diagram-registry'
 import { useEditorStore } from '../store/editor'
 import { StructureTree } from './StructureTree'
@@ -34,6 +35,16 @@ import {
   ParticipantForm,
   SequenceDiagramForm,
 } from './sequence-forms'
+import {
+  AddClassInlineForm,
+  AddClassNoteInlineForm,
+  AddMemberInlineForm,
+  AddRelationInlineForm,
+  ClassForm,
+  ClassNoteForm,
+  MemberForm,
+  RelationForm,
+} from './class-forms'
 
 /**
  * 属性面板（工单 04/06）：上半为结构树、下半为选中元素属性表单。
@@ -50,6 +61,10 @@ type AddKind =
   | 'message'
   | 'note'
   | 'block'
+  | 'class'
+  | 'class-member'
+  | 'class-relation'
+  | 'class-note'
   | null
 
 interface PropertyPanelProps {
@@ -93,6 +108,8 @@ function FlowchartSelectionForm({
       const cd = projection.classDefs.find((c) => c.name === selection.name)
       return cd !== undefined ? <ClassDefForm classDef={cd} /> : null
     }
+    default:
+      return null
   }
 }
 
@@ -148,13 +165,62 @@ function SequenceSelectionForm({
       if (b === undefined || !isBlockOpen(b)) return null
       return <BlockForm block={b} elseBranches={elseBranchesOf(projection, b.elementId)} />
     }
+    default:
+      return null
+  }
+}
+
+function ClassSelectionForm({
+  projection,
+  selection,
+}: {
+  projection: ClassProjection
+  selection: Selection | null
+}) {
+  const { t } = useTranslation()
+  if (selection === null) {
+    return (
+      <Text size="sm" c="dimmed" px="xs">
+        {t('app:propertyPanel.nothingSelected')}
+      </Text>
+    )
+  }
+  switch (selection.kind) {
+    case 'diagram':
+      return (
+        <Text size="sm" c="dimmed" px="xs">
+          {t('app:propertyPanel.classDiagramHint')}
+        </Text>
+      )
+    case 'class': {
+      const c = projection.classes.find((x) => x.name === selection.name)
+      return c !== undefined ? <ClassForm cls={c} /> : null
+    }
+    case 'class-member': {
+      const m = projection.members.find((x) => x.elementId === selection.elementId)
+      return m !== undefined ? <MemberForm member={m} /> : null
+    }
+    case 'class-relation': {
+      const r = projection.relations.find((x) => x.elementId === selection.elementId)
+      return r !== undefined ? <RelationForm relation={r} /> : null
+    }
+    case 'class-note': {
+      const n = projection.notes.find((x) => x.elementId === selection.elementId)
+      return n !== undefined ? <ClassNoteForm note={n} /> : null
+    }
+    case 'classdef': {
+      const cd = projection.classDefs.find((x) => x.name === selection.name)
+      return cd !== undefined ? <ClassDefForm classDef={cd} /> : null
+    }
+    default:
+      return null
   }
 }
 
 function resolveProjectionSelection(projection: AnyProjection, selection: Selection | null): Selection | null {
-  return projection.type === 'flowchart'
-    ? resolveSelection(projection.flowchart, selection)
-    : resolveSequenceSelection(projection.sequence, selection)
+  if (projection.type === 'flowchart') return resolveSelection(projection.flowchart, selection)
+  if (projection.type === 'sequence') return resolveSequenceSelection(projection.sequence, selection)
+  return resolveClassSelection(projection.class, selection)
 }
 
 function AddElementsBox({
@@ -197,16 +263,51 @@ function AddElementsBox({
       </Box>
     )
   }
-  const sequence = projection.sequence
+  if (projection.type === 'sequence') {
+    const sequence = projection.sequence
+    return (
+      <Box px="xs">
+        <Group gap="xs">
+          {(
+            [
+              ['participant', t('app:propertyPanel.addParticipantTitle')],
+              ['message', t('app:propertyPanel.addMessageTitle')],
+              ['note', t('app:propertyPanel.addNoteTitle')],
+              ['block', t('app:propertyPanel.addBlockTitle')],
+            ] as const
+          ).map(([kind, label]) => (
+            <Button
+              key={kind}
+              size="compact-xs"
+              variant={addKind === kind ? 'light' : 'default'}
+              onClick={() => setAddKind(addKind === kind ? null : kind)}
+            >
+              + {label}
+            </Button>
+          ))}
+        </Group>
+        {addKind === 'participant' && <AddParticipantInlineForm onDone={() => setAddKind(null)} />}
+        {addKind === 'message' && (
+          <AddMessageInlineForm participants={sequence.participants} onDone={() => setAddKind(null)} />
+        )}
+        {addKind === 'note' && (
+          <AddNoteInlineForm participants={sequence.participants} onDone={() => setAddKind(null)} />
+        )}
+        {addKind === 'block' && <AddBlockInlineForm onDone={() => setAddKind(null)} />}
+      </Box>
+    )
+  }
+  const classes = projection.class.classes
   return (
     <Box px="xs">
       <Group gap="xs">
         {(
           [
-            ['participant', t('app:propertyPanel.addParticipantTitle')],
-            ['message', t('app:propertyPanel.addMessageTitle')],
-            ['note', t('app:propertyPanel.addNoteTitle')],
-            ['block', t('app:propertyPanel.addBlockTitle')],
+            ['class', t('app:propertyPanel.addClassTitle')],
+            ['class-member', t('app:propertyPanel.addMemberTitle')],
+            ['class-relation', t('app:propertyPanel.addRelationTitle')],
+            ['class-note', t('app:propertyPanel.addNoteTitle')],
+            ['classdef', t('app:propertyPanel.addClassDefTitle')],
           ] as const
         ).map(([kind, label]) => (
           <Button
@@ -219,14 +320,11 @@ function AddElementsBox({
           </Button>
         ))}
       </Group>
-      {addKind === 'participant' && <AddParticipantInlineForm onDone={() => setAddKind(null)} />}
-      {addKind === 'message' && (
-        <AddMessageInlineForm participants={sequence.participants} onDone={() => setAddKind(null)} />
-      )}
-      {addKind === 'note' && (
-        <AddNoteInlineForm participants={sequence.participants} onDone={() => setAddKind(null)} />
-      )}
-      {addKind === 'block' && <AddBlockInlineForm onDone={() => setAddKind(null)} />}
+      {addKind === 'class' && <AddClassInlineForm onDone={() => setAddKind(null)} />}
+      {addKind === 'class-member' && <AddMemberInlineForm classes={classes} onDone={() => setAddKind(null)} />}
+      {addKind === 'class-relation' && <AddRelationInlineForm classes={classes} onDone={() => setAddKind(null)} />}
+      {addKind === 'class-note' && <AddClassNoteInlineForm classes={classes} onDone={() => setAddKind(null)} />}
+      {addKind === 'classdef' && <AddClassDefInlineForm onDone={() => setAddKind(null)} />}
     </Box>
   )
 }
@@ -287,8 +385,10 @@ export function PropertyPanel({ projection, parseError }: PropertyPanelProps) {
             {projection !== null &&
               (projection.type === 'flowchart' ? (
                 <FlowchartSelectionForm projection={projection.flowchart} selection={effectiveSelection} />
-              ) : (
+              ) : projection.type === 'sequence' ? (
                 <SequenceSelectionForm projection={projection.sequence} selection={effectiveSelection} />
+              ) : (
+                <ClassSelectionForm projection={projection.class} selection={effectiveSelection} />
               ))}
           </Box>
         </ScrollArea>

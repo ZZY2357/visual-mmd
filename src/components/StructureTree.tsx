@@ -51,11 +51,9 @@ function TreeItem({
 
 /** 图种无关的结构树入口（工单 06）：按投影类型分发到各图种分支 */
 export function StructureTree({ projection }: { projection: AnyProjection }) {
-  return projection.type === 'flowchart' ? (
-    <FlowchartTree projection={projection.flowchart} />
-  ) : (
-    <SequenceTree projection={projection.sequence} />
-  )
+  if (projection.type === 'flowchart') return <FlowchartTree projection={projection.flowchart} />
+  if (projection.type === 'sequence') return <SequenceTree projection={projection.sequence} />
+  return <ClassTree projection={projection.class} />
 }
 
 function FlowchartTree({ projection }: { projection: FlowchartProjection }) {
@@ -205,6 +203,95 @@ function SequenceTree({ projection }: { projection: Extract<AnyProjection, { typ
           active={is({ kind: 'block', elementId: b.elementId })}
           depth={b.depth}
           onSelect={() => select({ kind: 'block', elementId: b.elementId })}
+        />
+      ))}
+    </Stack>
+  )
+}
+
+function ClassTree({ projection }: { projection: Extract<AnyProjection, { type: 'class' }>['class'] }) {
+  const { t } = useTranslation()
+  const selection = useEditorStore((s) => s.selection)
+  const select = useEditorStore((s) => s.select)
+  const is = (sel: Selection) => selection !== null && sameSelection(selection, sel)
+
+  return (
+    <Stack gap={4} aria-label={t('app:propertyPanel.structureTree')}>
+      <TreeItem
+        label={t('app:propertyPanel.diagram')}
+        detail="classDiagram"
+        active={is(DIAGRAM_SELECTION)}
+        depth={0}
+        onSelect={() => select(DIAGRAM_SELECTION)}
+      />
+
+      <Text size="xs" c="dimmed" mt={4} px="xs">
+        {t('app:propertyPanel.classes')}（{projection.classes.length}）
+      </Text>
+      {projection.classes.map((c) => (
+        <TreeItem
+          key={c.elementId}
+          label={c.generic !== null ? `${c.name}~${c.generic}~` : c.name}
+          detail={c.hasBlock ? '{}' : undefined}
+          active={is({ kind: 'class', name: c.name })}
+          depth={1}
+          onSelect={() => select({ kind: 'class', name: c.name })}
+        />
+      ))}
+
+      <Text size="xs" c="dimmed" mt={4} px="xs">
+        {t('app:propertyPanel.members')}（{projection.members.length}）
+      </Text>
+      {projection.members.map((m) => (
+        <TreeItem
+          key={m.elementId}
+          label={`${m.vis === '' ? '' : m.vis + ' '}${m.text}`}
+          detail={m.owner ?? undefined}
+          active={is({ kind: 'class-member', elementId: m.elementId })}
+          depth={2}
+          onSelect={() => select({ kind: 'class-member', elementId: m.elementId })}
+        />
+      ))}
+
+      <Text size="xs" c="dimmed" mt={4} px="xs">
+        {t('app:propertyPanel.relations')}（{projection.relations.length}）
+      </Text>
+      {projection.relations.map((r) => (
+        <TreeItem
+          key={r.elementId}
+          label={`${r.from} ${r.kind} ${r.to}`}
+          detail={r.label ?? undefined}
+          active={is({ kind: 'class-relation', elementId: r.elementId })}
+          depth={1}
+          onSelect={() => select({ kind: 'class-relation', elementId: r.elementId })}
+        />
+      ))}
+
+      <Text size="xs" c="dimmed" mt={4} px="xs">
+        {t('app:propertyPanel.notes')}（{projection.notes.length}）
+      </Text>
+      {projection.notes.map((n) => (
+        <TreeItem
+          key={n.elementId}
+          label={n.forClass !== null ? t('app:propertyPanel.noteFor', { cls: n.forClass }) : t('app:propertyPanel.floatingNote')}
+          detail={n.text || undefined}
+          active={is({ kind: 'class-note', elementId: n.elementId })}
+          depth={1}
+          onSelect={() => select({ kind: 'class-note', elementId: n.elementId })}
+        />
+      ))}
+
+      <Text size="xs" c="dimmed" mt={4} px="xs">
+        {t('app:propertyPanel.classDefs')}（{projection.classDefs.length}）
+      </Text>
+      {projection.classDefs.map((cd) => (
+        <TreeItem
+          key={cd.name}
+          label={cd.name}
+          detail={cd.props.fill}
+          active={is({ kind: 'classdef', name: cd.name })}
+          depth={1}
+          onSelect={() => select({ kind: 'classdef', name: cd.name })}
         />
       ))}
     </Stack>

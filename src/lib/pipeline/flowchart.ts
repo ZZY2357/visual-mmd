@@ -486,11 +486,11 @@ export interface ClassDefData {
   items: ClassDefItem[]
 }
 
-function renderClassDefRaw(d: ClassDefData): string {
+export function renderClassDefRaw(d: ClassDefData): string {
   return `classDef${d.gap}${d.name}${d.items.map((i) => `${i.sep}${i.key}:${i.value}`).join('')}`
 }
 
-function renderClassDef(d: ClassDefData, changes: { prop: string; value: string }): string {
+export function renderClassDef(d: ClassDefData, changes: { prop: string; value: string }): string {
   if (changes.prop === '') return renderClassDefRaw(d)
   const firstSep = d.items[0]?.sep ?? ' '
   const items = d.items.map((i) => ({ ...i })).filter((i) => !(i.key === changes.prop && changes.value === ''))
@@ -635,7 +635,7 @@ function parseSubgraphLine(line: string, start: number): SubgraphOpenData | null
   return { kind: 'subgraph-open', id, title, titleBracketed, quote, gap1, gap2 }
 }
 
-function parseClassDefLine(line: string, start: number): ClassDefData | null {
+export function parseClassDefLine(line: string, start: number): ClassDefData | null {
   const rest = line.slice(start + 'classDef'.length)
   if (rest !== '' && !/^[ \t]/.test(rest)) return null
   const gap = /^[ \t]*/.exec(rest)?.[0] ?? ''

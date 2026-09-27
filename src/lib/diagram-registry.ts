@@ -2,8 +2,10 @@ import type { SourceDocument } from './pipeline/document'
 import type { DiagramParser } from './pipeline/parser'
 import { flowchartParser } from './pipeline/flowchart'
 import { sequenceParser } from './pipeline/sequence'
+import { classParser } from './pipeline/class'
 import { buildFlowchartProjection, type FlowchartProjection } from './projection/flowchart-projection'
 import { buildSequenceProjection, type SequenceProjection } from './projection/sequence-projection'
+import { buildClassProjection, type ClassProjection } from './projection/class-projection'
 import { DEFAULT_DIAGRAM_SOURCE } from './storage'
 
 /**
@@ -12,11 +14,12 @@ import { DEFAULT_DIAGRAM_SOURCE } from './storage'
  * store 的 commitIntent 与 App 的投影派生都经此分发，新图种接入只需在此注册。
  */
 
-export type DiagramTypeId = 'flowchart' | 'sequence'
+export type DiagramTypeId = 'flowchart' | 'sequence' | 'class'
 
 export type AnyProjection =
   | { type: 'flowchart'; flowchart: FlowchartProjection }
   | { type: 'sequence'; sequence: SequenceProjection }
+  | { type: 'class'; class: ClassProjection }
 
 export interface DiagramTypeRegistration {
   id: DiagramTypeId
@@ -56,6 +59,21 @@ export const SEQUENCE_TEMPLATE = `sequenceDiagram
     end
 `
 
+export const CLASS_TEMPLATE = `classDiagram
+    class BankAccount
+    BankAccount : +String owner
+    BankAccount : +deposit(amount) bool
+    class Account~T~{
+        +T value
+        +get() T
+    }
+    BankAccount <|-- Account~T~
+    Customer "1" o-- "*" Account : 持有
+    Account ..> Ledger : 记账
+    note for BankAccount "银行账户"
+    classDef highlight fill:#fff3bf,stroke:#f08c00
+`
+
 export const DIAGRAM_TYPES: Record<DiagramTypeId, DiagramTypeRegistration> = {
   flowchart: {
     id: 'flowchart',
@@ -71,12 +89,24 @@ export const DIAGRAM_TYPES: Record<DiagramTypeId, DiagramTypeRegistration> = {
     detect: (source) => /^sequenceDiagram\b/i.test(firstStatementLine(source)),
     buildProjection: (doc) => ({ type: 'sequence', sequence: buildSequenceProjection(doc) }),
   },
+  class: {
+    id: 'class',
+    parser: classParser,
+    template: CLASS_TEMPLATE,
+    detect: (source) => /^classDiagram\b/i.test(firstStatementLine(source)),
+    buildProjection: (doc) => ({ type: 'class', class: buildClassProjection(doc) }),
+  },
 }
 
 /** 识别当前源码的图表类型；无法识别时默认 flowchart（保持工单 04 行为） */
 export function detectDiagramType(source: string): DiagramTypeRegistration {
   if (DIAGRAM_TYPES.sequence.detect(source)) return DIAGRAM_TYPES.sequence
+  if (DIAGRAM_TYPES.class.detect(source)) return DIAGRAM_TYPES.class
   return DIAGRAM_TYPES.flowchart
 }
 
-export const DIAGRAM_TYPE_LIST: DiagramTypeRegistration[] = [DIAGRAM_TYPES.flowchart, DIAGRAM_TYPES.sequence]
+export const DIAGRAM_TYPE_LIST: DiagramTypeRegistration[] = [
+  DIAGRAM_TYPES.flowchart,
+  DIAGRAM_TYPES.sequence,
+  DIAGRAM_TYPES.class,
+]

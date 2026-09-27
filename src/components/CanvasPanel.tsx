@@ -23,16 +23,22 @@ interface CanvasPanelProps {
   projection: AnyProjection | null
 }
 
-/** 图种 → data-id resolver（工单 06）：flowchart 全套适配；sequence 参与者的 data-id 即 actorId */
+/** 图种 → data-id resolver（工单 06/07）：flowchart 全套适配；sequence 参与者与
+ * class 类的 data-id 即其 id（尽力而为，无法匹配时不选中） */
 function resolverOf(projection: AnyProjection): DataIdResolver {
   if (projection.type === 'flowchart') return flowchartDataIdResolver(projection.flowchart)
-  return nodeDataIdResolver(projection.sequence.participants.map((p) => p.actorId))
+  if (projection.type === 'sequence') return nodeDataIdResolver(projection.sequence.participants.map((p) => p.actorId))
+  return nodeDataIdResolver(projection.class.classes.map((c) => c.name))
 }
 
 /** 图种无关的画布选中 → 编辑器选中 */
 function canvasToEditorSelection(projection: AnyProjection, canvasSelection: CanvasSelection): Selection | null {
   if (projection.type === 'flowchart') return toEditorSelection(canvasSelection)
-  if (canvasSelection.kind === 'node') return { kind: 'participant', actorId: canvasSelection.id }
+  if (canvasSelection.kind === 'node') {
+    return projection.type === 'sequence'
+      ? { kind: 'participant', actorId: canvasSelection.id }
+      : { kind: 'class', name: canvasSelection.id }
+  }
   return null
 }
 
@@ -43,6 +49,8 @@ function selectedDataIdOf(selection: Selection): string | null {
       return selection.nodeId
     case 'participant':
       return selection.actorId
+    case 'class':
+      return selection.name
     default:
       return null
   }

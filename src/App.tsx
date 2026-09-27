@@ -77,6 +77,7 @@ export default function App() {
               <Menu.Dropdown>
                 <Menu.Item onClick={() => newDiagram('flowchart')}>{t('newDiagram.flowchart')}</Menu.Item>
                 <Menu.Item onClick={() => newDiagram('sequence')}>{t('newDiagram.sequence')}</Menu.Item>
+                <Menu.Item onClick={() => newDiagram('class')}>{t('newDiagram.class')}</Menu.Item>
               </Menu.Dropdown>
             </Menu>
             <Button

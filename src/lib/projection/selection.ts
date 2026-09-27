@@ -15,6 +15,11 @@ export type Selection =
   | { kind: 'message'; elementId: string }
   | { kind: 'note'; elementId: string }
   | { kind: 'block'; elementId: string }
+  // class（工单 07）
+  | { kind: 'class'; name: string }
+  | { kind: 'class-member'; elementId: string }
+  | { kind: 'class-relation'; elementId: string }
+  | { kind: 'class-note'; elementId: string }
 
 export const DIAGRAM_SELECTION: Selection = { kind: 'diagram' }
 
@@ -38,6 +43,14 @@ export function selectionKey(sel: Selection): string {
       return `note:${sel.elementId}`
     case 'block':
       return `block:${sel.elementId}`
+    case 'class':
+      return `class:${sel.name}`
+    case 'class-member':
+      return `class-member:${sel.elementId}`
+    case 'class-relation':
+      return `class-relation:${sel.elementId}`
+    case 'class-note':
+      return `class-note:${sel.elementId}`
   }
 }
 
