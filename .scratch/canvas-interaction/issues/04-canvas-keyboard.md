@@ -1,6 +1,6 @@
 # 04 画布键盘焦点体系（Tab/Enter 加节点）
 
-Status: ready-for-agent
+Status: resolved
 
 ## 需求
 
@@ -17,3 +17,17 @@ Status: ready-for-agent
 
 - 点选节点后按 Tab/Enter 分别加子/同级节点，浏览器焦点不跳走。
 - 焦点在代码面板打字时按 Tab 是正常缩进/跳格。
+
+## Comments
+
+- 实现方式：`use-canvas-keyboard.ts` 的 keydown 从 window 级改为挂在画布容器上——
+  焦点在代码面板/输入框时事件根本不会到达容器，天然满足"只在画布聚焦时拦截"；
+  容器内输入控件的排除逻辑（`.cm-editor, input, …`）防御性保留。
+- `CanvasPanel` 容器加 `tabindex=0`、`outline: none`，点击（含节点）时显式 `focus()`。
+- Tab/Enter/Del 语义与新节点 id 命名沿用既有 `canvas-keyboard.ts`（前序工单已实现），
+  本单将其接入画布焦点体系。
+- 工单 05 占位：`CanvasPanelProps.onNodeCreated(nodeId)` 回调，新节点落码并选中后触发；
+  内联命名实现留待工单 05。
+- 新增 `use-canvas-keyboard.test.tsx`（happy-dom + react act）：容器聚焦时 Tab/Enter
+  生效并 preventDefault、输入控件与容器外不拦截、未选中节点不处理、onNodeCreated 回调。
+- 验证：npm test 333 通过；npm run typecheck 通过。
