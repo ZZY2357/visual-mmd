@@ -355,7 +355,11 @@ function parseArrowAt(
     lineStyle = 'thick'
     coreLen = m[1].length
   }
-  if (lineStyle === null) return null
+  if (lineStyle === null) {
+    // 纯箭头解析失败：整体可能是 `-. 标签 .->` 行内标签形式（点线行内标签没有
+    // 纯箭头前缀），仅尝试行内标签分支
+    return tryInlineLabel(line, pos) ?? null
+  }
   p += coreLen
 
   let head: ArrowMarker = 'none'
@@ -384,7 +388,16 @@ function parseArrowAt(
   }
 
   // 行内标签：仅当整体区间比纯箭头更长时采用
-  let inline: { spec: LinkSpec; gapBeforeLabel: string; gapAfterLabel: string; end: number } | null = null
+  const inline = tryInlineLabel(line, pos)
+  if (inline !== null && inline.end > plainEnd) return inline
+  return { spec: plainSpec, gapBeforeLabel: ' ', gapAfterLabel: ' ', end: plainEnd }
+}
+
+/** 在 pos 处尝试行内标签连线（`-- 文字 -->` / `-. 文字 .->` / `== 文字 ==>`） */
+function tryInlineLabel(
+  line: string,
+  pos: number,
+): { spec: LinkSpec; gapBeforeLabel: string; gapAfterLabel: string; end: number } | null {
   for (const { open, close, lineStyle: ls } of INLINE_ARROWS) {
     if (!line.startsWith(open, pos)) continue
     // open 后紧跟箭头头（如 `-->` 的 '>'）：这是纯箭头而非行内标签
@@ -396,7 +409,7 @@ function parseArrowAt(
     if (/^[-=.]*>?$/.test(labelRaw.trim())) continue
     const gapBeforeLabel = /^[ \t]*/.exec(labelRaw)?.[0] ?? ''
     const gapAfterLabel = /[ \t]*$/.exec(labelRaw)?.[0] ?? ''
-    inline = {
+    return {
       spec: {
         lineStyle: ls,
         head: 'arrow',
@@ -410,10 +423,8 @@ function parseArrowAt(
       gapAfterLabel,
       end: closeIdx + close.length,
     }
-    break
   }
-  if (inline !== null && inline.end > plainEnd) return inline
-  return { spec: plainSpec, gapBeforeLabel: ' ', gapAfterLabel: ' ', end: plainEnd }
+  return null
 }
 
 // ---------- 行级元素：header / subgraph / direction / classDef ----------
@@ -714,6 +725,11 @@ const DIRECTIONS = ['TB', 'TD', 'BT', 'RL', 'LR']
 
 function isValidNodeId(id: string): boolean {
   return VALID_NEW_ID_RE.test(id) && !id.includes('--') && id !== 'end'
+}
+
+/** 新建节点/连线 id 的合法性校验（表单层复用，与意图落地侧同一规则） */
+export function isValidNewNodeId(id: string): boolean {
+  return isValidNodeId(id)
 }
 
 export class FlowchartParser implements DiagramParser {

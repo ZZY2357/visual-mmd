@@ -112,6 +112,21 @@ export function CodePanel({ error }: CodePanelProps) {
     view.dispatch({ effects: setErrorLineEffect.of(error?.line ?? null) })
   }, [error])
 
+  // 错误行跳转请求（属性面板触发）：滚动到目标行并高亮
+  const gotoLine = useEditorStore((s) => s.gotoLine)
+  useEffect(() => {
+    const view = viewRef.current
+    if (view === null || gotoLine === null) return
+    const lineNo = Math.min(Math.max(gotoLine.line, 1), view.state.doc.lines)
+    const lineInfo = view.state.doc.line(lineNo)
+    view.dispatch({
+      effects: [
+        setErrorLineEffect.of(lineNo),
+        EditorView.scrollIntoView(lineInfo.from, { y: 'center' }),
+      ],
+    })
+  }, [gotoLine])
+
   return (
     <Stack gap="xs" h="100%" style={{ minHeight: 0 }}>
       <Title order={4}>{t('codePanel.title')}</Title>

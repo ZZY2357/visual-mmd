@@ -66,3 +66,32 @@ describe('editor store：快照栈接入', () => {
     }
   })
 })
+
+describe('editor store：commitIntent 表单意图落码', () => {
+  beforeEach(() => {
+    window.localStorage?.clear()
+    resetEditorHistory(DEFAULT_DIAGRAM_SOURCE)
+  })
+
+  it('意图经管线落码并成为独立撤销步骤', () => {
+    const source = DEFAULT_DIAGRAM_SOURCE
+    const ok = useEditorStore.getState().commitIntent({ type: 'set-direction', direction: 'LR' })
+    expect(ok).toBe(true)
+    expect(useEditorStore.getState().source.startsWith('flowchart LR')).toBe(true)
+    // 表单操作 = 离散快照：一次撤销即回到操作前
+    useEditorStore.getState().undo()
+    expect(useEditorStore.getState().source).toBe(source)
+  })
+
+  it('意图不可应用时返回 false 且源码不变', () => {
+    const source = useEditorStore.getState().source
+    const ok = useEditorStore.getState().commitIntent({ type: 'set-node-text', nodeId: '不存在', text: 'x' })
+    expect(ok).toBe(false)
+    expect(useEditorStore.getState().source).toBe(source)
+  })
+
+  it('select 更新选中状态', () => {
+    useEditorStore.getState().select({ kind: 'node', nodeId: 'A' })
+    expect(useEditorStore.getState().selection).toEqual({ kind: 'node', nodeId: 'A' })
+  })
+})

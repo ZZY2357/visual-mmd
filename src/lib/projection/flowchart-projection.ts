@@ -1,0 +1,161 @@
+import type { SourceDocument } from '../pipeline/document'
+import {
+  type ClassDefData,
+  type HeaderData,
+  type LinkOccData,
+  type LinkSpec,
+  type NodeOccData,
+  type NodeShapeType,
+  type SubgraphOpenData,
+} from '../pipeline/flowchart'
+
+/**
+ * flowchart 投影（ADR-0008）：从解析产物派生的只读结构视图，
+ * 驱动结构树与属性表单。投影不持久化、不参与撤销；一切编辑经
+ * 编辑意图改写源码，投影随源码重新解析而刷新。
+ */
+
+export interface ProjectionNode {
+  nodeId: string
+  /** 形状内显示文本；全部出现均无形状时为 null（表单改名会给首个出现补形状） */
+  text: string | null
+  shape: NodeShapeType | null
+}
+
+export interface ProjectionEdge {
+  from: string
+  to: string
+  /** 同一对节点的第几条连线（1 起） */
+  occurrence: number
+  label: string | null
+  spec: LinkSpec
+}
+
+export interface ProjectionSubgraph {
+  /** `subgraph:N`，编辑意图据此寻址 */
+  elementId: string
+  /** 括号标题（`subgraph id[标题]`）；裸 `subgraph 名称` 形式解析为 id、title 为 null */
+  title: string | null
+  /** 声明的 id；标题兜底展示用 */
+  id: string | null
+}
+
+export interface ProjectionClassDef {
+  name: string
+  props: Record<string, string>
+}
+
+export interface FlowchartProjection {
+  /** 图方向（flowchart TD 的 TD）；无 header 时为 null */
+  direction: string | null
+  nodes: ProjectionNode[]
+  edges: ProjectionEdge[]
+  subgraphs: ProjectionSubgraph[]
+  classDefs: ProjectionClassDef[]
+}
+
+/** 从解析产物构建 flowchart 投影（纯函数） */
+export function buildFlowchartProjection(doc: SourceDocument): FlowchartProjection {
+  const direction: string | null = (() => {
+    const header = doc.elements.find((part) => part.element.kind === 'header')
+    return header !== undefined ? (header.element as HeaderData).direction : null
+  })()
+
+  const nodes: ProjectionNode[] = []
+  const nodeSeen = new Set<string>()
+  const edges: ProjectionEdge[] = []
+  const subgraphs: ProjectionSubgraph[] = []
+  const classDefs: ProjectionClassDef[] = []
+
+  for (const part of doc.elements) {
+    const data = part.element
+    if (data.kind === 'node') {
+      const node = data as NodeOccData
+      if (!nodeSeen.has(node.nodeId)) {
+        nodeSeen.add(node.nodeId)
+        nodes.push({ nodeId: node.nodeId, text: node.text, shape: node.shapeType })
+      }
+    } else if (data.kind === 'link') {
+      const link = data as LinkOccData
+      // element id 已编码 occurrence（linkElementId），这里从 id 恢复序号
+      const m = /#(\d+)$/.exec(part.id)
+      edges.push({
+        from: link.fromNodeId,
+        to: link.toNodeId,
+        occurrence: m !== null ? Number(m[1]) : 1,
+        label: link.spec.label,
+        spec: link.spec,
+      })
+    } else if (data.kind === 'subgraph-open') {
+      const sg = data as SubgraphOpenData
+      subgraphs.push({ elementId: part.id, title: sg.title, id: sg.id })
+    } else if (data.kind === 'classdef') {
+      const cd = data as ClassDefData
+      const props: Record<string, string> = {}
+      for (const item of cd.items) props[item.key] = item.value
+      classDefs.push({ name: cd.name, props })
+    }
+  }
+
+  return { direction, nodes, edges, subgraphs, classDefs }
+}
+
+// ---------- 选中状态 ----------
+
+export type Selection =
+  | { kind: 'diagram' }
+  | { kind: 'node'; nodeId: string }
+  | { kind: 'edge'; from: string; to: string; occurrence: number }
+  | { kind: 'subgraph'; elementId: string }
+  | { kind: 'classdef'; name: string }
+
+export const DIAGRAM_SELECTION: Selection = { kind: 'diagram' }
+
+export function selectionKey(sel: Selection): string {
+  switch (sel.kind) {
+    case 'diagram':
+      return 'diagram'
+    case 'node':
+      return `node:${sel.nodeId}`
+    case 'edge':
+      return `edge:${sel.from}->${sel.to}#${sel.occurrence}`
+    case 'subgraph':
+      return `subgraph:${sel.elementId}`
+    case 'classdef':
+      return `classdef:${sel.name}`
+  }
+}
+
+export function sameSelection(a: Selection, b: Selection): boolean {
+  return selectionKey(a) === selectionKey(b)
+}
+
+/**
+ * 选中目标在投影中仍存在则原样返回，否则回落到图表级（diagram）。
+ * 源码被外部修改（代码输入、撤销）后选中元素可能消失，此时表单回落而不是崩溃。
+ */
+export function resolveSelection(
+  projection: FlowchartProjection,
+  selection: Selection | null,
+): Selection | null {
+  if (selection === null) return null
+  switch (selection.kind) {
+    case 'diagram':
+      return selection
+    case 'node':
+      return projection.nodes.some((n) => n.nodeId === selection.nodeId) ? selection : null
+    case 'edge':
+      return projection.edges.some(
+        (e) =>
+          e.from === selection.from &&
+          e.to === selection.to &&
+          e.occurrence === selection.occurrence,
+      )
+        ? selection
+        : null
+    case 'subgraph':
+      return projection.subgraphs.some((s) => s.elementId === selection.elementId) ? selection : null
+    case 'classdef':
+      return projection.classDefs.some((c) => c.name === selection.name) ? selection : null
+  }
+}
