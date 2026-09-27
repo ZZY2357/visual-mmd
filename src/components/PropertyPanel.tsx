@@ -47,6 +47,7 @@ import {
 } from './class-forms'
 import { MindmapNodeForm, MindmapRootForm } from './mindmap-forms'
 import { resolveMindmapSelection, type MindmapProjection } from '../lib/projection/mindmap-projection'
+import { ThemePicker } from './ThemePicker'
 
 /**
  * 属性面板（工单 04/06）：上半为结构树、下半为选中元素属性表单。
@@ -385,6 +386,11 @@ export function PropertyPanel({ projection, parseError }: PropertyPanelProps) {
   return (
     <Stack gap="xs" h="100%" style={{ minHeight: 0 }} aria-label={t('app:propertyPanel.ariaLabel')}>
       <Title order={4}>{t('app:propertyPanel.title')}</Title>
+
+      {/* 主题选择器（工单 11）：图种无关，frontmatter 手术式落码 */}
+      <Box px="xs">
+        <ThemePicker disabled={disabled} />
+      </Box>
 
       {parseError !== null && (
         <Alert color="red" title={t('app:propertyPanel.disabledTitle')}>

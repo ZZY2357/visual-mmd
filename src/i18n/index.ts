@@ -106,6 +106,13 @@ export const zhDict = {
     propertyPanel: {
       title: '属性面板',
       ariaLabel: '结构与属性面板',
+      theme: '主题',
+      themeAria: '选择图表主题',
+      themeDefault: '默认（default）',
+      themeNeutral: '中性（neutral）',
+      themeDark: '暗色（dark）',
+      themeForest: '森林（forest）',
+      themeBase: '基础（base）',
       structureTree: '结构树',
       diagram: '图表',
       nodes: '节点',

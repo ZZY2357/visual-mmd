@@ -8,6 +8,7 @@ import {
 } from '../lib/library-storage'
 import { SnapshotStack } from '../lib/pipeline/snapshot-stack'
 import { applyEdit } from '../lib/pipeline/pipeline'
+import { applySetTheme, isMermaidTheme } from '../lib/pipeline/frontmatter'
 import type { EditIntent } from '../lib/pipeline/parser'
 import { detectDiagramType, DIAGRAM_TYPES, type DiagramTypeId } from '../lib/diagram-registry'
 import { DIAGRAM_SELECTION, type Selection } from '../lib/projection/flowchart-projection'
@@ -164,6 +165,16 @@ export const useEditorStore = create<EditorState>((set, get) => ({
   commitIntent: (intent) => {
     const state = get()
     const current = state.source
+    // 主题是图种无关的 frontmatter 编辑（工单 11）：不经图种解析器，
+    // 直接手术式落码；源码有语法错误时也可用（不依赖解析成功）
+    if (intent.type === 'set-theme') {
+      const theme = intent.theme
+      if (typeof theme !== 'string' || !isMermaidTheme(theme)) return false
+      const next = applySetTheme(current, theme)
+      snapshotStack.commit(next)
+      set({ source: next, diagrams: withActiveSource(state, next), ...historyOf(snapshotStack) })
+      return true
+    }
     const result = applyEdit(current, detectDiagramType(current).parser, intent)
     if (!result.ok) return false
     snapshotStack.commit(result.source)

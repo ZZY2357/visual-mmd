@@ -1,5 +1,6 @@
 import { assembleDocument, getElementById, type AnyElement, type SourceDocument } from './document'
 import type { DiagramParser, EditIntent, ParseResult, SourceParseError } from './parser'
+import { frontmatterEnd } from './frontmatter'
 import { lineAtOffset, type Span } from './span'
 
 /**
@@ -388,8 +389,10 @@ export class SequenceParser implements DiagramParser {
     }
     const blockStack: number[] = []
     let seenHeader = false
-    let lineNo = 0
-    let cursor = 0
+    // 文首 frontmatter 块（主题等配置）不参与解析，整体 verbatim 保留（工单 11）
+    const bodyStart = frontmatterEnd(source)
+    let lineNo = bodyStart === 0 ? 0 : source.slice(0, bodyStart).split('\n').length - 1
+    let cursor = bodyStart
 
     for (;;) {
       const nl = source.indexOf('\n', cursor)

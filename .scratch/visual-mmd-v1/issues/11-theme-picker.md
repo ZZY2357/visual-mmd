@@ -4,8 +4,8 @@
 
 **Blocked by:** 04 — Flowchart 可视化编辑端到端（复用管线与表单框架）。
 
-**Status:** ready-for-agent
+**Status:** done
 
-- [ ] 切换主题 → frontmatter 手术式更新，画布重渲染
-- [ ] 无 frontmatter 时自动插入；已有 frontmatter 时其他配置项逐字保留
-- [ ] 可撤销
+- [x] 切换主题 → frontmatter 手术式更新，画布重渲染
+- [x] 无 frontmatter 时自动插入；已有 frontmatter 时其他配置项逐字保留
+- [x] 可撤销

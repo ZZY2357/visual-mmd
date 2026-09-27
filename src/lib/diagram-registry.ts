@@ -4,6 +4,7 @@ import { flowchartParser } from './pipeline/flowchart'
 import { sequenceParser } from './pipeline/sequence'
 import { classParser } from './pipeline/class'
 import { mindmapParser } from './pipeline/mindmap'
+import { frontmatterEnd } from './pipeline/frontmatter'
 import { buildFlowchartProjection, type FlowchartProjection } from './projection/flowchart-projection'
 import { buildSequenceProjection, type SequenceProjection } from './projection/sequence-projection'
 import { buildClassProjection, type ClassProjection } from './projection/class-projection'
@@ -34,9 +35,10 @@ export interface DiagramTypeRegistration {
   buildProjection(doc: SourceDocument): AnyProjection
 }
 
-/** 跳过空行与注释后的首个语句行 */
+/** 跳过 frontmatter 块、空行与注释后的首个语句行 */
 function firstStatementLine(source: string): string {
-  for (const raw of source.split(/\r?\n/)) {
+  const body = source.slice(frontmatterEnd(source))
+  for (const raw of body.split(/\r?\n/)) {
     const line = raw.trim()
     if (line === '' || line.startsWith('%%')) continue
     return line
