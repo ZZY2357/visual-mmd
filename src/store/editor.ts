@@ -10,6 +10,7 @@ import { SnapshotStack } from '../lib/pipeline/snapshot-stack'
 import { applyEdit } from '../lib/pipeline/pipeline'
 import { applySetTheme, isMermaidTheme } from '../lib/pipeline/frontmatter'
 import type { EditIntent } from '../lib/pipeline/parser'
+import type { InlineEditTarget } from '../lib/editing/inline-edit'
 import { detectDiagramType, DIAGRAM_TYPES, type DiagramTypeId } from '../lib/diagram-registry'
 import { DIAGRAM_SELECTION, type Selection } from '../lib/projection/flowchart-projection'
 
@@ -35,6 +36,13 @@ export interface GotoLineRequest {
   nonce: number
 }
 
+/** 画布内联命名请求（工单 06，nonce 语义同 gotoLine）：结构树键盘添加节点后，
+ * 画布侧消费该请求，在原位浮出命名输入框（use-canvas-inline-edit 的 beginEdit） */
+export interface InlineEditRequest {
+  target: InlineEditTarget
+  nonce: number
+}
+
 interface EditorState {
   /** 图表库：全部图表 */
   diagrams: StoredLibraryDiagram[]
@@ -48,6 +56,8 @@ interface EditorState {
   selection: Selection | null
   /** 错误行跳转请求（代码面板滚动并高亮） */
   gotoLine: GotoLineRequest | null
+  /** 内联命名请求（结构树键盘添加节点 → 画布浮出命名输入框，工单 06） */
+  pendingInlineEdit: InlineEditRequest | null
   /** 代码面板连续输入：按输入会话合并为一个快照 */
   commitTypedSource: (source: string) => void
   /** 表单/画布等离散编辑：独立快照 */
@@ -56,6 +66,7 @@ interface EditorState {
   commitIntent: (intent: EditIntent) => boolean
   select: (selection: Selection | null) => void
   requestGotoLine: (line: number) => void
+  requestInlineEdit: (target: InlineEditTarget) => void
   undo: () => void
   redo: () => void
   // ---- 图表库操作（工单 09）----
@@ -83,6 +94,7 @@ function historyOf(stack: SnapshotStack): Pick<EditorState, 'canUndo' | 'canRedo
 }
 
 let gotoLineNonce = 0
+let inlineEditNonce = 0
 let idCounter = 0
 
 function nextId(): string {
@@ -141,6 +153,7 @@ function switchTo(diagram: StoredLibraryDiagram | null): Partial<EditorState> {
     source: diagram?.source ?? '',
     selection: DIAGRAM_SELECTION,
     gotoLine: null,
+    pendingInlineEdit: null,
     ...historyOf(snapshotStack),
   }
 }
@@ -152,6 +165,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
   ...historyOf(snapshotStack),
   selection: DIAGRAM_SELECTION,
   gotoLine: null,
+  pendingInlineEdit: null,
   commitTypedSource: (source) => {
     const state = get()
     snapshotStack.commit(source, { coalesce: true })
@@ -183,6 +197,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
   },
   select: (selection) => set({ selection }),
   requestGotoLine: (line) => set({ gotoLine: { line, nonce: ++gotoLineNonce } }),
+  requestInlineEdit: (target) => set({ pendingInlineEdit: { target, nonce: ++inlineEditNonce } }),
   undo: () => {
     const previous = snapshotStack.undo()
     if (previous === null) return

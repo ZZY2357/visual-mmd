@@ -254,6 +254,8 @@ export const zhDict = {
       mindmapHint: '思维导图：在上方结构树中点选节点，即可在此编辑文本、形状与图标，或增删层级节点。',
       mindmapEmpty: '（暂无节点）',
       mindmapEmptyHint: '思维导图为空：先添加一个根节点，即可在结构树中逐层搭建。',
+      // 工单 06：键盘添加节点的占位名（确认前落码用，内联命名确认后改写）
+      mindmapNewNode: '新节点',
       cancel: '取消',
     },
     shapes: {

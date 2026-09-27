@@ -18,9 +18,11 @@ function findMarked(root: ParentNode): Element[] {
  */
 export function applyHighlight(root: ParentNode, dataId: string): void {
   clearHighlight(root)
-  const all = Array.from(root.querySelectorAll('[data-id]'))
+  // 工单 06：data-id 之外也匹配 DOM id——mermaid mindmap 节点无 data-id，
+  // 只有稳定 DOM id（node_N，见 data-id.ts 的注释）；相等比较不会误标其它元素。
+  const all = Array.from(root.querySelectorAll('[data-id], [id]'))
   for (const el of all) {
-    if (el.getAttribute('data-id') === dataId) {
+    if (el.getAttribute('data-id') === dataId || el.getAttribute('id') === dataId) {
       el.setAttribute(HIGHLIGHT_ATTR, 'true')
     }
   }

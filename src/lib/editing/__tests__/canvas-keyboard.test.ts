@@ -1,12 +1,15 @@
 import { describe, expect, it } from 'vitest'
 import { applyEdit } from '../../pipeline/pipeline'
 import { flowchartParser } from '../../pipeline/flowchart'
+import { mindmapParser } from '../../pipeline/mindmap'
 import {
   keyToNodeAction,
+  mindmapActionIntents,
   nextNodeId,
   nodeActionIntents,
 } from '../canvas-keyboard'
 import { buildFlowchartProjection, type FlowchartProjection } from '../../projection/flowchart-projection'
+import { buildMindmapProjection, type MindmapProjection } from '../../projection/mindmap-projection'
 
 const SAMPLE = `flowchart TD
     A[开始] --> B[处理]
@@ -141,5 +144,92 @@ describe('意图经管线落码（手术式、可渲染）', () => {
     const after = projectionOf((result as { ok: true; source: string }).source)
     expect(after.nodes.some((n) => n.nodeId === 'B')).toBe(false)
     expect(after.edges.length).toBe(0)
+  })
+})
+
+// ---------- mindmap（工单 06） ----------
+
+const MINDMAP_SAMPLE = `mindmap
+  root((中心))
+    分支A
+      叶子
+    分支B
+`
+
+function mindmapProjectionOf(source: string): MindmapProjection {
+  const parsed = mindmapParser.parse(source)
+  if (!parsed.ok) throw new Error(`样例源码必须可解析：${parsed.error.message}`)
+  return buildMindmapProjection(parsed.doc)
+}
+
+describe('mindmap 动作 → 编辑意图序列（工单 06）', () => {
+  const projection = mindmapProjectionOf(MINDMAP_SAMPLE)
+  // 节点序：root=1，分支A=2，叶子=3，分支B=4
+
+  it('delete 产出 delete-node 意图（子树删除由管线处理）', () => {
+    expect(mindmapActionIntents(projection, 'mindmap-node:2', 'delete', '新节点')).toEqual({
+      intents: [{ type: 'delete-node', elementId: 'mindmap-node:2' }],
+      newElementId: null,
+    })
+  })
+
+  it('add-child：意图挂在选中节点下，新节点序号 = 子树末节点 + 1', () => {
+    const plan = mindmapActionIntents(projection, 'mindmap-node:2', 'add-child', '新节点')
+    // 分支A 的子树末节点是叶子（3），新节点序号 4
+    expect(plan).toEqual({
+      intents: [{ type: 'add-child', parentElementId: 'mindmap-node:2', text: '新节点' }],
+      newElementId: 'mindmap-node:4',
+    })
+  })
+
+  it('add-sibling：同级插入，新节点序号同样在子树之后', () => {
+    const plan = mindmapActionIntents(projection, 'mindmap-node:2', 'add-sibling', '新节点')
+    expect(plan!.intents[0]).toEqual({ type: 'add-sibling', elementId: 'mindmap-node:2', text: '新节点' })
+    expect(plan!.newElementId).toBe('mindmap-node:4')
+  })
+
+  it('根节点（无父）按 Enter 退化为加子节点', () => {
+    const plan = mindmapActionIntents(projection, 'mindmap-node:1', 'add-sibling', '新节点')
+    expect(plan!.intents[0]).toEqual({ type: 'add-child', parentElementId: 'mindmap-node:1', text: '新节点' })
+  })
+
+  it('选中的节点不存在于投影 → null（不产出意图）', () => {
+    expect(mindmapActionIntents(projection, 'mindmap-node:99', 'add-child', '新节点')).toBeNull()
+  })
+})
+
+describe('mindmap 意图经管线落码（缩进层级，工单 06）', () => {
+  it('add-child 落码：缩进跟随既有子节点，插在子树之后，既有节点编号后移', () => {
+    const projection = mindmapProjectionOf(MINDMAP_SAMPLE)
+    const plan = mindmapActionIntents(projection, 'mindmap-node:2', 'add-child', '新节点')!
+    const result = applyEdit(MINDMAP_SAMPLE, mindmapParser, plan.intents[0])
+    expect(result.ok).toBe(true)
+    const source = (result as { ok: true; source: string }).source
+    const lines = source.split('\n')
+    // 新节点按叶子的缩进（6 空格）插在叶子之后、分支B 之前
+    expect(lines[4]).toBe('      新节点')
+    expect(lines[5]).toBe('    分支B')
+    // 新节点在文档序第 4 个节点位置 → elementId mindmap-node:4，与预计算一致
+    const after = mindmapProjectionOf(source)
+    expect(after.nodes[3]).toMatchObject({ elementId: 'mindmap-node:4', text: '新节点', depth: 2 })
+  })
+
+  it('add-sibling 落码：缩进与选中节点一致', () => {
+    const projection = mindmapProjectionOf(MINDMAP_SAMPLE)
+    const plan = mindmapActionIntents(projection, 'mindmap-node:4', 'add-sibling', '新节点')!
+    const result = applyEdit(MINDMAP_SAMPLE, mindmapParser, plan.intents[0])
+    expect(result.ok).toBe(true)
+    const after = mindmapProjectionOf((result as { ok: true; source: string }).source)
+    const created = after.nodes.find((n) => n.text === '新节点')
+    expect(created).toMatchObject({ depth: 1, parentId: 'mindmap-node:1' })
+  })
+
+  it('delete 落码：连同子树一起删除', () => {
+    const projection = mindmapProjectionOf(MINDMAP_SAMPLE)
+    const plan = mindmapActionIntents(projection, 'mindmap-node:2', 'delete', '新节点')!
+    const result = applyEdit(MINDMAP_SAMPLE, mindmapParser, plan.intents[0])
+    expect(result.ok).toBe(true)
+    const after = mindmapProjectionOf((result as { ok: true; source: string }).source)
+    expect(after.nodes.map((n) => n.text)).toEqual(['中心', '分支B'])
   })
 })

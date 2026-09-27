@@ -24,11 +24,12 @@ export type InlineEditCommit =
   /** mindmap 文本非法（空文本）；flowchart 文本恒合法 */
   | { action: 'invalid' }
 
-/** 从双击目标解析编辑对象：优先 data-id（flowchart 等有稳定 id 的图种） */
+/** 从双击目标解析编辑对象：优先 data-id（flowchart 等有稳定 id 的图种）。
+ * 返回 flowchart 形目标，由 inlineEditTargetFromEvent 按图种改写 kind */
 function targetFromDataId(
   target: EventTarget | null,
   resolver: DataIdResolver | null,
-): InlineEditTarget | null {
+): { kind: 'flowchart'; nodeId: string } | null {
   const selection: CanvasSelection | null = selectionFromEventTarget(target, resolver)
   if (selection !== null && selection.kind === 'node') {
     return { kind: 'flowchart', nodeId: selection.id }
@@ -57,16 +58,21 @@ function targetFromMindmapText(target: EventTarget | null, nodes: ProjectionMind
 /**
  * 双击目标 → 编辑对象；两边都匹配不上时返回 null（如点在空白处/边上），
  * 安静地不进入编辑，不崩溃。
+ *
+ * kind 指明图种（工单 06）：有 resolver 命中时按图种把 node 选择映射为对应编辑
+ * 目标（mindmap 的画布选中 id 即 elementId）；仅 mindmap 才回落文本匹配。
  */
 export function inlineEditTargetFromEvent(
   target: EventTarget | null,
   resolver: DataIdResolver | null,
   mindmapNodes: ProjectionMindmapNode[] = [],
+  kind: 'flowchart' | 'mindmap' = 'flowchart',
 ): InlineEditTarget | null {
-  return (
-    targetFromDataId(target, resolver) ??
-    targetFromMindmapText(target, mindmapNodes)
-  )
+  const byId = targetFromDataId(target, resolver)
+  if (byId !== null) {
+    return kind === 'mindmap' ? { kind: 'mindmap', elementId: byId.nodeId } : byId
+  }
+  return kind === 'mindmap' ? targetFromMindmapText(target, mindmapNodes) : null
 }
 
 /**

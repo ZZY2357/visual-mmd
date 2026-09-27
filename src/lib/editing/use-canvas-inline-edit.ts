@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { useEditorStore } from '../../store/editor'
 import type { AnyProjection } from '../diagram-registry'
+import { mindmapDomIdOf } from '../canvas-selection/mindmap-adapter'
 import type { DataIdResolver } from '../canvas-selection/data-id'
 import type { ViewState } from '../canvas-view/view-state'
 import {
@@ -43,7 +44,7 @@ export function inlineEditTextOf(projection: AnyProjection | null, target: Inlin
   return ''
 }
 
-/** mindmap 节点没有 data-id：找文本内容等于给定文本的最深元素（其包围盒即标签位置） */
+/** 找文本内容等于给定文本的最深元素（旧版 mindmap 定位方式，保留为回落路径） */
 function findMindmapTextElement(root: Element, text: string): Element | null {
   let deepest: Element | null = null
   for (const el of root.querySelectorAll('*')) {
@@ -53,7 +54,18 @@ function findMindmapTextElement(root: Element, text: string): Element | null {
   return deepest
 }
 
-/** 在渲染 SVG 中定位编辑目标的元素：flowchart 按 data-id，mindmap 按可见文本 */
+/** mindmap：优先按 DOM id 定位（工单 06：节点 g id = node_{N-1}，与选中一致），
+ * 渲染产物不带该 id 时回落找文本内容等于给定文本的最深元素（其包围盒即标签位置） */
+function findMindmapElement(root: Element, elementId: string, text: string): Element | null {
+  const domId = mindmapDomIdOf(elementId)
+  if (domId !== null) {
+    const el = root.querySelector(`[id="${CSS.escape(domId)}"]`)
+    if (el !== null) return el
+  }
+  return text === '' ? null : findMindmapTextElement(root, text)
+}
+
+/** 在渲染 SVG 中定位编辑目标的元素：flowchart 按 data-id，mindmap 按 DOM id（回落文本） */
 function findTargetElement(root: Element, target: InlineEditTarget, text: string): Element | null {
   if (target.kind === 'flowchart') {
     for (const el of root.querySelectorAll('[data-id]')) {
@@ -61,7 +73,7 @@ function findTargetElement(root: Element, target: InlineEditTarget, text: string
     }
     return null
   }
-  return text === '' ? null : findMindmapTextElement(root, text)
+  return findMindmapElement(root, target.elementId, text)
 }
 
 export interface CanvasInlineEditOptions {
@@ -107,11 +119,13 @@ export function useCanvasInlineEdit({ projection, resolver, svg, containerRef, v
     setEditing((cur) => (cur !== null ? { ...cur, rect } : cur))
   }, [editingTarget, svg, view, projection, containerRef])
 
-  /** 双击进入编辑（挂到画布容器 onDoubleClick） */
+  /** 双击进入编辑（挂到画布容器 onDoubleClick）：kind 随图种——mindmap 画布点选
+   * 启用（工单 06）后节点命中走 resolver（DOM id 精确匹配），文本匹配保留为回落 */
   const onDoubleClick = useCallback(
     (e: React.MouseEvent) => {
       const mindmapNodes = projection?.type === 'mindmap' ? projection.mindmap.nodes : []
-      const target = inlineEditTargetFromEvent(e.target, resolver, mindmapNodes)
+      const kind = projection?.type === 'mindmap' ? 'mindmap' : 'flowchart'
+      const target = inlineEditTargetFromEvent(e.target, resolver, mindmapNodes, kind)
       if (target === null) return
       e.preventDefault()
       beginEdit(target)

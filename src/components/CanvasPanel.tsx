@@ -3,6 +3,7 @@ import { Alert, Box, Button, Stack, Text, TextInput, Title } from '@mantine/core
 import { useTranslation } from 'react-i18next'
 import type { MermaidPreview } from '../lib/use-mermaid-preview'
 import { flowchartDataIdResolver, toEditorSelection } from '../lib/canvas-selection/flowchart-adapter'
+import { mindmapDataIdResolver, mindmapDomIdOf } from '../lib/canvas-selection/mindmap-adapter'
 import type { CanvasSelection, DataIdResolver } from '../lib/canvas-selection/data-id'
 import { nodeDataIdResolver } from '../lib/canvas-selection/data-id'
 import type { Selection } from '../lib/projection/selection'
@@ -36,18 +37,22 @@ interface CanvasPanelProps {
 
 /** 图种 → data-id resolver（工单 06/07/08）：flowchart 全套适配；sequence 参与者与
  * class 类的 data-id 即其 id（尽力而为，无法匹配时不选中）。
- * mindmap（工单 08）：mermaid 渲染的 mindmap 节点无可靠 data-id 映射，
- * 画布侧不做选中（结构树即该图种的主编辑入口）。 */
+ * mindmap（工单 06）：mermaid 不发 data-id，但节点 g 的 DOM id 为 node_N（源码节点序），
+ * 经 mindmapDataIdResolver 映射回投影节点。 */
 function resolverOf(projection: AnyProjection): DataIdResolver {
   if (projection.type === 'flowchart') return flowchartDataIdResolver(projection.flowchart)
   if (projection.type === 'sequence') return nodeDataIdResolver(projection.sequence.participants.map((p) => p.actorId))
-  if (projection.type === 'mindmap') return () => null
+  if (projection.type === 'mindmap') return mindmapDataIdResolver(projection.mindmap)
   return nodeDataIdResolver(projection.class.classes.map((c) => c.name))
 }
 
 /** 图种无关的画布选中 → 编辑器选中 */
 function canvasToEditorSelection(projection: AnyProjection, canvasSelection: CanvasSelection): Selection | null {
   if (projection.type === 'flowchart') return toEditorSelection(canvasSelection)
+  if (projection.type === 'mindmap') {
+    // mindmap 画布选中只可能是节点（无连线）；canvas id 即 elementId（mindmap-node:N）
+    return canvasSelection.kind === 'node' ? { kind: 'mindmap-node', elementId: canvasSelection.id } : null
+  }
   if (canvasSelection.kind === 'node') {
     return projection.type === 'sequence'
       ? { kind: 'participant', actorId: canvasSelection.id }
@@ -65,6 +70,9 @@ function selectedDataIdOf(selection: Selection): string | null {
       return selection.actorId
     case 'class':
       return selection.name
+    case 'mindmap-node':
+      // mindmap 无 data-id：高亮按节点 DOM id（node_{N-1}）匹配（highlight 已支持）
+      return mindmapDomIdOf(selection.elementId)
     default:
       return null
   }
@@ -133,17 +141,36 @@ export function CanvasPanel({ preview, projection }: CanvasPanelProps) {
     view,
   })
 
-  // 键盘焦点体系（工单 04）：容器 tabindex=0，点击画布即持有焦点；keydown 挂在
-  // 容器上，Tab/Enter/Del 仅在画布聚焦时拦截，焦点在代码面板/输入框时完全不干扰。
-  // flowchart 才有画布键盘语义；其它图种接线见后续工单
+  // 键盘焦点体系（工单 04，工单 06 扩展 mindmap）：容器 tabindex=0，点击画布即持有
+  // 焦点；keydown 挂在容器上，Tab/Enter/Del 仅在画布聚焦时拦截，焦点在代码面板/
+  // 输入框时完全不干扰。flowchart 与 mindmap 各有画布键盘语义（Tab 加子 / Enter 加
+  // 同级 / Del 删除），其它图种接线见后续工单
   useCanvasKeyboard(
-    projection !== null && projection.type === 'flowchart' ? projection.flowchart : null,
+    projection === null
+      ? null
+      : projection.type === 'flowchart'
+        ? { kind: 'flowchart', projection: projection.flowchart }
+        : projection.type === 'mindmap'
+          ? { kind: 'mindmap', projection: projection.mindmap }
+          : null,
     {
       containerRef,
-      // 工单 05 接线：新建节点落码后立即进入内联命名
-      onNodeCreated: (nodeId) => beginEdit({ kind: 'flowchart', nodeId }),
+      // 工单 05/06 接线：新建节点落码后立即进入内联命名
+      onNodeCreated: beginEdit,
+      newNodeText: t('app:propertyPanel.mindmapNewNode'),
     },
   )
+
+  // 结构树键盘（工单 06）添加节点后的内联命名请求：画布侧消费（gotoLine 同款 nonce 模式）
+  const pendingInlineEdit = useEditorStore((s) => s.pendingInlineEdit)
+  useEffect(() => {
+    if (pendingInlineEdit === null || projection === null) return
+    // 请求目标必须属于当前图种（切换图表后残留请求安静丢弃）
+    const matches =
+      (projection.type === 'flowchart' && pendingInlineEdit.target.kind === 'flowchart') ||
+      (projection.type === 'mindmap' && pendingInlineEdit.target.kind === 'mindmap')
+    if (matches) beginEdit(pendingInlineEdit.target)
+  }, [pendingInlineEdit, projection, beginEdit])
 
   const { containerRef: selectionRef, onClick } = useCanvasSelection({
     svg,

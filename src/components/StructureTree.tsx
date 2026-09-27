@@ -5,6 +5,7 @@ import { DIAGRAM_SELECTION, type Selection, sameSelection } from '../lib/project
 import type { AnyProjection } from '../lib/diagram-registry'
 import type { FlowchartProjection } from '../lib/projection/flowchart-projection'
 import type { MindmapProjection, ProjectionMindmapNode } from '../lib/projection/mindmap-projection'
+import { mindmapActionIntents } from '../lib/editing/canvas-keyboard'
 import { useEditorStore } from '../store/editor'
 
 /**
@@ -20,16 +21,20 @@ function TreeItem({
   active,
   depth,
   onSelect,
+  onKeyDown,
 }: {
   label: string
   detail?: string
   active: boolean
   depth: number
   onSelect: () => void
+  /** 键盘操作（工单 06：mindmap 树节点聚焦时 Tab/Enter 增删节点） */
+  onKeyDown?: (e: React.KeyboardEvent) => void
 }) {
   return (
     <UnstyledButton
       onClick={onSelect}
+      onKeyDown={onKeyDown}
       py={4}
       px="xs"
       style={{
@@ -317,6 +322,26 @@ function MindmapTree({ projection }: { projection: MindmapProjection }) {
     childrenOf.set(node.parentId, list)
   }
 
+  // 结构树键盘（工单 06）：焦点在树节点上时 Tab 加子节点 / Enter 加同级节点
+  // （preventDefault 压掉焦点切换），落码按 mindmap 缩进层级；新节点落码后选中
+  // 并请求画布内联命名（pendingInlineEdit → CanvasPanel 的 beginEdit）
+  const onItemKeyDown = (node: ProjectionMindmapNode) => (e: React.KeyboardEvent) => {
+    const action =
+      e.key === 'Tab' && !e.shiftKey ? 'add-child' : e.key === 'Enter' && !e.shiftKey ? 'add-sibling' : null
+    if (action === null) return
+    e.preventDefault()
+    const plan = mindmapActionIntents(projection, node.elementId, action, t('app:propertyPanel.mindmapNewNode'))
+    if (plan === null) return
+    const { commitIntent, select: selectInStore, requestInlineEdit: request } = useEditorStore.getState()
+    for (const intent of plan.intents) {
+      if (!commitIntent(intent)) return
+    }
+    if (plan.newElementId !== null) {
+      selectInStore({ kind: 'mindmap-node', elementId: plan.newElementId })
+      request({ kind: 'mindmap', elementId: plan.newElementId })
+    }
+  }
+
   const renderNode = (node: ProjectionMindmapNode): ReactNode => {
     const children = childrenOf.get(node.elementId) ?? []
     const shapeLabel =
@@ -331,6 +356,7 @@ function MindmapTree({ projection }: { projection: MindmapProjection }) {
           active={is({ kind: 'mindmap-node', elementId: node.elementId })}
           depth={node.depth}
           onSelect={() => select({ kind: 'mindmap-node', elementId: node.elementId })}
+          onKeyDown={onItemKeyDown(node)}
         />
         {children.map(renderNode)}
       </Stack>

@@ -90,8 +90,16 @@ export function selectionFromEventTarget(
   let el: Element | null = target
   while (el !== null) {
     const dataId = el.getAttribute('data-id')
-    if (dataId !== null) {
+    if (dataId !== null && dataId !== '') {
       const selection = resolver(dataId)
+      if (selection !== null) return selection
+    }
+    // 工单 06：mermaid mindmap 不发 data-id，但节点 <g> 带稳定 DOM id（`node_N`，
+    // N 为源码节点序，事实约定）。id 同样交给 resolver 尽力匹配——resolver 只认
+    // 已知节点，未知 id（如 svg 根 id）返回 null，安静地不选中。
+    const domId = el.getAttribute('id')
+    if (domId !== null && domId !== '') {
+      const selection = resolver(domId)
       if (selection !== null) return selection
     }
     el = el.parentElement

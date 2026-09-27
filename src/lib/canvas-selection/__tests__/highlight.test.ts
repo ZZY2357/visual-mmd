@@ -20,6 +20,22 @@ describe('画布选中高亮（工单 05）', () => {
     expect(marked[0].getAttribute('data-id')).toBe('A')
   })
 
+  it('无 data-id 时按 DOM id 匹配（工单 06：mindmap 节点 g id = node_N）', () => {
+    const host = document.createElement('div')
+    host.innerHTML = `<svg id="m0"><g id="node_1"><rect/></g></svg>`
+    applyHighlight(host, 'node_1')
+    const marked = host.querySelectorAll('[data-vm-selected]')
+    expect(marked.length).toBe(1)
+    expect(marked[0].getAttribute('id')).toBe('node_1')
+  })
+
+  it('DOM id 不相等的不误标（svg 根 id 等不受影响）', () => {
+    const host = document.createElement('div')
+    host.innerHTML = `<svg id="m0"><g id="node_1"><rect/></g></svg>`
+    applyHighlight(host, 'node_2')
+    expect(host.querySelectorAll('[data-vm-selected]').length).toBe(0)
+  })
+
   it('重复调用先清除旧标记（单选语义）', () => {
     const host = buildSvg()
     applyHighlight(host, 'A')

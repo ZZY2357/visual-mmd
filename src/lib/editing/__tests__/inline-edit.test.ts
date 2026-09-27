@@ -45,9 +45,19 @@ describe('inlineEditTargetFromEvent（双击目标 → 编辑对象）', () => {
     expect(inlineEditTargetFromEvent(path, edgeResolver)).toBeNull()
   })
 
-  it('mindmap：无 data-id，按可见文本对投影节点尽力匹配', () => {
+  it('mindmap：无 data-id，按可见文本对投影节点尽力匹配（kind=mindmap 才回落文本）', () => {
     const text = el('<g class="label"><text>子节点</text></g>')
-    expect(inlineEditTargetFromEvent(text, null, MINDMAP_NODES)).toEqual({
+    expect(inlineEditTargetFromEvent(text, null, MINDMAP_NODES, 'mindmap')).toEqual({
+      kind: 'mindmap',
+      elementId: 'mindmap-node:2',
+    })
+  })
+
+  it('mindmap：resolver 命中（画布点选的 DOM id 映射）→ 按图种改写为 mindmap 目标', () => {
+    const mmResolver = (dataId: string): CanvasSelection | null =>
+      dataId === 'node_1' ? { kind: 'node', id: 'mindmap-node:2' } : null
+    const g = el('<g id="node_1"><text>子节点</text></g>')
+    expect(inlineEditTargetFromEvent(g.querySelector('text'), mmResolver, MINDMAP_NODES, 'mindmap')).toEqual({
       kind: 'mindmap',
       elementId: 'mindmap-node:2',
     })
@@ -55,15 +65,20 @@ describe('inlineEditTargetFromEvent（双击目标 → 编辑对象）', () => {
 
   it('mindmap：文本匹配不上（点空白处/未知元素）返回 null，不进入编辑', () => {
     const other = el('<g><text>别的</text></g>')
-    expect(inlineEditTargetFromEvent(other, null, MINDMAP_NODES)).toBeNull()
+    expect(inlineEditTargetFromEvent(other, null, MINDMAP_NODES, 'mindmap')).toBeNull()
   })
 
-  it('flowchart data-id 优先于 mindmap 文本匹配', () => {
+  it('mindmap：resolver 命中优先于文本匹配（命中 id ≠ 文本对应的 elementId 即证明）', () => {
     const node = el('<g data-id="A"><text>子节点</text></g>')
-    expect(inlineEditTargetFromEvent(node, flowResolver, MINDMAP_NODES)).toEqual({
-      kind: 'flowchart',
-      nodeId: 'A',
+    expect(inlineEditTargetFromEvent(node, flowResolver, MINDMAP_NODES, 'mindmap')).toEqual({
+      kind: 'mindmap',
+      elementId: 'A', // resolver 命中的 id 原样作为 elementId，而非文本匹配到的 :2
     })
+  })
+
+  it('kind=flowchart：resolver 未命中不回落 mindmap 文本匹配', () => {
+    const other = el('<g><text>子节点</text></g>')
+    expect(inlineEditTargetFromEvent(other, null, MINDMAP_NODES, 'flowchart')).toBeNull()
   })
 })
 
