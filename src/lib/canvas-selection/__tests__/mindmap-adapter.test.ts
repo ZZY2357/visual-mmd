@@ -29,6 +29,11 @@ describe('mindmapDataIdResolver（工单 06）', () => {
     expect(resolver('node_1')).toEqual({ kind: 'node', id: 'mindmap-node:2' })
   })
 
+  it('mermaid v12 带 svgId 前缀的 DOM id（{svgId}-node_N）按后缀命中（工单 08）', () => {
+    expect(resolver('mmd-preview-4-node_0')).toEqual({ kind: 'node', id: 'mindmap-node:1' })
+    expect(resolver('mmd-preview-12-node_1')).toEqual({ kind: 'node', id: 'mindmap-node:2' })
+  })
+
   it('未知 id（svg 根 id、越界序号）→ null', () => {
     expect(resolver('some-svg-id')).toBeNull()
     expect(resolver('node_99')).toBeNull()

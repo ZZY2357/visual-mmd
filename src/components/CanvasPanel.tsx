@@ -416,6 +416,10 @@ export function CanvasPanel({ preview, projection }: CanvasPanelProps) {
         onPointerDown={(e) => {
           // 内联编辑期间不让背景拖拽抢走指针（输入框上的按下要留给文本选择）
           if (editing !== null) return
+          // 右键菜单 / 添加样式表单打开时也不启动背景拖拽：拖拽的 setPointerCapture
+          // 会把后续指针事件（含派生的 click）劫持到容器，菜单项/表单按钮将永远
+          // 收不到点击（工单 08 浏览器实测发现）
+          if (ctx.menu !== null || ctx.styleForm !== null) return
           onPointerDown(e)
         }}
         onPointerMove={onPointerMove}

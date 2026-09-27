@@ -54,12 +54,15 @@ function findMindmapTextElement(root: Element, text: string): Element | null {
   return deepest
 }
 
-/** mindmap：优先按 DOM id 定位（工单 06：节点 g id = node_{N-1}，与选中一致），
+/** mindmap：优先按 DOM id 定位（工单 06：节点 g id 含 `node_{N-1}`，与选中一致；
+ * 工单 08：mermaid v12 的 id 带 svgId 前缀，按后缀回查），
  * 渲染产物不带该 id 时回落找文本内容等于给定文本的最深元素（其包围盒即标签位置） */
 function findMindmapElement(root: Element, elementId: string, text: string): Element | null {
   const domId = mindmapDomIdOf(elementId)
   if (domId !== null) {
-    const el = root.querySelector(`[id="${CSS.escape(domId)}"]`)
+    const el =
+      root.querySelector(`[id="${CSS.escape(domId)}"]`) ??
+      root.querySelector(`[id$="-${CSS.escape(domId)}"]`)
     if (el !== null) return el
   }
   return text === '' ? null : findMindmapTextElement(root, text)
