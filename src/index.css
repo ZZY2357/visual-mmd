@@ -1,0 +1,20 @@
+html,
+body,
+#root {
+  height: 100%;
+  margin: 0;
+}
+
+/* 代码面板错误行整行标红（工单 01：错误行标红并显示错误信息） */
+.cm-editor .cm-errorLine {
+  background: rgba(250, 82, 82, 0.18);
+}
+
+.cm-editor {
+  height: 100%;
+}
+
+.cm-editor .cm-scroller {
+  overflow: auto;
+  font-family: var(--mantine-font-family-monospace);
+}
