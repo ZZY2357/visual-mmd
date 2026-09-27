@@ -1,6 +1,8 @@
 import { reassemble, type SourceDocument } from './document'
 import type { DiagramParser, EditIntent, ParseResult, SourceParseError } from './parser'
 
+export type { EditIntent }
+
 /**
  * 源码变换管线（ADR-0008 的核心接缝）：
  *   (当前源码文本, 编辑意图) → 新源码文本

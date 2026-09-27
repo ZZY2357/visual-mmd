@@ -49,4 +49,37 @@ describe('管线错误处理：解析失败返回含行号的错误', () => {
     if (result.ok) return
     expect('source' in result).toBe(false)
   })
+
+  it('连线上的节点形状未闭合：错误指向所在行', () => {
+    const result = applyEdit('flowchart TD\n    A --> B(坏\n', flowchartParser, {
+      type: 'set-node-text',
+      nodeId: 'A',
+      text: 'x',
+    })
+    expect(result.ok).toBe(false)
+    if (result.ok) return
+    expect(result.error.line).toBe(2)
+  })
+
+  it('subgraph 缺少 end：错误指向 subgraph 声明行', () => {
+    const result = applyEdit('flowchart TD\n    A --> B\n    subgraph 组\n        C --> D\n', flowchartParser, {
+      type: 'set-node-text',
+      nodeId: 'A',
+      text: 'x',
+    })
+    expect(result.ok).toBe(false)
+    if (result.ok) return
+    expect(result.error.line).toBe(3)
+  })
+
+  it('多余的 end：错误指向所在行', () => {
+    const result = applyEdit('flowchart TD\n    A --> B\n    end\n', flowchartParser, {
+      type: 'set-node-text',
+      nodeId: 'A',
+      text: 'x',
+    })
+    expect(result.ok).toBe(false)
+    if (result.ok) return
+    expect(result.error.line).toBe(3)
+  })
 })
