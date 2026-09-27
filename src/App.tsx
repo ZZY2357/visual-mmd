@@ -11,6 +11,7 @@ import { CodePanel } from './components/CodePanel'
 import { CanvasPanel } from './components/CanvasPanel'
 import { PropertyPanel } from './components/PropertyPanel'
 import { ThreePaneLayout } from './components/ThreePaneLayout'
+import { useCanvasKeyboard } from './lib/editing/use-canvas-keyboard'
 
 /**
  * 三栏布局（工单 04）：代码面板 | 画布 | 属性面板（结构树 + 属性表单）。
@@ -32,6 +33,9 @@ export default function App() {
     () => (parseResult.ok ? buildFlowchartProjection(parseResult.doc) : null),
     [parseResult],
   )
+
+  // 画布键盘操作（工单 05）：选中节点后 Del/Tab/Enter，经管线落码可撤销
+  useCanvasKeyboard(projection)
 
   // 自动保存：连续输入合并为一次写入（防抖），卸载/隐藏时立即冲刷
   const debouncedSaveRef = useRef(debounce((src: string) => saveDiagram(src), 500))
@@ -89,7 +93,7 @@ export default function App() {
         <div style={{ height: 'calc(100vh - 56px - var(--mantine-spacing-md) * 2)' }}>
           <ThreePaneLayout
             code={<CodePanel error={preview.error} />}
-            canvas={<CanvasPanel preview={preview} />}
+            canvas={<CanvasPanel preview={preview} projection={projection} />}
             properties={
               <PropertyPanel
                 projection={projection}

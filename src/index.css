@@ -14,6 +14,12 @@ body,
   height: 100%;
 }
 
+/* 画布选中高亮（工单 05）：标记属性由 canvas-selection/highlight 打在
+   渲染 SVG 的 [data-id] 元素上；用 filter 光晕避免与 mermaid 描边样式冲突 */
+[data-vm-selected] {
+  filter: drop-shadow(0 0 4px var(--mantine-color-blue-6));
+}
+
 .cm-editor .cm-scroller {
   overflow: auto;
   font-family: var(--mantine-font-family-monospace);
