@@ -12,6 +12,13 @@ import { PropertyPanel } from './components/PropertyPanel'
 import { ThreePaneLayout } from './components/ThreePaneLayout'
 import { DiagramLibraryDrawer } from './components/DiagramLibraryDrawer'
 import { useCanvasKeyboard } from './lib/editing/use-canvas-keyboard'
+import {
+  downloadBlob,
+  readFileText,
+  sanitizeFileName,
+  svgToPngBlob,
+  withExtension,
+} from './lib/file-io'
 
 /**
  * 三栏布局（工单 04）：代码面板 | 画布 | 属性面板（结构树 + 属性表单）。
@@ -29,8 +36,45 @@ export default function App() {
   const undo = useEditorStore((s) => s.undo)
   const redo = useEditorStore((s) => s.redo)
   const newDiagram = useEditorStore((s) => s.newDiagram)
+  const commitEdit = useEditorStore((s) => s.commitEdit)
   const [libraryOpened, setLibraryOpened] = useState(false)
+  const fileInputRef = useRef<HTMLInputElement>(null)
   const preview = useMermaidPreview(source)
+
+  // 当前图表名（工单 10）：导出文件名的建议来源
+  const activeName = useMemo(
+    () => diagrams.find((d) => d.id === activeId)?.name ?? '',
+    [diagrams, activeId],
+  )
+  const exportBaseName = useMemo(() => sanitizeFileName(activeName), [activeName])
+
+  // ---- 导入/导出（工单 10）----
+  // 导入：文件内容原样成为当前源码（commitEdit 独立快照，可撤销）；
+  // 非法内容无需特判——预览与投影对源码的既有错误冻结路径自然生效
+  const handleImportFile = async (file: File | undefined) => {
+    if (file === undefined) return
+    try {
+      const text = await readFileText(file)
+      commitEdit(text)
+    } catch {
+      window.alert(t('file.importReadError'))
+    }
+    // 允许连续选择同一个文件再次触发 change
+    if (fileInputRef.current !== null) fileInputRef.current.value = ''
+  }
+  const handleExportMmd = () => {
+    // 导出的源码即代码面板原文（逐字保留承诺延伸到交付物），不做任何变换
+    downloadBlob(new Blob([source], { type: 'text/plain;charset=utf-8' }), withExtension(exportBaseName, 'mmd'))
+  }
+  const handleExportSvg = () => {
+    if (preview.svg === null) return
+    downloadBlob(new Blob([preview.svg], { type: 'image/svg+xml;charset=utf-8' }), withExtension(exportBaseName, 'svg'))
+  }
+  const handleExportPng = async () => {
+    if (preview.svg === null) return
+    const blob = await svgToPngBlob(preview.svg, { scale: 2, background: '#ffffff' })
+    downloadBlob(blob, withExtension(exportBaseName, 'png'))
+  }
 
   // 投影：源码 → 图种注册表分发解析器 → 只读结构视图（属性面板，工单 06 起）
   const diagramType = useMemo(() => detectDiagramType(source), [source])
@@ -77,6 +121,45 @@ export default function App() {
             </Text>
           </Group>
           <Group gap="xs">
+            <input
+              ref={fileInputRef}
+              type="file"
+              accept=".mmd,text/plain"
+              style={{ display: 'none' }}
+              onChange={(e) => void handleImportFile(e.target.files?.[0])}
+            />
+            <Button
+              variant="default"
+              size="compact-sm"
+              onClick={() => fileInputRef.current?.click()}
+              aria-label={t('file.importAria')}
+            >
+              {t('file.import')}
+            </Button>
+            <Menu shadow="md" withinPortal>
+              <Menu.Target>
+                <Button variant="default" size="compact-sm" aria-label={t('file.export')}>
+                  {t('file.export')}
+                </Button>
+              </Menu.Target>
+              <Menu.Dropdown>
+                <Menu.Item onClick={handleExportMmd}>{t('file.exportMmd')}</Menu.Item>
+                <Menu.Item
+                  disabled={preview.svg === null}
+                  title={preview.svg === null ? t('file.exportUnavailable') : undefined}
+                  onClick={() => void handleExportSvg()}
+                >
+                  {t('file.exportSvg')}
+                </Menu.Item>
+                <Menu.Item
+                  disabled={preview.svg === null}
+                  title={preview.svg === null ? t('file.exportUnavailable') : undefined}
+                  onClick={() => void handleExportPng()}
+                >
+                  {t('file.exportPng')}
+                </Menu.Item>
+              </Menu.Dropdown>
+            </Menu>
             <Button
               variant="default"
               size="compact-sm"

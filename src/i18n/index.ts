@@ -30,6 +30,16 @@ export const zhDict = {
       undo: '撤销',
       redo: '重做',
     },
+    file: {
+      import: '导入 .mmd',
+      importAria: '导入 .mmd 文件',
+      importReadError: '读取文件失败，请重试',
+      export: '导出',
+      exportMmd: '导出为 .mmd',
+      exportSvg: '导出为 SVG',
+      exportPng: '导出为 PNG',
+      exportUnavailable: '（画布尚未渲染成功，暂不可导出图像）',
+    },
     newDiagram: {
       title: '新建',
       flowchart: '流程图',
