@@ -242,6 +242,7 @@ DOM 节点 `mmd-preview-3-node_0..node_12`，用 `textContent` 实测出投影�
   属性面板保持原节点）——本节的"无选中"起点因此改用「结构树 → 图表mindmap」按钮构造。flowchart 的
   空白点击是否清除选中本轮**未单独构造对照实验**（首次 flowchart 点击前状态本就是图表级），故不对
   两种图种的行为差异下结论。
+- 本节汇总：7 条通过 / 0 条不通过 / 0 条无法验证。
 
 ### 04 空图空白右键（验收记录）
 
@@ -320,5 +321,5 @@ DOM 节点 `mmd-preview-3-node_0..node_12`，用 `textContent` 实测出投影�
 
 - 控制台：本节全流程（新建 5 种图 + 改源码 6 次 + 空图右键 4 次 + 非空右键 4 次 + 点击菜单项 7 次）
   `playwright-cli console error` / `console warning` 均返回 **Errors: 0 / Warnings: 0**。
-- 本节汇总：7 条通过 / 1 条不通过（class 内联命名）/ 0 条无法验证；不通过项已开
+- 本节汇总：6 条通过 / 1 条不通过（class 内联命名）/ 0 条无法验证；不通过项已开
   `09-class-inline-edit-target-unresolved.md`。
