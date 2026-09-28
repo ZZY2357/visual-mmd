@@ -173,3 +173,72 @@ Blocked by: 01, 02, 03, 04, 05, 06
   `flowchart TD\n    A[一] --> B\n    A[二] --> C\n`，控制台仍 0 报错（结构树里 `A` 被去重为
   单个 `一A`）——**本轮未能复现** React「Encountered two children with the same key」，无法给出
   触发视图/操作。该报错在 01/02 两节所覆盖的路径上均未出现。
+
+### 03 方向键（验收记录）
+
+环境：dev server `http://localhost:5199/`，viewport 1600×1000，先 `localStorage.clear()` 再 reload。
+全部按键走真实键盘事件（`playwright-cli press`）。**判定依据三件套**：(a) 渲染 SVG 上的选中标记属性
+`[data-vm-selected]`（`src/lib/canvas-selection/highlight.ts:9` 的 `HIGHLIGHT_ATTR`，mindmap 走
+`id.endsWith('-node_N')` 后缀匹配）；(b) 右侧属性面板的表单联动（选中节点时出现「显示文本 / 形状 /
+节点 ID」，图表级选中时为「方向」）；(c) `document.activeElement`（画布容器 = 无 class 的
+`DIV[tabindex="0"]`）。`preventDefault` 用 `document` 级 keydown 监听器读 `e.defaultPrevented`
+（监听器挂在 React 根容器之上、冒泡更晚，故读到的是 app/CodeMirror 处理后的结果）。
+
+**mindmap**（新建 → 思维导图，默认模板）。源码（代码面板文本与 `localStorage` 一致）：
+`mindmap\n  root((Visual MMD))\n    双面板同步\n      代码面板\n        源码是唯一真相源\n      画布\n        实时渲染预览\n    属性面板\n      结构树\n        树形缩进编辑\n      属性表单\n    图表库\n      ::icon(fa fa-database)\n      localStorage 自动保存\n      导出 mmd / svg / png\n`。
+DOM 节点 `mmd-preview-3-node_0..node_12`，用 `textContent` 实测出投影序映射：
+`_0=Visual MMD(根)`、`_1=双面板同步`、`_2=代码面板`、`_3=源码是唯一真相源`、`_4=画布`、
+`_5=实时渲染预览`、`_6=属性面板`、`_7=结构树`、`_8=树形缩进编辑`、`_9=属性表单`、`_10=图表库`、
+`_11=localStorage 自动保存`、`_12=导出 mmd / svg / png`（与源码 DFS 前序逐条吻合）。
+
+- [通过] mindmap 中层节点四向语义正确（父 / 首子 / 上兄弟 / 下兄弟）
+  —— 步骤：真实鼠标点选画布上的「属性面板」（`g[id$="-node_6"]`）后依次按 `←`/`→`/`↑`/`↓`
+  （每次按完回读状态，必要时用反向键回到 `_6` 重取基线）/ 预期：`←`=父、`→`=第一个子、
+  `↑`=上一个兄弟、`↓`=下一个兄弟 / 实际：`←` → `mmd-preview-3-node_0`（面板「显示文本」=
+  `Visual MMD`、「形状」= `圆 (( )`、「节点 ID」= `root`）；`→`（从根）→ `node_1`（`双面板同步`）；
+  `↑`（从 `_6`）→ `node_1`（`双面板同步`）；`↓`（从 `_1`）→ `node_6`（`属性面板`）→ `node_10`
+  （`图表库`，面板「图标」= `fa fa-database`）/ 通过。
+- [通过] mindmap 三种边界均无操作、不回绕
+  —— 步骤：分别把选中停在根节点 / 第一个兄弟 / 最后一个兄弟 / 叶子后按越界方向键 / 预期：无操作 /
+  实际：根 `node_0` 按 `←` → 仍 `node_0`；首兄弟 `node_1`（`双面板同步`）按 `↑` → 仍 `node_1`；
+  末兄弟 `node_10`（`图表库`）按 `↓` → 仍 `node_10`；叶子 `node_3`（`源码是唯一真相源`，无子）按
+  `→` → 仍 `node_3`。四个用例的状态回读与按键前逐字相同，未出现回绕到另一端 / 通过。
+- [通过] 方向键只移动选中，DOM 焦点始终留在画布容器
+  —— 步骤：每次按键后读 `document.activeElement` / 预期：焦点不动 / 实际：本节 mindmap 全流程
+  （约 14 次按键）`activeElement` 恒为 `DIV/`（tagName=DIV，className 为空，`tabindex="0"`）；
+  属性面板随选中联动（默认模板→`方向`；点节点→`显示文本/形状/节点ID/删除节点`）/ 通过。
+- [通过] 未选中任何节点时按 `→` 选中第一个节点（mindmap = 根）
+  —— 步骤：点结构树顶部的「图表mindmap」按钮（回到图表级选中，`[data-vm-selected]` = 空、面板只剩
+  「主题」），再点画布空白使容器获得焦点，然后按 `→` / 预期：选中根节点 / 实际：`→` 后
+  `[data-vm-selected]` = `mmd-preview-3-node_0`，面板 = `Visual MMD / 圆 (( ) / root` / 通过。
+- [通过] 边界按键 `preventDefault` 成立（"不滚动页面"的正向证据）
+  —— 步骤：在 `document` 级挂 keydown 监听器记录 `defaultPrevented`，焦点在画布容器时按根节点的
+  `←`（越界无操作）与 `↑` / 预期：被 `preventDefault` 拦截 / 实际：记录 =
+  `[{"k":"ArrowLeft","pd":true},{"k":"ArrowUp","pd":true}]` / 通过。
+  说明：页面本身 `documentElement.scrollHeight === clientHeight === 1000`（整页不可滚动），
+  画布容器 `overflow-x/y: hidden`，所以**无法用滚动位移做证据**，改用 `defaultPrevented`；
+  全流程 `window.scrollX/Y` 恒为 `[0,0]`（作为辅助观察，不单独构成结论）。
+
+**flowchart**（默认模板）。投影/结构树顺序 = `A(开始)`、`B(是否学会 Mermaid?)`、`C(享受画图)`、
+`D(用 Visual MMD)`，data-id 依次 `A/B/C/D`。
+
+- [通过] flowchart 未选中时按 `→` 选中投影首个节点；`→`/`↓` 前进、`←`/`↑` 回退、首尾无操作
+  —— 步骤：点画布空白（`[data-vm-selected]` = 空），按 `→` ×4、再 `←` ×2、`↑` ×2、`←` ×1、
+  `↓` ×1 / 预期：A → B → C → D → 尾无操作；再 C → B → A → 首无操作 → 首无操作；`↓` → B /
+  实际（逐步回读）：`→`=`A` → `B` → `C` → `D` → `D`（尾不回绕）；`←`=`C` → `B`；`↑`=`A`；
+  再 `↑`=`A`（首不回绕）；再 `←`=`A`；`↓`=`B`（`↓` 与 `→` 同义、`↑` 与 `←` 同义）/ 通过。
+- [通过] 焦点在代码面板时方向键是正常光标移动、不被画布拦截
+  —— 步骤：真实鼠标点代码面板（落点在源码第 2 行），读 DOM Selection 的 anchor/offset，然后按
+  `→`×3、`←`、`↓` / 预期：光标正常移动，画布选中不变 / 实际：`activeElement` 恒为
+  `DIV/cm-content cm-lineWrapping`（`closest('.cm-editor')` 为真）；offset 15 → 17 → 18 → 17（`←`），
+  `↓` 换到下一行 `    B -- 是 --> C[享受画图]`；同一期间 `[data-vm-selected]` 恒为 `["B"]` 不变。
+  另实测画布容器**不包含** CodeMirror：`document.querySelector('main div[tabindex="0"]').contains(document.querySelector('.cm-editor')) === false`
+  —— 说明事件根本到不了容器监听器，符合 design 意图 / 通过。
+
+- 控制台：本节全流程（创建 mindmap + 约 14 次 mindmap 按键 + 约 12 次 flowchart 按键 + 代码面板
+  6 次按键）`playwright-cli console error` 返回 **Errors: 0 / Warnings: 0**。
+- 题外观察（**非本节清单项，仅记录，不判通过/不通过**）：在 **mindmap** 画布上真实鼠标点击空白处
+  （实测两点 470,200 与 500,940，均为无节点的空白区），选中**不会**被清除（`[data-vm-selected]` 与
+  属性面板保持原节点）——本节的"无选中"起点因此改用「结构树 → 图表mindmap」按钮构造。flowchart 的
+  空白点击是否清除选中本轮**未单独构造对照实验**（首次 flowchart 点击前状态本就是图表级），故不对
+  两种图种的行为差异下结论。
