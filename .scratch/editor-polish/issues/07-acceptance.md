@@ -323,3 +323,66 @@ DOM 节点 `mmd-preview-3-node_0..node_12`，用 `textContent` 实测出投影�
   `playwright-cli console error` / `console warning` 均返回 **Errors: 0 / Warnings: 0**。
 - 本节汇总：6 条通过 / 1 条不通过（class 内联命名）/ 0 条无法验证；不通过项已开
   `09-class-inline-edit-target-unresolved.md`。
+
+### 05 mindmap id（验收记录）
+
+环境：dev server `http://localhost:5199/`，viewport 1600×1000，先 `localStorage.clear()` 再 reload。
+操作全部走真实 UI（右键菜单 / 属性面板表单 / 真实鼠标 `page.mouse.dblclick` / 真实键盘）；
+源码证据取自 `localStorage['visual-mmd:library'].diagrams.at(-1).source`（与代码面板逐字一致）。
+
+- [通过] 新节点默认纯文本 `新节点`，属性面板 ID 字段为空
+  —— 步骤：「新建」→「思维导图」（默认模板）→ 在画布节点「localStorage 自动保存」的真实包围盒中心
+  右键 → 点菜单「添加子节点」/ 预期：源码追加纯文本 `新节点`、ID 字段空 / 实际：源码新增
+  `        新节点`（无括号、无 id）；画布内联浮层自动打开（`style` 无 `display:none`、
+  `input.value = 新节点`、`document.activeElement === INPUT`）；Enter 提交后属性面板 =
+  `显示文本: 新节点`、`形状: 默认（无形状）`、`节点 ID: ""` / 通过。
+- [通过] 填 `NewId` → 源码 `NewId[新节点]`（方框），选中/高亮/双击内联编辑不位移
+  —— 步骤：「节点 ID」字段填 `NewId` + Enter / 预期：分离写法 + 引入方框 + 位置序寻址不受影响 /
+  实际：源码 `        NewId[新节点]`；画布 `[data-vm-selected]` 仍是 `mmd-preview-5-node_12`
+  （**同一个逻辑节点**、未错位），且该节点 `g[data-vm-selected]` 唯一；形状选择器显示 `方形 [ ]`；
+  对该节点真实 `page.mouse.dblclick` → 内联浮层 `display` 非 none、预填 `新节点`、`focused: true`、
+  浮层 `top` 与节点包围盒对齐（节点 box `[1107,626]`、浮层 box `[1081,626]`，同 y） / 通过。
+- [通过] 有形状的节点设 id → 形状保留（`((圆))` → `id((圆))`）
+  —— 步骤：属性面板「+ 添加子节点」子表单里「节点文本 = 圆」+「形状 = 圆 (( ))」→「添加」，
+  得到源码 `          ((圆))`（用户自选圆形、无 id）；再在该节点「节点 ID」填 `CircleId` / 预期：
+  `CircleId((圆))` 且圆形保留 / 实际：源码 `          CircleId((圆))`；画布该节点 SVG 仍含 `<circle>`
+  （`shapes = circle,rect`，`circle` 包围盒 `[1138,633,30,30]`），形状选择器显示 `圆 (( ))` / 通过。
+- [通过] 显示文本含空格保留：`User Input` → `UserNewInput[User Input]`；清空 id → 回落 `User Input`
+  —— 步骤：面板「+ 添加子节点」子表单「节点文本 = User Input」+「形状 = 默认（无形状）」→「添加」
+  → 源码 `            User Input`（空格保留、纯文本）；选中后「节点 ID」填 `UserNewInput` / 预期：
+  `UserNewInput[User Input]`（不丢空格）/ 实际：源码 `            UserNewInput[User Input]`；
+  再清空「节点 ID」+ Enter → 源码回落 `            User Input` / 通过。
+- [通过] 非法 id（含空格 / 圆括号 / 方括号 / 花括号）→ 表单阻止提交、源码不落码 + 错误提示
+  —— 步骤：逐次在「节点 ID」填 `Bad Id` / `Bad(Id)` / `Bad[Id]` / `Bad{Id}` + Enter / 预期：不落码 +
+  提示 / 实际：**四例全部**源码不变（仍为 `User Input`，`src.indexOf('Bad') === -1`），输入框带
+  `[invalid]` 属性，其 `.mantine-TextInput-error` 文案恒为
+  `ID 不能包含空白、圆括号、方括号、花括号`；画布无 Alert / 通过。
+- [通过] 两个不同节点用同一个 id → 允许、不报错
+  —— 步骤：把 `User Input` 节点 id 设为 `dup`（`dup[User Input]`），再把 `新节点` 节点 id 也设为
+  `dup` / 预期：允许 / 实际：源码同时含 `        dup[新节点]` 与 `            dup[User Input]`
+  （`dup[` 出现 2 次），ID 字段无 `[invalid]`、无错误文案、`.mantine-Alert-root` 数量 0、画布正常
+  渲染 / 通过。
+- [通过] 撤销/重做覆盖 设 id / 清 id
+  —— 步骤：连续两次「撤销」→ 连续两次「重做」；再对 `dup[User Input]` 清空 id，然后「撤销」/
+  「重做」各一次 / 实际：设 id 链 `dup[新节点]` →（撤销）→ `NewId[新节点]` / `User Input`，
+  重做链回到 `dup[新节点]` + `dup[User Input]`；清 id 链 `dup[User Input]` →（清空）→
+  `User Input` →（撤销）→ `dup[User Input]` →（重做）→ `User Input`，全程源码文本可逆 / 通过。
+
+**存疑点（如实记录实际观察，不下结论，供编排方裁定）**：对**用户自选形状**的节点先设 id 再清空 id，
+形状**保留了**。
+
+- 步骤：承上「圆」节点，源码 `((圆))`（用户自选圆形、无 id）→ 设 id `CircleId` → 再清空 id。
+- 实际（源码）：`((圆))` → 设 id → `CircleId((圆))` → 清空 id → **`((圆))`**（**不是**回落成 `圆`）。
+- 实际（画布外观）：清空前该节点为 `<circle>` 30×30（`circle` 包围盒 `[1138,633,30,30]`）；
+  清空后仍是同一个 `<circle>`（`shapes = circle,rect`，`circle` 包围盒 `[1138,633,30,30]`）
+  → **用户自选形状保留**。
+- 对照：对**纯文本**节点（`User Input`）设 id 再清空，源码 `User Input` → `UserNewInput[User Input]`
+  → 清空 → `User Input`（**完全回到纯文本**）—— 因为该方框是"分离必然引入的"、清除时一并去掉。
+- 即实现取的是"保留用户自选形状、只去掉分离必然引入的方框"，与票面另一句"还原纯文本"的字面表述
+  不一致；实际观察以本记录为准。
+
+- 控制台：本节全流程（新建 mindmap + 右键加子节点 + 面板子表单加 3 个节点 + 设/清 id 约 8 次 +
+  非法 id 4 次 + 撤销/重做 5 次 + 双击 + 多次点选）`playwright-cli console` 显示
+  **Errors: 0 / Warnings: 0**。
+
+- 本节汇总：7 条通过 / 0 条不通过 / 0 条无法验证；存疑点已如实记录（无新增失败单）。
