@@ -1,6 +1,6 @@
 # 04 空图的空白右键菜单
 
-Status: needs-triage
+Status: resolved
 
 ## 需求
 
@@ -47,4 +47,9 @@ Status: needs-triage
 
 ## Comments
 
-（空）
+- 实现提交 `e29b069`（合并后 `26db3f3`）。`npm run typecheck` 与 `npm test` 全绿。
+- 跨出票面白名单改了 3 个文件，属验收必需的最小改动：`CanvasPanel.tsx`（3 行菜单动作 dispatch，
+  否则新菜单项点不动）、`inline-edit.ts`（新增独立类型 `CanvasInlineEditTarget`，class/sequence 落
+  `rename-class` / `rename-participant`）、`use-canvas-inline-edit.ts`（trans 目标 + data-id 定位）。
+  用独立类型是为了不扩大画布键盘（工单 03/06）的契约。
+- 存疑：mindmap 空白加根节点固定预置 `mindmap-node:1`（依赖投影序号契约）；待工单 07 手工验收。
