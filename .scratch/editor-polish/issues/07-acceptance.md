@@ -1,6 +1,6 @@
 # 07 验收收尾
 
-Status: needs-triage
+Status: resolved
 
 Blocked by: 01, 02, 03, 04, 05, 06
 
@@ -658,4 +658,25 @@ DOM 节点 `mmd-preview-3-node_0..node_12`，用 `textContent` 实测出投影�
   0 条无法验证。**未修改任何源码**（`git status` 干净）。
   证据文件：`C:\Users\zzy2357\AppData\Local\Temp\vmmd-verify\narrow-480.png`；
   导出产物 `.playwright-cli/思维导图.mmd|svg|png`（358 / 46898 / 16134 字节）。
+
+### 收尾
+
+以上 01-07 七节均为**真实浏览器实测**记录（证据含源码文本、DOM 片段、字节级导出对照、截图）。
+**7 节全部执行完毕，验收过程未改动任何源码。**
+
+验收发现 **5 条不通过**，已各开一张失败单（均 `Status: needs-triage`，按票面要求未在本票改需求）：
+
+| 单 | 标题 | 影响面 |
+|---|---|---|
+| [08](08-theme-toplevel-key-not-cleared.md) | 顶层 `theme:` 行（config 块之外）不回显也不被清除 | 口径张力：需先裁定"顶层 theme 是否算受支持写法" |
+| [09](09-class-inline-edit-target-unresolved.md) | class 节点缺 `data-id` → class 的画布点选 / 内联编辑 / 节点右键菜单全不可用 | **功能性缺口**；06 节的 1 条不通过 + 2 条无法验证都归因于此 |
+| [10](10-sequence-add-message-duplicate-participant.md) | sequence 隐式参与者未按 actorId 合并 → 结构树重复参与者 + React 重复 key | 功能性 bug，根因在投影层 |
+| [11](11-cascade-delete-leaves-empty-block.md) | 「删除参与者」级联后残留空 `loop`/`alt` 块，mermaid 侧产出成批 NaN 属性 error | 功能性 bug |
+| [12](12-fit-view-button-pointer-capture-hijack.md) | 「适应窗口」按钮真实鼠标点击被背景拖拽的指针捕获劫持；键盘 Enter 触发又误加节点 | 交互 bug |
+
+另有 **1 处口径张力**（未开单，记录在 05 节）：对**用户自选形状**的 mindmap 节点先设 id 再清空 id，
+实现**保留**了自选形状（`((圆))` → `CircleId((圆))` → `((圆))`），而票面另一句写"还原纯文本"；
+纯文本节点被分离引入的方框则会一并去掉。需裁定取哪种口径。
+
+回归基线：`npm test` 43 files / 519 tests 全绿；`npm run typecheck` 无输出。
 
