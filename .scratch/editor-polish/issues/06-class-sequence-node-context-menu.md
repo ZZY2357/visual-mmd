@@ -1,6 +1,6 @@
 # 06 class/sequence 的节点右键菜单
 
-Status: ready-for-agent
+Status: resolved
 
 ## 需求
 
