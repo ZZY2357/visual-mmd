@@ -1,6 +1,6 @@
 # 05 mindmap 的 id 与显示文本分离
 
-Status: needs-triage
+Status: resolved
 
 ## 需求
 
@@ -55,4 +55,8 @@ Status: needs-triage
 
 ## Comments
 
-（空）
+- 实现提交 `89978ad`（合并后 `295aa68`）。`npm run typecheck` 与 `npm test` 全绿。新增
+  `mindmap-projection.test.ts`、`mindmap-forms.test.tsx`，金样补 `NewId[新节点]` 与 `id((圆))`。
+- 清 id 的语义票面两句有张力（"还原纯文本" vs "形状按 mermaid 语义回落"）。实现取：去掉 id 前缀，
+  并去掉**分离必然引入的方框**（`UserNewInput[User Input]` → `User Input`），用户自选的圆/
+  圆角/六边形形状保留（`root((思维导图))` → `((思维导图)`）。工单 07 验收时确认。
