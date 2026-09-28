@@ -1,16 +1,23 @@
 import { useEffect, useRef } from 'react'
-import type { FlowchartProjection } from '../projection/flowchart-projection'
-import type { MindmapProjection } from '../projection/mindmap-projection'
 import { useEditorStore } from '../../store/editor'
 import type { InlineEditTarget } from './inline-edit'
-import { keyToNodeAction, mindmapActionIntents, nodeActionIntents } from './canvas-keyboard'
+import {
+  isNavigationKey,
+  keyToNodeAction,
+  mindmapActionIntents,
+  navigationTarget,
+  nodeActionIntents,
+  type CanvasKeyboardProjection,
+} from './canvas-keyboard'
 
 /**
- * 画布键盘操作 Hook（工单 04 焦点体系，工单 06 扩展 mindmap）：keydown 挂在画布
- * 容器上（而非 window），天然只在画布持有焦点时触发——焦点在代码面板或任何输入框
- * 时事件根本不会到达容器，完全不拦截。容器内若嵌有输入控件（防御性保留），也不触发
+ * 画布键盘操作 Hook（工单 04 焦点体系，工单 06 扩展 mindmap，工单 03 方向键导航）：
+ * keydown 挂在画布容器上（而非 window），天然只在画布持有焦点时触发——焦点在代码面板或
+ * 任何输入框时事件根本不会到达容器，完全不拦截。容器内若嵌有输入控件（防御性保留），也不触发
  * 画布操作。Del / Tab / Enter 映射为编辑意图，经 commitIntent 手术式落码（可撤销）。
  * 添加动作成功后自动选中新节点并回调 onNodeCreated（工单 05 已接线：内联命名）。
+ * 方向键（Tab/Enter/Del 未命中时）移动「选中」本身（ADR-0010：不动 DOM 焦点），
+ * 到边界无操作但仍 preventDefault（否则页面滚动）。
  *
  * 图种语义（键位相同，落码各按其语法）：
  * - flowchart（工单 04）：Tab = 选中 --> 新；Enter = 父 --> 新（无入边退化为连出）
@@ -18,9 +25,7 @@ import { keyToNodeAction, mindmapActionIntents, nodeActionIntents } from './canv
  */
 
 /** 参与画布键盘的图种投影（tagged union，keydown 时按图种分支） */
-export type CanvasKeyboardProjection =
-  | { kind: 'flowchart'; projection: FlowchartProjection }
-  | { kind: 'mindmap'; projection: MindmapProjection }
+export type { CanvasKeyboardProjection }
 
 /** 容器内焦点落在这类控件上时不触发画布键盘操作 */
 const FOCUS_EXCLUDE_SELECTOR =
@@ -54,7 +59,14 @@ export function useCanvasKeyboard(
 
       const { selection, commitIntent, select } = useEditorStore.getState()
       const action = keyToNodeAction(e.key, { shift: e.shiftKey })
-      if (action === null) return
+      if (action === null) {
+        // 方向键导航（工单 03）：只改选中，不动 DOM 焦点；到边界无操作也要 preventDefault
+        if (!isNavigationKey(e.key)) return
+        e.preventDefault()
+        const next = navigationTarget(target, selection, e.key)
+        if (next !== null) select(next)
+        return
+      }
 
       // 落码成功后：选中 + 进入内联命名的目标（两类图种各按其选中种类）
       let newTarget: InlineEditTarget | null = null

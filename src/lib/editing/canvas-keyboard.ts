@@ -3,13 +3,18 @@ import { nodeElementId } from '../pipeline/flowchart'
 import type { MindmapIntent } from '../pipeline/mindmap'
 import type { FlowchartProjection } from '../projection/flowchart-projection'
 import type { MindmapProjection } from '../projection/mindmap-projection'
+import type { Selection } from '../projection/selection'
 
 /**
- * 画布选中后的键盘操作（工单 05）：Del 删除、Tab 添加子节点、Enter 添加同级节点。
- *
- * 本模块是纯逻辑：键位 → 动作、动作 → 编辑意图序列。落码经管线
- * applyEdit / commitIntent（03 编辑意图 + ADR-0008 手术式改写），快照入栈可撤销。
+ * 画布键盘的纯逻辑（工单 05 编辑动作 / 工单 03 方向键导航）：
+ * 键位 → 动作、动作 → 编辑意图序列、方向键 → 新的选中。
+ * 落码经管线 applyEdit / commitIntent（03 编辑意图 + ADR-0008 手术式改写），快照入栈可撤销。
  */
+
+/** 参与画布键盘的图种投影（tagged union，keydown 时按图种分支） */
+export type CanvasKeyboardProjection =
+  | { kind: 'flowchart'; projection: FlowchartProjection }
+  | { kind: 'mindmap'; projection: MindmapProjection }
 
 export type NodeKeyAction = 'delete' | 'add-child' | 'add-sibling'
 
@@ -110,4 +115,90 @@ export function mindmapActionIntents(
     return { intents: [{ type: 'add-child', parentElementId: elementId, text: defaultText }], newElementId }
   }
   return { intents: [{ type: 'add-sibling', elementId, text: defaultText }], newElementId }
+}
+
+// ---------- 方向键导航（工单 03）：移动「选中」本身，不动 DOM 焦点 ----------
+
+/** 本批参与导航的键位；其余键（含组合键）不参与 */
+export function isNavigationKey(key: string): boolean {
+  return key === 'ArrowLeft' || key === 'ArrowRight' || key === 'ArrowUp' || key === 'ArrowDown'
+}
+
+/**
+ * 方向键 → 新的选中；无对应目标时 null（调用方仍应 preventDefault，避免页面滚动）。
+ *
+ * 语义（CONTEXT.md「选中」词条 + ADR-0010）：只移动选中，不引入独立于选中的「焦点」概念，
+ * 焦点始终留在画布容器上。
+ * - mindmap（树形四向）：`←` 父节点（根 → null）；`→` 第一个子节点（无子 → null）；
+ *   `↑`/`↓` 上一个/下一个兄弟（到边界 → null）
+ * - flowchart（线性）：`←`/`↑` 上一个节点、`→`/`↓` 下一个节点；顺序即投影数组顺序
+ *   （源码出现顺序），**不是**画布上的视觉方位；到首/尾 → null
+ * - 当前没有选中本图种的节点时（无选中 / 图表级 / 别种元素 / 选中已不在投影中）：
+ *   任方向键选中第一个节点（mindmap 根 / flowchart 首节点）——应用初始选中是「图表级」，
+ *   这让方向键一按即有落点
+ *
+ * 到边界一律无操作、不回绕；空投影返回 null。
+ */
+export function navigationTarget(
+  target: CanvasKeyboardProjection,
+  selection: Selection | null,
+  key: string,
+): Selection | null {
+  return target.kind === 'mindmap'
+    ? mindmapNavigationTarget(target.projection, selection, key)
+    : flowchartNavigationTarget(target.projection, selection, key)
+}
+
+function mindmapNavigationTarget(
+  projection: MindmapProjection,
+  selection: Selection | null,
+  key: string,
+): Selection | null {
+  const nodes = projection.nodes
+  if (nodes.length === 0) return null
+  const node =
+    selection !== null && selection.kind === 'mindmap-node'
+      ? nodes.find((n) => n.elementId === selection.elementId)
+      : undefined
+  if (node === undefined) return mindmapNodeSelection(nodes[0].elementId)
+
+  if (key === 'ArrowLeft') {
+    // 父节点；根节点（无父）无操作
+    return node.parentId === null ? null : mindmapNodeSelection(node.parentId)
+  }
+  if (key === 'ArrowRight') {
+    // 第一个子节点（文档序里首个 parentId 指向本节点的节点）
+    const child = nodes.find((n) => n.parentId === node.elementId)
+    return child === undefined ? null : mindmapNodeSelection(child.elementId)
+  }
+  // 兄弟 = 同父节点集合（根节点无父，其「兄弟」只有自己）
+  const siblings = nodes.filter((n) => n.parentId === node.parentId)
+  const index = siblings.findIndex((n) => n.elementId === node.elementId)
+  const siblingIndex = key === 'ArrowUp' ? index - 1 : key === 'ArrowDown' ? index + 1 : -1
+  const sibling = siblings[siblingIndex] // 非 ↑/↓ 或越界 → undefined（无操作）
+  return sibling === undefined ? null : mindmapNodeSelection(sibling.elementId)
+}
+
+function flowchartNavigationTarget(
+  projection: FlowchartProjection,
+  selection: Selection | null,
+  key: string,
+): Selection | null {
+  const nodes = projection.nodes
+  if (nodes.length === 0) return null
+  const index =
+    selection !== null && selection.kind === 'node'
+      ? nodes.findIndex((n) => n.nodeId === selection.nodeId)
+      : -1
+  if (index === -1) return { kind: 'node', nodeId: nodes[0].nodeId }
+
+  const step =
+    key === 'ArrowLeft' || key === 'ArrowUp' ? -1 : key === 'ArrowRight' || key === 'ArrowDown' ? 1 : 0
+  if (step === 0) return null
+  const next = nodes[index + step]
+  return next === undefined ? null : { kind: 'node', nodeId: next.nodeId }
+}
+
+function mindmapNodeSelection(elementId: string): Selection {
+  return { kind: 'mindmap-node', elementId }
 }

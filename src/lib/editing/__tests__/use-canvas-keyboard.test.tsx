@@ -7,6 +7,7 @@ import { flowchartParser } from '../../pipeline/flowchart'
 import { mindmapParser } from '../../pipeline/mindmap'
 import { buildFlowchartProjection } from '../../projection/flowchart-projection'
 import { buildMindmapProjection } from '../../projection/mindmap-projection'
+import type { Selection } from '../../projection/selection'
 import { nodeDataIdResolver } from '../../canvas-selection/data-id'
 import { useCanvasInlineEdit } from '../use-canvas-inline-edit'
 import { useCanvasKeyboard, type CanvasKeyboardProjection } from '../use-canvas-keyboard'
@@ -213,6 +214,145 @@ describe('useCanvasKeyboard（工单 06 mindmap 画布键盘）', () => {
     expect(source).not.toContain('分支A')
     expect(source).not.toContain('叶子')
     expect(created).toEqual([])
+  })
+})
+
+describe('useCanvasKeyboard（工单 03 方向键导航：flowchart）', () => {
+  let host: HTMLDivElement
+  let root: ReturnType<typeof createRoot>
+
+  beforeEach(() => {
+    host = document.createElement('div')
+    document.body.appendChild(host)
+    root = createRoot(host)
+  })
+  afterEach(() => {
+    act(() => root.unmount())
+    host.remove()
+    resetEditorHistory(DEFAULT_DIAGRAM_SOURCE)
+    useEditorStore.getState().select(null)
+  })
+
+  /** 挂载画布容器（投影序：A、B）；selection 为 null 时模拟「无选中」 */
+  function mountFlow(selection: Selection | null = { kind: 'node', nodeId: 'A' }) {
+    resetEditorHistory(SAMPLE)
+    useEditorStore.getState().select(selection)
+    const projection = flowProjectionOf(SAMPLE)
+    act(() => {
+      root.render(<Harness target={{ kind: 'flowchart', projection }} />)
+    })
+    return host.firstElementChild as HTMLDivElement
+  }
+
+  it('画布聚焦时 →：选中下一个节点（源码顺序）、preventDefault、不改源码', () => {
+    const container = mountFlow()
+
+    expect(keyOn(container, 'ArrowRight')).toBe(true)
+    expect(useEditorStore.getState().selection).toEqual({ kind: 'node', nodeId: 'B' })
+    expect(useEditorStore.getState().source).toBe(SAMPLE)
+
+    expect(keyOn(container, 'ArrowUp')).toBe(true)
+    expect(useEditorStore.getState().selection).toEqual({ kind: 'node', nodeId: 'A' })
+  })
+
+  it('到末尾按 → / ↓：无操作（不回绕）但仍 preventDefault（不滚动页面）', () => {
+    const container = mountFlow({ kind: 'node', nodeId: 'B' })
+
+    expect(keyOn(container, 'ArrowRight')).toBe(true)
+    expect(useEditorStore.getState().selection).toEqual({ kind: 'node', nodeId: 'B' })
+    expect(keyOn(container, 'ArrowDown')).toBe(true)
+    expect(useEditorStore.getState().selection).toEqual({ kind: 'node', nodeId: 'B' })
+  })
+
+  it('选中图表级（无节点选中）时按方向键：选中投影首个节点', () => {
+    const container = mountFlow(null)
+
+    expect(keyOn(container, 'ArrowLeft')).toBe(true)
+    expect(useEditorStore.getState().selection).toEqual({ kind: 'node', nodeId: 'A' })
+  })
+
+  it('焦点在容器内的输入控件上：完全不拦截，选中不变', () => {
+    const container = mountFlow()
+    const input = document.createElement('input')
+    container.appendChild(input)
+
+    expect(keyOn(input, 'ArrowRight')).toBe(false)
+    expect(useEditorStore.getState().selection).toEqual({ kind: 'node', nodeId: 'A' })
+  })
+
+  it('焦点在容器外（代码面板等）：事件不经过容器监听，不拦截不改选中', () => {
+    mountFlow()
+    const outside = document.createElement('div')
+    document.body.appendChild(outside)
+
+    expect(keyOn(outside, 'ArrowRight')).toBe(false)
+    expect(useEditorStore.getState().selection).toEqual({ kind: 'node', nodeId: 'A' })
+    outside.remove()
+  })
+})
+
+describe('useCanvasKeyboard（工单 03 方向键导航：mindmap）', () => {
+  let host: HTMLDivElement
+  let root: ReturnType<typeof createRoot>
+
+  beforeEach(() => {
+    host = document.createElement('div')
+    document.body.appendChild(host)
+    root = createRoot(host)
+  })
+  afterEach(() => {
+    act(() => root.unmount())
+    host.remove()
+    resetEditorHistory(DEFAULT_DIAGRAM_SOURCE)
+    useEditorStore.getState().select(null)
+  })
+
+  // 节点序：root=1，分支A=2，叶子=3，分支B=4
+  function mountMindmap(selection: Selection | null = { kind: 'mindmap-node', elementId: 'mindmap-node:2' }) {
+    resetEditorHistory(MINDMAP_SAMPLE)
+    useEditorStore.getState().select(selection)
+    const projection = mindmapProjectionOf(MINDMAP_SAMPLE)
+    act(() => {
+      root.render(<Harness target={{ kind: 'mindmap', projection }} newNodeText="新节点" />)
+    })
+    return host.firstElementChild as HTMLDivElement
+  }
+
+  it('画布聚焦时 ← 走父节点、→ 走第一个子节点、↓ 走下一个兄弟', () => {
+    const container = mountMindmap()
+
+    expect(keyOn(container, 'ArrowLeft')).toBe(true)
+    expect(useEditorStore.getState().selection).toEqual({ kind: 'mindmap-node', elementId: 'mindmap-node:1' })
+    expect(keyOn(container, 'ArrowRight')).toBe(true)
+    expect(useEditorStore.getState().selection).toEqual({ kind: 'mindmap-node', elementId: 'mindmap-node:2' })
+    expect(keyOn(container, 'ArrowDown')).toBe(true)
+    expect(useEditorStore.getState().selection).toEqual({ kind: 'mindmap-node', elementId: 'mindmap-node:4' })
+    // 不改源码：导航只移动选中
+    expect(useEditorStore.getState().source).toBe(MINDMAP_SAMPLE)
+  })
+
+  it('到边界（根按 ←）无操作但仍 preventDefault（不滚动页面）', () => {
+    const container = mountMindmap({ kind: 'mindmap-node', elementId: 'mindmap-node:1' })
+
+    expect(keyOn(container, 'ArrowLeft')).toBe(true)
+    expect(useEditorStore.getState().selection).toEqual({ kind: 'mindmap-node', elementId: 'mindmap-node:1' })
+  })
+
+  it('无选中时按 →：选中根节点', () => {
+    const container = mountMindmap(null)
+
+    expect(keyOn(container, 'ArrowRight')).toBe(true)
+    expect(useEditorStore.getState().selection).toEqual({ kind: 'mindmap-node', elementId: 'mindmap-node:1' })
+  })
+
+  it('焦点在容器外的代码面板：方向键不拦截不改选中', () => {
+    mountMindmap()
+    const outside = document.createElement('div')
+    document.body.appendChild(outside)
+
+    expect(keyOn(outside, 'ArrowDown')).toBe(false)
+    expect(useEditorStore.getState().selection).toEqual({ kind: 'mindmap-node', elementId: 'mindmap-node:2' })
+    outside.remove()
   })
 })
 
