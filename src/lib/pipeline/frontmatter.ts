@@ -1,19 +1,49 @@
 /**
- * frontmatter 主题配置（工单 11，图种无关）：
- * 五种 mermaid 主题以 YAML frontmatter 的 `config: theme:` 落码（mermaid v10.5+
- * 官方写法，金样测试用 mermaid v12 实际 parse 验证其合法性）。
+ * frontmatter 主题配置（工单 01，图种无关）：
+ * mermaid 12 的 11 个主题以 YAML frontmatter 的 `config: theme:` 落码
+ * （mermaid v10.5+ 官方写法，金样测试用 mermaid v12 实际 parse 验证其合法性）。
  *
  * 手术式语义（ADR-0008）：
  * - 无 frontmatter：在文首插入 `---\nconfig:\n  theme: xxx\n---\n`
  * - 已有 frontmatter：只新增/改写主题项一行；用户手写的其余配置项逐字保留
+ * - 清除（theme = null）：删 `theme:` 行 → `config:` 下再无有效子项（忽略空行与
+ *   `#` 注释）则连 `config:` 行一起删 → frontmatter 因此无有效内容则连整块一起删
+ *   （回到「无 frontmatter」），正文与其余配置项逐字保留
  *
  * 本模块不参与各图种解析器的元素解析；frontmatter 块整体作为文档开头的
  * verbatim 区间被解析器保留（各 parseDocument 用 frontmatterEnd 跳过）。
  */
 
-export type MermaidTheme = 'default' | 'neutral' | 'dark' | 'forest' | 'base'
+export type MermaidTheme =
+  | 'default'
+  | 'neutral'
+  | 'dark'
+  | 'forest'
+  | 'base'
+  | 'redux-color'
+  | 'redux-dark-color'
+  | 'redux'
+  | 'redux-dark'
+  | 'neo'
+  | 'neo-dark'
 
-export const MERMAID_THEMES: readonly MermaidTheme[] = ['default', 'neutral', 'dark', 'forest', 'base']
+/**
+ * mermaid 12 注册的全部 11 个主题（spec 背景事实）。
+ * 顺序 = 选择器展示顺序：既有 5 个在前，新增 6 个在后。
+ */
+export const MERMAID_THEMES: readonly MermaidTheme[] = [
+  'default',
+  'neutral',
+  'dark',
+  'forest',
+  'base',
+  'redux-color',
+  'redux-dark-color',
+  'redux',
+  'redux-dark',
+  'neo',
+  'neo-dark',
+]
 
 export function isMermaidTheme(value: string): value is MermaidTheme {
   return (MERMAID_THEMES as readonly string[]).includes(value)
@@ -73,29 +103,68 @@ function findConfigLine(lines: string[]): number {
   return lines.findIndex((l) => /^config[ \t]*:/.test(l.trim()) && /^[ \t]*config[ \t]*:/.test(l))
 }
 
-/** 读取当前主题；无 frontmatter / 无 config / 无 theme / 值非法时返回 null */
-export function readTheme(source: string): MermaidTheme | null {
+/** 有效行 = 非空且非 `#` 注释（判定 config 子项与 frontmatter 是否为空时忽略它们） */
+function isEffectiveLine(line: string): boolean {
+  const trimmed = line.trim()
+  return trimmed !== '' && !trimmed.startsWith('#')
+}
+
+/** 删掉 theme 行后，config 块内是否还有有效子项（止于下一个顶层键） */
+function hasEffectiveConfigChildren(lines: string[], configIdx: number): boolean {
+  for (let i = configIdx + 1; i < lines.length; i++) {
+    if (!isEffectiveLine(lines[i])) continue
+    const indent = /^([ \t]*)/.exec(lines[i])?.[1] ?? ''
+    if (indent.length === 0) break // 下一个顶层键：config 块结束
+    return true
+  }
+  return false
+}
+
+/**
+ * 读取源码里的主题**原始字符串**；无 frontmatter / 无 config / 无 theme 键时返回 null。
+ * 不做白名单过滤：手写的非法值（如 `solarized`）也如实回显（mermaid 会静默忽略它）。
+ */
+export function readTheme(source: string): string | null {
   const split = splitFrontmatter(source)
   if (split === null) return null
   const configIdx = findConfigLine(split.lines)
   if (configIdx === -1) return null
   const themeIdx = findThemeLine(split.lines, configIdx)
   if (themeIdx === -1) return null
-  const value = split.lines[themeIdx].slice(split.lines[themeIdx].indexOf(':') + 1).trim()
-  return isMermaidTheme(value) ? value : null
+  const line = split.lines[themeIdx]
+  const value = line.slice(line.indexOf(':') + 1).trim()
+  return value === '' ? null : value
 }
 
 /**
  * 主题编辑的手术式落码：`(当前源码, 主题) → 新源码`。
- * 未触碰的 frontmatter 配置项与图表正文逐字保留。
+ * - theme 为字符串：新增/改写主题项一行；未触碰的 frontmatter 配置项与图表正文逐字保留
+ * - theme 为 null（「跟随 Mermaid 默认」）：清除主题键，并连带清掉因此悬空的
+ *   `config:` 行与 frontmatter 块
  */
-export function applySetTheme(source: string, theme: MermaidTheme): string {
+export function applySetTheme(source: string, theme: MermaidTheme | null): string {
   const split = splitFrontmatter(source)
-  if (split === null) {
-    return `---\nconfig:\n  theme: ${theme}\n---\n` + source
-  }
+  if (split === null) return theme === null ? source : `---\nconfig:\n  theme: ${theme}\n---\n` + source
   const { lines, openDelimiter, closeDelimiter, body, eol } = split
   const configIdx = findConfigLine(lines)
+
+  if (theme === null) {
+    // ---- 清除：删 theme 行 → 若 config 再无有效子项则删 config 行 → 若 frontmatter
+    // 再无有效内容则删整块（含因此悬空的空行与注释），回到「无 frontmatter」 ----
+    if (configIdx === -1) return source
+    const themeIdx = findThemeLine(lines, configIdx)
+    if (themeIdx === -1) return source
+    const withoutTheme = lines.filter((_, i) => i !== themeIdx)
+    if (hasEffectiveConfigChildren(withoutTheme, configIdx)) {
+      return openDelimiter + withoutTheme.join(eol) + eol + closeDelimiter + body
+    }
+    const withoutConfig = withoutTheme.filter((_, i) => i !== configIdx)
+    if (withoutConfig.some(isEffectiveLine)) {
+      return openDelimiter + withoutConfig.join(eol) + eol + closeDelimiter + body
+    }
+    return body
+  }
+
   const newLines = [...lines]
 
   if (configIdx === -1) {

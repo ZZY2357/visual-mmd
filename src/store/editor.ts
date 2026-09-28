@@ -179,11 +179,12 @@ export const useEditorStore = create<EditorState>((set, get) => ({
   commitIntent: (intent) => {
     const state = get()
     const current = state.source
-    // 主题是图种无关的 frontmatter 编辑（工单 11）：不经图种解析器，
-    // 直接手术式落码；源码有语法错误时也可用（不依赖解析成功）
+    // 主题是图种无关的 frontmatter 编辑（工单 01）：不经图种解析器，
+    // 直接手术式落码；源码有语法错误时也可用（不依赖解析成功）。
+    // theme: null = 「跟随 Mermaid 默认」，清除主题键（连带清掉悬空的 config/frontmatter）
     if (intent.type === 'set-theme') {
       const theme = intent.theme
-      if (typeof theme !== 'string' || !isMermaidTheme(theme)) return false
+      if (theme !== null && (typeof theme !== 'string' || !isMermaidTheme(theme))) return false
       const next = applySetTheme(current, theme)
       snapshotStack.commit(next)
       set({ source: next, diagrams: withActiveSource(state, next), ...historyOf(snapshotStack) })
