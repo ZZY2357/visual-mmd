@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useRef, useState, type ReactNode } from 'react'
 import { Alert, Box, Button, ColorInput, Group, Stack, Text, TextInput, Title, UnstyledButton } from '@mantine/core'
 import { useTranslation } from 'react-i18next'
 import type { MermaidPreview } from '../lib/use-mermaid-preview'
@@ -14,6 +14,8 @@ import type { InlineEditCloseOptions } from '../lib/editing/use-canvas-inline-ed
 import type { Rect } from '../lib/editing/inline-edit'
 import { useCanvasContextMenu } from '../lib/editing/use-canvas-context-menu'
 import type { ContextMenuItemId } from '../lib/editing/context-menu'
+import { AddMemberInlineForm, AddRelationInlineForm } from './class-forms'
+import { AddMessageInlineForm } from './sequence-forms'
 import { useCanvasView } from '../lib/canvas-view/use-canvas-view'
 import type { AnyProjection } from '../lib/diagram-registry'
 import { useEditorStore } from '../store/editor'
@@ -32,9 +34,10 @@ import { useEditorStore } from '../store/editor'
  * 内联编辑（工单 05）：双击节点（flowchart + mindmap）原位浮出输入框，回车/失焦
  * 提交、Esc 取消；Tab/Enter 新建节点后经 onNodeCreated 自动进入同一输入框。
  *
- * 右键菜单（工单 07）：单一菜单随右键目标变化（空白/节点/连线/mindmap 节点），
- * 挂在画布容器上阻止浏览器默认菜单，代码面板不受影响；连线模式光标十字，
- * 依次单击起点终点创建连线；「添加样式」在菜单位置浮出小表单，提交才落码。
+ * 右键菜单（工单 07/04/06）：单一菜单随右键目标变化（空白/节点/连线/mindmap 节点/
+ * class 节点/sequence 参与者），挂在画布容器上阻止浏览器默认菜单，代码面板不受影响；
+ * 连线模式光标十字，依次单击起点终点创建连线；「添加样式」与 class/sequence 的
+ * 「添加成员/关系/消息」在菜单位置浮出小表单，提交才落码。
  */
 
 interface CanvasPanelProps {
@@ -147,6 +150,9 @@ function menuItemLabel(t: (k: string) => string, id: ContextMenuItemId): string 
   return t(`app:canvas.menu.${id}`)
 }
 
+/** 破坏性菜单项（红色高亮）：删除类/参与者与既有删除同理 */
+const DESTRUCTIVE_MENU_ITEMS: ContextMenuItemId[] = ['delete', 'delete-class', 'delete-participant']
+
 /** 右键菜单浮层（工单 07）：绝对定位在右键点，应用样式为原地展开的子列表 */
 function ContextMenuOverlay(props: {
   x: number
@@ -220,7 +226,7 @@ function ContextMenuOverlay(props: {
         ) : (
           <UnstyledButton
             key={id}
-            style={{ ...itemSx, color: id === 'delete' ? 'var(--mantine-color-red-filled)' : undefined }}
+            style={{ ...itemSx, color: DESTRUCTIVE_MENU_ITEMS.includes(id) ? 'var(--mantine-color-red-filled)' : undefined }}
             onClick={() => props.onItem(id)}
             onMouseOver={(e) => (e.currentTarget.style.background = 'var(--mantine-color-gray-1)')}
             onMouseOut={(e) => (e.currentTarget.style.background = '')}
@@ -298,6 +304,41 @@ function AddStyleForm(props: {
   )
 }
 
+/** class/sequence 节点菜单的表单浮层外壳（工单 06）：与「添加样式」同款定位/外观，
+ * 内容按 kind 选择复用属性面板的添加型小表单，另有取消按钮（提交由表单自身的按钮负责） */
+function NodeFormPopup(props: { x: number; y: number; onClose: () => void; children: ReactNode }) {
+  const { t } = useTranslation()
+  return (
+    <Box
+      style={{
+        position: 'absolute',
+        left: props.x,
+        top: props.y,
+        zIndex: 30,
+        width: 240,
+        maxHeight: '80%',
+        overflowY: 'auto',
+        background: 'var(--mantine-color-body)',
+        border: '1px solid var(--mantine-color-gray-3)',
+        borderRadius: 'var(--mantine-radius-sm)',
+        boxShadow: 'var(--mantine-shadow-md)',
+        padding: 8,
+      }}
+      onClick={(e) => e.stopPropagation()}
+      onContextMenu={(e) => e.preventDefault()}
+    >
+      <Stack gap={6}>
+        {props.children}
+        <Group gap="xs" justify="flex-end">
+          <Button size="compact-xs" variant="default" onClick={props.onClose}>
+            {t('app:propertyPanel.cancel')}
+          </Button>
+        </Group>
+      </Stack>
+    </Box>
+  )
+}
+
 export function CanvasPanel({ preview, projection }: CanvasPanelProps) {
   const { t } = useTranslation()
   const select = useEditorStore((s) => s.select)
@@ -360,6 +401,10 @@ export function CanvasPanel({ preview, projection }: CanvasPanelProps) {
     else if (id === 'add-class') ctx.addClass()
     else if (id === 'add-participant') ctx.addParticipant()
     else if (id === 'add-root') ctx.addMindmapRoot()
+    else if (id === 'add-member') ctx.addMember()
+    else if (id === 'add-relation') ctx.addRelation()
+    else if (id === 'add-message') ctx.addMessage()
+    else if (id === 'delete-class' || id === 'delete-participant') ctx.deleteTarget()
     else if (id === 'link-from-here') {
       const target = ctx.menu?.target
       if (target !== undefined && target.kind === 'flowchart-node') ctx.enterLinkMode(target.nodeId)
@@ -432,6 +477,11 @@ export function CanvasPanel({ preview, projection }: CanvasPanelProps) {
             ctx.closeMenu()
             return
           }
+          // class/sequence 的节点菜单表单浮层：点击画布空白处取消（浮层内部已 stopPropagation）
+          if (ctx.nodeForm !== null) {
+            ctx.closeNodeForm()
+            return
+          }
           // 连线模式优先消费单击（工单 07）：节点 = 推进，空白 = 取消
           if (ctx.onCanvasClick(e)) return
           onClick(e)
@@ -441,10 +491,10 @@ export function CanvasPanel({ preview, projection }: CanvasPanelProps) {
         onPointerDown={(e) => {
           // 内联编辑期间不让背景拖拽抢走指针（输入框上的按下要留给文本选择）
           if (editing !== null) return
-          // 右键菜单 / 添加样式表单打开时也不启动背景拖拽：拖拽的 setPointerCapture
+          // 右键菜单 / 添加样式表单 / 节点表单打开时也不启动背景拖拽：拖拽的 setPointerCapture
           // 会把后续指针事件（含派生的 click）劫持到容器，菜单项/表单按钮将永远
           // 收不到点击（工单 08 浏览器实测发现）
-          if (ctx.menu !== null || ctx.styleForm !== null) return
+          if (ctx.menu !== null || ctx.styleForm !== null || ctx.nodeForm !== null) return
           onPointerDown(e)
         }}
         onPointerMove={onPointerMove}
@@ -493,6 +543,35 @@ export function CanvasPanel({ preview, projection }: CanvasPanelProps) {
             onSubmit={ctx.submitStyleForm}
             onClose={ctx.closeStyleForm}
           />
+        )}
+        {/* class/sequence 节点菜单的添加型表单（工单 06）：成员 / 关系 / 消息 */}
+        {ctx.nodeForm !== null && projection !== null && (
+          <NodeFormPopup x={ctx.nodeForm.x} y={ctx.nodeForm.y} onClose={ctx.closeNodeForm}>
+            {ctx.nodeForm.kind === 'member' && projection.type === 'class' && (
+              <AddMemberInlineForm
+                classes={projection.class.classes}
+                initialClassName={ctx.nodeForm.className}
+                afterElementId={ctx.nodeForm.anchorElementId}
+                onDone={ctx.closeNodeForm}
+              />
+            )}
+            {ctx.nodeForm.kind === 'relation' && projection.type === 'class' && (
+              <AddRelationInlineForm
+                classes={projection.class.classes}
+                initialFrom={ctx.nodeForm.className}
+                afterElementId={ctx.nodeForm.anchorElementId}
+                onDone={ctx.closeNodeForm}
+              />
+            )}
+            {ctx.nodeForm.kind === 'message' && projection.type === 'sequence' && (
+              <AddMessageInlineForm
+                participants={projection.sequence.participants}
+                initialFrom={ctx.nodeForm.from}
+                afterElementId={ctx.nodeForm.anchorElementId}
+                onDone={ctx.closeNodeForm}
+              />
+            )}
+          </NodeFormPopup>
         )}
       </Box>
     </Stack>

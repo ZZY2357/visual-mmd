@@ -7,9 +7,7 @@ import { useDraft } from './property-forms'
 import {
   RELATION_KIND_OPTIONS,
   VISIBILITY_OPTIONS,
-  addClassIntent,
   addMemberIntent,
-  addNoteIntent,
   addRelationIntent,
   deleteClassIntent,
   deleteMemberIntent,
@@ -241,44 +239,24 @@ export function ClassNoteForm({ note }: { note: ProjectionNote }) {
   )
 }
 
-// ---------- 添加元素（内联小表单） ----------
+// ---------- 添加元素（右键菜单的浮层小表单，工单 06） ----------
 
-export function AddClassInlineForm({ onDone }: { onDone: () => void }) {
+export function AddMemberInlineForm({
+  classes,
+  initialClassName,
+  afterElementId,
+  onDone,
+}: {
+  classes: ProjectionClass[]
+  /** 预选类名（右键的那个类）；缺省取第一个类 */
+  initialClassName?: string
+  /** 落码锚点（类声明的 elementId）：新成员插到它之后 */
+  afterElementId?: string
+  onDone: () => void
+}) {
   const t = useTranslation().t
   const commitIntent = useCommit()
-  const [name, setName] = useState('')
-  const [generic, setGeneric] = useState('')
-  return (
-    <Stack gap="sm">
-      <TextInput
-        label={t('app:propertyPanel.className')}
-        value={name}
-        onChange={(e) => setName(e.currentTarget.value)}
-      />
-      <TextInput
-        label={t('app:propertyPanel.classGeneric')}
-        value={generic}
-        onChange={(e) => setGeneric(e.currentTarget.value)}
-      />
-      <Button
-        onClick={() => {
-          const intent = addClassIntent({ name: name.trim(), generic: generic.trim() })
-          if (intent !== null && commitIntent(intent)) {
-            useEditorStore.getState().select({ kind: 'class', name: name.trim() })
-            onDone()
-          }
-        }}
-      >
-        {t('app:propertyPanel.add')}
-      </Button>
-    </Stack>
-  )
-}
-
-export function AddMemberInlineForm({ classes, onDone }: { classes: ProjectionClass[]; onDone: () => void }) {
-  const t = useTranslation().t
-  const commitIntent = useCommit()
-  const [className, setClassName] = useState<string | null>(classes[0]?.name ?? null)
+  const [className, setClassName] = useState<string | null>(initialClassName ?? classes[0]?.name ?? null)
   const [vis, setVis] = useState<Visibility>('+')
   const [text, setText] = useState('')
   return (
@@ -307,7 +285,7 @@ export function AddMemberInlineForm({ classes, onDone }: { classes: ProjectionCl
         onClick={() => {
           if (className === null) return
           const intent = addMemberIntent({ className, vis, text })
-          if (intent !== null && commitIntent(intent)) onDone()
+          if (intent !== null && commitIntent({ ...intent, afterElementId })) onDone()
         }}
       >
         {t('app:propertyPanel.add')}
@@ -316,11 +294,25 @@ export function AddMemberInlineForm({ classes, onDone }: { classes: ProjectionCl
   )
 }
 
-export function AddRelationInlineForm({ classes, onDone }: { classes: ProjectionClass[]; onDone: () => void }) {
+export function AddRelationInlineForm({
+  classes,
+  initialFrom,
+  afterElementId,
+  onDone,
+}: {
+  classes: ProjectionClass[]
+  /** 预选起点类名（右键的那个类）；缺省取第一个类 */
+  initialFrom?: string
+  /** 落码锚点（类声明的 elementId）：新关系插到它之后 */
+  afterElementId?: string
+  onDone: () => void
+}) {
   const t = useTranslation().t
   const commitIntent = useCommit()
-  const [from, setFrom] = useState<string | null>(classes[0]?.name ?? null)
-  const [to, setTo] = useState<string | null>(classes[1]?.name ?? classes[0]?.name ?? null)
+  const start = initialFrom ?? classes[0]?.name ?? null
+  const [from, setFrom] = useState<string | null>(start)
+  // 终点默认取一个不同于起点的类（自关系需要用户显式选择）
+  const [to, setTo] = useState<string | null>(() => classes.find((c) => c.name !== start)?.name ?? start)
   const [kind, setKind] = useState<RelationKind>('-->')
   const [cardFrom, setCardFrom] = useState('')
   const [cardTo, setCardTo] = useState('')
@@ -348,38 +340,7 @@ export function AddRelationInlineForm({ classes, onDone }: { classes: Projection
         onClick={() => {
           if (from === null || to === null) return
           const intent = addRelationIntent({ from, to, kind, cardFrom, cardTo, label })
-          if (intent !== null && commitIntent(intent)) onDone()
-        }}
-      >
-        {t('app:propertyPanel.add')}
-      </Button>
-    </Stack>
-  )
-}
-
-export function AddClassNoteInlineForm({ classes, onDone }: { classes: ProjectionClass[]; onDone: () => void }) {
-  const t = useTranslation().t
-  const commitIntent = useCommit()
-  const [className, setClassName] = useState<string | null>(classes[0]?.name ?? null)
-  const [floating, setFloating] = useState(false)
-  const [text, setText] = useState('')
-  return (
-    <Stack gap="sm">
-      <Select
-        label={t('app:propertyPanel.noteTarget')}
-        data={[{ value: '', label: t('app:propertyPanel.floatingNote') }, ...classes.map((c) => ({ value: c.name, label: c.name }))]}
-        value={floating ? '' : (className ?? '')}
-        onChange={(v) => {
-          setFloating(v === '')
-          setClassName(v)
-        }}
-        allowDeselect={false}
-      />
-      <TextInput label={t('app:propertyPanel.noteText')} value={text} onChange={(e) => setText(e.currentTarget.value)} />
-      <Button
-        onClick={() => {
-          const intent = addNoteIntent({ className: floating ? null : className, text })
-          if (intent !== null && commitIntent(intent)) onDone()
+          if (intent !== null && commitIntent({ ...intent, afterElementId })) onDone()
         }}
       >
         {t('app:propertyPanel.add')}

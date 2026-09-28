@@ -2,12 +2,12 @@ import { describe, expect, it } from 'vitest'
 import { contextMenuItems, contextMenuTargetFromSelection } from '../context-menu'
 
 /**
- * 右键菜单目标解析（工单 07/04）：画布选中 + 图种 → 菜单目标 → 菜单项列表。
- * 空白处四种图种都有添加动作（工单 04：class/sequence/mindmap 不再是 null）；
- * sequence/class 的**节点**菜单见工单 06。
+ * 右键菜单目标解析（工单 07/04/06）：画布选中 + 图种 → 菜单目标 → 菜单项列表。
+ * 空白处四种图种都有添加动作（工单 04）；节点菜单四种图种齐备（工单 06 补齐
+ * class/sequence 的节点），连线本轮仅 flowchart 有定义（其余返回 null）。
  */
 
-describe('contextMenuTargetFromSelection（工单 07/04 菜单目标解析）', () => {
+describe('contextMenuTargetFromSelection（工单 07/04/06 菜单目标解析）', () => {
   it('flowchart 空白处 → blank（携带图种）', () => {
     expect(contextMenuTargetFromSelection(null, 'flowchart')).toEqual({ kind: 'blank', diagramType: 'flowchart' })
   })
@@ -38,13 +38,28 @@ describe('contextMenuTargetFromSelection（工单 07/04 菜单目标解析）', 
     })
   })
 
-  it('sequence/class 节点本轮未定义菜单 → null', () => {
-    expect(contextMenuTargetFromSelection({ kind: 'node', id: 'Alice' }, 'sequence')).toBeNull()
-    expect(contextMenuTargetFromSelection({ kind: 'node', id: 'Foo' }, 'class')).toBeNull()
+  it('class 节点（画布选中 id 即类名）→ class-node（工单 06）', () => {
+    expect(contextMenuTargetFromSelection({ kind: 'node', id: 'Foo' }, 'class')).toEqual({
+      kind: 'class-node',
+      name: 'Foo',
+    })
+  })
+
+  it('sequence 节点（画布选中 id 即 actorId）→ sequence-participant（工单 06）', () => {
+    expect(contextMenuTargetFromSelection({ kind: 'node', id: 'Alice' }, 'sequence')).toEqual({
+      kind: 'sequence-participant',
+      actorId: 'Alice',
+    })
+  })
+
+  it('sequence/class 的连线本轮未定义 → null', () => {
+    const edge = { kind: 'edge' as const, from: 'A', to: 'B', occurrence: 1 }
+    expect(contextMenuTargetFromSelection(edge, 'sequence')).toBeNull()
+    expect(contextMenuTargetFromSelection(edge, 'class')).toBeNull()
   })
 })
 
-describe('contextMenuItems（工单 07/04 菜单项）', () => {
+describe('contextMenuItems（工单 07/04/06 菜单项）', () => {
   it('flowchart 空白处：添加节点 / 添加连线 / 添加样式 / 添加子图（不回归）', () => {
     expect(contextMenuItems({ kind: 'blank', diagramType: 'flowchart' })).toEqual([
       'add-node',
@@ -87,6 +102,21 @@ describe('contextMenuItems（工单 07/04 菜单项）', () => {
       'add-child',
       'edit-text',
       'delete',
+    ])
+  })
+
+  it('class 节点：添加成员 / 添加关系 / 删除类（工单 06）', () => {
+    expect(contextMenuItems({ kind: 'class-node', name: 'Foo' })).toEqual([
+      'add-member',
+      'add-relation',
+      'delete-class',
+    ])
+  })
+
+  it('sequence 参与者：添加消息 / 删除参与者（工单 06）', () => {
+    expect(contextMenuItems({ kind: 'sequence-participant', actorId: 'Alice' })).toEqual([
+      'add-message',
+      'delete-participant',
     ])
   })
 })

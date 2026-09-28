@@ -2,7 +2,7 @@ import type { DiagramTypeId } from '../diagram-registry'
 import type { CanvasSelection } from '../canvas-selection/data-id'
 
 /**
- * 右键菜单（工单 07/04）：单一菜单随右键目标变化。
+ * 右键菜单（工单 07/04/06）：单一菜单随右键目标变化。
  *
  * 本模块是纯逻辑，与 DOM/React 解耦：
  * - 画布选中（data-id 解析产物）+ 图种 → 菜单目标（blank / 节点 / 连线）
@@ -10,7 +10,9 @@ import type { CanvasSelection } from '../canvas-selection/data-id'
  *
  * 空白处四种图种都有添加动作（工单 04）：flowchart 添加节点、class 添加类、
  * sequence 添加参与者、mindmap 添加根节点；空图与错误态（空 classDiagram）同样适用。
- * 右键目标无法映射为菜单目标（如 sequence/class 的节点，见工单 06）时返回 null：
+ * 节点菜单四种图种齐备（工单 06）：class 节点选中 id 即类名、sequence 节点选中 id 即
+ * 参与者 actorId，各给最小可用集（class = 加成员/加关系/删除类；sequence = 加消息/删除参与者）。
+ * 右键目标无法映射为菜单目标（如 sequence/class 的连线，本轮未定义）时返回 null：
  * 安静地不弹菜单，不崩溃。
  */
 
@@ -20,6 +22,10 @@ export type ContextMenuTarget =
   | { kind: 'flowchart-node'; nodeId: string }
   | { kind: 'flowchart-edge'; from: string; to: string; occurrence: number }
   | { kind: 'mindmap-node'; elementId: string }
+  /** class 节点：选中 id 即类名 */
+  | { kind: 'class-node'; name: string }
+  /** sequence 参与者：选中 id 即 actorId */
+  | { kind: 'sequence-participant'; actorId: string }
 
 export type ContextMenuItemId =
   | 'add-node'
@@ -29,6 +35,11 @@ export type ContextMenuItemId =
   | 'add-class'
   | 'add-participant'
   | 'add-root'
+  | 'add-member'
+  | 'add-relation'
+  | 'delete-class'
+  | 'add-message'
+  | 'delete-participant'
   | 'link-from-here'
   | 'edit-text'
   | 'edit-label'
@@ -37,8 +48,9 @@ export type ContextMenuItemId =
   | 'delete'
 
 /**
- * 画布选中 → 菜单目标：节点/连线按图种改写 kind；sequence/class 的节点菜单见工单 06
- * （本轮仍返回 null）。空白处一律返回 blank（图种随目标携带，决定菜单项）。
+ * 画布选中 → 菜单目标：节点/连线按图种改写 kind（四种图种的节点都有菜单）；
+ * 连线仅 flowchart 有定义（sequence/class 的连线本轮未定义 → null）。
+ * 空白处一律返回 blank（图种随目标携带，决定菜单项）。
  */
 export function contextMenuTargetFromSelection(
   selection: CanvasSelection | null,
@@ -48,7 +60,8 @@ export function contextMenuTargetFromSelection(
   if (selection.kind === 'node') {
     if (diagramType === 'flowchart') return { kind: 'flowchart-node', nodeId: selection.id }
     if (diagramType === 'mindmap') return { kind: 'mindmap-node', elementId: selection.id }
-    return null
+    if (diagramType === 'class') return { kind: 'class-node', name: selection.id }
+    return { kind: 'sequence-participant', actorId: selection.id }
   }
   return diagramType === 'flowchart'
     ? { kind: 'flowchart-edge', from: selection.from, to: selection.to, occurrence: selection.occurrence }
@@ -76,6 +89,8 @@ function blankMenuItems(diagramType: DiagramTypeId): ContextMenuItemId[] {
  * - flowchart 节点：从这里连线 / 编辑文本 / 应用样式 / 删除
  * - flowchart 连线：编辑标签 / 删除
  * - mindmap 节点：添加子节点 / 编辑文本 / 删除
+ * - class 节点：添加成员 / 添加关系 / 删除类（级联删成员与相关关系）
+ * - sequence 参与者：添加消息 / 删除参与者（级联删引用它的语句）
  */
 export function contextMenuItems(target: ContextMenuTarget): ContextMenuItemId[] {
   switch (target.kind) {
@@ -87,5 +102,9 @@ export function contextMenuItems(target: ContextMenuTarget): ContextMenuItemId[]
       return ['edit-label', 'delete']
     case 'mindmap-node':
       return ['add-child', 'edit-text', 'delete']
+    case 'class-node':
+      return ['add-member', 'add-relation', 'delete-class']
+    case 'sequence-participant':
+      return ['add-message', 'delete-participant']
   }
 }

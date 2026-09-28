@@ -2,7 +2,6 @@ import { useEffect, useState } from 'react'
 import {
   Button,
   ColorInput,
-  Group,
   MultiSelect,
   NumberInput,
   Select,
@@ -19,10 +18,6 @@ import {
   DIRECTION_OPTIONS,
   LINK_STYLE_OPTIONS,
   SHAPE_OPTIONS,
-  addClassDefIntent,
-  addEdgeIntent,
-  addNodeIntent,
-  addSubgraphIntent,
   applyClassIntent,
   classDefStyleIntents,
   deleteClassDefIntent,
@@ -345,135 +340,6 @@ export function ClassDefForm({ classDef }: { classDef: ProjectionClassDef }) {
         }}
       >
         {t('app:propertyPanel.deleteClassDef')}
-      </Button>
-    </Stack>
-  )
-}
-
-// ---------- 添加元素（内联小表单） ----------
-
-export function AddNodeInlineForm({ onDone }: { onDone: () => void }) {
-  const t = useTranslation().t
-  const commitIntent = useCommitIntent()
-  const [nodeId, setNodeId] = useState('')
-  const [text, setText] = useState('')
-  const [shape, setShape] = useState<NodeShapeType>('rectangle')
-  return (
-    <Stack gap="sm">
-      <TextInput label={t('app:propertyPanel.addNode')} value={nodeId} onChange={(e) => setNodeId(e.currentTarget.value)} />
-      <TextInput label={t('app:propertyPanel.addNodeText')} value={text} onChange={(e) => setText(e.currentTarget.value)} />
-      <Select
-        label={t('app:propertyPanel.nodeShape')}
-        data={shapeOptions(t)}
-        value={shape}
-        onChange={(v) => v !== null && setShape(v as NodeShapeType)}
-        allowDeselect={false}
-      />
-      <Button
-        onClick={() => {
-          const intent = addNodeIntent({ nodeId: nodeId.trim(), text: text.trim(), shape })
-          if (intent !== null && commitIntent(intent)) onDone()
-        }}
-      >
-        {t('app:propertyPanel.add')}
-      </Button>
-    </Stack>
-  )
-}
-
-export function AddEdgeInlineForm({ nodes, onDone }: { nodes: ProjectionNode[]; onDone: () => void }) {
-  const t = useTranslation().t
-  const commitIntent = useCommitIntent()
-  const [from, setFrom] = useState<string | null>(nodes[0]?.nodeId ?? null)
-  const [to, setTo] = useState<string | null>(nodes[1]?.nodeId ?? nodes[0]?.nodeId ?? null)
-  const [label, setLabel] = useState('')
-  const options = nodes.map((n) => ({ value: n.nodeId, label: n.text ?? n.nodeId }))
-  return (
-    <Stack gap="sm">
-      <Select
-        label={t('app:propertyPanel.addEdgeFrom')}
-        data={options}
-        value={from}
-        onChange={setFrom}
-        allowDeselect={false}
-      />
-      <Select
-        label={t('app:propertyPanel.addEdgeTo')}
-        data={options}
-        value={to}
-        onChange={setTo}
-        allowDeselect={false}
-      />
-      <TextInput
-        label={t('app:propertyPanel.addEdgeLabel')}
-        value={label}
-        onChange={(e) => setLabel(e.currentTarget.value)}
-      />
-      <Button
-        onClick={() => {
-          if (from === null || to === null) return
-          const intent = addEdgeIntent({ from, to, label: label.trim() })
-          if (intent !== null && commitIntent(intent)) onDone()
-        }}
-      >
-        {t('app:propertyPanel.add')}
-      </Button>
-    </Stack>
-  )
-}
-
-export function AddSubgraphInlineForm({ onDone }: { onDone: () => void }) {
-  const t = useTranslation().t
-  const commitIntent = useCommitIntent()
-  const [title, setTitle] = useState('')
-  return (
-    <Stack gap="sm">
-      <TextInput
-        label={t('app:propertyPanel.addSubgraphLabel')}
-        value={title}
-        onChange={(e) => setTitle(e.currentTarget.value)}
-      />
-      <Button
-        onClick={() => {
-          if (commitIntent(addSubgraphIntent(title.trim()))) onDone()
-        }}
-      >
-        {t('app:propertyPanel.add')}
-      </Button>
-    </Stack>
-  )
-}
-
-export function AddClassDefInlineForm({ onDone }: { onDone: () => void }) {
-  const t = useTranslation().t
-  const commitIntent = useCommitIntent()
-  const [name, setName] = useState('')
-  const [fill, setFill] = useState('')
-  const [stroke, setStroke] = useState('')
-  const [dashStyle, setDashStyle] = useState<BorderDashStyle>('solid')
-  const [color, setColor] = useState('')
-  return (
-    <Stack gap="sm">
-      <TextInput label={t('app:propertyPanel.classDefName')} value={name} onChange={(e) => setName(e.currentTarget.value)} />
-      <Group grow>
-        <ColorInput label={t('app:propertyPanel.styleFill')} value={fill} onChange={setFill} />
-        <ColorInput label={t('app:propertyPanel.styleStroke')} value={stroke} onChange={setStroke} />
-      </Group>
-      <Select
-        label={t('app:propertyPanel.styleDash')}
-        data={BORDER_DASH_OPTIONS.map((d) => ({ value: d, label: t(`app:borderDash.${d}`) }))}
-        value={dashStyle}
-        onChange={(v) => v !== null && setDashStyle(v as BorderDashStyle)}
-        allowDeselect={false}
-      />
-      <ColorInput label={t('app:propertyPanel.styleColor')} value={color} onChange={setColor} />
-      <Button
-        onClick={() => {
-          const intent = addClassDefIntent({ name: name.trim(), fill, stroke, dashStyle, color })
-          if (intent !== null && commitIntent(intent)) onDone()
-        }}
-      >
-        {t('app:propertyPanel.add')}
       </Button>
     </Stack>
   )

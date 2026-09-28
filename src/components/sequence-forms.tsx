@@ -3,13 +3,9 @@ import { Button, Group, Select, Stack, Switch, Text, TextInput } from '@mantine/
 import { useTranslation } from 'react-i18next'
 import type { BlockKeyword, MessageAct, MessageArrow, NotePos } from '../lib/pipeline/sequence'
 import {
-  BLOCK_KEYWORD_OPTIONS,
   MESSAGE_ARROW_OPTIONS,
   NOTE_POS_OPTIONS,
-  addBlockIntent,
   addMessageIntent,
-  addNoteIntent,
-  addParticipantIntent,
   deleteBlockIntent,
   deleteElseIntent,
   deleteMessageIntent,
@@ -315,52 +311,29 @@ function ElseForm({ branch }: { branch: ProjectionElse }) {
   )
 }
 
-// ---------- 添加元素（内联小表单） ----------
-
-export function AddParticipantInlineForm({ onDone }: { onDone: () => void }) {
-  const t = useTranslation().t
-  const commitIntent = useCommit()
-  const [actorId, setActorId] = useState('')
-  const [alias, setAlias] = useState('')
-  const [isActor, setIsActor] = useState(false)
-  return (
-    <Stack gap="sm">
-      <TextInput
-        label={t('app:propertyPanel.addParticipantId')}
-        value={actorId}
-        onChange={(e) => setActorId(e.currentTarget.value)}
-      />
-      <TextInput
-        label={t('app:propertyPanel.participantAlias')}
-        value={alias}
-        onChange={(e) => setAlias(e.currentTarget.value)}
-      />
-      <Switch label={t('app:propertyPanel.useActor')} checked={isActor} onChange={(e) => setIsActor(e.currentTarget.checked)} />
-      <Button
-        onClick={() => {
-          const intent = addParticipantIntent({ actorId: actorId.trim(), isActor, alias: alias.trim() })
-          if (intent !== null && commitIntent(intent)) onDone()
-        }}
-      >
-        {t('app:propertyPanel.add')}
-      </Button>
-    </Stack>
-  )
-}
+// ---------- 添加元素（右键菜单的浮层小表单，工单 06） ----------
 
 export function AddMessageInlineForm({
   participants,
+  initialFrom,
   afterElementId,
   onDone,
 }: {
   participants: ProjectionParticipant[]
+  /** 预选起点参与者（右键的那个参与者）；缺省取第一个参与者 */
+  initialFrom?: string
+  /** 落码锚点（参与者声明的 elementId）：新消息插到它之后 */
   afterElementId?: string
   onDone: () => void
 }) {
   const t = useTranslation().t
   const commitIntent = useCommit()
-  const [from, setFrom] = useState<string | null>(participants[0]?.actorId ?? null)
-  const [to, setTo] = useState<string | null>(participants[1]?.actorId ?? participants[0]?.actorId ?? null)
+  const start = initialFrom ?? participants[0]?.actorId ?? null
+  const [from, setFrom] = useState<string | null>(start)
+  // 终点默认取一个不同于起点的参与者（自消息需要用户显式选择）
+  const [to, setTo] = useState<string | null>(
+    () => participants.find((p) => p.actorId !== start)?.actorId ?? start,
+  )
   const [arrow, setArrow] = useState<MessageArrow>('->>')
   const [act, setAct] = useState<MessageAct>('')
   const [text, setText] = useState('')
@@ -395,82 +368,6 @@ export function AddMessageInlineForm({
           if (from === null || to === null) return
           const intent = addMessageIntent({ from, to, arrow, act, text: text.trim() })
           if (intent !== null && commitIntent({ ...intent, afterElementId })) onDone()
-        }}
-      >
-        {t('app:propertyPanel.add')}
-      </Button>
-    </Stack>
-  )
-}
-
-export function AddNoteInlineForm({
-  participants,
-  afterElementId,
-  onDone,
-}: {
-  participants: ProjectionParticipant[]
-  afterElementId?: string
-  onDone: () => void
-}) {
-  const t = useTranslation().t
-  const commitIntent = useCommit()
-  const [pos, setPos] = useState<NotePos>('over')
-  const [actorA, setActorA] = useState<string | null>(participants[0]?.actorId ?? null)
-  const [actorB, setActorB] = useState<string | null>(participants[1]?.actorId ?? participants[0]?.actorId ?? null)
-  const [text, setText] = useState('')
-  const options = participants.map((p) => ({ value: p.actorId, label: p.alias ?? p.actorId }))
-  return (
-    <Stack gap="sm">
-      <Select
-        label={t('app:propertyPanel.notePosition')}
-        data={NOTE_POS_OPTIONS.map((p) => ({ value: p, label: t(`app:notePos.${p}`) }))}
-        value={pos}
-        onChange={(v) => v !== null && setPos(v as NotePos)}
-        allowDeselect={false}
-      />
-      <Group grow>
-        <Select label={t('app:propertyPanel.noteActorA')} data={options} value={actorA} onChange={setActorA} allowDeselect={false} />
-        {pos === 'over' && (
-          <Select label={t('app:propertyPanel.noteActorB')} data={options} value={actorB} onChange={setActorB} allowDeselect={false} />
-        )}
-      </Group>
-      <TextInput label={t('app:propertyPanel.noteText')} value={text} onChange={(e) => setText(e.currentTarget.value)} />
-      <Button
-        onClick={() => {
-          if (actorA === null || (pos === 'over' && actorB === null)) return
-          const intent = addNoteIntent({
-            pos,
-            actorA,
-            actorB: actorB ?? '',
-            text: text.trim(),
-          })
-          if (intent !== null && commitIntent({ ...intent, afterElementId })) onDone()
-        }}
-      >
-        {t('app:propertyPanel.add')}
-      </Button>
-    </Stack>
-  )
-}
-
-export function AddBlockInlineForm({ afterElementId, onDone }: { afterElementId?: string; onDone: () => void }) {
-  const t = useTranslation().t
-  const commitIntent = useCommit()
-  const [keyword, setKeyword] = useState<BlockKeyword>('loop')
-  const [label, setLabel] = useState('')
-  return (
-    <Stack gap="sm">
-      <Select
-        label={t('app:propertyPanel.blockKeyword')}
-        data={BLOCK_KEYWORD_OPTIONS.map((k) => ({ value: k, label: blockKeywordLabel(t, k) }))}
-        value={keyword}
-        onChange={(v) => v !== null && setKeyword(v as BlockKeyword)}
-        allowDeselect={false}
-      />
-      <TextInput label={t('app:propertyPanel.blockLabel')} value={label} onChange={(e) => setLabel(e.currentTarget.value)} />
-      <Button
-        onClick={() => {
-          if (commitIntent({ ...addBlockIntent({ keyword, label: label.trim() }), afterElementId })) onDone()
         }}
       >
         {t('app:propertyPanel.add')}

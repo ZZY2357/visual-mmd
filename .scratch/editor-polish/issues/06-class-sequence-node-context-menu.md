@@ -63,4 +63,51 @@ Status: ready-for-agent
 
 ## Comments
 
-（空）
+### 跨白名单改动（如实记录）
+- `src/components/CanvasPanel.tsx`：**必要**改动，本票允许且必须。
+  - 菜单项 dispatch（`onMenuItem`）新增 `add-member / add-relation / add-message`（开表单浮层）
+    与 `delete-class / delete-participant`（→ `ctx.deleteTarget()`）。
+  - 节点表单浮层：新增 `NodeFormPopup` 外壳 + 按 `ctx.nodeForm.kind` 渲染
+    `AddMemberInlineForm / AddRelationInlineForm / AddMessageInlineForm`（复用属性面板表单）。
+  - 附带：删除项红色高亮从 `id === 'delete'` 扩到 `delete-class / delete-participant`；
+    画布单击关闭节点表单、表单打开时禁用背景拖拽（与既有 menu/styleForm 同款守卫）。
+- 未动 `canvas-keyboard.ts` / `use-canvas-keyboard.ts`。
+
+### 落码设计
+- 只做 UI 接线，未新增任何 pipeline 意图。新增菜单项的动作：class
+  `add-member`/`add-relation`/`delete-class`；sequence `add-message`/`delete-participant`。
+- 添加型动作在菜单位置浮出小表单（提交才 `commitIntent`），锚点 `afterElementId` =
+  右键节点的**声明** elementId（`class:<名>` / `participant:<id>`），新元素插到它之后；
+  起点默认取右键的那个节点（`initialClassName` / `initialFrom`），终点默认取另一个节点。
+- 删除类/参与者直接 `commitIntent(deleteClassIntent|deleteParticipantIntent)`，
+  级联（类体成员、owner 为该类的行式成员、引用该类的 relation；引用该 actor 的语句）
+  由既有 `resolveDeleteClass` / `resolveDeleteParticipant` 负责，无需新定。
+- 表单浮层状态托管在 hook（`nodeForm`），由 CanvasPanel 渲染——与既有 `styleForm`
+  （`submitStyleForm` + `AddStyleForm`）同一分层，避免 lib 反向依赖 components。
+
+### 死代码裁决结果
+- **保留并接线 3 个**：`AddMemberInlineForm`、`AddRelationInlineForm`（class-forms.tsx）、
+  `AddMessageInlineForm`（sequence-forms.tsx）。三个都加了可选 `afterElementId`
+  （成员/关系）与 `initialClassName`/`initialFrom` 预选，供右键菜单接线。
+- **删除 9 个**（均无外部引用，全量测试确认）：
+  - `class-forms.tsx`：`AddClassInlineForm`、`AddClassNoteInlineForm`；
+  - `sequence-forms.tsx`：`AddParticipantInlineForm`、`AddNoteInlineForm`、`AddBlockInlineForm`；
+  - `property-forms.tsx`：`AddNodeInlineForm`、`AddEdgeInlineForm`、`AddSubgraphInlineForm`、
+    `AddClassDefInlineForm`。
+- **i18n key**：连同删除这些表单专属、且全网已无引用的 key——
+  `addNodeId/addNodeText/addEdgeLabel/addSubgraphLabel/addParticipantId/useActor/noteActorA/noteActorB/noteTarget/blockKeyword`；
+  另清理工单 07 删面板入口后遗留、同样零引用的 `*Title` 系列（`addNodeTitle/addEdgeTitle/
+  addSubgraphTitle/addClassDefTitle/addParticipantTitle/addMessageTitle/addNoteTitle/
+  addBlockTitle/addClassTitle/addMemberTitle/addRelationTitle`）与 `noNodeAvailable`。
+  保留 `addEdgeFrom/addEdgeTo`（两个保留表单仍用）。
+
+### 验证
+- `npm run typecheck`：通过（无输出错误）。
+- `npm test`：**43 files / 519 tests 全绿**。
+- 未做浏览器实测（"图仍可渲染"依赖真实 mermaid 渲染）：落码合法性由 `commitIntent`→
+  `applyEdit` 校验（失败即不落码），级联由既有 pipeline 单测覆盖。
+
+### 存疑
+- `contextMenuTargetFromSelection` 对 class/sequence 的**连线**仍返回 null（本批非目标）。
+- sequence/class 的画布节点选中依赖 mermaid 的 `data-id`（ADR-0007 事实约定，尽力而为）；
+  测不到 `data-id` 时右键不会弹节点菜单（既有行为，非本票引入）。

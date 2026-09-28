@@ -1,8 +1,10 @@
 import { act, useEffect, useRef } from 'react'
 import { createRoot } from 'react-dom/client'
+import { MantineProvider } from '@mantine/core'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { resetEditorHistory, useEditorStore } from '../../../store/editor'
 import { DEFAULT_DIAGRAM_SOURCE } from '../../../lib/storage'
+import { initI18n } from '../../../i18n'
 import { flowchartParser } from '../../pipeline/flowchart'
 import { mindmapParser } from '../../pipeline/mindmap'
 import { classParser } from '../../pipeline/class'
@@ -15,16 +17,20 @@ import { flowchartDataIdResolver } from '../../canvas-selection/flowchart-adapte
 import { mindmapDataIdResolver } from '../../canvas-selection/mindmap-adapter'
 import { nodeDataIdResolver } from '../../canvas-selection/data-id'
 import type { AnyProjection } from '../../diagram-registry'
-import { useCanvasContextMenu } from '../use-canvas-context-menu'
+import { useCanvasContextMenu, type NodeFormState } from '../use-canvas-context-menu'
+import { AddMemberInlineForm, AddRelationInlineForm } from '../../../components/class-forms'
+import { AddMessageInlineForm } from '../../../components/sequence-forms'
 import type { CanvasInlineEditTarget } from '../inline-edit'
 import type { ContextMenuTarget } from '../context-menu'
 import type { LinkModeState } from '../link-mode'
 
 /**
- * 画布右键菜单 Hook（工单 07）：右键弹出随目标变化的菜单并联动选中；
+ * 画布右键菜单 Hook（工单 07/04/06）：右键弹出随目标变化的菜单并联动选中；
  * 添加节点走编辑意图管线并回调内联命名；连线模式两步落码连线、Esc 取消；
- * 添加样式表单提交才落码。
+ * 添加样式表单提交才落码；class/sequence 节点菜单的添加型表单提交才落码（工单 06）。
  */
+
+initI18n()
 
 const SAMPLE = `flowchart TD
     A[开始] --> B[处理]
@@ -95,6 +101,7 @@ interface MenuSnapshot {
   menu: { target: ContextMenuTarget; items: string[] } | null
   linkMode: LinkModeState
   styleForm: unknown
+  nodeForm: NodeFormState | null
 }
 
 interface ContextMenuApi {
@@ -103,6 +110,9 @@ interface ContextMenuApi {
   addClass: () => void
   addParticipant: () => void
   addMindmapRoot: () => void
+  addMember: () => void
+  addRelation: () => void
+  addMessage: () => void
   enterLinkMode: (from?: string) => void
   addSubgraph: () => void
   applyStyle: (name: string) => void
@@ -135,6 +145,9 @@ function Harness(props: {
     addClass: ctx.addClass,
     addParticipant: ctx.addParticipant,
     addMindmapRoot: ctx.addMindmapRoot,
+    addMember: ctx.addMember,
+    addRelation: ctx.addRelation,
+    addMessage: ctx.addMessage,
     enterLinkMode: ctx.enterLinkMode,
     addSubgraph: ctx.addSubgraph,
     applyStyle: ctx.applyStyle,
@@ -150,11 +163,43 @@ function Harness(props: {
       menu: ctx.menu !== null ? { target: ctx.menu.target, items: ctx.menu.items } : null,
       linkMode: ctx.linkMode,
       styleForm: ctx.styleForm,
+      nodeForm: ctx.nodeForm,
     })
   })
+  // 节点菜单的添加型表单：与 CanvasPanel 同样的接线（提交才落码，锚点为右键节点的声明）
   return (
     <div ref={ref} tabIndex={0} onContextMenu={ctx.onContextMenu}>
       <div dangerouslySetInnerHTML={{ __html: props.svg }} />
+      {ctx.nodeForm !== null && props.projection.type === 'class' && ctx.nodeForm.kind === 'member' && (
+        <MantineProvider>
+          <AddMemberInlineForm
+            classes={props.projection.class.classes}
+            initialClassName={ctx.nodeForm.className}
+            afterElementId={ctx.nodeForm.anchorElementId}
+            onDone={ctx.closeNodeForm}
+          />
+        </MantineProvider>
+      )}
+      {ctx.nodeForm !== null && props.projection.type === 'class' && ctx.nodeForm.kind === 'relation' && (
+        <MantineProvider>
+          <AddRelationInlineForm
+            classes={props.projection.class.classes}
+            initialFrom={ctx.nodeForm.className}
+            afterElementId={ctx.nodeForm.anchorElementId}
+            onDone={ctx.closeNodeForm}
+          />
+        </MantineProvider>
+      )}
+      {ctx.nodeForm !== null && props.projection.type === 'sequence' && ctx.nodeForm.kind === 'message' && (
+        <MantineProvider>
+          <AddMessageInlineForm
+            participants={props.projection.sequence.participants}
+            initialFrom={ctx.nodeForm.from}
+            afterElementId={ctx.nodeForm.anchorElementId}
+            onDone={ctx.closeNodeForm}
+          />
+        </MantineProvider>
+      )}
     </div>
   )
 }
@@ -592,5 +637,239 @@ describe('useCanvasContextMenu（工单 04 空白处按图种建元素）', () =
 
     act(() => api.current!.addNode())
     expect(useEditorStore.getState().source).toContain('n1[n1]')
+  })
+})
+
+/** 按 label 文案定位输入框（Mantine 的 label 通过 for/id 关联输入框） */
+function inputByLabel(host: HTMLElement, labelText: string): HTMLInputElement {
+  const label = Array.from(host.querySelectorAll('label')).find((l) => l.textContent?.trim() === labelText)
+  if (label === undefined) throw new Error(`未找到标签：${labelText}`)
+  const input = document.getElementById(label.htmlFor)
+  if (!(input instanceof HTMLInputElement)) throw new Error(`标签未关联输入框：${labelText}`)
+  return input
+}
+
+/** React 受控输入：必须走原生 setter 再派发 input 事件，onChange 才会触发 */
+async function typeInto(input: HTMLInputElement, value: string): Promise<void> {
+  await act(async () => {
+    const setter = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')?.set
+    setter?.call(input, value)
+    input.dispatchEvent(new Event('input', { bubbles: true }))
+  })
+}
+
+/** 按文案点击按钮（表单的提交按钮为「添加」） */
+async function clickButton(host: HTMLElement, text: string): Promise<void> {
+  const button = Array.from(host.querySelectorAll('button')).find((b) => b.textContent?.trim() === text)
+  if (button === undefined) throw new Error(`未找到按钮：${text}`)
+  await act(async () => button.click())
+}
+
+describe('useCanvasContextMenu（工单 06 class/sequence 节点菜单）', () => {
+  let host: HTMLDivElement
+  let root: ReturnType<typeof createRoot>
+  let snapshots: MenuSnapshot[]
+  let api: { current: ContextMenuApi | null }
+  let created: string[]
+
+  // 含成员块与关系的类图：验证删除类的级联
+  const CLASS_SAMPLE = `classDiagram
+    class Foo {
+        +String name
+    }
+    class Bar
+    Foo --> Bar
+`
+  const SEQ_SAMPLE = `sequenceDiagram
+    participant 甲
+    participant 乙
+    甲->>乙: hi
+`
+  const CLASS_SVG = '<svg><g data-id="Foo">Foo</g><g data-id="Bar">Bar</g></svg>'
+  const SEQ_SVG = '<svg><g data-id="甲">甲</g><g data-id="乙">乙</g></svg>'
+
+  beforeEach(() => {
+    host = document.createElement('div')
+    document.body.appendChild(host)
+    root = createRoot(host)
+    snapshots = []
+    api = { current: null }
+    created = []
+  })
+  afterEach(() => {
+    act(() => root.unmount())
+    host.remove()
+    vi.restoreAllMocks()
+    resetEditorHistory(DEFAULT_DIAGRAM_SOURCE)
+    useEditorStore.getState().select(null)
+  })
+
+  function mount(projection: AnyProjection, source: string, svg: string): HTMLDivElement {
+    resetEditorHistory(source)
+    act(() => {
+      root.render(
+        <Harness
+          projection={projection}
+          svg={svg}
+          onState={(s) => snapshots.push(s)}
+          apiRef={api}
+          onNodeCreated={(t) => created.push(createdIdOf(t))}
+        />,
+      )
+    })
+    return host.firstElementChild as HTMLDivElement
+  }
+
+  function mountClass(): HTMLDivElement {
+    return mount(classProjectionOf(CLASS_SAMPLE), CLASS_SAMPLE, CLASS_SVG)
+  }
+
+  function mountSequence(): HTMLDivElement {
+    return mount(sequenceProjectionOf(SEQ_SAMPLE), SEQ_SAMPLE, SEQ_SVG)
+  }
+
+  function contextMenuOn(container: Element, selector: string): boolean {
+    let prevented = false
+    act(() => {
+      const event = new MouseEvent('contextmenu', { bubbles: true, cancelable: true })
+      container.querySelector(selector)!.dispatchEvent(event)
+      prevented = event.defaultPrevented
+    })
+    return prevented
+  }
+
+  /** 监听 store 的 commitIntent，取第 n 次收到的意图（断言意图字段与 afterElementId） */
+  function spyCommitIntent() {
+    return vi.spyOn(useEditorStore.getState(), 'commitIntent')
+  }
+
+  it('右键 class 节点：菜单为添加成员/添加关系/删除类并联动选中', () => {
+    const container = mountClass()
+
+    expect(contextMenuOn(container, '[data-id="Foo"]')).toBe(true)
+
+    const last = snapshots.at(-1)!
+    expect(last.menu?.target).toEqual({ kind: 'class-node', name: 'Foo' })
+    expect(last.menu?.items).toEqual(['add-member', 'add-relation', 'delete-class'])
+    expect(useEditorStore.getState().selection).toEqual({ kind: 'class', name: 'Foo' })
+  })
+
+  it('右键 sequence 参与者：菜单为添加消息/删除参与者并联动选中', () => {
+    const container = mountSequence()
+
+    expect(contextMenuOn(container, '[data-id="甲"]')).toBe(true)
+
+    const last = snapshots.at(-1)!
+    expect(last.menu?.target).toEqual({ kind: 'sequence-participant', actorId: '甲' })
+    expect(last.menu?.items).toEqual(['add-message', 'delete-participant'])
+    expect(useEditorStore.getState().selection).toEqual({ kind: 'participant', actorId: '甲' })
+  })
+
+  it('菜单「添加成员」：打开表单（锚点为右键的那个类）→ 提交落码带 afterElementId', async () => {
+    const container = mountClass()
+    contextMenuOn(container, '[data-id="Foo"]')
+
+    const spy = spyCommitIntent()
+    act(() => api.current!.addMember())
+
+    // 打开表单并收起菜单：kind / 预选类 / 落码锚点都来自右键节点
+    const form = snapshots.at(-1)!.nodeForm
+    expect(form).toMatchObject({ kind: 'member', className: 'Foo', anchorElementId: 'class:Foo' })
+    expect(snapshots.at(-1)!.menu).toBeNull()
+
+    await typeInto(inputByLabel(container, '成员声明（如 String name 或 add(id) bool）'), 'String name')
+    await clickButton(container, '添加')
+
+    expect(spy.mock.calls[0]?.[0]).toMatchObject({
+      type: 'add-member',
+      className: 'Foo',
+      vis: '+',
+      text: 'String name',
+      afterElementId: 'class:Foo',
+    })
+    expect(useEditorStore.getState().source).toContain('+String name')
+  })
+
+  it('菜单「添加关系」：默认以右键的类为起点 → 提交落码带 afterElementId', async () => {
+    const container = mountClass()
+    contextMenuOn(container, '[data-id="Foo"]')
+
+    const spy = spyCommitIntent()
+    act(() => api.current!.addRelation())
+
+    const form = snapshots.at(-1)!.nodeForm
+    expect(form).toMatchObject({ kind: 'relation', className: 'Foo', anchorElementId: 'class:Foo' })
+
+    // 起点默认右键的那个类，终点默认另一个类
+    await clickButton(container, '添加')
+    expect(spy.mock.calls[0]?.[0]).toMatchObject({
+      type: 'add-relation',
+      from: 'Foo',
+      to: 'Bar',
+      kind: '-->',
+      afterElementId: 'class:Foo',
+    })
+    expect(useEditorStore.getState().source).toContain('Foo --> Bar')
+  })
+
+  it('菜单「添加消息」：默认以右键的参与者为起点 → 提交落码带 afterElementId', async () => {
+    const container = mountSequence()
+    contextMenuOn(container, '[data-id="甲"]')
+
+    const spy = spyCommitIntent()
+    act(() => api.current!.addMessage())
+
+    const form = snapshots.at(-1)!.nodeForm
+    expect(form).toMatchObject({ kind: 'message', from: '甲', anchorElementId: 'participant:甲' })
+
+    await clickButton(container, '添加')
+    expect(spy.mock.calls[0]?.[0]).toMatchObject({
+      type: 'add-message',
+      from: '甲',
+      to: '乙',
+      arrow: '->>',
+      afterElementId: 'participant:甲',
+    })
+    expect(useEditorStore.getState().source).toContain('甲->>乙')
+  })
+
+  it('菜单「删除类」：级联删除成员与引用该类的 relation、清空选中', () => {
+    const container = mountClass()
+    contextMenuOn(container, '[data-id="Foo"]')
+    snapshots.length = 0
+
+    act(() => api.current!.deleteTarget())
+
+    const source = useEditorStore.getState().source
+    expect(source).not.toContain('Foo')
+    expect(source).not.toContain('-->')
+    expect(source).not.toContain('String name')
+    expect(useEditorStore.getState().selection).toBeNull()
+    expect(snapshots.at(-1)!.menu).toBeNull()
+  })
+
+  it('菜单「删除参与者」：级联删除引用它的语句、清空选中', () => {
+    const container = mountSequence()
+    contextMenuOn(container, '[data-id="甲"]')
+    snapshots.length = 0
+
+    act(() => api.current!.deleteTarget())
+
+    const source = useEditorStore.getState().source
+    expect(source).not.toContain('甲')
+    expect(source).not.toContain('hi')
+    expect(useEditorStore.getState().selection).toBeNull()
+    expect(snapshots.at(-1)!.menu).toBeNull()
+  })
+
+  it('添加／删除都走 commitIntent（可撤销）', async () => {
+    const container = mountClass()
+    contextMenuOn(container, '[data-id="Foo"]')
+    act(() => api.current!.addRelation())
+    await clickButton(container, '添加')
+    expect(useEditorStore.getState().canUndo).toBe(true)
+
+    useEditorStore.getState().undo()
+    expect(useEditorStore.getState().source).toBe(CLASS_SAMPLE)
   })
 })
