@@ -109,6 +109,40 @@ describe('inlineEditCommitOf（输入值 → 提交动作）', () => {
       intent: { type: 'set-node-text', elementId: 'mindmap-node:2', text: '改名' },
     })
   })
+
+  // 工单 04：空白右键新建的 class / sequence 直入命名，编辑的是语法名
+  it('class：类名变化 → rename-class 意图（中文类名合法）', () => {
+    expect(inlineEditCommitOf({ kind: 'class', name: '新类' }, ' 订单 ', '新类')).toEqual({
+      action: 'commit',
+      intent: { type: 'rename-class', name: '新类', newName: '订单' },
+    })
+  })
+
+  it('class：非法类名（含空格）→ invalid（不落码）', () => {
+    expect(inlineEditCommitOf({ kind: 'class', name: '新类' }, 'Order Item', '新类')).toEqual({
+      action: 'invalid',
+    })
+  })
+
+  it('class：名字未改动 → unchanged', () => {
+    expect(inlineEditCommitOf({ kind: 'class', name: '新类' }, '新类', '新类')).toEqual({ action: 'unchanged' })
+  })
+
+  it('sequence：参与者 id 变化 → rename-participant 意图（不生成 alias）', () => {
+    expect(inlineEditCommitOf({ kind: 'sequence', actorId: '新参与者' }, '服务端', '新参与者')).toEqual({
+      action: 'commit',
+      intent: { type: 'rename-participant', actorId: '新参与者', newId: '服务端' },
+    })
+  })
+
+  it('sequence：非法参与者 id（含空格或冒号）→ invalid', () => {
+    expect(inlineEditCommitOf({ kind: 'sequence', actorId: '新参与者' }, 'a b', '新参与者')).toEqual({
+      action: 'invalid',
+    })
+    expect(inlineEditCommitOf({ kind: 'sequence', actorId: '新参与者' }, 'a:b', '新参与者')).toEqual({
+      action: 'invalid',
+    })
+  })
 })
 
 describe('overlayRectInContainer（浮层定位）', () => {

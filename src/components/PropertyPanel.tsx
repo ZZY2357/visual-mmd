@@ -15,7 +15,7 @@ import { StructureTree } from './StructureTree'
 import { ClassDefForm, DiagramForm, EdgeForm, NodeForm, SubgraphForm } from './property-forms'
 import { BlockForm, MessageForm, NoteForm, ParticipantForm, SequenceDiagramForm } from './sequence-forms'
 import { ClassForm, ClassNoteForm, MemberForm, RelationForm } from './class-forms'
-import { MindmapNodeForm, MindmapRootForm } from './mindmap-forms'
+import { MindmapNodeForm } from './mindmap-forms'
 import { resolveMindmapSelection, type MindmapProjection } from '../lib/projection/mindmap-projection'
 import { ThemePicker } from './ThemePicker'
 
@@ -266,13 +266,6 @@ export function PropertyPanel({ projection, parseError }: PropertyPanelProps) {
         </ScrollArea>
 
         <Divider />
-
-        {/* mindmap 空图起步：树形结构树无法右键空画布添加根节点，保留根节点表单 */}
-        {projection !== null && projection.type === 'mindmap' && projection.mindmap.nodes.length === 0 && (
-          <Box px="xs">
-            <MindmapRootForm />
-          </Box>
-        )}
 
         {/* 下半：选中元素属性表单 */}
         <ScrollArea style={{ flex: '1 1 60%', minHeight: 0 }} type="auto">

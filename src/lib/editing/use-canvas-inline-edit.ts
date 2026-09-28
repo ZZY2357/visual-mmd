@@ -9,7 +9,7 @@ import {
   inlineEditTargetFromEvent,
   overlayRectInContainer,
   toRect,
-  type InlineEditTarget,
+  type CanvasInlineEditTarget,
   type Rect,
 } from './inline-edit'
 
@@ -29,8 +29,8 @@ import {
  */
 
 interface EditingState {
-  target: InlineEditTarget
-  /** 浮层相对画布容器的位置；null = SVG 中还没找到该节点（等待重渲染） */
+  target: CanvasInlineEditTarget
+  /** 浮层相对画布容器的位置；null = SVG 中还没找到该元素（等待重渲染） */
   rect: Rect | null
 }
 
@@ -40,15 +40,22 @@ export interface InlineEditCloseOptions {
   restoreFocus?: boolean
 }
 
-/** 编辑目标在投影中的当前显示文本（预填用；找不到时回落空串）。
- * 导出给画布组件：渲染输入框时取最新投影文本（新建节点的文本落码后才可见）。 */
-export function inlineEditTextOf(projection: AnyProjection | null, target: InlineEditTarget): string {
+/** 编辑目标在投影中的当前文本（预填用；找不到时回落空串）。
+ * class/sequence 新建（工单 04）编辑的是语法名（类名 / 参与者 id），不是显示文本。
+ * 导出给画布组件：渲染输入框时取最新投影文本（新建元素的文本落码后才可见）。 */
+export function inlineEditTextOf(projection: AnyProjection | null, target: CanvasInlineEditTarget): string {
   if (projection === null) return ''
   if (projection.type === 'flowchart' && target.kind === 'flowchart') {
     return projection.flowchart.nodes.find((n) => n.nodeId === target.nodeId)?.text ?? target.nodeId
   }
   if (projection.type === 'mindmap' && target.kind === 'mindmap') {
     return projection.mindmap.nodes.find((n) => n.elementId === target.elementId)?.text ?? ''
+  }
+  if (projection.type === 'class' && target.kind === 'class') {
+    return projection.class.classes.find((c) => c.name === target.name)?.name ?? target.name
+  }
+  if (projection.type === 'sequence' && target.kind === 'sequence') {
+    return projection.sequence.participants.find((p) => p.actorId === target.actorId)?.actorId ?? target.actorId
   }
   return ''
 }
@@ -77,11 +84,15 @@ function findMindmapElement(root: Element, elementId: string, text: string): Ele
   return text === '' ? null : findMindmapTextElement(root, text)
 }
 
-/** 在渲染 SVG 中定位编辑目标的元素：flowchart 按 data-id，mindmap 按 DOM id（回落文本） */
-function findTargetElement(root: Element, target: InlineEditTarget, text: string): Element | null {
-  if (target.kind === 'flowchart') {
+/** 在渲染 SVG 中定位编辑目标的元素：flowchart/class/sequence 按 data-id（三者的
+ * data-id 分别是节点 id / 类名 / 参与者 id，见 CanvasPanel 的 resolverOf），
+ * mindmap 按 DOM id（回落文本）。 */
+function findTargetElement(root: Element, target: CanvasInlineEditTarget, text: string): Element | null {
+  if (target.kind === 'flowchart' || target.kind === 'class' || target.kind === 'sequence') {
+    const dataId =
+      target.kind === 'flowchart' ? target.nodeId : target.kind === 'class' ? target.name : target.actorId
     for (const el of root.querySelectorAll('[data-id]')) {
-      if (el.getAttribute('data-id') === target.nodeId) return el
+      if (el.getAttribute('data-id') === dataId) return el
     }
     return null
   }
@@ -110,8 +121,8 @@ export function useCanvasInlineEdit({ projection, resolver, svg, containerRef, v
   // 焦点被移走而触发 onBlur，会拿着同一份旧状态二次提交，这里把它挡掉
   const editingActiveRef = useRef(false)
 
-  /** 进入编辑：预填文本在渲染时从投影取（新建节点落码后投影才到位） */
-  const beginEdit = useCallback((target: InlineEditTarget) => {
+  /** 进入编辑：预填文本在渲染时从投影取（新建元素落码后投影才到位） */
+  const beginEdit = useCallback((target: CanvasInlineEditTarget) => {
     editingActiveRef.current = true
     setEditing({ target, rect: null })
   }, [])

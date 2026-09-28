@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { Button, Group, Select, Stack, Text, TextInput } from '@mantine/core'
+import { Button, Group, Select, Stack, TextInput } from '@mantine/core'
 import { useTranslation } from 'react-i18next'
 import type { MindmapShapeType } from '../lib/pipeline/mindmap'
 import type { ProjectionMindmapNode } from '../lib/projection/mindmap-projection'
@@ -162,35 +162,6 @@ export function MindmapNodeForm({ node }: { node: ProjectionMindmapNode }) {
           </Group>
         </Stack>
       )}
-    </Stack>
-  )
-}
-
-/** 空思维导图（无任何节点）时的起步表单：创建根节点 */
-export function MindmapRootForm() {
-  const { t } = useTranslation()
-  const commitIntent = useCommitIntent()
-  const [text, setText] = useState('')
-  const submit = () => {
-    const intent = addChildIntent(undefined, text)
-    if (intent !== null && commitIntent(intent)) setText('')
-  }
-  return (
-    <Stack gap="sm">
-      <Text size="sm" c="dimmed">
-        {t('app:propertyPanel.mindmapEmptyHint')}
-      </Text>
-      <TextInput
-        label={t('app:propertyPanel.mindmapAddText')}
-        value={text}
-        onChange={(e) => setText(e.currentTarget.value)}
-        onKeyDown={(e) => {
-          if (e.key === 'Enter') submit()
-        }}
-      />
-      <Button size="compact-xs" onClick={submit}>
-        {t('app:propertyPanel.addRootNode')}
-      </Button>
     </Stack>
   )
 }

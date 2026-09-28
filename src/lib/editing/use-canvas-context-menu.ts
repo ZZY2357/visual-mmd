@@ -2,8 +2,9 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import type { AnyProjection } from '../diagram-registry'
 import type { DataIdResolver } from '../canvas-selection/data-id'
 import { selectionFromEventTarget } from '../canvas-selection/data-id'
-import { mindmapActionIntents, nextNodeId } from './canvas-keyboard'
+import { mindmapActionIntents, nextNodeId, type MindmapActionPlan } from './canvas-keyboard'
 import { addClassDefIntent } from './flowchart-forms'
+import type { CanvasInlineEditTarget } from './inline-edit'
 import {
   contextMenuItems,
   contextMenuTargetFromSelection,
@@ -14,11 +15,16 @@ import { linkModeTransition, type LinkModeState } from './link-mode'
 import { useEditorStore } from '../../store/editor'
 
 /**
- * 画布右键菜单 Hook（工单 07）：右键弹出单一菜单（随目标变化），并托管连线模式
+ * 画布右键菜单 Hook（工单 07/04）：右键弹出单一菜单（随目标变化），并托管连线模式
  * 与「添加样式」小表单两个派生状态。
  *
  * - onContextMenu：阻止浏览器默认菜单（只挂在画布容器上，代码面板不受影响），
  *   经 data-id 解析右键目标；无菜单可弹（如 sequence 节点）安静关闭。
+ * - 空白菜单（工单 04）：flowchart 添加节点 / 连线模式 / 添加样式 / 添加子图；
+ *   class 添加类 / sequence 添加参与者 / mindmap 添加根节点。空图（含空 classDiagram
+ *   的错误态）同样可弹。新建元素落码后选中并进入内联命名（复用工单 05 的 beginEdit）。
+ * - 落码位置：空白处没有锚点元素，不传 afterElementId，由各管线回退到文档最后一个
+ *   元素（只有表头的文档即表头），新行因此落在图的开头之后。
  * - 连线模式：光标十字，依次单击起点、终点即 add-edge 落码；Esc / 点击空白取消；
  *   节点右键「从这里连线」带预选起点省一步。
  * - 添加样式：菜单位置浮出小表单（名称 + 颜色），提交才经 add-classdef 落码。
@@ -39,8 +45,17 @@ export interface StyleFormState {
   y: number
 }
 
-/** 内联编辑请求目标（与 InlineEditTarget 同形，避免循环依赖此处展开） */
-type InlineEditTargetLike = { kind: 'flowchart'; nodeId: string } | { kind: 'mindmap'; elementId: string }
+/** 生成未冲突的默认名：base、base2、base3……（跳过已占用的名字）。
+ * 类名/参与者 id 有引用语义（重名会让后续改名连带影响多份声明），新建时必须避重。 */
+function nextFreeName(base: string, used: Iterable<string>): string {
+  const taken = new Set(used)
+  if (!taken.has(base)) return base
+  for (let i = 2; i < 10000; i++) {
+    const candidate = `${base}${i}`
+    if (!taken.has(candidate)) return candidate
+  }
+  return `${base}${Date.now()}` // 理论不可达的兜底
+}
 
 export interface CanvasContextMenuOptions {
   projection: AnyProjection | null
@@ -49,7 +64,7 @@ export interface CanvasContextMenuOptions {
   /** 画布容器（contextmenu / Escape 监听宿主；浮层定位基准） */
   containerRef: React.RefObject<HTMLElement | null>
   /** 菜单「编辑文本」与新建节点后的内联编辑入口（工单 05 beginEdit） */
-  onNodeCreated?: (target: InlineEditTargetLike) => void
+  onNodeCreated?: (target: CanvasInlineEditTarget) => void
   /** mindmap 新子节点占位文本（确认前落码用） */
   newNodeText?: string
 }
@@ -158,6 +173,57 @@ export function useCanvasContextMenu(
     closeMenu()
   }, [closeMenu])
 
+  /** class 空白处：新建类（默认名「新类」）→ 选中并进入内联命名（类名）。
+   * 空 classDiagram（画布停在解析错误态）同样可用：管线在表头后落一行 `class 新类`，
+   * 源码随之合法。不传 afterElementId → 回退到文档最后一个元素（只有表头时即表头）。 */
+  const addClass = useCallback((): void => {
+    const proj = latest.current.projection
+    if (proj === null || proj.type !== 'class') return
+    const name = nextFreeName('新类', proj.class.classes.map((c) => c.name))
+    if (!useEditorStore.getState().commitIntent({ type: 'add-class', name })) return
+    useEditorStore.getState().select({ kind: 'class', name })
+    latest.current.onNodeCreated?.({ kind: 'class', name })
+    closeMenu()
+  }, [closeMenu])
+
+  /** sequence 空白处：新建参与者（默认名「新参与者」，不生成 alias）→ 选中并进入
+   * 内联命名（参与者 id）。不传 afterElementId → 回退到文档最后一个元素。 */
+  const addParticipant = useCallback((): void => {
+    const proj = latest.current.projection
+    if (proj === null || proj.type !== 'sequence') return
+    const actorId = nextFreeName('新参与者', proj.sequence.participants.map((p) => p.actorId))
+    if (!useEditorStore.getState().commitIntent({ type: 'add-participant', actorId })) return
+    useEditorStore.getState().select({ kind: 'participant', actorId })
+    latest.current.onNodeCreated?.({ kind: 'sequence', actorId })
+    closeMenu()
+  }, [closeMenu])
+
+  /** mindmap 空白处：新建根节点（空文档即是第一个根）→ 选中并进入内联命名（显示文本）。
+   * 空文档走 add-child（无父）→ 管线在表头后建根，elementId 必为 mindmap-node:1；
+   * 非空时挂到根节点下（与「缺省父节点」的管线语义一致），末节点序号 + 2。 */
+  const addMindmapRoot = useCallback((): void => {
+    const proj = latest.current.projection
+    if (proj === null || proj.type !== 'mindmap') return
+    const text = latest.current.newNodeText
+    const roots = proj.mindmap.nodes
+    let plan: MindmapActionPlan | null
+    if (roots.length === 0) {
+      plan = { intents: [{ type: 'add-child', text }], newElementId: 'mindmap-node:1' }
+    } else {
+      plan = mindmapActionIntents(proj.mindmap, roots[0].elementId, 'add-child', text)
+    }
+    if (plan === null) return
+    const { commitIntent, select } = useEditorStore.getState()
+    for (const intent of plan.intents) {
+      if (!commitIntent(intent)) return
+    }
+    if (plan.newElementId !== null) {
+      select({ kind: 'mindmap-node', elementId: plan.newElementId })
+      latest.current.onNodeCreated?.({ kind: 'mindmap', elementId: plan.newElementId })
+    }
+    closeMenu()
+  }, [closeMenu])
+
   /** 进入连线模式（preselectedFrom = 「从这里连线」的预选起点） */
   const enterLinkMode = useCallback(
     (preselectedFrom?: string): void => {
@@ -247,7 +313,7 @@ export function useCanvasContextMenu(
     return true
   }, [])
 
-  // 可用菜单项（空白处菜单只对 flowchart 有定义，其余图种为空列表不弹）
+  // 可用菜单项（空白菜单按图种给添加动作；其余图种未定义的目标不弹）
   const items: ContextMenuItemId[] = menu !== null ? contextMenuItems(menu.target) : []
 
   return {
@@ -260,6 +326,9 @@ export function useCanvasContextMenu(
     closeStyleForm,
     submitStyleForm,
     addNode,
+    addClass,
+    addParticipant,
+    addMindmapRoot,
     enterLinkMode,
     addSubgraph,
     applyStyle,

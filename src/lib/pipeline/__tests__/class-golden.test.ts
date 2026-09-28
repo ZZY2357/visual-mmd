@@ -106,4 +106,16 @@ describe('金样合法性（class）', () => {
     }
     await expect(mermaid.parse(source)).resolves.toBeTruthy()
   })
+
+  it('只有表头的 classDiagram（mermaid 解析错误）：add-class 落码后 parse 通过', async () => {
+    const empty = 'classDiagram\n'
+    // 空类图在 mermaid 里是解析错误（画布停在错误态），加一个类即修复
+    await expect(mermaid.parse(empty)).rejects.toBeTruthy()
+
+    const result = applyEdit(empty, classParser, { type: 'add-class', name: '新类' })
+    expect(result.ok).toBe(true)
+    if (!result.ok) return
+    expect(result.source).toContain('class 新类')
+    await expect(mermaid.parse(result.source)).resolves.toBeTruthy()
+  })
 })

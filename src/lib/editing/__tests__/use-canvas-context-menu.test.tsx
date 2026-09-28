@@ -1,15 +1,22 @@
 import { act, useEffect, useRef } from 'react'
 import { createRoot } from 'react-dom/client'
-import { afterEach, beforeEach, describe, expect, it } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { resetEditorHistory, useEditorStore } from '../../../store/editor'
 import { DEFAULT_DIAGRAM_SOURCE } from '../../../lib/storage'
 import { flowchartParser } from '../../pipeline/flowchart'
 import { mindmapParser } from '../../pipeline/mindmap'
+import { classParser } from '../../pipeline/class'
+import { sequenceParser } from '../../pipeline/sequence'
 import { buildFlowchartProjection } from '../../projection/flowchart-projection'
 import { buildMindmapProjection } from '../../projection/mindmap-projection'
+import { buildClassProjection } from '../../projection/class-projection'
+import { buildSequenceProjection } from '../../projection/sequence-projection'
 import { flowchartDataIdResolver } from '../../canvas-selection/flowchart-adapter'
 import { mindmapDataIdResolver } from '../../canvas-selection/mindmap-adapter'
+import { nodeDataIdResolver } from '../../canvas-selection/data-id'
+import type { AnyProjection } from '../../diagram-registry'
 import { useCanvasContextMenu } from '../use-canvas-context-menu'
+import type { CanvasInlineEditTarget } from '../inline-edit'
 import type { ContextMenuTarget } from '../context-menu'
 import type { LinkModeState } from '../link-mode'
 
@@ -50,6 +57,40 @@ function mindmapProjectionOf(source: string) {
   return { type: 'mindmap' as const, mindmap: buildMindmapProjection(parsed.doc) }
 }
 
+function classProjectionOf(source: string) {
+  const parsed = classParser.parse(source)
+  if (!parsed.ok) throw new Error(`样例源码必须可解析：${parsed.error.message}`)
+  return { type: 'class' as const, class: buildClassProjection(parsed.doc) }
+}
+
+function sequenceProjectionOf(source: string) {
+  const parsed = sequenceParser.parse(source)
+  if (!parsed.ok) throw new Error(`样例源码必须可解析：${parsed.error.message}`)
+  return { type: 'sequence' as const, sequence: buildSequenceProjection(parsed.doc) }
+}
+
+/** 图种 → data-id resolver（与 CanvasPanel 的 resolverOf 同约定） */
+function resolverOf(projection: AnyProjection) {
+  if (projection.type === 'flowchart') return flowchartDataIdResolver(projection.flowchart)
+  if (projection.type === 'mindmap') return mindmapDataIdResolver(projection.mindmap)
+  if (projection.type === 'sequence') return nodeDataIdResolver(projection.sequence.participants.map((p) => p.actorId))
+  return nodeDataIdResolver(projection.class.classes.map((c) => c.name))
+}
+
+/** 内联编辑目标 → 便于断言的字符串 */
+function createdIdOf(target: CanvasInlineEditTarget): string {
+  switch (target.kind) {
+    case 'flowchart':
+      return target.nodeId
+    case 'mindmap':
+      return target.elementId
+    case 'class':
+      return target.name
+    case 'sequence':
+      return target.actorId
+  }
+}
+
 interface MenuSnapshot {
   menu: { target: ContextMenuTarget; items: string[] } | null
   linkMode: LinkModeState
@@ -59,6 +100,9 @@ interface MenuSnapshot {
 interface ContextMenuApi {
   onCanvasClick: (e: { target: EventTarget | null }) => boolean
   addNode: () => void
+  addClass: () => void
+  addParticipant: () => void
+  addMindmapRoot: () => void
   enterLinkMode: (from?: string) => void
   addSubgraph: () => void
   applyStyle: (name: string) => void
@@ -71,26 +115,26 @@ interface ContextMenuApi {
 }
 
 function Harness(props: {
-  projection: ReturnType<typeof flowProjectionOf> | ReturnType<typeof mindmapProjectionOf>
+  projection: AnyProjection
   svg: string
   onState: (s: MenuSnapshot) => void
   apiRef: { current: ContextMenuApi | null }
-  onNodeCreated?: (target: { kind: 'flowchart'; nodeId: string } | { kind: 'mindmap'; elementId: string }) => void
+  onNodeCreated?: (target: CanvasInlineEditTarget) => void
 }) {
   const ref = useRef<HTMLDivElement | null>(null)
   const ctx = useCanvasContextMenu({
     projection: props.projection,
-    resolver:
-      props.projection.type === 'flowchart'
-        ? flowchartDataIdResolver(props.projection.flowchart)
-        : mindmapDataIdResolver(props.projection.mindmap),
+    resolver: resolverOf(props.projection),
     containerRef: ref,
-    onNodeCreated: props.onNodeCreated as never,
+    onNodeCreated: props.onNodeCreated,
     newNodeText: '新节点',
   })
   props.apiRef.current = {
     onCanvasClick: ctx.onCanvasClick as never,
     addNode: ctx.addNode,
+    addClass: ctx.addClass,
+    addParticipant: ctx.addParticipant,
+    addMindmapRoot: ctx.addMindmapRoot,
     enterLinkMode: ctx.enterLinkMode,
     addSubgraph: ctx.addSubgraph,
     applyStyle: ctx.applyStyle,
@@ -146,7 +190,7 @@ describe('useCanvasContextMenu（工单 07 右键菜单）', () => {
           svg={SVG_STUB}
           onState={(s) => snapshots.push(s)}
           apiRef={api}
-          onNodeCreated={(t) => created.push(t.kind === 'flowchart' ? t.nodeId : String(t.elementId))}
+          onNodeCreated={(t) => created.push(createdIdOf(t))}
         />,
       )
     })
@@ -197,7 +241,7 @@ describe('useCanvasContextMenu（工单 07 右键菜单）', () => {
     expect(contextMenuOnEl(container.firstElementChild as HTMLElement)).toBe(true)
 
     const last = snapshots.at(-1)!
-    expect(last.menu?.target).toEqual({ kind: 'blank' })
+    expect(last.menu?.target).toEqual({ kind: 'blank', diagramType: 'flowchart' })
     expect(last.menu?.items).toEqual(['add-node', 'link-mode', 'add-style', 'add-subgraph'])
   })
 
@@ -328,7 +372,7 @@ describe('useCanvasContextMenu（工单 07 mindmap 节点菜单）', () => {
           svg={MINDMAP_SVG_STUB}
           onState={(s) => snapshots.push(s)}
           apiRef={api}
-          onNodeCreated={(t) => created.push(t.kind === 'mindmap' ? t.elementId : t.nodeId)}
+          onNodeCreated={(t) => created.push(createdIdOf(t))}
         />,
       )
     })
@@ -372,5 +416,181 @@ describe('useCanvasContextMenu（工单 07 mindmap 节点菜单）', () => {
     act(() => api.current!.beginEditText())
 
     expect(created).toEqual(['mindmap-node:2'])
+  })
+})
+
+describe('useCanvasContextMenu（工单 04 空白处按图种建元素）', () => {
+  let host: HTMLDivElement
+  let root: ReturnType<typeof createRoot>
+  let snapshots: MenuSnapshot[]
+  let api: { current: ContextMenuApi | null }
+  let created: string[]
+
+  beforeEach(() => {
+    host = document.createElement('div')
+    document.body.appendChild(host)
+    root = createRoot(host)
+    snapshots = []
+    api = { current: null }
+    created = []
+  })
+  afterEach(() => {
+    act(() => root.unmount())
+    host.remove()
+    vi.restoreAllMocks()
+    resetEditorHistory(DEFAULT_DIAGRAM_SOURCE)
+    useEditorStore.getState().select(null)
+  })
+
+  function mount(projection: AnyProjection, source: string, svg = '') {
+    resetEditorHistory(source)
+    act(() => {
+      root.render(
+        <Harness
+          projection={projection}
+          svg={svg}
+          onState={(s) => snapshots.push(s)}
+          apiRef={api}
+          onNodeCreated={(t) => created.push(createdIdOf(t))}
+        />,
+      )
+    })
+    return host.firstElementChild as HTMLDivElement
+  }
+
+  /** 右键画布空白（SVG 无 data-id 的包裹元素） */
+  function blankContextMenu(container: HTMLDivElement): boolean {
+    let prevented = false
+    act(() => {
+      const event = new MouseEvent('contextmenu', { bubbles: true, cancelable: true })
+      container.firstElementChild!.dispatchEvent(event)
+      prevented = event.defaultPrevented
+    })
+    return prevented
+  }
+
+  /** 监听 store 的 commitIntent，取第 n 次收到的意图（断言意图字段与 afterElementId） */
+  function spyCommitIntent() {
+    return vi.spyOn(useEditorStore.getState(), 'commitIntent')
+  }
+
+  // 只有表头的文档：class 图在 mermaid 里是解析错误，app 自有解析器仍可用
+  const CLASS_HEADER_ONLY = 'classDiagram\n'
+  const SEQUENCE_HEADER_ONLY = 'sequenceDiagram\n'
+  const MINDMAP_HEADER_ONLY = 'mindmap\n'
+  const MINDMAP_SAMPLE_2 = `mindmap
+  root((中心))
+    分支A
+`
+  const CLASS_SVG_STUB = '<svg><g data-id="已有类">已有类</g></svg>'
+  const SEQUENCE_SVG_STUB = '<svg><g data-id="甲">甲</g></svg>'
+
+  it('class 空白右键（空图错误态）：菜单为「添加类」，落码后选中并回调内联命名类名', () => {
+    const container = mount(classProjectionOf(CLASS_HEADER_ONLY), CLASS_HEADER_ONLY)
+
+    expect(blankContextMenu(container)).toBe(true)
+    const last = snapshots.at(-1)!
+    expect(last.menu?.target).toEqual({ kind: 'blank', diagramType: 'class' })
+    expect(last.menu?.items).toEqual(['add-class'])
+
+    const spy = spyCommitIntent()
+    act(() => api.current!.addClass())
+
+    // 空白处没有锚点元素：不传 afterElementId，由管线回退到文档最后一个元素（这里即表头）
+    const intent = spy.mock.calls[0]?.[0]
+    expect(intent).toMatchObject({ type: 'add-class', name: '新类' })
+    expect(intent !== undefined && 'afterElementId' in intent).toBe(false)
+
+    const source = useEditorStore.getState().source
+    // 表头后落一行 class（修复空 classDiagram 的解析错误）
+    expect(source).toContain('classDiagram\nclass 新类')
+    expect(useEditorStore.getState().selection).toEqual({ kind: 'class', name: '新类' })
+    expect(created).toEqual(['新类'])
+  })
+
+  it('class 空白右键（已有内容）：默认名避重、锚点回退到最后一个元素', () => {
+    const source = 'classDiagram\n    class 新类\n'
+    const container = mount(classProjectionOf(source), source, CLASS_SVG_STUB)
+
+    expect(blankContextMenu(container)).toBe(true)
+
+    const spy = spyCommitIntent()
+    act(() => api.current!.addClass())
+
+    expect(spy.mock.calls[0]?.[0]).toMatchObject({ type: 'add-class', name: '新类2' })
+    expect(useEditorStore.getState().source).toContain('class 新类2')
+    expect(created).toEqual(['新类2'])
+  })
+
+  it('sequence 空白右键（空图）：菜单为「添加参与者」，落码不带 alias 并回调内联命名 id', () => {
+    const container = mount(sequenceProjectionOf(SEQUENCE_HEADER_ONLY), SEQUENCE_HEADER_ONLY)
+
+    expect(blankContextMenu(container)).toBe(true)
+    expect(snapshots.at(-1)!.menu?.items).toEqual(['add-participant'])
+
+    const spy = spyCommitIntent()
+    act(() => api.current!.addParticipant())
+
+    const intent = spy.mock.calls[0]?.[0]
+    expect(intent).toMatchObject({ type: 'add-participant', actorId: '新参与者' })
+    expect(intent !== undefined && 'alias' in intent).toBe(false)
+    expect(intent !== undefined && 'afterElementId' in intent).toBe(false)
+
+    // 表头后落一行 participant，且不带 as 别名
+    expect(useEditorStore.getState().source).toContain('sequenceDiagram\nparticipant 新参与者')
+    expect(useEditorStore.getState().source).not.toContain(' as ')
+    expect(useEditorStore.getState().selection).toEqual({ kind: 'participant', actorId: '新参与者' })
+    expect(created).toEqual(['新参与者'])
+  })
+
+  it('sequence 空白右键（已有参与者）：加在最后一行之后', () => {
+    const source = 'sequenceDiagram\n    participant 甲\n    甲->>甲: 自己\n'
+    const container = mount(sequenceProjectionOf(source), source, SEQUENCE_SVG_STUB)
+
+    expect(blankContextMenu(container)).toBe(true)
+    act(() => api.current!.addParticipant())
+
+    expect(useEditorStore.getState().source).toContain('participant 新参与者')
+    expect(created).toEqual(['新参与者'])
+  })
+
+  it('mindmap 空白右键（空图）：菜单为「添加根节点」，落码纯文本并回调内联命名显示文本', () => {
+    const container = mount(mindmapProjectionOf(MINDMAP_HEADER_ONLY), MINDMAP_HEADER_ONLY)
+
+    expect(blankContextMenu(container)).toBe(true)
+    const last = snapshots.at(-1)!
+    expect(last.menu?.target).toEqual({ kind: 'blank', diagramType: 'mindmap' })
+    expect(last.menu?.items).toEqual(['add-root'])
+
+    const spy = spyCommitIntent()
+    act(() => api.current!.addMindmapRoot())
+
+    expect(spy.mock.calls[0]?.[0]).toMatchObject({ type: 'add-child', text: '新节点' })
+    expect(useEditorStore.getState().source).toContain('新节点')
+    // 空文档：新根是第一个节点行
+    expect(useEditorStore.getState().selection).toEqual({ kind: 'mindmap-node', elementId: 'mindmap-node:1' })
+    expect(created).toEqual(['mindmap-node:1'])
+  })
+
+  it('mindmap 空白右键（已有内容）：挂到根节点下并选中新节点', () => {
+    const container = mount(mindmapProjectionOf(MINDMAP_SAMPLE_2), MINDMAP_SAMPLE_2)
+
+    expect(blankContextMenu(container)).toBe(true)
+    act(() => api.current!.addMindmapRoot())
+
+    expect(useEditorStore.getState().source).toContain('新节点')
+    // 「分支A」子树末节点（第 2 行）之后 → 新节点是第 3 个节点行
+    expect(useEditorStore.getState().selection).toEqual({ kind: 'mindmap-node', elementId: 'mindmap-node:3' })
+    expect(created).toEqual(['mindmap-node:3'])
+  })
+
+  it('flowchart 空白菜单不回归（仍是四项，且走 add-node）', () => {
+    const container = mount(flowProjectionOf(SAMPLE), SAMPLE, SVG_STUB)
+
+    expect(blankContextMenu(container)).toBe(true)
+    expect(snapshots.at(-1)!.menu?.items).toEqual(['add-node', 'link-mode', 'add-style', 'add-subgraph'])
+
+    act(() => api.current!.addNode())
+    expect(useEditorStore.getState().source).toContain('n1[n1]')
   })
 })

@@ -103,4 +103,29 @@ describe('金样合法性（sequence）', () => {
     expect(result.source).toContain('A--xB: 清单外虚线叉头')
     await expect(mermaid.parse(result.source)).resolves.toBeTruthy()
   })
+
+  it('只有表头的 sequenceDiagram：add-participant 落码后 parse 通过（不带 alias）', async () => {
+    const empty = 'sequenceDiagram\n'
+    const result = applyEdit(empty, sequenceParser, { type: 'add-participant', actorId: '新参与者' })
+    expect(result.ok).toBe(true)
+    if (!result.ok) return
+    expect(result.source).toContain('participant 新参与者')
+    expect(result.source).not.toContain(' as ')
+    await expect(mermaid.parse(result.source)).resolves.toBeTruthy()
+  })
+
+  it('只有表头的 sequenceDiagram：落码后改名（内联命名提交路径）仍 parse 通过', async () => {
+    const step1 = applyEdit('sequenceDiagram\n', sequenceParser, { type: 'add-participant', actorId: '新参与者' })
+    expect(step1.ok).toBe(true)
+    if (!step1.ok) return
+    const step2 = applyEdit(step1.source, sequenceParser, {
+      type: 'rename-participant',
+      actorId: '新参与者',
+      newId: '服务端',
+    })
+    expect(step2.ok).toBe(true)
+    if (!step2.ok) return
+    expect(step2.source).toContain('participant 服务端')
+    await expect(mermaid.parse(step2.source)).resolves.toBeTruthy()
+  })
 })

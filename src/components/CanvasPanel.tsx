@@ -357,6 +357,9 @@ export function CanvasPanel({ preview, projection }: CanvasPanelProps) {
     else if (id === 'link-mode') ctx.enterLinkMode()
     else if (id === 'add-style') ctx.openStyleForm()
     else if (id === 'add-subgraph') ctx.addSubgraph()
+    else if (id === 'add-class') ctx.addClass()
+    else if (id === 'add-participant') ctx.addParticipant()
+    else if (id === 'add-root') ctx.addMindmapRoot()
     else if (id === 'link-from-here') {
       const target = ctx.menu?.target
       if (target !== undefined && target.kind === 'flowchart-node') ctx.enterLinkMode(target.nodeId)

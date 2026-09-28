@@ -33,6 +33,10 @@ export const zhDict = {
         'link-mode': '添加连线',
         'add-style': '添加样式',
         'add-subgraph': '添加子图',
+        // 空白处按图种（工单 04）：class / sequence / mindmap 的添加动作
+        'add-class': '添加类',
+        'add-participant': '添加参与者',
+        'add-root': '添加根节点',
         'link-from-here': '从这里连线',
         'edit-text': '编辑文本',
         'edit-label': '编辑标签',
@@ -271,14 +275,12 @@ export const zhDict = {
       // ---- mindmap（工单 08） ----
       addChild: '添加子节点',
       addSibling: '添加同级节点',
-      addRootNode: '添加根节点',
       deleteMindmapNode: '删除节点（含子级）',
       mindmapNodeIcon: '图标',
       mindmapIconHint: '图标类名（如 fa fa-book），留空移除图标',
       mindmapAddText: '节点文本',
       mindmapHint: '思维导图：在上方结构树中点选节点，即可在此编辑文本、形状与图标，或增删层级节点。',
       mindmapEmpty: '（暂无节点）',
-      mindmapEmptyHint: '思维导图为空：先添加一个根节点，即可在结构树中逐层搭建。',
       // ---- mindmap 节点 ID（工单 05） ----
       mindmapNodeIdHint: '留空则还原为纯文本节点；设置 ID 会引入形状（无形状时为方框）',
       mindmapInvalidNodeId: 'ID 不能包含空白、圆括号、方括号、花括号',

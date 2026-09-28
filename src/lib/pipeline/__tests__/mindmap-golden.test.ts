@@ -116,4 +116,15 @@ describe('金样合法性（mindmap）', () => {
     expect(step4.ok).toBe(false) // id 已是 a，空操作拒绝
     await expect(mermaid.parse(dupSource)).resolves.toBeTruthy()
   })
+
+  it('只有表头的 mindmap：add-child（无父）落码根节点后 parse 通过', async () => {
+    const empty = 'mindmap\n'
+    const result = applyEdit(empty, mindmapParser, { type: 'add-child', text: '新节点' })
+    expect(result.ok).toBe(true)
+    if (!result.ok) return
+    expect(result.source).toContain('新节点')
+    // 根节点缩进 = 表头缩进 + 一档
+    expect(result.source).toContain('  新节点')
+    await expect(mermaid.parse(result.source)).resolves.toBeTruthy()
+  })
 })
