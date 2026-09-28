@@ -471,3 +471,191 @@ DOM 节点 `mmd-preview-3-node_0..node_12`，用 `textContent` 实测出投影�
 - 本节汇总：4 条通过（其中「撤销/重做」1 条为部分覆盖）/ 1 条不通过 / 2 条无法验证。
   不通过项 = class 节点右键菜单不可达，无法验证项 = class 加成员/加关系落码 与 删除类级联，
   **三项均属失败单 09 根因**（class 节点缺 `data-id`），故本节**未新建**任何 issue 文件。
+
+### 07 回归（验收记录）
+
+环境：dev server `http://localhost:5199/`，viewport 1600×1000，先 `localStorage.clear()` 再 reload。
+操作全部走真实输入（`playwright-cli` 的真实鼠标 `mousemove/mousedown/mouseup`、真实键盘 `type/press`、
+工具栏真实按钮）；**代码面板文本**统一取 `.cm-content .cm-line` 的 `textContent` 以 `\n` join
+（实测该值与 `localStorage['visual-mmd:library']` 的 active 图表 `source` **逐字一致**，
+`.cm-content` 的 `innerText` 会多一个行尾换行，故不采用）。导出内容用页面内钩子
+（改写 `URL.createObjectURL` + `HTMLAnchorElement.prototype.click`）截获 Blob 后读原文，
+并核对 playwright-cli 实际落盘文件大小。
+
+**清单条目 1：代码面板 ↔ 画布双向同步 + 外部落码不被回声吞掉**
+
+- [通过] 代码面板 → 画布：面板手改源码，画布随之更新
+  —— 步骤：点代码面板 → `Control+a` → 键入 `flowchart LR\n    X[甲] --> Y[乙]\n` / 预期：画布出现
+  甲、乙两个节点 / 实际：面板文本与源码**同时**变为 `flowchart LR\n    X[甲] --> Y[乙]\n    `
+  （行尾 4 空格是 CodeMirror 在 `\n` 后的 mermaid 自动缩进，如实记录）；画布预览
+  `svg#mmd-preview-16` 的 `textContent` 末尾 = `…trebuchet ms",verdana,arial,sans-serif;}甲乙` / 通过。
+- [通过] 画布 → 代码面板：画布操作后代码面板立刻反映新源码
+  —— 步骤：真实鼠标点选节点 `X`（包围盒中心 734,559）→ `Tab`（开出内联框，预填 `n1`）→ 键入
+  `画布加的节点` → `Enter` / 预期：源码落码 + 面板同步 / 实际：源码 = 面板文本 =
+  `flowchart LR\n    X[甲] --> Y[乙]\n    X --> n1\n    n1[画布加的节点]\n    `；画布
+  `mmd-preview-18` 末尾含 `甲乙画布加的节点`；`[data-vm-selected] = ["n1"]` / 通过。
+- [通过] 连续两次**外部落码**（不经面板打字）都被面板吸收（`b5c35d0` 修复的核心）
+  —— 步骤：承上，焦点已在画布容器（`DIV[tabindex=0]`）→ 再 `Enter` + 键入 `同级别` + `Enter`
+  / 预期：第二次外部落码同样回写到代码面板，不停在旧源码 / 实际：面板文本 =
+  `flowchart LR\n    X[甲] --> Y[乙]\n    X --> n1\n    X --> n2\n    n2[同级别]\n    n1[画布加的节点]\n    `
+  与源码逐字一致（旧实现在这里会把第二次外部同步吞掉）/ 通过。
+- [通过] 「画布 → 面板 → 画布 → 面板 → 画布 → 面板」交替 3 轮后两边仍一致
+  —— 步骤与逐轮证据（每轮结束都读一次 `panel === source`）：
+  第 1 轮 面板写 `flowchart LR\n    X[甲] --> Y[乙]`（画布 `mmd-preview-16` 末尾 `甲乙`）；
+  第 2 轮 画布加 `n1[画布加的节点]`（面板同步）；第 3 轮 面板写 `flowchart TD\n    M[三] --> N[四]`
+  （画布 `mmd-preview-33` 末尾 `三四`）；第 4 轮 画布加 `n1[c2节点]`（`mmd-preview-35`）；
+  第 5 轮 面板写 `flowchart LR\n    P[五] --> Q[六]`（`mmd-preview-48`）；第 6 轮 画布加
+  `n1[c3节点]`（`mmd-preview-50`）。六次 `panel === source` 全部 true，`.mantine-Alert-root` 恒为 0
+  —— 面板未出现"停在旧源码"、也未出现回声交替吞掉 / 通过。
+  控制台：本节（含 4 次面板整体改写 + 4 次画布落码）`playwright-cli console error` =
+  **Errors: 0 / Warnings: 0**。
+
+**清单条目 2：撤销/重做覆盖本批全部新动作**
+
+- [通过] 清除主题（选「跟随」）可撤销、可重做
+  —— 步骤：结构树点「图表LR」回到图表级 → 主题下拉选「森林（forest）」→ 再选「跟随 Mermaid 默认
+  （不设置主题）」→ 工具栏「撤销」→「重做」/ 预期：清除动作可逆 / 实际：选 forest 后源码首部为
+  `---\nconfig:\n  theme: forest\n---\n`；选「跟随」后该 frontmatter 整块消失、面板同步、选择器回显
+  「跟随 Mermaid 默认（不设置主题）」；「撤销」→ 源码重新出现 `---\nconfig:\n  theme: forest\n---\n`
+  且选择器回显 `森林（forest）`；「重做」→ 再次清除、选择器回「跟随…」/ 通过。
+- [通过] 设 / 清 mindmap 节点 id 可撤销、可重做
+  —— 步骤：「新建」→「思维导图」→ 真实鼠标点选 `g[id$="-node_1"]`（`双面板同步`）→ 面板「节点 ID」
+  填 `UbId` + Enter → 撤销 → 重做；再清空 id + Enter → 撤销 → 重做 / 实际（源码逐字）：
+  `    双面板同步` →（设 id）→ `    UbId[双面板同步]` →（撤销）→ `    双面板同步` →（重做）→
+  `    UbId[双面板同步]` →（清 id）→ `    双面板同步` →（撤销）→ `    UbId[双面板同步]` →
+  （重做）→ `    双面板同步`，全程 `panel === source` / 通过。
+- [通过] 方向键移动选中后再加节点（Tab/Enter）可撤销、可重做
+  —— 步骤：flowchart `flowchart LR\n    P[五] --> Q[六]\n    P --> n1\n    n1[c3节点]`、选中 `n1`
+  → 按 `ArrowLeft`（选中移到 `Q`，`[data-vm-selected] = ["Q"]`，方向键语义见 03 节）→
+  `Tab` 开出内联框（预填 `n2`）→ 键入 `方向键后加节点` → `Enter` → 工具栏「撤销」×N →「重做」×N
+  / 预期：这串新动作全部进快照栈 / 实际：落码后源码 = `…\n    Q --> n2\n    n2[方向键后加节点]\n…`；
+  连续「撤销」6 次逐步退回（`n2[方向键后加节点]` → `n2[n2]` → 去掉 `Q --> n2` → 去掉 `n2[n2]`
+  → `n1[c3节点]`→`n1[n1]` → 去掉 `P --> n1` → `flowchart LR\n    P[五] --> Q[六]`，六次每次源码都变），
+  「重做」6 次逐字回到含 `n2[方向键后加节点]` 的状态（此时「重做」按钮 `disabled = true`）/
+  通过。**注**：一次"加节点 + 命名"会落成 2 个快照（先结构后文本），故一次用户流程需要两次撤销，
+  如实记录。
+- 控制台：本节（主题切换 + 下拉选择 4 次 + 面板填表 4 次 + 撤销/重做 18 次）Errors: 0 / Warnings: 0。
+
+**清单条目 3：导入/导出 `.mmd` / SVG / PNG，不受视图影响；切图表重置视图**
+
+- [通过] 导出 `.mmd` 的内容与代码面板逐字一致
+  —— 步骤：当前图为「思维导图」（源码首部 `---\nconfig:\n  theme: neo-dark\n---\n`）→ 点「导出」→
+  「导出为 .mmd」→ 读截获的 Blob / 预期：`text === 代码面板文本` / 实际：
+  `(await blob.text()) === __panel()` **true**，且 `=== localStorage source` **true**
+  （256 字符 / 358 字节 UTF-8）；playwright-cli 落盘 `.playwright-cli/思维导图.mmd`
+  大小 **358 字节** = Blob 大小 / 通过。
+- [通过] 导出 SVG / PNG 成功（内容/格式可用）
+  —— 实际：`.svg` Blob `type=image/svg+xml;charset=utf-8`、**46898 字节**，首部
+  `<svg id="mmd-preview-91" width="100%" xmlns="http://www.w3.org/2000/svg" class="mindmapDiagram" style=…`，
+  落盘 `.playwright-cli/思维导图.svg`；`.png` Blob `type=image/png`、**16134 字节**，
+  前 8 字节 = `137,80,78,71,13,10,26,10`（PNG magic），IHDR 尺寸 **200×1150**（= SVG 原始尺寸 ×2
+  的 2x 光栅化），落盘 `.playwright-cli/思维导图.png` / 通过。
+- [通过] 导出**不受画布视图（缩放/平移）影响**（逐字节对照）
+  —— 步骤：记录预览 `svg#mmd-preview-91` 的 transform 与 id → 导出 SVG/PNG（基线）→
+  在画布上真实拖拽平移 + 两次滚轮缩放（transform 变为
+  `translate(390.381px, -880.647px) scale(2.31606)`，基线是
+  `translate(95.1964px, -704.894px) scale(2.14871)`）→ 再导出 SVG/PNG / 预期：两份产物逐字节相同 /
+  实际：SVG **46898 == 46898 字节且逐字节相同**、PNG **16134 == 16134 字节且逐字节相同**；
+  两次导出之间预览 `svg` id 恒为 `mmd-preview-91`（**证明期间未发生重渲染**，排除了
+  "mermaid 每次渲染换 id" 的干扰因素）/ 通过。
+  **踩坑记录**：首次对照（`mmd-preview-90` vs `-91`）出现大小不同（45203 / 46898），定位为
+  中途源码被误改导致预览重渲染（非视图原因）；改用"确认 id 不变再比字节"的方式重做后方为上述结论。
+- [通过] 图表库**切换图表时视图重置为 fit**
+  —— 步骤：把 mindmap 放大 + 平移（transform 为
+  `translate(-467.375px, -10.0999px) scale(1.74223)`）→ 打开「图表库」抽屉 → 点「打开图表 流程图」
+  → 读新预览 / 预期：新图回到 fit（缩放/平移不复存在）/ 实际：新预览 `mmd-preview-95` 的 transform =
+  `translate(118px, 351.5px) scale(1)`，且**正好居中**（容器 788×849、svg 552×146 →
+  `(788-552)/2 = 118`、`(849-146)/2 = 351.5` 与实测逐值吻合）；再点「打开图表 思维导图」→
+  `mmd-preview-96` transform = `translate(24px, 187.873px) scale(0.822969)`，同样居中
+  （`(788-740)/2 = 24`、`(849-473)/2 = 188`）/ 通过。
+- [通过] 导入 `.mmd`（往返）
+  —— 步骤：把导出的 .mmd 另存为 `import-check.mmd`（内容 `flowchart TD\n    IMPORT[导入验证] --> OK[成功]\n`）
+  → 对隐藏 `input[type=file]` 真实 `setInputFiles` / 预期：文件内容原样成为当前源码 / 实际：面板文本 =
+  `flowchart TD\n    IMPORT[导入验证] --> OK[成功]\n`（含文件末尾换行）与源码逐字一致，画布
+  `mmd-preview-97` 渲染出 `导入验证成功`；工具栏「撤销」回到导入前源码 / 通过。
+- **踩坑记录（非清单项）**：「图表库」抽屉点选图表后**不会自动关闭**，其 `mantine-Drawer-overlay`
+  继续拦截点击（实测 `撤销` 按钮的点击被 overlay 拦截并 500ms 重试），需 `Escape` 关闭；
+  另 `getByRole('button', { name: '导出' })` 是 strict-mode 歧义（还命中代码面板标题旁的
+  「导出 mmd / svg / png」文本按钮），必须 `exact: true`。两条都只影响自动化脚本，不判通过/不通过。
+
+**清单条目 4：11 个主题下选中态可见**
+
+- [通过] 11 个主题逐个切换，选中态（高亮）在画布上均实际生效
+  —— 步骤：mindmap 上真实鼠标点选 `g[id$="-node_1"]`（保持选中），依次在下拉里选 11 个主题，
+  每次读 `[data-vm-selected]` 命中的元素与 `getComputedStyle(el).filter` / 预期：每个主题下都有
+  可见的选中高亮 / 实际：11 个主题
+  （经典 `default`、中性 `neutral`、暗色 `dark`、森林 `forest`、基础 `base`、Redux 彩色 `redux-color`、
+  Redux 暗色 `redux-dark-color`、Redux `redux`、Redux 暗色 `redux-dark`、新派 `neo`、新派暗色 `neo-dark`）
+  **全部**命中 1~2 个 `[data-vm-selected]` 元素，其 computed `filter` 恒为
+  `drop-shadow(rgb(34, 139, 230) 0px 0px 4px)`（即 `src/index.css:19-21` 的 `[data-vm-selected]` 规则，
+  `--mantine-color-blue-6 = #228be6` 已解析）；命中元素包围盒非空（随主题字形为 93x26 / 87x44 / 91x26），
+  说明高亮落在真实渲染出来的节点上。
+  **如实说明**：票面写"外圈描边高亮"，实现是 `filter: drop-shadow(...)` 光晕（非描边），
+  视觉上仍是围绕节点的一圈蓝色光晕。
+  11 轮换主题期间 `playwright-cli console error` = Errors 0（该段未新增任何 error）/ 通过。
+
+**清单条目 5：窄屏布局不破**
+
+- [通过] 视口 480×900 下按设计只显示画布，且无破版
+  —— 步骤：`resize 480 900` / 预期：只显示画布 / 实际：`.cm-editor` 不在 DOM
+  （`document.querySelector('.cm-editor') === null`）、属性面板
+  `[aria-label="结构与属性面板"]` 不在 DOM，`svg[id^="mmd-preview"]` 在；
+  `documentElement.scrollWidth === clientWidth === 480`（**无横向溢出**）、`body.scrollWidth = 480`、
+  `main` 无溢出、`main` = 480×900；截图
+  `C:\Users\zzy2357\AppData\Local\Temp\vmmd-verify\narrow-480.png`（只见头部 + 画布，无面板残留）。
+  回到 1000×900 与 1600×1000 时两面板都回来且 `scrollWidth - clientWidth = 0` / 通过。
+
+**清单条目 6：`npm test` / `npm run typecheck` 全绿**
+
+- [通过] 本节自行复跑（编排方结论一致）
+  —— 实际：`npm test` → `Test Files 43 passed (43)`、`Tests 519 passed (519)`、exit code **0**
+  （日志 `Duration 4.13s`）；`npm run typecheck`（`tsc -b --noEmit`）**无输出、exit code 0** / 通过。
+
+**题外确认（前一节 06 的新观察）：UI 级联删除后源码是否残留空 `loop`/`alt` 块**
+
+- [不通过] **是 app 侧级联删除留下的空块**（不是只有手写源码才会出现）—— 已开失败单
+  `11-cascade-delete-leaves-empty-block.md`
+  —— 步骤 A：`localStorage.clear()` + reload →「新建」→「时序图」（默认模板末尾
+  `loop 每次编辑` + 块体内 1 条语句）→ 在画布上对参与者「系统」真实右键 → 点「删除参与者」/ 预期：
+  级联删掉语句、不留空块 / 实际：源码变为
+  `sequenceDiagram\n    autonumber\n    actor 使用者\n    \n    \n    \n    \n    \n    \n    \n    \n    loop 每次编辑\n        \n    end\n`
+  —— `loop 每次编辑` 与 `end` 之间**没有任何语句**（块体为空），另有 8 行"只有 4 个空格"的空白行；
+  该源码在画布上新增 **51 条** console error（`<line> attribute y1/y2: Expected length, "NaN"`、
+  `<circle> attribute cy`、`<text> attribute x/y`、`<tspan> attribute x` 等），删除前该时点
+  Errors = 0；`.mantine-Alert-root = 0`（语法合法，畸形点是"空块"结构）。
+  步骤 B（换 `alt` 验证不是 loop 特有）：代码面板改写为
+  `sequenceDiagram\nactor A\nparticipant B as Bee\nalt 条件一\nA->>B: hi\nend` → 对参与者 `B`
+  真实右键 →「删除参与者」/ 实际：源码变为 `sequenceDiagram\nactor A\n\nalt 条件一\n\nend`
+  —— `alt` 块体为空，再新增 **47 条**同型 NaN error（该时点
+  `Total messages: 102 (Errors: 98, Warnings: 0)`，98 条全部是 NaN 属性）。
+  对照：手写空块同样报同型 error（沿用 06 节结论 + reload 后加载本单产出的含空 `alt` 存档、
+  零操作再报约 50 条），说明 NaN 渲染属 mermaid 行为，**但空块是 app 制造的**，故开单。
+
+**题外观察（非清单条目）：画布「适应窗口」按钮对鼠标不可用，键盘触发会误改源码**
+
+- [不通过] 真实鼠标点击「适应窗口」**完全无反应**（视图不变）；把焦点放到该按钮再按 `Enter`
+  虽能复位视图，**却同时往源码里插入一个 `新节点`** —— 已开失败单
+  `12-fit-view-button-pointer-capture-hijack.md`
+  —— 步骤：flowchart 上滚轮放大到 `scale(2.02418)` → 真实鼠标点「适应窗口」按钮中心 / 预期：回到 fit /
+  实际：transform 点击前后**逐字相同**（`translate(-618.089px, -70.8216px) scale(2.02418)`）；
+  捕获阶段监听显示 `pointerdown` 落在按钮内的 `SPAN`（文本「适应窗口」），但随后的 `click` 目标是
+  **画布容器 `DIV`**，按钮 `onClick` 从未执行（背景拖拽的 `setPointerCapture` 劫持了 click；
+  `CanvasPanel.tsx` 现有守卫只覆盖菜单/两种表单浮层）。键盘路径：`focus()` 到按钮后
+  `document.activeElement` 确为该 `<button>`，按 `Enter` 后 transform 变为居中 fit 值
+  `translate(24px, 190.079px) scale(0.873601)`，**同时源码新增 `    新节点`**（计数 0 → 1），
+  重复一次变 2（`use-canvas-keyboard.ts` 的 `FOCUS_EXCLUDE_SELECTOR` 不含 `button`，按键冒泡被当画布操作）。
+  **归类**：非本批改动引入（该按钮与指针捕获同属工单 03），但真实浏览器上鼠标不可用，故开单。
+
+- 控制台汇总（本节全流程）：新建 5 张图（含时序/思维导图/流程图）+ 面板整体改写 5 次 +
+  画布落码 4 次 + 主题切换 11 次 + 撤销/重做 18 次 + 导出 9 次 + 导入 1 次 + 缩放/平移/切图 →
+  **级联删除之前** `playwright-cli console error` = `Errors: 0 / Warnings: 0`（含 11 主题轮询、
+  全部导出/导入、"重复 key"之类旧报错均**未复现**）。
+  仅在「UI 级联删除留下空块」路径出现 error：空 `loop` +51 条、空 `alt` +47 条
+  （该时点 `Total messages: 102 (Errors: 98, Warnings: 0)`，98 条全部是 mermaid 的
+  `attribute …: Expected length, "NaN"`），reload 加载该存档再 +50 条 —— 已在失败单 11 记录。
+- 本节汇总：清单 6 条（拆成 14 项子检查，含 4 条"逐字节/逐项对照"）**全部通过** /
+  题外发现 **2 条不通过**（空 `loop`/`alt` 级联残留 → 单 11；适应窗口按钮 → 单 12）/
+  0 条无法验证。**未修改任何源码**（`git status` 干净）。
+  证据文件：`C:\Users\zzy2357\AppData\Local\Temp\vmmd-verify\narrow-480.png`；
+  导出产物 `.playwright-cli/思维导图.mmd|svg|png`（358 / 46898 / 16134 字节）。
+
