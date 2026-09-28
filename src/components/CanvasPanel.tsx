@@ -10,6 +10,7 @@ import type { Selection } from '../lib/projection/selection'
 import { useCanvasSelection } from '../lib/canvas-selection/use-canvas-selection'
 import { useCanvasKeyboard } from '../lib/editing/use-canvas-keyboard'
 import { useCanvasInlineEdit, inlineEditTextOf } from '../lib/editing/use-canvas-inline-edit'
+import type { InlineEditCloseOptions } from '../lib/editing/use-canvas-inline-edit'
 import type { Rect } from '../lib/editing/inline-edit'
 import { useCanvasContextMenu } from '../lib/editing/use-canvas-context-menu'
 import type { ContextMenuItemId } from '../lib/editing/context-menu'
@@ -84,8 +85,15 @@ function selectedDataIdOf(selection: Selection): string | null {
   }
 }
 
-/** 内联编辑浮层输入框（工单 05）：预填当前显示文本，回车/失焦提交、Esc 取消 */
-function InlineEditInput(props: { rect: Rect | null; initialText: string; onCommit: (text: string) => void; onCancel: () => void }) {
+/** 内联编辑浮层输入框（工单 05/02）：预填当前显示文本，回车/失焦提交、Esc 取消。
+ * Enter/Esc 走「归还焦点」的提交路径（keydown，用户想继续在画布上操作）；
+ * 失焦提交不归还焦点（用户已点到画布之外，如代码面板）。 */
+function InlineEditInput(props: {
+  rect: Rect | null
+  initialText: string
+  onCommit: (text: string, options?: InlineEditCloseOptions) => void
+  onCancel: () => void
+}) {
   const { t } = useTranslation()
   const [value, setValue] = useState(props.initialText)
   const inputRef = useRef<HTMLInputElement>(null)
@@ -104,11 +112,15 @@ function InlineEditInput(props: { rect: Rect | null; initialText: string; onComm
     <TextInput
       ref={inputRef}
       variant="unstyled"
+      // 浮层根元素标记（style/className 落在 Mantine 的 wrapper 根上）：容器点击
+      // 用 .canvas-inline-edit 排除整个浮层，连它的内边距也不当作画布（工单 02）
+      className="canvas-inline-edit"
       aria-label={t('canvas.inlineEditAria')}
       value={value}
       onChange={(e) => setValue(e.currentTarget.value)}
       onKeyDown={(e) => {
-        if (e.key === 'Enter') props.onCommit(value)
+        // Enter/Esc 是「keydown 提交」：结束后由 hook 把焦点归还画布容器（工单 02）
+        if (e.key === 'Enter') props.onCommit(value, { restoreFocus: true })
         else if (e.key === 'Escape') props.onCancel()
       }}
       onBlur={() => props.onCommit(value)}
@@ -405,13 +417,13 @@ export function CanvasPanel({ preview, projection }: CanvasPanelProps) {
           outline: 'none', // 画布聚焦即键盘生效，不要浏览器默认焦点圈
         }}
         onClick={(e) => {
-          // 点击画布（含节点）把焦点收进容器：Tab/Enter/Del 随即可用。
-          // 点击的是输入控件（内联编辑浮层）时不抢焦点——否则输入框失焦，
-          // 回车/文本输入都落不到浮层（工单 08 浏览器实测发现）
-          if ((e.target as Element).closest('input, textarea, .cm-editor') === null) {
-            selectionRef.current?.focus()
-          }
-          selectionRef.current?.focus()
+          // 只在点击画布背景/节点时把焦点收进容器：Tab/Enter/Del 随即可用。
+          // 点击内联编辑浮层（含其根元素的留白）时不抢焦点——否则输入框立刻失焦并
+          // 触发 onBlur 提交，表现为「输入框点不进去」（工单 02 修复的死守卫：
+          // 原来这个 if 后面还跟着一句无条件 focus()，守卫形同虚设）
+          const clickedControl =
+            (e.target as Element).closest('input, textarea, .cm-editor, .canvas-inline-edit') !== null
+          if (!clickedControl) selectionRef.current?.focus()
           // 打开的菜单先收起（点击画布任意处关闭菜单）
           if (ctx.menu !== null) {
             ctx.closeMenu()

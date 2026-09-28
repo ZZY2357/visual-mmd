@@ -23,12 +23,21 @@ import {
  * 浮层定位：编辑目标对应的 SVG 元素 getBoundingClientRect 相对画布容器换算
  * （视图变换已反映在包围盒里）；SVG 重渲染或视图变化时重算，新建节点落码后
  * 等下一次 SVG 到位自动补上定位。
+ *
+ * 焦点归还（工单 02，ADR-0010）：Enter/Esc 结束编辑后把焦点还给画布容器，使
+ * Tab/Enter/Delete 立即可用于连续操作；失焦提交（点到画布之外）不归还。
  */
 
 interface EditingState {
   target: InlineEditTarget
   /** 浮层相对画布容器的位置；null = SVG 中还没找到该节点（等待重渲染） */
   rect: Rect | null
+}
+
+/** 关闭编辑的来源（工单 02）：keydown 提交（Enter/Esc）归还焦点，失焦提交不归还 */
+export interface InlineEditCloseOptions {
+  /** true = 关闭后把焦点归还画布容器；省略 = 不归还（用户已把注意力移出画布） */
+  restoreFocus?: boolean
 }
 
 /** 编辑目标在投影中的当前显示文本（预填用；找不到时回落空串）。
@@ -97,9 +106,13 @@ export function useCanvasInlineEdit({ projection, resolver, svg, containerRef, v
   // 提交/定位要读最新的 projection，事件回调里用 ref 兜住
   const latestRef = useRef({ projection, editing })
   latestRef.current = { projection, editing }
+  // 编辑是否仍在进行（与渲染解耦的同步标记）：Enter 提交会卸载输入框，若卸载前
+  // 焦点被移走而触发 onBlur，会拿着同一份旧状态二次提交，这里把它挡掉
+  const editingActiveRef = useRef(false)
 
   /** 进入编辑：预填文本在渲染时从投影取（新建节点落码后投影才到位） */
   const beginEdit = useCallback((target: InlineEditTarget) => {
+    editingActiveRef.current = true
     setEditing({ target, rect: null })
   }, [])
 
@@ -136,19 +149,42 @@ export function useCanvasInlineEdit({ projection, resolver, svg, containerRef, v
     [projection, resolver, beginEdit],
   )
 
-  /** 回车/失焦：提交（落码改文本）并关闭；未改动/清空只关闭不落码 */
-  const commit = useCallback((text: string): void => {
-    const { editing: cur, projection: proj } = latestRef.current
-    if (cur === null) return
-    const result = inlineEditCommitOf(cur.target, text, inlineEditTextOf(proj, cur.target))
-    if (result.action === 'commit') useEditorStore.getState().commitIntent(result.intent)
-    setEditing(null)
-  }, [])
+  /** 关闭编辑状态，并按需把焦点归还画布容器（工单 02，ADR-0010）。
+   *
+   * 归还放微任务：本次提交会让输入框卸载，React 19 不会把焦点还给已移除的元素
+   * （焦点落到 `<body>`，而 keydown 挂在容器上，事件从此到不了容器）；等这次提交
+   * 引发的重渲染落定后再聚焦容器，才不会被随后的卸载动作冲掉。 */
+  const closeEditing = useCallback(
+    (restoreFocus: boolean): void => {
+      editingActiveRef.current = false
+      setEditing(null)
+      if (!restoreFocus) return
+      queueMicrotask(() => containerRef.current?.focus())
+    },
+    [containerRef],
+  )
 
-  /** Esc：取消（不落码） */
+  /** 回车：提交（落码改文本）并关闭；未改动/清空只关闭不落码。
+   * options.restoreFocus = true（Enter 路径）→ 焦点归还容器，Tab/Enter 可连续用；
+   * 失焦提交（onBlur 路径）不传 → 不归还，否则会把用户从代码面板拽回画布。 */
+  const commit = useCallback(
+    (text: string, options?: InlineEditCloseOptions): void => {
+      if (!editingActiveRef.current) return
+      const { editing: cur, projection: proj } = latestRef.current
+      if (cur !== null) {
+        const result = inlineEditCommitOf(cur.target, text, inlineEditTextOf(proj, cur.target))
+        if (result.action === 'commit') useEditorStore.getState().commitIntent(result.intent)
+      }
+      closeEditing(options?.restoreFocus === true)
+    },
+    [closeEditing],
+  )
+
+  /** Esc：取消（不落码），同样归还焦点（取消后仍要继续在画布上操作） */
   const cancel = useCallback((): void => {
-    setEditing(null)
-  }, [])
+    if (!editingActiveRef.current) return
+    closeEditing(true)
+  }, [closeEditing])
 
   // 双击定位要等浏览器原生 dblclick；编辑期间屏蔽背景拖拽由使用方按 editing 判断
   return { editing, onDoubleClick, beginEdit, commit, cancel }

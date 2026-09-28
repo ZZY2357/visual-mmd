@@ -1,4 +1,4 @@
-import { act, useRef } from 'react'
+import { act, useMemo, useRef } from 'react'
 import { createRoot } from 'react-dom/client'
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
 import { resetEditorHistory, useEditorStore } from '../../../store/editor'
@@ -7,6 +7,8 @@ import { flowchartParser } from '../../pipeline/flowchart'
 import { mindmapParser } from '../../pipeline/mindmap'
 import { buildFlowchartProjection } from '../../projection/flowchart-projection'
 import { buildMindmapProjection } from '../../projection/mindmap-projection'
+import { nodeDataIdResolver } from '../../canvas-selection/data-id'
+import { useCanvasInlineEdit } from '../use-canvas-inline-edit'
 import { useCanvasKeyboard, type CanvasKeyboardProjection } from '../use-canvas-keyboard'
 
 /**
@@ -15,6 +17,8 @@ import { useCanvasKeyboard, type CanvasKeyboardProjection } from '../use-canvas-
  * - 焦点在容器内的输入控件 / 容器外（代码面板）时完全不拦截
  * - 新节点落码成功后回调 onNodeCreated（工单 05 内联命名占位）
  * 工单 06：mindmap 画布键盘同方案（Tab 加子节点 / Enter 加同级 / Del 删除）。
+ * 工单 02：键盘监听挂在容器上的前提是「容器真的持有焦点」——内联编辑 Enter 提交后
+ * 必须归还焦点（见文末端到端用例）；焦点掉到 body 时事件到不了容器。
  */
 
 const SAMPLE = `flowchart TD
@@ -209,5 +213,144 @@ describe('useCanvasKeyboard（工单 06 mindmap 画布键盘）', () => {
     expect(source).not.toContain('分支A')
     expect(source).not.toContain('叶子')
     expect(created).toEqual([])
+  })
+})
+
+/**
+ * 工单 02 端到端焦点断言：内联编辑 + 画布键盘两个 hook 接在同一条链路上
+ * （与 CanvasPanel 的接线一致：Enter → commit(restoreFocus)，失焦 → commit 不归还）。
+ *
+ * 键盘监听挂在容器上，所以「第二次 Tab 能不能用」取决于事件是否经过容器——
+ * 用例把 keydown 派发到 document.activeElement（真实输入时事件的起点），
+ * 而不是直接派发到容器；这样焦点没归还时事件根本到不了容器，bug 会被钉住。
+ */
+function FocusFlowHarness() {
+  const source = useEditorStore((s) => s.source)
+  const flowchart = useMemo(() => flowProjectionOf(source), [source])
+  // 与真实接线一致：projection 只在源码变化时换新（内联编辑 hook 的定位 effect 依赖其身份）
+  const projection = useMemo(() => ({ type: 'flowchart' as const, flowchart }), [flowchart])
+  const containerRef = useRef<HTMLDivElement | null>(null)
+  const { editing, beginEdit, commit, cancel } = useCanvasInlineEdit({
+    projection,
+    resolver: nodeDataIdResolver(flowchart.nodes.map((n) => n.nodeId)),
+    svg: null,
+    containerRef,
+    view: null,
+  })
+  useCanvasKeyboard({ kind: 'flowchart', projection: flowchart }, { containerRef, onNodeCreated: beginEdit })
+
+  const target = editing?.target
+  const initialText =
+    target !== undefined && target.kind === 'flowchart'
+      ? flowchart.nodes.find((n) => n.nodeId === target.nodeId)?.text ?? ''
+      : ''
+  return (
+    <div ref={containerRef} tabIndex={0}>
+      {target !== undefined && (
+        <input
+          aria-label="inline-edit"
+          defaultValue={initialText}
+          onKeyDown={(e) => {
+            if (e.key === 'Enter') commit(e.currentTarget.value, { restoreFocus: true })
+            else if (e.key === 'Escape') cancel()
+          }}
+          onBlur={(e) => commit(e.currentTarget.value)}
+        />
+      )}
+    </div>
+  )
+}
+
+/** 把 keydown 派发到当前真正持焦的元素（等价于用户在那上面按键） */
+function keyOnFocused(key: string): boolean {
+  return keyOn(document.activeElement ?? document.body, key)
+}
+
+describe('useCanvasKeyboard（工单 02 内联编辑提交后的焦点归还）', () => {
+  let host: HTMLDivElement
+  let root: ReturnType<typeof createRoot>
+
+  beforeEach(() => {
+    host = document.createElement('div')
+    document.body.appendChild(host)
+    root = createRoot(host)
+  })
+  afterEach(() => {
+    act(() => root.unmount())
+    host.remove()
+    resetEditorHistory(DEFAULT_DIAGRAM_SOURCE)
+    useEditorStore.getState().select(null)
+  })
+
+  function mountFlow() {
+    resetEditorHistory(SAMPLE)
+    useEditorStore.getState().select({ kind: 'node', nodeId: 'A' })
+    act(() => {
+      root.render(<FocusFlowHarness />)
+    })
+    return host.firstElementChild as HTMLDivElement
+  }
+
+  it('Tab → Enter 提交 → 焦点回容器 → 再 Tab 连续加出第二层节点', async () => {
+    const container = mountFlow()
+
+    // 第一次 Tab：A --> n1，落码后进入内联命名，输入框接管焦点
+    act(() => {
+      expect(keyOn(container, 'Tab')).toBe(true)
+    })
+    const input = container.querySelector('input')
+    expect(input).not.toBeNull()
+    act(() => input!.focus())
+    expect(document.activeElement).toBe(input)
+
+    // 输入名称后 Enter 提交（内联编辑 keydown 路径）
+    act(() => {
+      input!.value = '子节点'
+    })
+    await act(async () => {
+      keyOn(input!, 'Enter')
+    })
+    expect(useEditorStore.getState().source).toContain('n1[子节点]')
+
+    // 焦点已归还画布容器：提交卸载输入框不会把焦点丢在 body 上
+    expect(document.activeElement).toBe(container)
+
+    // 第二次 Tab 直接可用（事件派发到真正持焦的元素上）
+    let prevented = false
+    await act(async () => {
+      prevented = keyOnFocused('Tab')
+    })
+    expect(prevented).toBe(true)
+    expect(useEditorStore.getState().selection).toEqual({ kind: 'node', nodeId: 'n2' })
+    // 第二层节点挂在刚命名的 n1 下（编辑结果与键盘操作连续生效）
+    expect(useEditorStore.getState().source).toContain('n1[子节点]')
+    expect(useEditorStore.getState().source).toContain('n1 --> n2')
+  })
+
+  it('失焦提交不归还焦点：焦点留在画布之外，后续 Tab 事件到不了容器', async () => {
+    const container = mountFlow()
+
+    act(() => {
+      expect(keyOn(container, 'Tab')).toBe(true)
+    })
+    const input = container.querySelector('input')!
+    act(() => input.focus())
+
+    // 用户点到画布之外（如代码面板）：输入框失焦提交，不归还焦点
+    const outside = document.createElement('button')
+    document.body.appendChild(outside)
+    act(() => outside.focus())
+    await act(async () => {
+      input.dispatchEvent(new FocusEvent('focusout', { bubbles: true }))
+    })
+    expect(document.activeElement).toBe(outside)
+    expect(document.activeElement).not.toBe(container)
+
+    // 焦点没回画布：Tab 事件不经过容器监听器，不落码（bug 复现路径的钉子）
+    expect(keyOnFocused('Tab')).toBe(false)
+    expect(document.activeElement).toBe(outside)
+    expect(useEditorStore.getState().selection).toEqual({ kind: 'node', nodeId: 'n1' })
+    expect(useEditorStore.getState().source).not.toContain('n2')
+    outside.remove()
   })
 })
