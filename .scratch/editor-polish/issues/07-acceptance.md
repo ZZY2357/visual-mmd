@@ -386,3 +386,88 @@ DOM 节点 `mmd-preview-3-node_0..node_12`，用 `textContent` 实测出投影�
   **Errors: 0 / Warnings: 0**。
 
 - 本节汇总：7 条通过 / 0 条不通过 / 0 条无法验证；存疑点已如实记录（无新增失败单）。
+
+### 06 class/sequence 节点右键（验收记录）
+
+环境：dev server `http://localhost:5199/`，viewport 1600×1000，先 `localStorage.clear()` 再 reload。
+全部右键 = 真实 `mousedown right` + `mouseup right`；菜单项 = 菜单浮层里的真实 `<button>`（菜单定位沿用 04：
+`div` 且 `style.zIndex === '30'` 且 `style.minWidth === '140px'`）。源码证据取自
+`localStorage['visual-mmd:library'].diagrams.at(-1).source`（与代码面板文本一致）。
+**踩坑**：`getByRole('button', { name })` 会被属性面板里的同名按钮命中（strict mode 一直等待），
+带「添加/删除」语义的菜单项一律改用菜单项包围盒中心真实点击。
+
+- [不通过] class 图（非空，默认模板）右键**任何一个类**都弹不出节点菜单（弹出的是**空白菜单**）
+  —— 步骤：「新建」→「类图」（默认模板）→ 对 4 个类框 `g.node` 与 1 个 note 的包围盒中心逐一真实右键
+  / 预期：菜单 = `["添加成员","添加关系","删除类（含成员与关系）"]` / 实际：**5 次右键全部**得到
+  `["添加类"]` —— 即 `blankMenuItems('class')`（`context-menu.ts:76-77`）的空白菜单，
+  且每次 `[data-vm-selected]` 数量恒为 **0**（无任何选中）。旁证：对同一个类框做**左键**单击也不选中
+  （`[data-vm-selected]` 仍为空、属性面板不回类表单）。
+  DOM 证据：class 节点 id 形如 `mmd-preview-4-classId-BankAccount-4`，`g.node[data-id]` 数量 = **0**；
+  整棵 class SVG 里带 `data-id` 的只有边（`id_BankAccount_Account_1` 等）。
+  机制：`use-canvas-context-menu.ts:127` 的 `selectionFromEventTarget(e.target, resolver)` 解析不出节点
+  → `selection === null` → `context-menu.ts:59` 返回 `{ kind: 'blank' }` → 落入空白菜单。
+  即**不是"右键盘弹不出菜单"，而是"弹出的不是节点菜单"**；**受失败单 09 阻塞**（class 节点缺 `data-id`
+  → 画布寻址失效，与 09 同一根因），**不另开单**。
+  控制台：此路径 `Errors: 0 / Warnings: 0`。
+- [无法验证] class「加成员 / 加关系落码正确（表单有起点/终点选择，默认值把右键那个类作为一端）」
+  —— 节点菜单不可达（上一条），真实 UI 上无法进入 `AddMemberInlineForm` / `AddRelationInlineForm`，
+  故无法验证；**不是"弹出了但落码不对"**。**受失败单 09 阻塞**。
+- [无法验证] class「删除类 → 成员与相关 relation 级联消失，图仍可渲染」
+  —— 同上：`delete-class` 菜单项不可达，无法在真实浏览器里构造该动作。**受失败单 09 阻塞**。
+- [通过] sequence 图（非空，默认模板）：右键一个参与者 → 两项齐全
+  —— 步骤：「新建」→「时序图」（默认模板 `actor 使用者` / `participant 系统 as Visual MMD` / …），
+  真实右键参与者「使用者」（落点在 `g[data-id="使用者"]` 内，`elementFromPoint` 的
+  `closest('[data-id]')` = `使用者`）/ 预期：`["添加消息","删除参与者"]` / 实际：菜单 =
+  `["添加消息","删除参与者"]`（与 `context-menu.ts:107-108` 一致），同一次右键 `selectTarget` 命中
+  两处 `[data-vm-selected]`。对参与者「系统」右键同样得到这两项 / 通过。
+- [通过] sequence「加消息落码正确，`from`/`to` 预填为该参与者」
+  —— 步骤 A（干净路径）：右键「系统」→ 点「添加消息」→ 表单「起点节点」= `Visual MMD`（隐藏 value = `系统`，
+  即右键那个参与者）、「终点节点」= `使用者`（隐藏 value = `使用者`）、「消息样式」= `实线箭头`（`->>`）；
+  填消息文本 `S2` → 点「添加」/ 预期：落码在 `participant 系统 as Visual MMD` 之后、`from`/`to` 与预填一致、
+  结构树不重复 / 实际：源码新增 `    系统->>使用者: S2`（插在第 4 行该参与者声明之后、`S1` 之前），
+  结构树 `参与者（2）`（`使用者` / `Visual MMD系统`），**控制台 0 error / 0 warning** / 通过。
+  —— 步骤 B（已知形态，如实复现并引用既有失败单）：右键「使用者」（其声明 `actor 使用者` 在
+  `participant 系统 as Visual MMD` **之前**）→「添加消息」→ 起点 = `使用者`、终点 = `Visual MMD`(`系统`)
+  → 填 `M1` →「添加」/ 实际：源码 `    使用者->>系统: M1` 插在 `actor 使用者` 之后（对方声明**之前**），
+  结构树 `参与者（3）`（`使用者` / `Visual MMD系统` / `系统`，重复），控制台 3 条
+  `Encountered two children with the same key, 系统` —— 与
+  `10-sequence-add-message-duplicate-participant.md` 逐条吻合（含手写源码对照），**不另开单**。
+  两条路径的落码位置均"按锚点 = 右键参与者的声明"正确，重复只出现在 app 侧投影/结构树。
+- [通过] sequence「删除参与者 → 其消息级联消失，图仍可渲染」
+  —— 步骤：承步骤 B 的图，对参与者「系统」（被 `S1`/`S2`/`打开图表`/`activate`/`渲染预览`/`deactivate`/
+  `修改属性`/`源码实时更新`/`Note` 及 loop 体内 1 条语句引用）真实右键 → 点「删除参与者」/
+  预期：引用它的语句一并消失、图仍渲染 / 实际：上述 11 条语句全部消失；结构树 `参与者（1）`（只剩 `使用者`）、
+  `消息（0）`、`注释（0）`；`.mantine-Alert-root` 数量 **0**（无错误态），画布仍有
+  `svg[aria-roledescription="sequence"]`，内含 `使用者` 小人 + `loop` 框（已渲染）/ 通过。
+  **观察（非清单项，如实记录）**：级联删除在源码里**残留空白行** —— 每条被删语句留下一行仅含原缩进的空白，
+  实测源码 `sequenceDiagram\n    autonumber\n    actor 使用者\n    \n    \n    \n    \n    \n    \n    \n    \n
+  \    \n    \n    loop 每次编辑\n        \n    end\n`（10 行 4 空格 + loop 体内 1 行 8 空格）。
+  该残留不改变本条判定（消息确实级联消失、图仍渲染），仅记录。
+- [通过] mindmap / flowchart 既有节点菜单不回归
+  —— flowchart（默认模板）：真实右键节点 `A`（`data-id=A`）→ 菜单 =
+  `["从这里连线","编辑文本","应用样式 ","删除"]`（`应用样式` 的 `textContent` 自带尾空格，如实记录），
+  `[data-vm-selected]` 命中 1 处；再点「编辑文本」→ `.canvas-inline-edit` `display: block`、
+  预填 `开始`、`document.activeElement` = 该 input → 动作链路未回归。
+  mindmap（默认模板）：真实右键 `g[id$="-node_1"]`（`双面板同步`）→ 菜单 =
+  `["添加子节点","编辑文本","删除"]`；点「添加子节点」→ 源码在 `双面板同步` 子级末尾追加 `      新节点`、
+  内联浮层 `display: block` + 预填 `新节点` → 未回归。
+- [通过（部分覆盖）] 新增落码走快照栈 → 撤销/重做可用
+  —— 用工具栏真实「撤销 / 重做」按钮（非代码面板快捷键）：
+  (a) 步骤 B 加 `M1` →「撤销」→ 源码回到无 `M1`、结构树回到 `参与者（2）`；「重做」→ `M1` 与重复参与者
+  状态一并恢复（控制台重复 key 报错同步复现）；
+  (b) 步骤 A 加 `S2` →「撤销」→ `S2` 消失；「重做」→ 恢复；
+  (c) 删除参与者 →「撤销」→ 源码**逐字**回到删除前（含全部语句，含 loop 体）；「重做」→ 再回到删除后状态。
+  **未覆盖**：class 的 add-member / add-relation / delete-class 因菜单不可达（受 09 阻塞）无法验证撤销/重做。
+- 控制台汇总：
+  - class 节点右键路径 = `Errors: 0 / Warnings: 0`；sequence「系统」路径加消息 = `Errors: 0 / Warnings: 0`。
+  - sequence「使用者」路径加消息 = `Errors: 3`（`Encountered two children with the same key, 系统` ×3），
+    属失败单 10，已引用。
+  - **新观察（非 06 清单项，已做对照实验）**：删除参与者级联后源码剩**空 loop**（loop 体内唯一语句被删），
+    该源码在画布上产出大量 React 属性校验 error（`Error: <line> attribute y2: Expected length, "NaN"`、
+    `<circle> attribute cy`、`<text> attribute y/x`、`<polygon> attribute points`、`<tspan> attribute x` 等，
+    一次渲染 51 条）。**对照实验**：不走本功能，直接在代码面板手写
+    `sequenceDiagram\n    actor 使用者\n    loop 每次编辑\n    end\n` → 同样 51 条 error；该源码 reload 后
+    零操作仍报错。归因：**mermaid 自身对空 loop 产出 NaN 坐标**，与本批改动无关，故不另开单，仅记录。
+- 本节汇总：4 条通过（其中「撤销/重做」1 条为部分覆盖）/ 1 条不通过 / 2 条无法验证。
+  不通过项 = class 节点右键菜单不可达，无法验证项 = class 加成员/加关系落码 与 删除类级联，
+  **三项均属失败单 09 根因**（class 节点缺 `data-id`），故本节**未新建**任何 issue 文件。
