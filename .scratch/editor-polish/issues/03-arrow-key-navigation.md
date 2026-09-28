@@ -1,6 +1,6 @@
 # 03 方向键导航
 
-Status: needs-triage
+Status: resolved
 
 Blocked by: 02
 
@@ -48,4 +48,7 @@ Blocked by: 02
 
 ## Comments
 
-（空）
+- 实现提交 `5f7c7e1`（合并后 `784d517`）。`npm run typecheck` 与 `npm test` 全绿。新增纯函数
+  `isNavigationKey` / `navigationTarget`，hook 侧仅在命中后 `preventDefault` + `select()`。
+- 决策：「无选中」含 `null` / 图表级选中 / 别种元素 / 选中已不在投影中——都回落为选中首个节点
+  （应用初始选中就是图表级，否则开机按方向键没有落点）。
