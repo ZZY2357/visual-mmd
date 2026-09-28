@@ -124,3 +124,52 @@ Blocked by: 01, 02, 03, 04, 05, 06
   返回原文，`frontmatter.ts:154`）。即：**顶层写法与 config 写法行为不同**，而票面/工单文字未区分。
 - 控制台：本节全流程（新建 4 种图 + 主题切换 20+ 次 + CodeMirror 手写 5 次）`playwright-cli console`
   显示 Errors: 0 / Warnings: 0，**未复现**「Encountered two children with the same key」。
+
+### 02 焦点归还（验收记录）
+
+环境同上（1600×1000，真实鼠标点击 / 真实键盘事件）。每步都记录 `document.activeElement`：
+画布容器 = `DIV`（无 class，`tabindex=0`），内联输入框 = `INPUT[aria-label="编辑节点文本"]`
+（位于 `div.canvas-inline-edit` 浮层内），代码面板 = `DIV.cm-content`。以下三条链式操作全部在
+**同一次页面会话内连续完成**，未 reload、未重新点选。
+
+- [通过] Tab → 输入 `一` → Enter → Tab → 输入 `二` → Enter → Tab → 输入 `三` → Enter：连续三层成立
+  —— 步骤：点击画布节点 `A`（`DIV[tabindex=0]` 获得焦点）→ 依次 3 轮「Tab → 输入 → Enter」/
+  预期：每轮 Tab 都能开出新的内联输入框，Enter 后焦点回到画布容器 / 实际（逐轮实测的
+  `activeElement`）：点 A 后 `DIV[tabindex=0]`；第 1 轮 Tab 后 `INPUT[编辑节点文本]`（预填 `n1`）→
+  输入 `一` → Enter 后 `DIV[tabindex=0]`；第 2 轮 Tab 后 `INPUT`（预填 `n2`）→ `二` → Enter 后
+  `DIV[tabindex=0]`；第 3 轮 Tab 后 `INPUT`（预填 `n3`）→ `三` → Enter 后 `DIV[tabindex=0]`。
+  源码（代码面板文本与 localStorage 逐字一致）：
+  `flowchart TD\n    A[开始] --> B{是否学会 Mermaid?}\n    A --> n1\n    n1 --> n2\n    n2 --> n3\n
+  \    n3[三]\n    n2[二]\n    n1[一]\n    B -- 是 --> C[享受画图]\n ...` → n1/n2/n3 三层链条
+  与三次命名全部落码 / 通过。
+- [通过] Escape 取消编辑后立刻按 Tab 仍能加节点
+  —— 步骤：点选节点 `n1` → Tab（开出内联框，预填 `n4`）→ 输入 `被取消` → Escape → 立刻 Tab →
+  输入 `复活` → Enter / 预期：Escape 丢弃本次命名并把焦点还给画布，紧接着的 Tab 仍能新建节点 /
+  实际：Escape 后 `activeElement = DIV[tabindex=0]`、内联浮层消失（输入框不在 DOM 中）；紧接着
+  Tab 立刻开出 `INPUT`（预填 `n5`），输入 `复活` + Enter 后
+  `activeElement = DIV[tabindex=0]`；源码新增 `n1 --> n4\n    n4 --> n5\n    n5[复活]\n    n4[n4]`，
+  即 `被取消` 未落码、`复活` 已落码 / 通过。
+- [通过] 点代码面板打字 → 点回画布 → Tab 恢复
+  —— 步骤：点代码面板并真实敲键盘（`Control+End` + 输入 `\n%% MARKER`）→ `Control+z` 撤销 →
+  点画布空白处 → 按 Tab / 预期：点代码面板时焦点在 CodeMirror（Tab 走缩进），点回画布后焦点收回
+  容器、Tab 恢复加节点 / 实际：打字后 `activeElement = DIV.cm-content`，
+  `document.querySelector('.cm-content').innerText.includes('%% MARKER') === true`（确认真敲进去了）；
+  撤销后 marker 消失；点画布空白后 `activeElement = DIV`（非 CodeMirror，`closest('.cm-editor')` 为
+  false）；按 Tab 立刻开出 `INPUT[编辑节点文本]` / 通过。
+- [通过] 鼠标点进内联输入框能正常输入（不再一点就提交）
+  —— 步骤：内联输入框开着（预填 `n7`）时，用真实鼠标在输入框中心 `mousedown+mouseup`，然后打字，
+  再 Enter / 预期：点击不触发失焦提交，输入框保持打开且可输入 / 实际：点击前后
+  `open=true, val="n7", focused=true`（输入框仍是 `document.activeElement`，节点数未变、无提交）；
+  打字后 `val="n7点进来了"` 且仍 focused；Enter 后浮层关闭、焦点回 `DIV[tabindex=0]`，源码
+  `n6 --> n7\n    n7[n7点进来了]` / 通过。
+- [通过] 代码面板里 Tab 仍是缩进（不回归）
+  —— 步骤：点代码面板 → `Control+Home` → 按 Tab / 预期：首行缩进、画布不加节点 / 实际：代码面板
+  首行由 `"flowchart TD"` 变为 `"  flowchart TD"`（2 空格缩进，`activeElement` 仍在 `.cm-content`），
+  同一时刻画布节点计数不变（`n\d+[` 出现次数 7 → 7，未新增）；`Control+z` 后首行回到
+  `"flowchart TD"` / 通过。
+- 控制台：本节全流程（3 层连续新建 4 次、Escape 取消、代码面板打字/撤销 3 次、点击输入框）
+  `playwright-cli console error` 返回 **Errors: 0 / Warnings: 0**。
+  另按线索做了一次定向尝试：手写含重复节点的源码
+  `flowchart TD\n    A[一] --> B\n    A[二] --> C\n`，控制台仍 0 报错（结构树里 `A` 被去重为
+  单个 `一A`）——**本轮未能复现** React「Encountered two children with the same key」，无法给出
+  触发视图/操作。该报错在 01/02 两节所覆盖的路径上均未出现。
