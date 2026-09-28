@@ -1,6 +1,6 @@
 # 01 主题清单与语义
 
-Status: needs-triage
+Status: resolved
 
 ## 需求
 
@@ -65,4 +65,7 @@ Status: needs-triage
 
 ## Comments
 
-（空）
+- 实现提交 `90dbf1f`（合并后 `effa4b6`）。`npm run typecheck` 与 `npm test` 全绿。新增
+  `src/components/__tests__/theme-picker.test.tsx`（12 项清单 / 回显 / 非法提示 / 选「跟随」清除）。
+- 已知取舍：前端 Mantine Select 恒显 label，故合法主题显示「Redux 彩色（redux-color）」而非裸名；
+  裸名在括号内可见，非法值则原样回显裸字符串。
