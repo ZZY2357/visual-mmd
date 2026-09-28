@@ -9,6 +9,7 @@ import {
   addSiblingIntent,
   deleteMindmapNodeIntent,
   setMindmapNodeIconIntent,
+  setMindmapNodeIdIntent,
   setMindmapNodeShapeIntent,
   setMindmapNodeTextIntent,
 } from '../lib/editing/mindmap-forms'
@@ -17,8 +18,10 @@ import { useEditorStore } from '../store/editor'
 
 /**
  * mindmap 属性表单（工单 08）：树形结构树是主编辑界面（StructureTree 的
- * mindmap 分支承担增删与选中），本表单负责选中节点的文本 / 形状 / 图标。
+ * mindmap 分支承担增删与选中），本表单负责选中节点的文本 / 形状 / 图标 / 节点 ID。
  * 全部编辑都映射为意图，经 store.commitIntent 手术式落码（独立撤销快照）。
+ * 节点 ID（工单 05，ADR-0009）：默认不分离；填 id 把纯文本节点改写成 `id[显示文本]`，
+ * 清空 id 还原纯文本；画布寻址用位置序，与 id 无关。
  */
 
 function useCommitIntent() {
@@ -43,6 +46,13 @@ export function MindmapNodeForm({ node }: { node: ProjectionMindmapNode }) {
   const iconDraft = useDraft(node.icon ?? '', (next) => {
     commitIntent(setMindmapNodeIconIntent(node.elementId, next))
   })
+  const currentId = node.id ?? ''
+  const idDraft = useDraft(currentId, (next) => {
+    const intent = setMindmapNodeIdIntent(node.elementId, next)
+    if (intent !== null) commitIntent(intent)
+  })
+  const idInvalid =
+    idDraft.draft !== currentId && setMindmapNodeIdIntent(node.elementId, idDraft.draft) === null
   const [addText, setAddText] = useState('')
   const [addShape, setAddShape] = useState<MindmapShapeType | 'default'>('default')
   const [addMode, setAddMode] = useState<'child' | 'sibling' | null>(null)
@@ -89,6 +99,18 @@ export function MindmapNodeForm({ node }: { node: ProjectionMindmapNode }) {
         onKeyDown={(e) => {
           if (e.key === 'Enter') iconDraft.commit()
         }}
+      />
+
+      <TextInput
+        label={t('app:propertyPanel.nodeId')}
+        description={t('app:propertyPanel.mindmapNodeIdHint')}
+        value={idDraft.draft}
+        onChange={(e) => idDraft.setDraft(e.currentTarget.value)}
+        onBlur={idDraft.commit}
+        onKeyDown={(e) => {
+          if (e.key === 'Enter') idDraft.commit()
+        }}
+        error={idInvalid ? t('app:propertyPanel.mindmapInvalidNodeId') : undefined}
       />
 
       <Group gap="xs">

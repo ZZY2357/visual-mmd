@@ -1,5 +1,5 @@
 import type { MindmapIntent, MindmapShapeType } from '../pipeline/mindmap'
-import { isValidMindmapNodeText } from '../pipeline/mindmap'
+import { isValidMindmapNodeId, isValidMindmapNodeText } from '../pipeline/mindmap'
 
 /**
  * 表单值 → 编辑意图 的纯映射（工单 08）。
@@ -20,6 +20,17 @@ export const MINDMAP_SHAPE_OPTIONS: Array<{ value: MindmapShapeType | 'default';
 
 export function setMindmapNodeTextIntent(elementId: string, text: string): MindmapIntent | null {
   return isValidMindmapNodeText(text) ? { type: 'set-node-text', elementId, text } : null
+}
+
+/**
+ * 节点 ID 字段 → set-node-id 意图（工单 05）。
+ * 空串 = 清除 id（还原纯文本节点）；非法字符（空白/圆括号/方括号/花括号）返回 null，
+ * 表单层据此展示错误并阻止提交。是否为空操作（无 id 可清、id 未变）由管线侧判定。
+ */
+export function setMindmapNodeIdIntent(elementId: string, id: string): MindmapIntent | null {
+  if (id === '') return { type: 'set-node-id', elementId, id: null }
+  if (!isValidMindmapNodeId(id)) return null
+  return { type: 'set-node-id', elementId, id }
 }
 
 export function setMindmapNodeShapeIntent(

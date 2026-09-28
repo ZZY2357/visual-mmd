@@ -16,8 +16,8 @@ import {
  */
 
 const MINDMAP_NODES: ProjectionMindmapNode[] = [
-  { elementId: 'mindmap-node:1', text: '根节点', shapeType: null, icon: null, depth: 0, parentId: null },
-  { elementId: 'mindmap-node:2', text: '子节点', shapeType: null, icon: null, depth: 1, parentId: 'mindmap-node:1' },
+  { elementId: 'mindmap-node:1', text: '根节点', id: null, shapeType: null, icon: null, depth: 0, parentId: null },
+  { elementId: 'mindmap-node:2', text: '子节点', id: null, shapeType: null, icon: null, depth: 1, parentId: 'mindmap-node:1' },
 ]
 
 function el(html: string): Element {

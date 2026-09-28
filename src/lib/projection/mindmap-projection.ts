@@ -11,6 +11,8 @@ export interface ProjectionMindmapNode {
   /** `mindmap-node:N`，编辑意图据此寻址 */
   elementId: string
   text: string
+  /** 语法 id（不显示）；节点没有 id 时 null */
+  id: string | null
   shapeType: MindmapShapeType | null
   /** ::icon() 图标类名；无图标时 null */
   icon: string | null
@@ -38,7 +40,15 @@ export function buildMindmapProjection(doc: SourceDocument): MindmapProjection {
           break
         }
       }
-      nodes.push({ elementId: part.id, text: n.text, shapeType: n.shapeType, icon: null, depth: n.depth, parentId })
+      nodes.push({
+        elementId: part.id,
+        text: n.text,
+        id: n.id,
+        shapeType: n.shapeType,
+        icon: null,
+        depth: n.depth,
+        parentId,
+      })
     } else if (part.element.kind === 'mindmap-icon') {
       // 图标行归属其前一个节点（必须紧跟，与 mermaid 语义一致）
       const prev = nodes[nodes.length - 1]

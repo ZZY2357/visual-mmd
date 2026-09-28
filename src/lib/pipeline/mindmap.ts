@@ -131,13 +131,17 @@ type MindmapElementData = MindmapHeaderData | MindmapNodeData | MindmapIconData
 
 export function renderMindmapNode(
   d: MindmapNodeData,
-  changes: { text?: string; shape?: MindmapShapeType | null } = {},
+  changes: { text?: string; shape?: MindmapShapeType | null; id?: string | null } = {},
 ): string {
   const text = changes.text !== undefined ? changes.text : d.text
-  const shape = changes.shape !== undefined ? changes.shape : d.shapeType
+  const id = changes.id !== undefined ? changes.id : d.id
+  let shape = changes.shape !== undefined ? changes.shape : d.shapeType
+  // 有 id 就必须有形状（ADR-0009）：无形状节点设 id 时必然引入默认方框
+  if (id !== null && shape === null) shape = 'square'
   const spec = shape !== null ? MINDMAP_SHAPES[shape] : null
   const body = spec !== null ? spec.open + text + spec.close : text
-  const idPart = d.id !== null ? d.id + d.gapAfterId : ''
+  // 已有 id 时保留其后的间隔原文；新插入 id 时紧贴形状（`NewId[文本]`）
+  const idPart = id !== null ? id + (d.id !== null ? d.gapAfterId : '') : ''
   return d.indent + idPart + body + d.trailing + d.eol
 }
 
@@ -151,6 +155,11 @@ export function renderMindmapIcon(d: MindmapIconData, changes: { icon?: string }
 export type MindmapIntent =
   /** 改节点显示文本（elementId = `mindmap-node:N`） */
   | { type: 'set-node-text'; elementId: string; text: string }
+  /**
+   * 设置节点 id（与显示文本分离，ADR-0009）；null = 清除 id（还原为纯文本节点）。
+   * 有 id 就必然有形状：无形状节点设 id 默认方框 `[]`，已有形状保留。
+   */
+  | { type: 'set-node-id'; elementId: string; id: string | null }
   /** 换节点形状；null = 默认无形状 */
   | { type: 'set-node-shape'; elementId: string; shape: MindmapShapeType | null }
   /** 设置节点图标；null/空串 = 移除图标行 */
@@ -171,6 +180,15 @@ export type MindmapIntent =
 /** 节点文本合法性校验（表单层复用）：mindmap 节点不能为空 */
 export function isValidMindmapNodeText(text: string): boolean {
   return text.trim() !== ''
+}
+
+/**
+ * 节点 id 合法性校验（表单层复用，与解析正则 `parseNodeBody` 同一规则）：
+ * 不能为空，且不能含空白、圆括号、方括号、花括号（id 与形状的边界约束）。
+ * 重名合法（mermaid 不报错，且 id 无引用语义）。
+ */
+export function isValidMindmapNodeId(id: string): boolean {
+  return id !== '' && !/[\s()[\]{}]/.test(id)
 }
 
 // ---------- 解析 ----------
@@ -308,6 +326,8 @@ export class MindmapParser implements DiagramParser {
     switch (intent.type) {
       case 'set-node-text':
         return this.resolveSetNodeText(doc, intent as Extract<MindmapIntent, { type: 'set-node-text' }>)
+      case 'set-node-id':
+        return this.resolveSetNodeId(doc, intent as Extract<MindmapIntent, { type: 'set-node-id' }>)
       case 'set-node-shape':
         return this.resolveSetNodeShape(doc, intent as Extract<MindmapIntent, { type: 'set-node-shape' }>)
       case 'set-node-icon':
@@ -385,6 +405,29 @@ export class MindmapParser implements DiagramParser {
     const part = this.nodePart(doc, intent.elementId)
     if (part === null || !isValidMindmapNodeText(intent.text)) return null
     return new Map([[part.id, renderMindmapNode(part.element as MindmapNodeData, { text: intent.text })]])
+  }
+
+  /**
+   * 设置 / 清除节点 id（ADR-0009）。手术式改写：只重写该节点行，未触碰文本逐字保留。
+   * - 设 / 改 id：插入或替换 id 前缀，显示文本逐字保留，已有形状保留（无形状 → 方框）
+   * - 清除 id：还原纯文本节点（去掉 id 前缀与分离必然引入的方框 `[]`；
+   *   圆 / 圆角 / 六边形等用户自选形状不属于分离产物，保留）
+   */
+  private resolveSetNodeId(
+    doc: SourceDocument,
+    intent: Extract<MindmapIntent, { type: 'set-node-id' }>,
+  ): Map<string, string> | null {
+    const part = this.nodePart(doc, intent.elementId)
+    if (part === null) return null
+    const node = part.element as MindmapNodeData
+    if (intent.id === null) {
+      // 无 id 可清（此时不动源码，避免误伤用户自行书写的形状）
+      if (node.id === null) return null
+      const shape = node.shapeType === 'square' ? null : node.shapeType
+      return new Map([[part.id, renderMindmapNode(node, { id: null, shape })]])
+    }
+    if (!isValidMindmapNodeId(intent.id) || intent.id === node.id) return null
+    return new Map([[part.id, renderMindmapNode(node, { id: intent.id })]])
   }
 
   private resolveSetNodeShape(

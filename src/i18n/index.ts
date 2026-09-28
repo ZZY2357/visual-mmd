@@ -279,6 +279,9 @@ export const zhDict = {
       mindmapHint: '思维导图：在上方结构树中点选节点，即可在此编辑文本、形状与图标，或增删层级节点。',
       mindmapEmpty: '（暂无节点）',
       mindmapEmptyHint: '思维导图为空：先添加一个根节点，即可在结构树中逐层搭建。',
+      // ---- mindmap 节点 ID（工单 05） ----
+      mindmapNodeIdHint: '留空则还原为纯文本节点；设置 ID 会引入形状（无形状时为方框）',
+      mindmapInvalidNodeId: 'ID 不能包含空白、圆括号、方括号、花括号',
       // 工单 06：键盘添加节点的占位名（确认前落码用，内联命名确认后改写）
       mindmapNewNode: '新节点',
       cancel: '取消',
