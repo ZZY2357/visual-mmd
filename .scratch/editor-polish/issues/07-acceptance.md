@@ -242,3 +242,83 @@ DOM 节点 `mmd-preview-3-node_0..node_12`，用 `textContent` 实测出投影�
   属性面板保持原节点）——本节的"无选中"起点因此改用「结构树 → 图表mindmap」按钮构造。flowchart 的
   空白点击是否清除选中本轮**未单独构造对照实验**（首次 flowchart 点击前状态本就是图表级），故不对
   两种图种的行为差异下结论。
+
+### 04 空图空白右键（验收记录）
+
+环境：dev server `http://localhost:5199/`，viewport 1600×1000，先 `localStorage.clear()` 再 reload。
+所有右键 = 真实 `mousedown right` + `mouseup right`（Chromium 在 mousedown 时派发 `contextmenu`），
+菜单项 = 点击浮层里的真实 `<button>`。菜单存在性用「`div` 且 `style.zIndex === '30'` 且
+`style.minWidth === '140px'`」定位（`ContextMenuOverlay` 的根样式，`CanvasPanel.tsx:180-191`；
+**踩坑**：菜单项是 `UnstyledButton`，没有 `role="menuitem"`，用 role 查会误判为"菜单没弹出"）。
+"空图"均由代码面板（`Control+a` + 键盘输入）把源码整体改写成只剩表头。
+
+- [通过] 空 `sequenceDiagram`：右键空白 → 「添加参与者」→ 内联命名 → 落码 + 渲染
+  —— 步骤：「新建」→「时序图」，代码面板整体改写为 `sequenceDiagram`（代码面板文本与 `localStorage`
+  逐字一致），画布空白 (700,500) 右键 / 预期：菜单含「添加参与者」，点击后落码 `participant xxx`、
+  直入内联命名、图能渲染 / 实际：菜单 = `["添加参与者"]`；点击后源码 =
+  `sequenceDiagram\nparticipant 新参与者`，内联浮层 `display: block`、`input.value = 新参与者`、
+  `focused: true`，选中 = `新参与者`（两处 `[data-vm-selected]`）；键盘输入 `验收参与者` + Enter 后
+  源码 = `sequenceDiagram\nparticipant 验收参与者`，浮层关闭；画布 SVG
+  `aria-roledescription="sequence"`、`text` 节点 = `["验收参与者","验收参与者"]`、`rect` 2 个
+  （上下两个参与者框）→ 已渲染 / 通过。
+- [通过] 空 `mindmap`：右键空白 → 「添加根节点」→ 落码；属性面板的「根节点」表单已移除
+  —— 步骤：「新建」→「思维导图」，源码整体改写为 `mindmap`（此时画布无节点、面板显示「（暂无节点）」），
+  先读面板再在空白处右键 / 预期：面板不再有旧起步表单；菜单含「添加根节点」，点击后落码
+  `新节点`（纯文本，不自动生成 id）并直入内联命名 / 实际：**改造前**的面板 = `主题|图表mindmap|（暂无节点）|
+  思维导图：在上方结构树中点选节点…`，`innerText.includes('思维导图为空') === false`、
+  面板内按钮只有 `["图表mindmap"]`（**没有**「添加根节点」按钮）——对照被移除的旧组件
+  `MindmapRootForm`（`git show 784d517~1:src/components/mindmap-forms.tsx` 末段，含
+  `mindmapEmptyHint`「思维导图为空：先添加一个根节点…」+ 输入框 + `addRootNode`「添加根节点」按钮），
+  且当前 `src/i18n/index.ts` 已无 `mindmapEmptyHint` / `addRootNode` 两个 key；右键后菜单 =
+  `["添加根节点"]`，点击后源码 = `mindmap\n  新节点\n\n`、内联浮层 `display: block` + `focused: true`
+  + 预填 `新节点`；输入 `验收根节点` + Enter 后源码 = `mindmap\n  验收根节点\n\n` / 通过。
+- [通过] 存疑点（前序实现者上报）：mindmap 空图加根节点后，选中/高亮落在正确的那个节点上
+  —— 步骤：沿上一条，在 `添加根节点` 落码后立刻（未命名前）与命名后各读一次画布 DOM / 预期：唯一的
+  新节点既被渲染也被高亮，而不是高亮到一个不存在的序号 / 实际：落码后画布节点集合 =
+  `[{id:"mmd-preview-16-node_0", txt:"新节点", hl:true}]`（**只有一个节点，且就是被高亮的那一个**），
+  `[data-vm-selected] = ["mmd-preview-16-node_0"]`，属性面板切到节点表单（`显示文本` = `新节点`）；
+  命名为 `验收根节点` 后 SVG 重渲染为 `mmd-preview-17-node_0`，高亮**跟随**到新 id 且唯一
+  （`[{node_0, txt:"验收根节点", hl:true}]`）。即预置的 `mindmap-node:1` 与实际新节点一致，
+  未观察到错位 / 通过。
+- [通过] 空 `classDiagram`（仅表头 = mermaid 解析错误）：右键空白能弹菜单 → 「添加类」→ 落码后错误
+  消失、图渲染 —— 步骤：「新建」→「类图」，源码整体改写为 `classDiagram`，等错误态出现，画布空白
+  (470,940) 右键 → 点「添加类」/ 预期：错误态下仍能弹出并可加类，加完源码合法、错误消失、图渲染 /
+  实际：错误态成立 —— `.mantine-Alert-root` 文案 =
+  `源码存在语法错误，画布已停留在最近一次合法状态` + `Parse error on line 2: classDiagram ------------^
+  Expecting 'acc_title', ...`，画布里的 SVG 是**上一次合法渲染的残留**（错误冻结语义）；
+  此时右键仍弹出菜单 = `["添加类"]`；点击后源码 = `classDiagram\nclass 新类`，`.mantine-Alert-root`
+  数量 **1 → 0**（错误消失），画布 `innerText` = `新类\n\n适应窗口`（类框已渲染） / 通过。
+- [不通过] 「创建后直入内联编辑（浮出输入框让你命名）」在 **class** 上失效
+  —— 步骤：承上，读 `.canvas-inline-edit` 浮层与 `document.activeElement`（并等 2 秒后复读）/
+  预期：浮层可见、预填 `新类`、获得焦点，可直接改名 / 实际：浮层**被渲染出来但不可用** ——
+  `getComputedStyle(overlay).display === "none"`、`input.offsetParent === null`、
+  `document.activeElement === BODY`（不是该 input），2 秒后复读仍相同；此时敲键盘进不了任何输入框、
+  源码不变。同一现象链的旁证：在 `classDiagram\nclass 新类` 上先用结构树「图表classDiagram」回到图表级
+  选中（面板 = 「类图：在左侧结构树中选中元素编辑属性。」），再真实点击画布类框
+  `g.node`（`id="mmd-preview-22-classId-新类-19"`），面板**不回到类表单**、`[data-vm-selected]` 仍为空
+  —— class 画布节点点选同样失效（同样操作在 flowchart/mindmap/sequence 上均正常）。DOM 证据：
+  class 图整棵 SVG 内 `[data-id]` 为空集（默认类图模板亦然：`g.node` 的 id 形如
+  `mmd-preview-21-classId-BankAccount-14`，带 `data-id` 的只有边 `<path> id_BankAccount_Account_1`），
+  而 `use-canvas-inline-edit.ts:90-100` 对 class 只看 `[data-id]` → `rect === null` →
+  `CanvasPanel.tsx:133` 的 `display: rect === null ? 'none' : undefined` 把它藏掉。已开失败单
+  `09-class-inline-edit-target-unresolved.md`。**对照**：sequence 与 mindmap 两条路径的浮层
+  均为 `display: block` + `focused: true` + 预填正确默认名，故缺陷是 class 特有。
+- [通过] 已有内容的同类图：空白右键也能加（锚点回退到最后一个元素）
+  —— 步骤：分别在**非空**的 sequence（默认时序模板）/ class（`classDiagram\nclass 新类`）/
+  mindmap（`mindmap\n  验收根节点`）上右键空白并点添加项 / 预期：菜单照常弹出、新元素追加到最后
+  一个元素之后 / 实际：sequence 菜单 = `["添加参与者"]`，点击后源码在末尾 `end` 之后追加
+  `    participant 新参与者`（内联浮层 `display: block` + `focused: true`，选中 = `新参与者`）；
+  class 菜单 = `["添加类"]`，点击后源码追加 `class 新类2`（**内联浮层同上述 class 缺陷不可用**）；
+  mindmap 菜单 = `["添加根节点"]`，点击后源码 = `mindmap\n  验收根节点\n    新节点\n`，高亮 =
+  `mmd-preview-18-node_1`（**就是新建的那个节点**，`node_0` = `验收根节点` 未被误标）/ 通过。
+- [通过] flowchart 空白菜单不回归（添加节点 / 连线模式 / 添加样式 / 添加子图）
+  —— 步骤：在默认 flowchart 模板与非空 `flowchart TD` 上各右键一次空白 / 预期：四项齐全且功能可用 /
+  实际：两种情况下菜单都 = `["添加节点","添加连线","添加样式","添加子图"]`（票面写「连线模式」，
+  UI 实际 label 是 `添加连线`，对应 `context-menu` 的 `link-mode`，`src/i18n/index.ts:39` 附近）；
+  点「添加节点」后源码追加 `    n1[n1]`、内联浮层 `display: block` + `focused: true` + 预填 `n1`、
+  选中 = `n1` / 通过。
+
+- 控制台：本节全流程（新建 5 种图 + 改源码 6 次 + 空图右键 4 次 + 非空右键 4 次 + 点击菜单项 7 次）
+  `playwright-cli console error` / `console warning` 均返回 **Errors: 0 / Warnings: 0**。
+- 本节汇总：7 条通过 / 1 条不通过（class 内联命名）/ 0 条无法验证；不通过项已开
+  `09-class-inline-edit-target-unresolved.md`。
