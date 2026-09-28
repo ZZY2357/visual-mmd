@@ -1,6 +1,6 @@
 # 02 内联编辑后的焦点归还
 
-Status: needs-triage
+Status: resolved
 
 ## 需求
 
@@ -46,4 +46,7 @@ Status: needs-triage
 
 ## Comments
 
-（空）
+- 实现提交 `188ad36`（合并后 `469657e`）。`npm run typecheck` 与 `npm test` 全绿。
+- `use-canvas-keyboard.ts` 未改动，监听仍挂画布容器（ADR-0010）。
+- 存疑：`CanvasPanel.tsx` 无组件级测试，抢焦点死守卫的修复靠走查验证（票面只允许改两个测试文件）；
+  `.canvas-inline-edit` 是否落在 Mantine wrapper 根属推断，待工单 07 手工验收确认。
