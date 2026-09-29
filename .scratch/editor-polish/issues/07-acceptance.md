@@ -680,3 +680,28 @@ DOM 节点 `mmd-preview-3-node_0..node_12`，用 `textContent` 实测出投影�
 
 回归基线：`npm test` 43 files / 519 tests 全绿；`npm run typecheck` 无输出。
 
+### 修复波复验（2026-09-29）
+
+5 条失败单已全部处理（08/09/10/11 修复提交 + 12 修复提交），合并到 `main` 后**在真实浏览器（dev :5207）
+逐条复验通过**，并在合并树上复跑测试：
+
+| 单 | 结论 | 复验证据（合并后真机） |
+|---|---|---|
+| 08 | resolved（口径裁定，**无行为改动**） | 顶层 `theme:` 视为无效文本：不识别/不清除/不加告警，选「跟随」时逐字保留；裁定前提（mermaid 静默忽略顶层 theme）由源码 + 计算样式实测双重确认；补 5 条钉住测试 |
+| 09 | resolved | class `g.node` 反注 `data-id` 后：左键点选 → `[data-vm-selected]` 恰 1 处、面板切到该类表单；右键 → 节点菜单 `添加成员/添加关系/删除类`；空类图空白右键加类后 `.canvas-inline-edit` 可交互；控制台 0 error |
+| 10 | resolved | 原作弊源码（消息先于声明）结构树 = **参与者（2）**、无重复；控制台 0 条 `Encountered two children with the same key`；UI 路径（右键 使用者 → 添加消息）产出同样的"消息在前"形态，仍为 2 个参与者 |
+| 11 | resolved | 默认模板删 `系统` → `loop 每次编辑…end` **整块移除**、无空块、0 条 NaN error（原 +51）；`alt` 用例同样整块移除、0 条（原 +47）；未引用语句（`autonumber` / `actor 使用者` / `A->>A: self`）逐字保留 |
+| 12 | resolved | 真鼠标点「适应窗口」→ 派生 `click` 落在 `SPAN:适应窗口`（不再被劫持到容器 DIV），transform `scale(2.44552)` → 居中 `scale(0.994275)`；按钮聚焦后 Enter 只 fit、源码逐字不变（原每按一次加一个节点） |
+
+口径张力（05 节那条，无需开单）已由用户裁定：**保留用户自选形状、只丢分离引入的方框**
+（`User Input` → `UserNewInput[User Input]` → 清 id → `User Input`；`myid(圆角)` → `(圆角)`）。
+已记入 ADR-0009 与 `spec.md` 的「验收后裁定」小节；行为由 `mindmap.test.ts` 4 条测试钉住。
+
+合并树基线：`npm test` **44 files / 568 tests 全绿**；`npm run typecheck` 退出码 0。
+
+**修复波复验时新发现 1 条缺陷（不在原 5 条内）**，已开单：[13](13-sequence-note-left-right-of-actors-unparsed.md)
+—— `Note left of X` / `Note right of X` 的参与者解析不出来（`actors === null`），导致
+（a）删除参与者时该 note 漏删、被删参与者又被 mermaid 隐式复现（画布上没删掉）；
+（b）只在 note 里出现的参与者投影/画布背离。`Status: needs-triage`，待裁决是否本轮修。
+
+
