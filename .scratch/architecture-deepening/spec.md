@@ -73,3 +73,15 @@
 
 06 的 spike 结束后**无论 Go 还是 No-Go 都要落 ADR**（编号顺延，预计 0016）——
 No-Go 尤其重要：它正是未来探索者需要它才能避免重复建议的那种理由。
+
+## 批次收官（2026-09-29）
+
+六票全部 resolved（01 由主线程完成，02 由主线程完成，03/04/05/06 由子代理在独立 git worktree
+完成后经审查逐票合入 main）。全量验证：`npm run typecheck` 0 error；`npm test` **61 文件 / 864 用例全绿**。
+
+- 新增模块：`pipeline/insert.ts`（02）、`editing/menu-actions.ts`（05）、
+  `canvas-selection/selection-codec.ts`（03）、`canvas-selection/capabilities.ts` + 四图种 adapter（04）、
+  `pipeline/mindmap-ir.ts`（06）。
+- ADR：0015（04 前置）、0016（06 spike，Go）。
+- `grep -c 'projection.type ==='`：CanvasPanel 20 → 0，PropertyPanel 6 → 0，全库 43 → 26，未新增。
+- 留给人类的欠账不变：U3（浏览器验收基线属越权）、U4（禁用字「边」），见 parity-review-followups/spec.md。
