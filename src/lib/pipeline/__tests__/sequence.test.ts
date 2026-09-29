@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { applyEdit } from '../pipeline'
 import { reassemble } from '../document'
-import { sequenceParser } from '../sequence'
+import { sequenceParser, renderNote, type NoteData } from '../sequence'
 import { SEQUENCE_TEMPLATE } from '../../diagram-registry'
 
 /**
@@ -544,5 +544,103 @@ describe('级联删除参与者后清理空块（工单 11）', () => {
     expect(result.source).toContain('    loop 空块\n    end\n')
     expect(result.source).not.toContain('participant B')
     expect(result.source).not.toContain('A->>B: hi')
+  })
+})
+
+// ---------- Note left of / right of 的参与者解析（工单 13） ----------
+
+/** 解析出源码里全部 note 元素（断言用） */
+function noteElements(source: string): NoteData[] {
+  const parsed = sequenceParser.parse(source)
+  expect(parsed.ok, `样例源码必须可解析：${source}`).toBe(true)
+  if (!parsed.ok) throw parsed.error
+  return parsed.doc.elements.filter((part) => part.element.kind === 'note').map((part) => part.element as NoteData)
+}
+
+describe('Note left of / right of 解析参与者（工单 13）', () => {
+  const RUBRIC = `sequenceDiagram
+    actor 甲
+    participant Server as 服务器
+    Note left of 甲: 左边注释
+    Note over 甲,Server: 跨越注释
+    Note right of Server: 右边注释
+`
+
+  it('left of / right of 解析出单个参与者，over 不受影响', () => {
+    const notes = noteElements(RUBRIC)
+    expect(notes.map((n) => [n.pos, n.actors])).toEqual([
+      ['left', ['甲']],
+      ['over', ['甲', 'Server']],
+      ['right', ['Server']],
+    ])
+  })
+
+  it('mid 含 ` of X`：未改 pos/actors 时 renderNote 逐字回写整行', () => {
+    const notes = noteElements(RUBRIC)
+    expect(notes.map((n) => n.mid)).toEqual([' of 甲', ' 甲,Server', ' of Server'])
+    expect(notes.map((n) => renderNote(n, {}))).toEqual([
+      'Note left of 甲: 左边注释',
+      'Note over 甲,Server: 跨越注释',
+      'Note right of Server: 右边注释',
+    ])
+  })
+
+  it('verbatim：解析 → 重组装逐字相同（含 ` of ` 前后的空格）', () => {
+    const parsed = sequenceParser.parse(RUBRIC)
+    if (!parsed.ok) throw parsed.error
+    expect(reassemble(parsed.doc)).toBe(RUBRIC)
+  })
+
+  it('no-op set-note（文本未变）逐字不改：`of` 不被吞掉', () => {
+    const source = `sequenceDiagram
+    actor 甲
+    participant 乙 as Bee
+    Note right of 乙: 注释
+`
+    const result = applyEdit(source, sequenceParser, { type: 'set-note', elementId: 'note:1', text: '注释' })
+    expect(result.ok).toBe(true)
+    if (!result.ok) return
+    expect(result.source).toBe(source)
+  })
+
+  it.each(['left', 'right'] as const)('级联删除：删参与者 乙 时 `Note %s of 乙` 一并移除（工单 13）', (pos) => {
+    const source = `sequenceDiagram
+    actor 甲
+    participant 乙 as Bee
+    Note ${pos} of 乙: 注释
+    甲->>乙: hi
+`
+    const result = applyEdit(source, sequenceParser, { type: 'delete-participant', actorId: '乙' })
+    expect(result.ok).toBe(true)
+    if (!result.ok) return
+    // 声明 / note / 消息全部级联消失，不留悬挂引用（否则 mermaid 会隐式复现「乙」框）
+    expect(nonBlankLines(result.source)).toEqual(['sequenceDiagram', '    actor 甲'])
+    expect(result.source).not.toContain(`Note ${pos} of 乙`)
+    expect(result.source).not.toContain('乙')
+    expectNoEmptyBranch(result.source)
+  })
+
+  it('set-note：`Note right of 甲` 改 pos 为 over 时带上参与者（不再是 `Note over : …`）', () => {
+    const source = `sequenceDiagram
+    participant 甲
+    Note right of 甲: 注释
+`
+    const result = applyEdit(source, sequenceParser, { type: 'set-note', elementId: 'note:1', pos: 'over' })
+    expect(result.ok).toBe(true)
+    if (!result.ok) return
+    expect(result.source).toContain('Note over 甲: 注释')
+    expect(result.source).not.toContain('Note over :')
+  })
+
+  it('rename-participant：`Note right of 甲` 的参与者一并改名，不留旧名', () => {
+    const source = `sequenceDiagram
+    participant 甲
+    Note right of 甲: 注释
+`
+    const result = applyEdit(source, sequenceParser, { type: 'rename-participant', actorId: '甲', newId: 'Client' })
+    expect(result.ok).toBe(true)
+    if (!result.ok) return
+    expect(result.source).toContain('Note right of Client: 注释')
+    expect(result.source).not.toContain('甲')
   })
 })

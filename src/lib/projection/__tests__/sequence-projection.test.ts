@@ -110,6 +110,21 @@ describe('buildSequenceProjection：参与者按 actorId 合并（工单 10）',
     expect(proj.notes).toHaveLength(1)
   })
 
+  it('只在 `Note right of X` / `Note left of X` 里出现的参与者：隐式列出且只一次（工单 13）', () => {
+    const onlyRight = project('sequenceDiagram\n    Note right of 乙: 注释\n')
+    expect(onlyRight.participants.map((p) => p.actorId)).toEqual(['乙'])
+    expect(onlyRight.participants).toHaveLength(1)
+    expect(onlyRight.notes).toEqual([{ elementId: 'note:1', pos: 'right', actors: ['乙'], text: '注释' }])
+
+    // 与显式声明合并后仍只有一个投影项（结构树 key 唯一）
+    const withDecl = project('sequenceDiagram\n    actor 甲\n    Note right of 乙: 注释\n    participant 乙 as Bee\n')
+    expect(withDecl.participants.map((p) => p.actorId)).toEqual(['甲', '乙'])
+    expect(withDecl.participants.find((p) => p.actorId === '乙')?.alias).toBe('Bee')
+
+    const onlyLeft = project('sequenceDiagram\n    actor 甲\n    Note left of 乙: 注释\n')
+    expect(onlyLeft.participants.map((p) => p.actorId)).toEqual(['甲', '乙'])
+  })
+
   it('activate 落在隐式引用的参与者上：合并后 active 生效', () => {
     const proj = project('sequenceDiagram\n    A->>B: hi\n    activate B\n    participant B as Bee\n')
 

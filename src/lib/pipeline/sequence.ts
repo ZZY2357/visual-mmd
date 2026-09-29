@@ -212,20 +212,25 @@ const MESSAGE_RE = /^(\S+?)([ \t]*)(->>|-->>?|-x|->|--)(?![>x])([+\-]?)([ \t]*)(
 function parseNoteLine(raw: string): NoteData | null {
   // raw 是去缩进后的行文本，start（行内偏移）只对 line 有效，这里直接跳过 'Note' 关键字
   const body = raw.slice('Note'.length)
-  const m = /^([ \t]+)(over|left of|right of)(.*?):(.*)$/i.exec(body)
+  // pos 分组只认关键字本身（over / left / right），`of` 单独放在可选分组里：
+  // 曾经写成 `(over|left of|right of)` 把 `of` 吃进 pos 分组，随后 parseAfterOf 又要匹配一次
+  // `of`，同一个 `of` 被消费两次 → left/right 的 actors 恒为 null（工单 13）。
+  // mid = pos 关键字与冒号之间的原文（left/right 含 ` of X`），未改 pos/actors 时可逐字回写整行。
+  const m = /^([ \t]+)(over|left|right)([ \t]+of)?(.*?):(.*)$/i.exec(body)
   if (m === null) return null
-  const posRaw = m[2].toLowerCase() as 'over' | 'left of' | 'right of'
-  const pos: NotePos = posRaw === 'over' ? 'over' : posRaw === 'left of' ? 'left' : 'right'
-  const midRaw = m[3]
-  const actors = pos === 'over' ? parseOverActorList(midRaw) : parseAfterOf(midRaw)
+  const pos = m[2].toLowerCase() as NotePos
+  // left / right 必须带 `of`（mermaid 语法），否则不认作 note（与原行为一致，原样保留）
+  if (pos !== 'over' && m[3] === undefined) return null
+  const mid = `${m[3] ?? ''}${m[4]}`
+  const actors = pos === 'over' ? parseOverActorList(m[4]) : parseAfterOf(mid)
   return {
     kind: 'note',
     gap1: m[1],
     pos,
-    mid: midRaw,
+    mid,
     actors,
-    colonGap: /^[ \t]*/.exec(m[4])?.[0] ?? '',
-    text: m[4].replace(/^[ \t]*/, ''),
+    colonGap: /^[ \t]*/.exec(m[5])?.[0] ?? '',
+    text: m[5].replace(/^[ \t]*/, ''),
   }
 }
 
@@ -236,7 +241,7 @@ function parseOverActorList(mid: string): string[] | null {
   return parts
 }
 
-/** `Note right of A` → ['A']；解析不出时 null */
+/** `Note right of A` 的 mid（` of A`）→ ['A']；解析不出时 null */
 function parseAfterOf(mid: string): string[] | null {
   const m = /^[ \t]+of[ \t]+([^\s:,]+)[ \t]*$/i.exec(mid)
   if (m === null) return null
