@@ -221,8 +221,16 @@ function menuItemLabel(t: (k: string) => string, id: ContextMenuItemId): string 
   return t(`app:canvas.menu.${id}`)
 }
 
-/** 破坏性菜单项（红色高亮）：删除类/参与者与既有删除同理 */
-const DESTRUCTIVE_MENU_ITEMS: ContextMenuItemId[] = ['delete', 'delete-class', 'delete-participant']
+/** 破坏性菜单项（红色高亮）：删除类/参与者/连线/注释/块与既有删除同理 */
+const DESTRUCTIVE_MENU_ITEMS: ContextMenuItemId[] = [
+  'delete',
+  'delete-class',
+  'delete-participant',
+  'delete-relation',
+  'delete-message',
+  'delete-note',
+  'delete-block',
+]
 
 /** 右键菜单浮层（工单 07）：绝对定位在右键点，应用样式为原地展开的子列表 */
 function ContextMenuOverlay(props: {
@@ -502,7 +510,7 @@ export function CanvasPanel({ preview, projection }: CanvasPanelProps) {
   })
   const classDefNames = projection?.type === 'flowchart' ? projection.flowchart.classDefs.map((c) => c.name) : []
 
-  // 菜单项 → 动作分发（编辑标签：右键时已选中该连线，EdgeForm 承接）
+  // 菜单项 → 动作分发（编辑标签/基数/文本：右键时已选中该连线，右侧表单承接）
   const onMenuItem = (id: ContextMenuItemId): void => {
     if (id === 'add-node') ctx.addNode()
     else if (id === 'link-mode') ctx.enterLinkMode()
@@ -514,7 +522,15 @@ export function CanvasPanel({ preview, projection }: CanvasPanelProps) {
     else if (id === 'add-member') ctx.addMember()
     else if (id === 'add-relation') ctx.addRelation()
     else if (id === 'add-message') ctx.addMessage()
-    else if (id === 'delete-class' || id === 'delete-participant') ctx.deleteTarget()
+    else if (
+      id === 'delete-class' ||
+      id === 'delete-participant' ||
+      id === 'delete-relation' ||
+      id === 'delete-message' ||
+      id === 'delete-note' ||
+      id === 'delete-block'
+    )
+      ctx.deleteTarget()
     else if (id === 'link-from-here') {
       const target = ctx.menu?.target
       if (target !== undefined && target.kind === 'flowchart-node') ctx.enterLinkMode(target.nodeId)
@@ -522,6 +538,10 @@ export function CanvasPanel({ preview, projection }: CanvasPanelProps) {
     else if (id === 'edit-label') ctx.beginEditLabel()
     else if (id === 'delete') ctx.deleteTarget()
     else if (id === 'add-child') ctx.addChildToMindmap()
+    else if (id === 'cycle-relation-kind') ctx.cycleRelationKind()
+    else if (id === 'edit-relation') ctx.editRelation()
+    else if (id === 'cycle-message-arrow') ctx.cycleMessageArrow()
+    else if (id === 'edit-message') ctx.editMessage()
   }
 
   // 结构树键盘（工单 06）添加节点后的内联命名请求：画布侧消费（gotoLine 同款 nonce 模式）

@@ -4,8 +4,20 @@ import type { DataIdResolver } from '../canvas-selection/data-id'
 import { selectionFromEventTarget } from '../canvas-selection/data-id'
 import { mindmapActionIntents, nextNodeId, type MindmapActionPlan } from './canvas-keyboard'
 import { addClassDefIntent } from './flowchart-forms'
-import { deleteClassIntent } from './class-forms'
-import { deleteParticipantIntent } from './sequence-forms'
+import {
+  deleteClassIntent,
+  deleteRelationIntent,
+  setRelationIntent,
+  RELATION_KIND_OPTIONS,
+} from './class-forms'
+import {
+  deleteBlockIntent,
+  deleteMessageIntent,
+  deleteNoteIntent,
+  deleteParticipantIntent,
+  setMessageIntent,
+  MESSAGE_ARROW_OPTIONS,
+} from './sequence-forms'
 import type { CanvasInlineEditTarget } from './inline-edit'
 import {
   contextMenuItems,
@@ -21,7 +33,7 @@ import { useEditorStore } from '../../store/editor'
  * 与「添加样式」小表单两个派生状态。
  *
  * - onContextMenu：阻止浏览器默认菜单（只挂在画布容器上，代码面板不受影响），
- *   经 data-id 解析右键目标；无菜单可弹（未定义目标，如 sequence/class 的连线）安静关闭。
+ *   经 data-id 解析右键目标；无菜单可弹（目标不可映射，或该目标本轮没有动作）安静关闭。
  * - 空白菜单（工单 04）：flowchart 添加节点 / 连线模式 / 添加样式 / 添加子图；
  *   class 添加类 / sequence 添加参与者 / mindmap 添加根节点。空图（含空 classDiagram
  *   的错误态）同样可弹。新建元素落码后选中并进入内联命名（复用工单 05 的 beginEdit）。
@@ -34,6 +46,12 @@ import { useEditorStore } from '../../store/editor'
  *   浮出表单（Add*member/relation/message*InlineForm），提交才落码（锚点为右键节点的声明，
  *   新元素插到它之后）；删除类/删除参与者直接经 delete-class / delete-participant 落码
  *   （级联删成员/关系/引用该参与者的语句由管线负责）。
+ * - 连线菜单（工单 03）：class 关系边与 sequence 消息线各给「编辑 + 删除」——能循环的
+ *   **直接改**（set-relation 的 kind / set-message 的 arrow，菜单不关可连着点），其余沿用
+ *   flowchart 既定链路（右键已联动选中 → 关掉菜单后右侧 RelationForm / MessageForm 可编）；
+ *   删除走 delete-relation / delete-message。sequence 注释与逻辑块**顺带接上删除**
+ *   （delete-note / delete-block 意图早已存在，接线成本≈0），不为其新造编辑动作。
+ *   本票不新建任何表单浮层（spec 决策：画布上应是「这元素能做什么」而非又一个表单）。
  * - 所有动作复用编辑意图管线（commitIntent，可撤销）；编辑文本/新建节点经
  *   onNodeCreated 进入内联编辑（工单 05 beginEdit）。
  */
@@ -79,6 +97,12 @@ function nextFreeName(base: string, used: Iterable<string>): string {
   return `${base}${Date.now()}` // 理论不可达的兜底
 }
 
+/** 循环取值（工单 03）：取 options 中 current 的下一项；current 不在表中时取第一项。
+ * 用于连线菜单「直接改」的字段（关系类型 / 消息箭头）——不新增表单浮层就能切换取值。 */
+function nextInCycle<T>(options: readonly T[], current: T): T {
+  return options[(options.indexOf(current) + 1) % options.length]
+}
+
 export interface CanvasContextMenuOptions {
   projection: AnyProjection | null
   /** 图种 data-id resolver（右键目标解析，与选中/内联编辑同一套事实约定） */
@@ -106,7 +130,7 @@ export function useCanvasContextMenu(
   const closeStyleForm = useCallback(() => setStyleForm(null), [])
   const closeNodeForm = useCallback(() => setNodeForm(null), [])
 
-  /** 右键目标 → 编辑器选中（属性面板联动，编辑标签依赖 EdgeForm） */
+  /** 右键目标 → 编辑器选中（属性面板联动，编辑标签与连线字段编辑依赖该选中） */
   const selectTarget = useCallback((target: ContextMenuTarget): void => {
     const { select } = useEditorStore.getState()
     if (target.kind === 'flowchart-node') select({ kind: 'node', nodeId: target.nodeId })
@@ -115,6 +139,10 @@ export function useCanvasContextMenu(
     else if (target.kind === 'mindmap-node') select({ kind: 'mindmap-node', elementId: target.elementId })
     else if (target.kind === 'class-node') select({ kind: 'class', name: target.name })
     else if (target.kind === 'sequence-participant') select({ kind: 'participant', actorId: target.actorId })
+    else if (target.kind === 'class-relation') select({ kind: 'class-relation', elementId: target.elementId })
+    else if (target.kind === 'sequence-message') select({ kind: 'message', elementId: target.elementId })
+    else if (target.kind === 'sequence-note') select({ kind: 'note', elementId: target.elementId })
+    else if (target.kind === 'sequence-block') select({ kind: 'block', elementId: target.elementId })
   }, [])
 
   /** 右键：阻止默认菜单；解析目标 → 选中联动 → 弹出菜单（无可弹项安静关闭） */
@@ -307,7 +335,7 @@ export function useCanvasContextMenu(
   const addRelation = useCallback(() => openNodeForm('relation'), [openNodeForm])
   const addMessage = useCallback(() => openNodeForm('message'), [openNodeForm])
 
-  /** 删除右键目标（节点/连线/mindmap 节点/类/参与者） */
+  /** 删除右键目标（节点/连线/mindmap 节点/类/参与者/位置序连线与块级元素） */
   const deleteTarget = useCallback((): void => {
     const target = menu?.target
     if (target === undefined) return
@@ -318,9 +346,48 @@ export function useCanvasContextMenu(
     else if (target.kind === 'mindmap-node') commitIntent({ type: 'delete-node', elementId: target.elementId })
     else if (target.kind === 'class-node') commitIntent(deleteClassIntent(target.name))
     else if (target.kind === 'sequence-participant') commitIntent(deleteParticipantIntent(target.actorId))
+    else if (target.kind === 'class-relation') commitIntent(deleteRelationIntent(target.elementId))
+    else if (target.kind === 'sequence-message') commitIntent(deleteMessageIntent(target.elementId))
+    else if (target.kind === 'sequence-note') commitIntent(deleteNoteIntent(target.elementId))
+    else if (target.kind === 'sequence-block') commitIntent(deleteBlockIntent(target.elementId))
     select(null)
     closeMenu()
   }, [menu, closeMenu])
+
+  /** class 关系边：循环切换关系类型（set-relation 的 kind，直接改，不弹表单）。
+   * 菜单保持打开，便于连点切到想要的那种；每次切换是一次独立快照（可撤销）。 */
+  const cycleRelationKind = useCallback((): void => {
+    const target = menu?.target
+    const proj = latest.current.projection
+    if (target === undefined || target.kind !== 'class-relation' || proj === null || proj.type !== 'class') return
+    const relation = proj.class.relations.find((r) => r.elementId === target.elementId)
+    if (relation === undefined) return
+    useEditorStore
+      .getState()
+      .commitIntent(setRelationIntent(target.elementId, { kind: nextInCycle(RELATION_KIND_OPTIONS, relation.kind) }))
+  }, [menu])
+
+  /** class 关系边：编辑基数/标签（右键已联动选中该边 → 关掉菜单即可在右侧 RelationForm 编辑） */
+  const editRelation = useCallback((): void => {
+    closeMenu()
+  }, [closeMenu])
+
+  /** sequence 消息线：循环切换箭头（set-message 的 arrow，直接改，不弹表单）。菜单保持打开。 */
+  const cycleMessageArrow = useCallback((): void => {
+    const target = menu?.target
+    const proj = latest.current.projection
+    if (target === undefined || target.kind !== 'sequence-message' || proj === null || proj.type !== 'sequence') return
+    const message = proj.sequence.messages.find((m) => m.elementId === target.elementId)
+    if (message === undefined) return
+    useEditorStore
+      .getState()
+      .commitIntent(setMessageIntent(target.elementId, { arrow: nextInCycle(MESSAGE_ARROW_OPTIONS, message.arrow) }))
+  }, [menu])
+
+  /** sequence 消息线：编辑激活/文本（右键已联动选中 → 关掉菜单即可在右侧 MessageForm 编辑） */
+  const editMessage = useCallback((): void => {
+    closeMenu()
+  }, [closeMenu])
 
   /** mindmap 添加子节点：落码后选中新节点并进入内联命名 */
   const addChildToMindmap = useCallback((): void => {
@@ -400,5 +467,9 @@ export function useCanvasContextMenu(
     beginEditText,
     beginEditLabel,
     openStyleForm,
+    cycleRelationKind,
+    editRelation,
+    cycleMessageArrow,
+    editMessage,
   }
 }

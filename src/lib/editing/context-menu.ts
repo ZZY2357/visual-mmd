@@ -3,7 +3,7 @@ import type { CanvasSelection } from '../canvas-selection/data-id'
 import { edgeSelectionOf } from '../canvas-selection/edge-adapter'
 
 /**
- * 右键菜单（工单 07/04/06）：单一菜单随右键目标变化。
+ * 右键菜单（工单 07/04/06/03）：单一菜单随右键目标变化。
  *
  * 本模块是纯逻辑，与 DOM/React 解耦：
  * - 画布选中（data-id 解析产物）+ 图种 → 菜单目标（blank / 节点 / 连线）
@@ -13,8 +13,9 @@ import { edgeSelectionOf } from '../canvas-selection/edge-adapter'
  * sequence 添加参与者、mindmap 添加根节点；空图与错误态（空 classDiagram）同样适用。
  * 节点菜单四种图种齐备（工单 06）：class 节点选中 id 即类名、sequence 节点选中 id 即
  * 参与者 actorId，各给最小可用集（class = 加成员/加关系/删除类；sequence = 加消息/删除参与者）。
- * 连线目标（工单 02）：flowchart 走 mermaid data-id，class / sequence 走位置序身份
- * （`edgeSelectionOf` 收窄）；无法映射为菜单目标时返回 null：安静地不弹菜单，不崩溃。
+ * 连线目标（工单 02 打通寻址 / 工单 03 挂上动作）：flowchart 走 mermaid data-id，
+ * class / sequence 走位置序身份（`edgeSelectionOf` 收窄）；无法映射为菜单目标时返回 null：
+ * 安静地不弹菜单，不崩溃。
  */
 
 export type ContextMenuTarget =
@@ -53,6 +54,16 @@ export type ContextMenuItemId =
   | 'apply-style'
   | 'add-child'
   | 'delete'
+  // 连线菜单（工单 03）：class 关系边与 sequence 消息线各「编辑 + 删除」；
+  // 注释 / 逻辑块只补删除（见 contextMenuItems 的说明）
+  | 'cycle-relation-kind'
+  | 'edit-relation'
+  | 'delete-relation'
+  | 'cycle-message-arrow'
+  | 'edit-message'
+  | 'delete-message'
+  | 'delete-note'
+  | 'delete-block'
 
 /**
  * 画布选中 → 菜单目标：节点/连线按图种改写 kind（四种图种的节点都有菜单）；
@@ -115,8 +126,15 @@ function blankMenuItems(diagramType: DiagramTypeId): ContextMenuItemId[] {
  * - mindmap 节点：添加子节点 / 编辑文本 / 删除
  * - class 节点：添加成员 / 添加关系 / 删除类（级联删成员与相关关系）
  * - sequence 参与者：添加消息 / 删除参与者（级联删引用它的语句）
- * - class 关系边 / sequence 连线：**本票（工单 02）只打通寻址**，菜单项为空 →
- *   右键安静不弹（工单 03 在此挂上「只放删除」起步的编辑动作）
+ * - class 关系边（工单 03）：切换关系类型（循环，直接改 kind）/ 编辑基数与标签（关闭菜单，
+ *   由右侧 RelationForm 承接）/ 删除
+ * - sequence 消息线（工单 03）：切换箭头（循环，直接改 arrow）/ 编辑激活与文本（关闭菜单，
+ *   由右侧 MessageForm 承接）/ 删除
+ * - sequence 注释 / 逻辑块（工单 03）：**只放删除**——本票把这两类目标顺带接上（删除意图
+ *   早已存在，接线成本≈0），但不再为它们补编辑动作（不扩大改造面；字段仍可在右侧表单改）
+ *
+ * 编辑类动作遵守 spec 决策「不新增表单浮层」：能循环的直接改（关系类型 / 箭头），
+ * 其余沿用 flowchart 的既定链路（右键已联动选中 → 关掉菜单后右侧表单可编）。
  */
 export function contextMenuItems(target: ContextMenuTarget): ContextMenuItemId[] {
   switch (target.kind) {
@@ -132,11 +150,13 @@ export function contextMenuItems(target: ContextMenuTarget): ContextMenuItemId[]
       return ['add-member', 'add-relation', 'delete-class']
     case 'sequence-participant':
       return ['add-message', 'delete-participant']
-    // 工单 03 的落点：连线菜单项（起步「删除」，收尾补编辑类动作）
     case 'class-relation':
+      return ['cycle-relation-kind', 'edit-relation', 'delete-relation']
     case 'sequence-message':
+      return ['cycle-message-arrow', 'edit-message', 'delete-message']
     case 'sequence-note':
+      return ['delete-note']
     case 'sequence-block':
-      return []
+      return ['delete-block']
   }
 }

@@ -15,7 +15,7 @@ import { buildClassProjection } from '../../projection/class-projection'
 import { buildSequenceProjection } from '../../projection/sequence-projection'
 import { flowchartDataIdResolver } from '../../canvas-selection/flowchart-adapter'
 import { mindmapDataIdResolver } from '../../canvas-selection/mindmap-adapter'
-import { nodeDataIdResolver } from '../../canvas-selection/data-id'
+import { nodeDataIdResolver, elementDataIdResolver } from '../../canvas-selection/data-id'
 import type { AnyProjection } from '../../diagram-registry'
 import { useCanvasContextMenu, type NodeFormState } from '../use-canvas-context-menu'
 import { AddMemberInlineForm, AddRelationInlineForm } from '../../../components/class-forms'
@@ -27,7 +27,9 @@ import type { LinkModeState } from '../link-mode'
 /**
  * 画布右键菜单 Hook（工单 07/04/06）：右键弹出随目标变化的菜单并联动选中；
  * 添加节点走编辑意图管线并回调内联命名；连线模式两步落码连线、Esc 取消；
- * 添加样式表单提交才落码；class/sequence 节点菜单的添加型表单提交才落码（工单 06）。
+ * 添加样式表单提交才落码；class/sequence 节点菜单的添加型表单提交才落码（工单 06）；
+ * class 关系边与 sequence 消息线的菜单（工单 03）：循环切换类型/箭头直接落码，
+ * 删除经 delete-relation / delete-message / delete-note / delete-block 落码。
  */
 
 initI18n()
@@ -75,12 +77,22 @@ function sequenceProjectionOf(source: string) {
   return { type: 'sequence' as const, sequence: buildSequenceProjection(parsed.doc) }
 }
 
-/** 图种 → data-id resolver（与 CanvasPanel 的 resolverOf 同约定） */
+/** 图种 → data-id resolver（与 CanvasPanel 的 resolverOf 同约定；工单 03 起含位置序连线） */
 function resolverOf(projection: AnyProjection) {
   if (projection.type === 'flowchart') return flowchartDataIdResolver(projection.flowchart)
   if (projection.type === 'mindmap') return mindmapDataIdResolver(projection.mindmap)
-  if (projection.type === 'sequence') return nodeDataIdResolver(projection.sequence.participants.map((p) => p.actorId))
-  return nodeDataIdResolver(projection.class.classes.map((c) => c.name))
+  if (projection.type === 'sequence') {
+    const nodes = nodeDataIdResolver(projection.sequence.participants.map((p) => p.actorId))
+    const edges = elementDataIdResolver([
+      ...projection.sequence.messages.map((m) => m.elementId),
+      ...projection.sequence.notes.map((n) => n.elementId),
+      ...projection.sequence.blocks.map((b) => b.elementId),
+    ])
+    return (dataId: string) => nodes(dataId) ?? edges(dataId)
+  }
+  const nodes = nodeDataIdResolver(projection.class.classes.map((c) => c.name))
+  const edges = elementDataIdResolver(projection.class.relations.map((r) => r.elementId))
+  return (dataId: string) => nodes(dataId) ?? edges(dataId)
 }
 
 /** 内联编辑目标 → 便于断言的字符串 */
@@ -122,6 +134,10 @@ interface ContextMenuApi {
   submitStyleForm: (name: string, color: string) => boolean
   openStyleForm: () => void
   closeStyleForm: () => void
+  cycleRelationKind: () => void
+  editRelation: () => void
+  cycleMessageArrow: () => void
+  editMessage: () => void
 }
 
 function Harness(props: {
@@ -157,6 +173,10 @@ function Harness(props: {
     submitStyleForm: ctx.submitStyleForm,
     openStyleForm: ctx.openStyleForm,
     closeStyleForm: ctx.closeStyleForm,
+    cycleRelationKind: ctx.cycleRelationKind,
+    editRelation: ctx.editRelation,
+    cycleMessageArrow: ctx.cycleMessageArrow,
+    editMessage: ctx.editMessage,
   }
   useEffect(() => {
     props.onState({
@@ -871,5 +891,236 @@ describe('useCanvasContextMenu（工单 06 class/sequence 节点菜单）', () =
 
     useEditorStore.getState().undo()
     expect(useEditorStore.getState().source).toBe(CLASS_SAMPLE)
+  })
+})
+
+describe('useCanvasContextMenu（工单 03 连线菜单）', () => {
+  let host: HTMLDivElement
+  let root: ReturnType<typeof createRoot>
+  let snapshots: MenuSnapshot[]
+  let api: { current: ContextMenuApi | null }
+  let created: string[]
+
+  // 两条不同的关系类型（relation:1 = -->，relation:2 = ..>）与两条不同箭头的消息
+  const CLASS_EDGE_SAMPLE = `classDiagram
+    class Foo
+    class Bar
+    Foo --> Bar
+    Bar ..> Foo
+`
+  const CLASS_EDGE_SVG =
+    '<svg><g data-id="Foo">Foo</g><g data-id="Bar">Bar</g><path data-id="relation:1"></path><path data-id="relation:2"></path></svg>'
+  const SEQ_EDGE_SAMPLE = `sequenceDiagram
+    participant 甲
+    participant 乙
+    甲->>乙: hi
+    甲-->>乙: 收到
+`
+  const SEQ_EDGE_SVG =
+    '<svg><g data-id="甲">甲</g><g data-id="乙">乙</g><line data-id="message:1"></line><line data-id="message:2"></line></svg>'
+  // 注释 + 逻辑块（工单 03 边界裁定：只补删除）
+  const SEQ_NOTE_BLOCK_SAMPLE = `sequenceDiagram
+    participant 甲
+    note over 甲: 备注
+    alt 条件
+        甲->>甲: 自语
+    end
+`
+  const SEQ_NOTE_BLOCK_SVG =
+    '<svg><g data-id="甲">甲</g><g data-id="note:1"></g><g data-id="block:1"></g></svg>'
+
+  beforeEach(() => {
+    host = document.createElement('div')
+    document.body.appendChild(host)
+    root = createRoot(host)
+    snapshots = []
+    api = { current: null }
+    created = []
+  })
+  afterEach(() => {
+    act(() => root.unmount())
+    host.remove()
+    vi.restoreAllMocks()
+    resetEditorHistory(DEFAULT_DIAGRAM_SOURCE)
+    useEditorStore.getState().select(null)
+  })
+
+  function mount(projection: AnyProjection, source: string, svg: string): HTMLDivElement {
+    resetEditorHistory(source)
+    act(() => {
+      root.render(
+        <Harness
+          projection={projection}
+          svg={svg}
+          onState={(s) => snapshots.push(s)}
+          apiRef={api}
+          onNodeCreated={(t) => created.push(createdIdOf(t))}
+        />,
+      )
+    })
+    return host.firstElementChild as HTMLDivElement
+  }
+
+  function mountClassEdge(): HTMLDivElement {
+    return mount(classProjectionOf(CLASS_EDGE_SAMPLE), CLASS_EDGE_SAMPLE, CLASS_EDGE_SVG)
+  }
+
+  function mountSequenceEdge(): HTMLDivElement {
+    return mount(sequenceProjectionOf(SEQ_EDGE_SAMPLE), SEQ_EDGE_SAMPLE, SEQ_EDGE_SVG)
+  }
+
+  function contextMenuOn(container: Element, selector: string): boolean {
+    let prevented = false
+    act(() => {
+      const event = new MouseEvent('contextmenu', { bubbles: true, cancelable: true })
+      container.querySelector(selector)!.dispatchEvent(event)
+      prevented = event.defaultPrevented
+    })
+    return prevented
+  }
+
+  /** 监听 store 的 commitIntent（断言意图字段） */
+  function spyCommitIntent() {
+    return vi.spyOn(useEditorStore.getState(), 'commitIntent')
+  }
+
+  it('右键 class 关系边：菜单为切换类型/编辑基数标签/删除并联动选中', () => {
+    const container = mountClassEdge()
+
+    // 工单 02 的位置序身份写在 DOM 上，右键即命中（工单 03 起不再安静关闭）
+    expect(contextMenuOn(container, 'path[data-id="relation:1"]')).toBe(true)
+
+    const last = snapshots.at(-1)!
+    expect(last.menu?.target).toEqual({ kind: 'class-relation', elementId: 'relation:1' })
+    expect(last.menu?.items).toEqual(['cycle-relation-kind', 'edit-relation', 'delete-relation'])
+    expect(useEditorStore.getState().selection).toEqual({ kind: 'class-relation', elementId: 'relation:1' })
+  })
+
+  it('菜单「删除关系」：只删该条关系，其余关系不受影响，清空选中', () => {
+    const container = mountClassEdge()
+    contextMenuOn(container, 'path[data-id="relation:1"]')
+    snapshots.length = 0
+
+    act(() => api.current!.deleteTarget())
+
+    const source = useEditorStore.getState().source
+    expect(source).not.toContain('Foo --> Bar')
+    expect(source).toContain('Bar ..> Foo')
+    expect(useEditorStore.getState().selection).toBeNull()
+    expect(snapshots.at(-1)!.menu).toBeNull()
+  })
+
+  it('菜单「切换关系类型」：循环到下一个 kind 落码、可撤销、菜单保持打开', () => {
+    const container = mountClassEdge()
+    contextMenuOn(container, 'path[data-id="relation:1"]')
+
+    const spy = spyCommitIntent()
+    act(() => api.current!.cycleRelationKind())
+
+    // RELATION_KINDS 顺序 <|-- <|.. *-- o-- --> ..>：当前 --> → 下一个 ..>
+    expect(spy.mock.calls[0]?.[0]).toMatchObject({ type: 'set-relation', elementId: 'relation:1', kind: '..>' })
+    expect(useEditorStore.getState().source).toContain('Foo ..> Bar')
+    // 菜单不关：循环切换要能连着点（关掉的话这里会是 menu: null）
+    expect(snapshots.at(-1)!.menu?.items).toEqual(['cycle-relation-kind', 'edit-relation', 'delete-relation'])
+
+    useEditorStore.getState().undo()
+    expect(useEditorStore.getState().source).toBe(CLASS_EDGE_SAMPLE)
+  })
+
+  it('菜单「编辑基数/标签」：关闭菜单但保持选中（右侧 RelationForm 承接，沿用 flowchart 链路）', () => {
+    const container = mountClassEdge()
+    contextMenuOn(container, 'path[data-id="relation:1"]')
+    snapshots.length = 0
+
+    act(() => api.current!.editRelation())
+
+    expect(snapshots.at(-1)!.menu).toBeNull()
+    expect(useEditorStore.getState().selection).toEqual({ kind: 'class-relation', elementId: 'relation:1' })
+  })
+
+  it('右键 sequence 消息线：菜单为切换箭头/编辑激活文本/删除并联动选中', () => {
+    const container = mountSequenceEdge()
+
+    expect(contextMenuOn(container, 'line[data-id="message:1"]')).toBe(true)
+
+    const last = snapshots.at(-1)!
+    expect(last.menu?.target).toEqual({ kind: 'sequence-message', elementId: 'message:1' })
+    expect(last.menu?.items).toEqual(['cycle-message-arrow', 'edit-message', 'delete-message'])
+    expect(useEditorStore.getState().selection).toEqual({ kind: 'message', elementId: 'message:1' })
+  })
+
+  it('菜单「删除消息」：只删该条消息，其余消息不受影响，清空选中', () => {
+    const container = mountSequenceEdge()
+    contextMenuOn(container, 'line[data-id="message:1"]')
+    snapshots.length = 0
+
+    act(() => api.current!.deleteTarget())
+
+    const source = useEditorStore.getState().source
+    expect(source).not.toContain('hi')
+    expect(source).toContain('甲-->>乙: 收到')
+    expect(useEditorStore.getState().selection).toBeNull()
+    expect(snapshots.at(-1)!.menu).toBeNull()
+  })
+
+  it('菜单「切换箭头」：循环到下一个箭头落码、可撤销', () => {
+    const container = mountSequenceEdge()
+    contextMenuOn(container, 'line[data-id="message:1"]')
+
+    const spy = spyCommitIntent()
+    act(() => api.current!.cycleMessageArrow())
+
+    // MESSAGE_ARROW_OPTIONS 顺序 ->> --> -x --：当前 ->> → 下一个 -->
+    expect(spy.mock.calls[0]?.[0]).toMatchObject({ type: 'set-message', elementId: 'message:1', arrow: '-->' })
+    expect(useEditorStore.getState().source).toContain('甲-->乙: hi')
+
+    useEditorStore.getState().undo()
+    expect(useEditorStore.getState().source).toBe(SEQ_EDGE_SAMPLE)
+  })
+
+  it('菜单「编辑激活/文本」：关闭菜单但保持选中（右侧 MessageForm 承接）', () => {
+    const container = mountSequenceEdge()
+    contextMenuOn(container, 'line[data-id="message:1"]')
+    snapshots.length = 0
+
+    act(() => api.current!.editMessage())
+
+    expect(snapshots.at(-1)!.menu).toBeNull()
+    expect(useEditorStore.getState().selection).toEqual({ kind: 'message', elementId: 'message:1' })
+  })
+
+  it('右键 sequence 注释：菜单只放删除（工单 03 边界裁定），删除只去掉该注释', () => {
+    const container = mount(
+      sequenceProjectionOf(SEQ_NOTE_BLOCK_SAMPLE),
+      SEQ_NOTE_BLOCK_SAMPLE,
+      SEQ_NOTE_BLOCK_SVG,
+    )
+    contextMenuOn(container, '[data-id="note:1"]')
+    expect(snapshots.at(-1)!.menu?.items).toEqual(['delete-note'])
+    snapshots.length = 0
+
+    act(() => api.current!.deleteTarget())
+
+    const source = useEditorStore.getState().source
+    expect(source).not.toContain('备注')
+    expect(source).toContain('alt 条件')
+  })
+
+  it('右键 sequence 逻辑块：菜单只放删除，删除整块（open 到 end）', () => {
+    const container = mount(
+      sequenceProjectionOf(SEQ_NOTE_BLOCK_SAMPLE),
+      SEQ_NOTE_BLOCK_SAMPLE,
+      SEQ_NOTE_BLOCK_SVG,
+    )
+    contextMenuOn(container, '[data-id="block:1"]')
+    expect(snapshots.at(-1)!.menu?.items).toEqual(['delete-block'])
+    snapshots.length = 0
+
+    act(() => api.current!.deleteTarget())
+
+    const source = useEditorStore.getState().source
+    expect(source).not.toContain('alt')
+    expect(source).not.toContain('自语')
+    expect(source).toContain('note over 甲: 备注')
   })
 })

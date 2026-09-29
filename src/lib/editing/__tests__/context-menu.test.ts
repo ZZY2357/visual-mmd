@@ -2,9 +2,10 @@ import { describe, expect, it } from 'vitest'
 import { contextMenuItems, contextMenuTargetFromSelection } from '../context-menu'
 
 /**
- * 右键菜单目标解析（工单 07/04/06）：画布选中 + 图种 → 菜单目标 → 菜单项列表。
+ * 右键菜单目标解析（工单 07/04/06/03）：画布选中 + 图种 → 菜单目标 → 菜单项列表。
  * 空白处四种图种都有添加动作（工单 04）；节点菜单四种图种齐备（工单 06 补齐
- * class/sequence 的节点），连线本轮仅 flowchart 有定义（其余返回 null）。
+ * class/sequence 的节点）；位置序连线（工单 03 补齐 class/sequence）也齐备，
+ * 而 flowchart 形态的 kind:edge 在 class/sequence 仍返回 null（不回归）。
  */
 
 describe('contextMenuTargetFromSelection（工单 07/04/06 菜单目标解析）', () => {
@@ -52,6 +53,8 @@ describe('contextMenuTargetFromSelection（工单 07/04/06 菜单目标解析）
     })
   })
 
+  // 工单 03 保留此断言：class/sequence 的连线走位置序（kind:element），flowchart 形态的
+  // kind:edge 在这两个图种上仍不产生目标——避免节点对寻址被误当成连线寻址。
   it('sequence/class 的 flowchart 形态边（旧 kind:edge）→ null（不回归）', () => {
     const edge = { kind: 'edge' as const, from: 'A', to: 'B', occurrence: 1 }
     expect(contextMenuTargetFromSelection(edge, 'sequence')).toBeNull()
@@ -147,10 +150,21 @@ describe('contextMenuItems（工单 07/04/06 菜单项）', () => {
     ])
   })
 
-  it('连线目标本轮（工单 02）还没有菜单项：安静不弹，等工单 03 填', () => {
-    expect(contextMenuItems({ kind: 'class-relation', elementId: 'relation:1' })).toEqual([])
-    expect(contextMenuItems({ kind: 'sequence-message', elementId: 'message:1' })).toEqual([])
-    expect(contextMenuItems({ kind: 'sequence-note', elementId: 'note:1' })).toEqual([])
-    expect(contextMenuItems({ kind: 'sequence-block', elementId: 'block:1' })).toEqual([])
+  it('连线目标（工单 03）：class 关系边与 sequence 消息线各有编辑 + 删除动作', () => {
+    expect(contextMenuItems({ kind: 'class-relation', elementId: 'relation:1' })).toEqual([
+      'cycle-relation-kind',
+      'edit-relation',
+      'delete-relation',
+    ])
+    expect(contextMenuItems({ kind: 'sequence-message', elementId: 'message:1' })).toEqual([
+      'cycle-message-arrow',
+      'edit-message',
+      'delete-message',
+    ])
+  })
+
+  it('sequence 注释与逻辑块：工单 03 只补删除（不做编辑动作，不扩大改造面）', () => {
+    expect(contextMenuItems({ kind: 'sequence-note', elementId: 'note:1' })).toEqual(['delete-note'])
+    expect(contextMenuItems({ kind: 'sequence-block', elementId: 'block:1' })).toEqual(['delete-block'])
   })
 })
