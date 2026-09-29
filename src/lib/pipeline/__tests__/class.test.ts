@@ -1,14 +1,14 @@
 import { describe, expect, it } from 'vitest'
 import { applyEdit } from '../pipeline'
 import { reassemble } from '../document'
-import { classParser, type NamespaceData } from '../class'
+import { classParser, type ClassDirectionData, type NamespaceData } from '../class'
 
 /**
  * class 解析器测试（工单 07，ADR-0004/0008）：
  * verbatim identity / 手术式改写，金样合法性见 class-golden.test.ts。
  */
 
-/** 覆盖 ADR-0005 清单内全部 class 语法 + 清单外（linkStyle、CSS 注入等）逐字保留 */
+/** 覆盖 ADR-0005 清单内全部 class 语法 + direction（工单 07 起进模型）+ 仍未解析的 linkStyle / CSS 注入 */
 const FULL_COVERAGE = `classDiagram
     %% 一条注释，必须逐字保留
     class BankAccount
@@ -48,7 +48,7 @@ const FULL_COVERAGE = `classDiagram
 
 describe('verbatim identity（class）', () => {
   const sources: Array<[string, string]> = [
-    ['覆盖全部语法的用例（含清单外 linkStyle / cssClass / direction）', FULL_COVERAGE],
+    ['覆盖全部语法的用例（含已进模型的 direction 与仍原样保留的 linkStyle / cssClass）', FULL_COVERAGE],
     ['无尾随换行', 'classDiagram\n    A <|-- B'],
     ['CRLF 行尾', 'classDiagram\r\n    A <|-- B\r\n    B *-- C\r\n'],
     ['紧凑无空格写法', 'classDiagram\n    A<|--B\n    C..>D:依赖\n'],
@@ -388,5 +388,142 @@ namespace Shapes {
       name: 'X',
     })
     expect(result.ok).toBe(false)
+  })
+})
+
+// ---------- direction 进模型（工单 07） ----------
+
+/** 解析出的 direction 元素（断言用） */
+function directionElements(source: string): ClassDirectionData[] {
+  const parsed = classParser.parse(source)
+  expect(parsed.ok, `样例源码必须可解析：${source}`).toBe(true)
+  if (!parsed.ok) throw parsed.error
+  return parsed.doc.elements
+    .filter((part) => part.element.kind === 'direction')
+    .map((part) => part.element as ClassDirectionData)
+}
+
+describe('direction 进模型（工单 07）', () => {
+  it('解析出 direction 取值与空白，位置照旧', () => {
+    const source = `classDiagram
+direction LR
+class A
+`
+    const parsed = classParser.parse(source)
+    expect(parsed.ok).toBe(true)
+    if (!parsed.ok) return
+    expect(parsed.doc.elements.map((p) => p.element.kind)).toEqual(['class-header', 'direction', 'class'])
+    expect(directionElements(source)[0]).toEqual({ kind: 'direction', gap: ' ', value: 'LR' })
+    expect(reassemble(parsed.doc)).toBe(source)
+  })
+
+  it('verbatim：缩进 / 多空白 / CRLF 下的 direction 行解析→重组装逐字相同', () => {
+    const sources = [
+      'classDiagram\n    direction RL\n    class A\n',
+      'classDiagram\ndirection   BT\n',
+      'classDiagram\r\n  direction LR\r\n  class A\r\n',
+      'classDiagram\ndirection LR',
+    ]
+    for (const source of sources) {
+      const parsed = classParser.parse(source)
+      expect(parsed.ok, `必须可解析：${JSON.stringify(source)}`).toBe(true)
+      if (!parsed.ok) return
+      expect(reassemble(parsed.doc)).toBe(source)
+    }
+    // CRLF 下的取值不把 \r 吃进去
+    expect(directionElements('classDiagram\r\n  direction LR\r\n  class A\r\n')[0]).toEqual({
+      kind: 'direction',
+      gap: ' ',
+      value: 'LR',
+    })
+  })
+
+  it('花括号块内的 direction 行不认作图表方向（保持既有块内成员口径）', () => {
+    const source = 'classDiagram\nclass A {\n    direction LR\n}\n'
+    const parsed = classParser.parse(source)
+    expect(parsed.ok).toBe(true)
+    if (!parsed.ok) return
+    expect(parsed.doc.elements.map((p) => p.element.kind)).toEqual(['class-header', 'class', 'member', 'class-end'])
+    expect(reassemble(parsed.doc)).toBe(source)
+  })
+
+  it('set-direction：源码无 direction 时插到表头之后', () => {
+    const source = 'classDiagram\n    class A\n'
+    const result = applyEdit(source, classParser, { type: 'set-direction', direction: 'LR' })
+    expect(result.ok).toBe(true)
+    if (!result.ok) return
+    expect(result.source).toBe('classDiagram\ndirection LR\n    class A\n')
+  })
+
+  it('set-direction：已有 direction 时原地改写，其余逐字不变', () => {
+    const source = `classDiagram
+    %% 注释逐字保留
+    direction TB
+    class Animal
+    Animal : +String name
+`
+    const result = applyEdit(source, classParser, { type: 'set-direction', direction: 'LR' })
+    expect(result.ok).toBe(true)
+    if (!result.ok) return
+    expect(result.source).toContain('    direction LR')
+    expect(result.source).not.toContain('direction TB')
+    expect(result.source).toContain('    %% 注释逐字保留')
+    expect(result.source).toContain('    Animal : +String name')
+    // 只改 direction 那一行
+    expect(result.source.length).toBe(source.length)
+  })
+
+  it('set-direction：取值归一为大写（mermaid 的 classDiagram 只认这四种）', () => {
+    const result = applyEdit('classDiagram\ndirection TB\n', classParser, { type: 'set-direction', direction: 'lr' })
+    expect(result.ok).toBe(true)
+    if (!result.ok) return
+    expect(result.source).toBe('classDiagram\ndirection LR\n')
+  })
+
+  it('set-direction：非法取值不落码（mermaid 只认 LR / RL / TB / BT）', () => {
+    for (const direction of ['XY', 'TD', '']) {
+      const result = applyEdit('classDiagram\ndirection TB\n', classParser, { type: 'set-direction', direction })
+      expect(result.ok, `取值 ${JSON.stringify(direction)} 不应落码`).toBe(false)
+    }
+  })
+
+  it('set-direction null：删除 direction 行，其余文本逐字不变', () => {
+    const source = `classDiagram
+    direction RL
+    class A
+    A <|-- B
+`
+    const result = applyEdit(source, classParser, { type: 'set-direction', direction: null })
+    expect(result.ok).toBe(true)
+    if (!result.ok) return
+    expect(result.source).not.toContain('direction')
+    expect(result.source).toContain('    class A\n')
+    expect(result.source).toContain('    A <|-- B\n')
+    // 全项目既有约定（spec 已记）：被删语句只清 span，行首缩进与换行留在 verbatim
+    expect(result.source).toBe('classDiagram\n    \n    class A\n    A <|-- B\n')
+  })
+
+  it('set-direction null：源码本来就没有 direction 时是无操作（不报错）', () => {
+    const source = 'classDiagram\n    class A\n'
+    const result = applyEdit(source, classParser, { type: 'set-direction', direction: null })
+    expect(result.ok).toBe(true)
+    if (!result.ok) return
+    expect(result.source).toBe(source)
+  })
+
+  it('linkStyle / cssClass / style 仍逐字保留、不受 direction 编辑影响', () => {
+    const source = `classDiagram
+direction TB
+class A
+linkStyle 0 stroke:red
+cssClass "A" styled
+style A fill:#f9f
+`
+    const result = applyEdit(source, classParser, { type: 'set-direction', direction: 'LR' })
+    expect(result.ok).toBe(true)
+    if (!result.ok) return
+    expect(result.source).toContain('linkStyle 0 stroke:red')
+    expect(result.source).toContain('cssClass "A" styled')
+    expect(result.source).toContain('style A fill:#f9f')
   })
 })

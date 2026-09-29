@@ -23,9 +23,12 @@ import {
  * - classDef（与 flowchart 同语法，复用其解析与渲染）
  * - namespace Foo { ... }（工单 06，ADR-0014）：渲染为视觉边框、不构成 DOM 包含
  *   （`childDataIds: []`），只做「解析 + 结构树可见 + 可改名」，不做分组编辑
+ * - direction LR / RL / TB / BT（工单 07）：图表级方向声明，只做「解析 + 改写 / 删除」
+ *   （删除 = 跟随 mermaid 默认）。mermaid 的 classDiagram 词法只认这四种取值，
+ *   故落地侧按白名单校验（`direction TD` 不是合法别名）
  *
  * 不解析、原样保留（清单外语法不报错，ADR-0008）：linkStyle、CSS 注入
- * （cssClass / style）、direction、注释、空行、以及一切无法识别的行。
+ * （cssClass / style）、注释、空行、以及一切无法识别的行。
  *
  * span 约定：元素 span 从该行首个非空白字符起、到行尾（不含换行）；
  * 行首缩进与换行永远留在 verbatim。
@@ -204,6 +207,23 @@ export interface NamespaceEndData {
   kind: 'namespace-end'
 }
 
+/**
+ * 图表级方向声明 `direction LR|RL|TB|BT`（工单 07）。取值**原样记录**、不在此校验：
+ * 解析层保持纯记录（verbatim 可回写），合法性由 `set-direction` 落地侧按白名单把关
+ * （与 flowchart 的 `resolveSetDirection` 同口径）。
+ */
+export interface ClassDirectionData {
+  kind: 'direction'
+  /** `direction` 与取值之间的空白 */
+  gap: string
+  /** 取值原文（逐字保留） */
+  value: string
+}
+
+export function renderDirection(d: ClassDirectionData, changes: { value?: string } = {}): string {
+  return `direction${d.gap}${changes.value ?? d.value}`
+}
+
 export type ClassElementData =
   | ClassHeaderData
   | ClassDeclData
@@ -212,6 +232,7 @@ export type ClassElementData =
   | NoteData
   | NamespaceData
   | NamespaceEndData
+  | ClassDirectionData
   | ClassDefData
   | { kind: 'class-end' }
 
@@ -224,6 +245,11 @@ const NAMESPACE_RE = /^namespace([ \t]+)(\S+)([\s\S]*)$/
 const ONE_LINE_MEMBER_RE = /^([^\s~:{}]+)((?:[ \t]*):[ \t]*)((?:[+\-#~])?)([ \t]*)(.*)$/
 const NOTE_FOR_RE = /^note([ \t]+)for([ \t]+)([^\s"']+)([ \t]+)(["'])(.*)\5([ \t\r]*)$/i
 const NOTE_FLOAT_RE = /^note([ \t]+)(["'])(.*)\2([ \t\r]*)$/i
+/** 图表级方向声明（工单 07）：`direction <取值>`；取值白名单见 CLASS_DIRECTIONS */
+const DIRECTION_RE = /^direction([ \t]+)(\S+)[ \t\r]*$/
+
+/** mermaid 的 classDiagram 词法只接受这四种方向（`TD` 不是别名） */
+const CLASS_DIRECTIONS = ['TB', 'BT', 'RL', 'LR']
 
 const NAME_RE = /^[A-Za-z0-9_\u00C0-\uFFFF]+/
 
@@ -434,6 +460,22 @@ function classifyLine(line: string, lineStart: number, lineNo: number, entries: 
     return
   }
 
+  // direction 只作图表级声明（mermaid 的 classDiagram 里它只在顶层语句位置合法）：
+  // 花括号块内的一行不作为方向，仍按块内成员处理（保持既有口径）。
+  // 整行必须恰好是 `direction <单个取值>`，否则落回后续解析（如名为 direction 的类的一行式成员）
+  if (!inClassBlock) {
+    const directionMatch = DIRECTION_RE.exec(line.slice(firstChar))
+    if (directionMatch !== null) {
+      counters.direction++
+      entries.push({
+        span,
+        id: `direction:${counters.direction}`,
+        data: { kind: 'direction', gap: directionMatch[1], value: directionMatch[2] },
+      })
+      return
+    }
+  }
+
   const member = parseOneLineMember(line, firstChar)
   if (member !== null) {
     counters.member++
@@ -453,7 +495,7 @@ function classifyLine(line: string, lineStart: number, lineNo: number, entries: 
     return
   }
 
-  // 其余（linkStyle、cssClass/style、direction、注释、无法识别的指令）不解析，逐字保留
+  // 其余（linkStyle、cssClass/style、注释、无法识别的指令）不解析，逐字保留
   void lineNo
 }
 
@@ -464,6 +506,7 @@ interface Counters {
   member: number
   relation: number
   note: number
+  direction: number
   end: number
 }
 
@@ -492,6 +535,7 @@ export class ClassParser implements DiagramParser {
       member: 0,
       relation: 0,
       note: 0,
+      direction: 0,
       end: 0,
     }
     // 未闭合的 `{` 栈：类花括号块与 namespace 块分开记，收尾 `}` 按栈顶类型出对应 end
@@ -604,6 +648,8 @@ export class ClassParser implements DiagramParser {
         return this.resolveAddClassDef(doc, intent as never)
       case 'set-namespace-name':
         return this.resolveSetNamespaceName(doc, intent as never)
+      case 'set-direction':
+        return this.resolveSetDirection(doc, intent as never)
       default:
         return null
     }
@@ -948,6 +994,31 @@ export class ClassParser implements DiagramParser {
     if (intent.name === '') return null
     return new Map([[part.id, renderNamespace(part.element as NamespaceData, { name: intent.name })]])
   }
+
+  // ----- direction（工单 07） -----
+
+  /**
+   * 设置图表方向：有 direction 行就原地改写，没有就插到表头之后（mermaid 文档的写法，
+   * 也是 sequence `autonumber` 的锚点口径）；`direction: null` = 删除该行（跟随 mermaid 默认）。
+   * 删除只清元素 span——行首缩进与换行留在 verbatim（全项目既有约定，spec 已记）。
+   */
+  private resolveSetDirection(
+    doc: SourceDocument,
+    intent: Extract<ClassIntent, { type: 'set-direction' }>,
+  ): Map<string, string> | null {
+    const existing = doc.elements.find((part) => part.element.kind === 'direction')
+    if (intent.direction === null) {
+      return existing === undefined ? new Map() : new Map([[existing.id, '']])
+    }
+    const value = intent.direction.toUpperCase()
+    if (!CLASS_DIRECTIONS.includes(value)) return null
+    if (existing !== undefined) {
+      return new Map([[existing.id, renderDirection(existing.element as ClassDirectionData, { value })]])
+    }
+    const header = doc.elements.find((part) => part.element.kind === 'class-header')
+    if (header === undefined) return null
+    return this.insertAfter(doc, header.id, () => [`direction ${value}`])
+  }
 }
 
 /** 新建类名的合法性校验（表单层复用，与意图落地侧同一规则） */
@@ -996,6 +1067,8 @@ export type ClassIntent =
   | { type: 'add-classdef'; name: string; props?: Record<string, string>; afterElementId?: string }
   /** 改 namespace 名（工单 06；行尾原文逐字保留） */
   | { type: 'set-namespace-name'; elementId: string; name: string }
+  /** 设置图表方向（工单 07）；null = 删除 direction 行（跟随 mermaid 默认） */
+  | { type: 'set-direction'; direction: string | null }
 
 /** 元素所在行的行首缩进（插入新行时跟随用户缩进习惯） */
 function lineIndent(source: string, offset: number): string {

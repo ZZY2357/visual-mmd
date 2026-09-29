@@ -10,6 +10,9 @@ import {
 } from '../lib/projection/sequence-projection'
 import { resolveClassSelection, type ClassProjection } from '../lib/projection/class-projection'
 import type { AnyProjection } from '../lib/diagram-registry'
+import { DIRECTIONS } from '../lib/pipeline/flowchart'
+import { setDirectionIntent } from '../lib/editing/flowchart-forms'
+import { setClassDirectionIntent } from '../lib/editing/class-forms'
 import { useEditorStore } from '../store/editor'
 import { StructureTree } from './StructureTree'
 import { ClassDefForm, DiagramForm, EdgeForm, NodeForm, SubgraphForm } from './property-forms'
@@ -39,6 +42,7 @@ function FlowchartSelectionForm({
   selection: Selection | null
 }) {
   const { t } = useTranslation()
+  const commitIntent = useEditorStore((s) => s.commitIntent)
   if (selection === null) {
     return (
       <Text size="sm" c="dimmed" px="xs">
@@ -48,7 +52,16 @@ function FlowchartSelectionForm({
   }
   switch (selection.kind) {
     case 'diagram':
-      return <DiagramForm direction={projection.direction} />
+      // 方向来自表头 token（`flowchart TD`）：没有「不设置」的形态，故不提供「跟随默认」
+      return (
+        <DiagramForm
+          direction={projection.direction}
+          knownDirections={DIRECTIONS}
+          onSelect={(next) => {
+            if (next !== null) commitIntent(setDirectionIntent(next))
+          }}
+        />
+      )
     case 'node': {
       const node = projection.nodes.find((n) => n.nodeId === selection.nodeId)
       return node !== undefined ? (
@@ -143,6 +156,7 @@ function ClassSelectionForm({
   selection: Selection | null
 }) {
   const { t } = useTranslation()
+  const commitIntent = useEditorStore((s) => s.commitIntent)
   if (selection === null) {
     return (
       <Text size="sm" c="dimmed" px="xs">
@@ -152,10 +166,13 @@ function ClassSelectionForm({
   }
   switch (selection.kind) {
     case 'diagram':
+      // classDiagram 的方向是独立语句行：没有该行时如实显示「跟随 Mermaid 默认」（工单 07）
       return (
-        <Text size="sm" c="dimmed" px="xs">
-          {t('app:propertyPanel.classDiagramHint')}
-        </Text>
+        <DiagramForm
+          direction={projection.direction}
+          allowFollowDefault
+          onSelect={(next) => commitIntent(setClassDirectionIntent(next))}
+        />
       )
     case 'class': {
       const c = projection.classes.find((x) => x.name === selection.name)

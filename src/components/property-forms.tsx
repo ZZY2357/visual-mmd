@@ -26,7 +26,6 @@ import {
   deleteSubgraphIntent,
   dasharrayToStyle,
   renameNodeIntent,
-  setDirectionIntent,
   setEdgeIntent,
   setNodeShapeIntent,
   setNodeTextIntent,
@@ -69,16 +68,53 @@ function shapeOptions(t: (k: string) => string) {
 
 // ---------- 图表（方向） ----------
 
-export function DiagramForm({ direction }: { direction: string | null }) {
+/** 「跟随 Mermaid 默认（不设置方向）」的哨兵值（不是方向 token，仅用于 Select 选项） */
+const FOLLOW_DIRECTION_VALUE = '__follow__'
+
+/**
+ * 图表方向选择器（flowchart / class 共用，工单 07 起）：
+ * - 回显源码里的**原始字符串**（源码是唯一真相源）；手写非法值时如实回显原文并提示，
+ *   不假装成某个值（这是主题选择器踩过的坑，见 editor-polish spec 的「选择器回显」）
+ * - `allowFollowDefault`：置顶「跟随 Mermaid 默认（不设置方向）」，选中即删除源码里的
+ *   direction 行；flowchart 的方向来自表头 token（`flowchart TD`）、没有「不设置」的形态，
+ *   故 flowchart 不启用
+ * - `knownDirections`：判定「手写值」时的合法取值全集（flowchart 的 `TD` 是 TB 的合法别名，
+ *   不应当被当成手写值）
+ */
+export function DiagramForm({
+  direction,
+  onSelect,
+  allowFollowDefault = false,
+  knownDirections = DIRECTION_OPTIONS,
+}: {
+  direction: string | null
+  /** `null` = 选「跟随 Mermaid 默认」（仅 allowFollowDefault 时可能传回） */
+  onSelect: (direction: string | null) => void
+  allowFollowDefault?: boolean
+  knownDirections?: readonly string[]
+}) {
   const t = useTranslation().t
-  const commitIntent = useCommitIntent()
+  // 手写值：不在已知取值里 → 如实回显原文（mermaid 会忽略它并回退到默认）
+  const unknownRaw = direction !== null && !knownDirections.includes(direction) ? direction : null
   return (
     <Select
       label={t('app:propertyPanel.direction')}
-      data={DIRECTION_OPTIONS.map((d) => ({ value: d, label: t(`app:directions.${d}`) }))}
-      value={direction ?? 'TB'}
+      aria-label={t('app:propertyPanel.direction')}
+      data={[
+        ...(allowFollowDefault
+          ? [{ value: FOLLOW_DIRECTION_VALUE, label: t('app:directions.followDefault') }]
+          : []),
+        ...DIRECTION_OPTIONS.map((d) => ({ value: d, label: t(`app:directions.${d}`) })),
+        ...(unknownRaw === null ? [] : [{ value: unknownRaw, label: unknownRaw }]),
+      ]}
+      // 无「跟随」形态（flowchart）时沿用旧口径：表头必有方向，缺省即 mermaid 的 TB
+      value={allowFollowDefault ? (direction ?? FOLLOW_DIRECTION_VALUE) : (direction ?? 'TB')}
+      error={unknownRaw === null ? undefined : t('app:propertyPanel.directionInvalid')}
       onChange={(v) => {
-        if (v !== null && v !== direction) commitIntent(setDirectionIntent(v))
+        if (v === null) return
+        const next = v === FOLLOW_DIRECTION_VALUE ? null : v
+        if (next === direction) return
+        onSelect(next)
       }}
       allowDeselect={false}
     />

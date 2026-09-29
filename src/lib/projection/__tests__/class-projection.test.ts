@@ -55,3 +55,23 @@ namespace Other {
     expect(resolveClassSelection(proj, { kind: 'class-namespace', elementId: 'namespace:不存在' })).toBeNull()
   })
 })
+
+// ---------- direction（工单 07） ----------
+
+describe('direction 进 class 投影（工单 07）', () => {
+  it('无 direction 行时为 null（表单据此显示「跟随 Mermaid 默认」，不假装某个值）', () => {
+    expect(project('classDiagram\nclass A\n').direction).toBe(null)
+  })
+
+  it('有 direction 行时取原文', () => {
+    expect(project('classDiagram\ndirection LR\nclass A\n').direction).toBe('LR')
+  })
+
+  it('多个 direction 行时取首个（与改写落地侧同口径）', () => {
+    expect(project('classDiagram\ndirection LR\nclass A\ndirection RL\n').direction).toBe('LR')
+  })
+
+  it('非法取值照原样进投影（由表单如实回显，不在投影层过滤）', () => {
+    expect(project('classDiagram\ndirection XY\nclass A\n').direction).toBe('XY')
+  })
+})

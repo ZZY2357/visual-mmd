@@ -182,6 +182,7 @@ export const zhDict = {
       apply: '应用',
       // ---- 图表表单 ----
       direction: '方向',
+      directionInvalid: '无效方向，Mermaid 将忽略它并回退到默认',
       // ---- 节点表单 ----
       nodeText: '显示文本',
       nodeId: '节点 ID',
@@ -343,6 +344,8 @@ export const zhDict = {
       BT: '从下到上（BT）',
       LR: '从左到右（LR）',
       RL: '从右到左（RL）',
+      // 源码里没有 direction 行时如实回显这一项（不假装成某个具体方向）
+      followDefault: '跟随 Mermaid 默认（不设置方向）',
     },
     mindmapShapes: {
       default: '默认（无形状）',

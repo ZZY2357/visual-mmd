@@ -800,7 +800,8 @@ export type FlowchartIntent =
   /** 删除 subgraph（open 到 end 之间的全部元素，含内容） */
   | { type: 'delete-subgraph'; elementId: string }
 
-const DIRECTIONS = ['TB', 'TD', 'BT', 'RL', 'LR']
+/** 表头与 subgraph 都可出现的合法方向取值（`TD` 是 `TB` 的别名，mermaid 亦接受） */
+export const DIRECTIONS = ['TB', 'TD', 'BT', 'RL', 'LR']
 
 function isValidNodeId(id: string): boolean {
   return VALID_NEW_ID_RE.test(id) && !id.includes('--') && id !== 'end'

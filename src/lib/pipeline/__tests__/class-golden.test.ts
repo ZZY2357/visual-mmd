@@ -66,7 +66,7 @@ describe('金样合法性（class）', () => {
     await expect(mermaid.parse(result.source)).resolves.toBeTruthy()
   })
 
-  it('清单外语法（linkStyle、cssClass、direction）不被解析且原样保留', async () => {
+  it('linkStyle / cssClass 仍不被解析且原样保留（direction 已进模型，工单 07）', async () => {
     const source = `classDiagram
     class A
     class B
@@ -80,6 +80,7 @@ describe('金样合法性（class）', () => {
     if (!parsed.ok) return
     expect(parsed.doc.elements.filter((p) => p.element.kind === 'relation')).toHaveLength(1)
     expect(parsed.doc.elements.filter((p) => p.element.kind === 'classdef')).toHaveLength(0)
+    expect(parsed.doc.elements.filter((p) => p.element.kind === 'direction')).toHaveLength(1)
 
     const result = applyEdit(source, classParser, { type: 'rename-class', name: 'A', newName: 'Base' })
     expect(result.ok).toBe(true)
@@ -88,6 +89,26 @@ describe('金样合法性（class）', () => {
     expect(result.source).toContain('cssClass "B" styled')
     expect(result.source).toContain('direction LR')
     await expect(mermaid.parse(result.source)).resolves.toBeTruthy()
+  })
+
+  it('set-direction 产物 parse 通过（插入 / 改写 / 删除，工单 07）', async () => {
+    const inserted = applyEdit('classDiagram\n    class A\n', classParser, { type: 'set-direction', direction: 'LR' })
+    expect(inserted.ok).toBe(true)
+    if (!inserted.ok) return
+    expect(inserted.source).toBe('classDiagram\ndirection LR\n    class A\n')
+    await expect(mermaid.parse(inserted.source)).resolves.toBeTruthy()
+
+    const rewritten = applyEdit(inserted.source, classParser, { type: 'set-direction', direction: 'BT' })
+    expect(rewritten.ok).toBe(true)
+    if (!rewritten.ok) return
+    expect(rewritten.source).toContain('direction BT')
+    await expect(mermaid.parse(rewritten.source)).resolves.toBeTruthy()
+
+    const deleted = applyEdit(rewritten.source, classParser, { type: 'set-direction', direction: null })
+    expect(deleted.ok).toBe(true)
+    if (!deleted.ok) return
+    expect(deleted.source).not.toContain('direction')
+    await expect(mermaid.parse(deleted.source)).resolves.toBeTruthy()
   })
 
   it('全部六种关系类型产物 parse 通过', async () => {

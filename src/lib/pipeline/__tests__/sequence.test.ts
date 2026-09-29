@@ -907,3 +907,37 @@ describe('Note left of / right of 解析参与者（工单 13）', () => {
     expect(result.source).not.toContain('甲')
   })
 })
+
+// ---------- direction 不在 sequence 的可编集合内（工单 07 的边界） ----------
+
+/**
+ * 工单 07 的 `direction` 只做 class：mermaid 12.0.0 的 sequenceDiagram **没有** `direction`
+ * 语法（下面的 `mermaid.parse` 断言就是硬证据），源码里写它就是语法错误。
+ * 因此不能给它做「可切换 / 可删除」的表单——那会产出非法源码。该行继续走
+ * 「不解析、原样保留」的老路（ADR-0008）：编辑任何别的元素都不触碰它。
+ */
+describe('sequence 的 direction 仍原样保留（工单 07 的边界）', () => {
+  it('mermaid 12 不接受 sequenceDiagram 的 direction', async () => {
+    const mermaid = (await import('mermaid')).default
+    await expect(mermaid.parse('sequenceDiagram\nA->>B: hi\n')).resolves.toBeTruthy()
+    await expect(mermaid.parse('sequenceDiagram\ndirection LR\nA->>B: hi\n')).rejects.toBeTruthy()
+  })
+
+  it('direction 行不被解析，编辑其它元素时逐字保留', () => {
+    const source = `sequenceDiagram
+    direction LR
+    participant 甲
+    甲->>乙: hi
+`
+    const parsed = sequenceParser.parse(source)
+    expect(parsed.ok).toBe(true)
+    if (!parsed.ok) return
+    expect(reassemble(parsed.doc)).toBe(source)
+    expect(parsed.doc.elements.some((p) => p.element.kind === 'direction')).toBe(false)
+
+    const result = applyEdit(source, sequenceParser, { type: 'set-participant', actorId: '甲', alias: 'Ali' })
+    expect(result.ok).toBe(true)
+    if (!result.ok) return
+    expect(result.source).toContain('    direction LR')
+  })
+})

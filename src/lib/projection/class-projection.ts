@@ -1,6 +1,7 @@
 import type { SourceDocument } from '../pipeline/document'
 import {
   type ClassDeclData,
+  type ClassDirectionData,
   type MemberData,
   type NamespaceData,
   type NoteData,
@@ -75,6 +76,11 @@ export interface ProjectionNamespace {
 }
 
 export interface ClassProjection {
+  /**
+   * 图表级方向（工单 07）：源码里 `direction` 行的取值原文；没有该行时为 null
+   * （表单据此显示「跟随 Mermaid 默认」，不假装某个值）。非法取值照原样带出。
+   */
+  direction: string | null
   classes: ProjectionClass[]
   members: ProjectionMember[]
   relations: ProjectionRelation[]
@@ -94,6 +100,8 @@ export function buildClassProjection(doc: SourceDocument): ClassProjection {
   const classDefs: ProjectionClassDef[] = []
   const namespaces: ProjectionNamespace[] = []
   const namespaceSeen = new Set<string>()
+  // 图表方向取首个 direction 行（与 set-direction 的改写落地侧同口径）
+  let direction: string | null = null
   // 块内成员的宿主：最近一个开块的类声明
   let currentBlockOwner: string | null = null
 
@@ -141,6 +149,8 @@ export function buildClassProjection(doc: SourceDocument): ClassProjection {
         for (const item of cd.items) props[item.key] = item.value
         classDefs.push({ name: cd.name, props })
       }
+    } else if (data.kind === 'direction') {
+      if (direction === null) direction = (data as ClassDirectionData).value
     } else if (data.kind === 'class-end') {
       currentBlockOwner = null
     } else if (data.kind === 'namespace') {
@@ -152,7 +162,7 @@ export function buildClassProjection(doc: SourceDocument): ClassProjection {
     }
   }
 
-  return { classes, members, relations, notes, classDefs, namespaces }
+  return { direction, classes, members, relations, notes, classDefs, namespaces }
 }
 
 // ---------- 选中回落 ----------

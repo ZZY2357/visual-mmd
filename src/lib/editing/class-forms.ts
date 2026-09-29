@@ -131,3 +131,14 @@ export function setNamespaceNameIntent(
   if (trimmed === '') return null
   return { type: 'set-namespace-name', elementId, name: trimmed }
 }
+
+// ---------- direction（工单 07） ----------
+
+/**
+ * 图表方向表单值 → set-direction 意图。
+ * `null` = 「跟随 Mermaid 默认」= 删除源码里的 direction 行。
+ * 取值合法性由管线落地侧把关（非法值不落码）。
+ */
+export function setClassDirectionIntent(direction: string | null): ClassIntent {
+  return { type: 'set-direction', direction }
+}
