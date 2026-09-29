@@ -1,13 +1,18 @@
 /**
- * 节点 data-id 后处理（工单 08 验收发现的修复）
+ * 节点 data-id 后处理（工单 08 验收发现的修复；工单 09 扩展到 class）
  *
- * mermaid v12 实测（neo look）：flowchart 的边 <path> 带 `data-id="L_{from}_{to}_{n}"`，
- * 但节点 <g.node> **不带 data-id**，只有 DOM id `{svgId}-flowchart-{节点id}-{序号}`
- * （ADR-0007 的"节点 data-id = 源码节点 id"事实约定在 v12 渲染产物上不成立）。
+ * mermaid v12 实测（neo look）：节点 <g.node> **不带 data-id**，只有 DOM id ——
+ * - flowchart：`{svgId}-flowchart-{节点id}-{序号}`
+ * - class：`{svgId}-classId-{类名}-{序号}`（实测 `mmd-preview-21-classId-BankAccount-14`）
+ * （ADR-0007 的"节点 data-id = 源码节点 id"事实约定在 v12 渲染产物上不成立）
  *
  * 与工单 01 的连线命中路径同类：渲染 SVG 注入后的纯 DOM 后处理——把节点 DOM id
  * 反注为 `data-id`，使 data-id 选中解析（data-id.ts）、高亮（highlight.ts）、
  * 内联编辑寻址（inline-edit.ts）的既有链路原样生效。幂等（已有 data-id 不动）。
+ *
+ * 工单 09：class 图复用同一条链路（反注而非各自打补丁），于是「左键点选 / 高亮 /
+ * 内联编辑定位 / 右键节点菜单」四处无需分别适配；mindmap 无法反注（其 DOM id 是
+ * 位置序 `node_N`，不是源码 id），仍走 mindmap-adapter 的映射。
  *
  * 尽力而为：解析不出节点 id 的 g.node 安静跳过（保持"退化为仅结构树可选中"
  * 的既有约定）；反注错误的 id 也不可能凭空造出选中——resolver 只认投影已知节点。
@@ -17,13 +22,25 @@
  * 节点 id 自身可含 `-`，以尾部 `-数字` 为序号切分 */
 const FLOWCHART_NODE_DOM_ID = /(?:^|-)flowchart-(.+)-(\d+)$/
 
+/** mermaid v12 class 类框 DOM id 形态：`{svgId}-classId-{类名}-{序号}`；
+ * 类名自身可含 `-`，同样以尾部 `-数字` 切分 */
+const CLASS_NODE_DOM_ID = /(?:^|-)classId-(.+)-(\d+)$/
+
+/** DOM id → 节点 id（flowchart / class 两种形态）；不是节点 id 时返回 null */
+function nodeIdOfDomId(domId: string): string | null {
+  const flow = FLOWCHART_NODE_DOM_ID.exec(domId)
+  if (flow !== null) return flow[1]
+  const cls = CLASS_NODE_DOM_ID.exec(domId)
+  return cls !== null ? cls[1] : null
+}
+
 export function annotateNodeDataIds(root: ParentNode): void {
   for (const g of root.querySelectorAll('g.node')) {
     if (g.getAttribute('data-id') !== null) continue
     const domId = g.getAttribute('id')
     if (domId === null) continue
-    const m = FLOWCHART_NODE_DOM_ID.exec(domId)
-    if (m === null) continue
-    g.setAttribute('data-id', m[1])
+    const nodeId = nodeIdOfDomId(domId)
+    if (nodeId === null) continue
+    g.setAttribute('data-id', nodeId)
   }
 }

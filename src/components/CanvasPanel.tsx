@@ -45,8 +45,9 @@ interface CanvasPanelProps {
   projection: AnyProjection | null
 }
 
-/** 图种 → data-id resolver（工单 06/07/08）：flowchart 全套适配；sequence 参与者与
- * class 类的 data-id 即其 id（尽力而为，无法匹配时不选中）。
+/** 图种 → data-id resolver（工单 06/07/08/09）：flowchart 全套适配；sequence 参与者
+ * 与 class 类的 data-id 即其 id（class 的 data-id 由 node-data-ids 的渲染后处理从
+ * `{svgId}-classId-{类名}-{n}` 反注而来，工单 09；无法匹配时不选中）。
  * mindmap（工单 06）：mermaid 不发 data-id，但节点 g 的 DOM id 为 node_N（源码节点序），
  * 经 mindmapDataIdResolver 映射回投影节点。 */
 function resolverOf(projection: AnyProjection): DataIdResolver {

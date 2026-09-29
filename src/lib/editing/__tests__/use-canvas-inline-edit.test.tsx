@@ -4,8 +4,12 @@ import { afterEach, beforeEach, describe, expect, it } from 'vitest'
 import { resetEditorHistory, useEditorStore } from '../../../store/editor'
 import { DEFAULT_DIAGRAM_SOURCE } from '../../../lib/storage'
 import { flowchartParser } from '../../pipeline/flowchart'
+import { classParser } from '../../pipeline/class'
 import { buildFlowchartProjection } from '../../projection/flowchart-projection'
+import { buildClassProjection } from '../../projection/class-projection'
 import { nodeDataIdResolver } from '../../canvas-selection/data-id'
+import { annotateNodeDataIds } from '../../canvas-selection/node-data-ids'
+import type { CanvasInlineEditTarget } from '../inline-edit'
 import { useCanvasInlineEdit, type InlineEditCloseOptions } from '../use-canvas-inline-edit'
 
 /**
@@ -31,7 +35,7 @@ function projectionOf(source: string) {
 interface InlineEditApi {
   commit: (text: string, options?: InlineEditCloseOptions) => void
   cancel: () => void
-  beginEdit: (target: { kind: 'flowchart'; nodeId: string }) => void
+  beginEdit: (target: CanvasInlineEditTarget) => void
 }
 
 interface HarnessProps {
@@ -209,5 +213,115 @@ describe('useCanvasInlineEdit（工单 05 内联编辑）', () => {
     // 只压了一份快照：撤销一次即回到原源码
     act(() => useEditorStore.getState().undo())
     expect(useEditorStore.getState().source).toBe(SAMPLE)
+  })
+})
+
+/**
+ * 工单 09：class 图新建类后的内联命名（浮层定位）。
+ * 缺陷形态：类框 g.node 没有 data-id（v12 只有 `{svgId}-classId-{类名}-{n}`），
+ * findTargetElement 找不到元素 → rect === null → 输入框 `display: none`、拿不到焦点。
+ * 修复走 node-data-ids 的渲染后处理（反注 data-id），本用例覆盖「反注后能定位」
+ * 与「不反注就定位不到」（负向对照，证明断言有效）。
+ */
+
+const CLASS_SAMPLE = `classDiagram
+class 新类
+`
+
+/** mermaid v12 class 图类框的真实形态：无 data-id，只有 classId- 形式的 DOM id */
+const CLASS_SVG = '<svg id="mmd-preview-21"><g class="node default" id="mmd-preview-21-classId-新类-19"><rect/><g class="label-group"><text>新类</text></g></g></svg>'
+
+function classProjectionOf() {
+  const parsed = classParser.parse(CLASS_SAMPLE)
+  if (!parsed.ok) throw new Error(`样例源码必须可解析：${parsed.error.message}`)
+  return { type: 'class' as const, class: buildClassProjection(parsed.doc) }
+}
+
+/** 投影引用必须跨渲染稳定（同 App 的 useMemo）：否则 rect 副作用会反复 setState */
+const CLASS_PROJECTION = classProjectionOf()
+
+function ClassHarness({
+  annotate,
+  onEditing,
+  apiRef,
+}: {
+  annotate: boolean
+  onEditing: (editing: unknown) => void
+  apiRef: { current: InlineEditApi | null }
+}) {
+  const ref = useRef<HTMLDivElement | null>(null)
+  // 渲染后处理（与 use-canvas-selection 中 node-data-ids 的接线同序：先注入 SVG 再反注）
+  useEffect(() => {
+    if (annotate && ref.current !== null) annotateNodeDataIds(ref.current)
+  }, [annotate])
+  const { editing, beginEdit, commit } = useCanvasInlineEdit({
+    projection: CLASS_PROJECTION,
+    resolver: null,
+    svg: CLASS_SVG,
+    containerRef: ref,
+    view: null,
+  })
+  apiRef.current = { commit, cancel: () => {}, beginEdit }
+  useEffect(() => {
+    onEditing(editing)
+  }, [editing, onEditing])
+  return <div ref={ref} tabIndex={0} dangerouslySetInnerHTML={{ __html: CLASS_SVG }} />
+}
+
+describe('useCanvasInlineEdit（工单 09：class 新建类的定位链路）', () => {
+  let host: HTMLDivElement
+  let root: ReturnType<typeof createRoot>
+  let snapshots: unknown[]
+  let api: { current: InlineEditApi | null }
+
+  beforeEach(() => {
+    host = document.createElement('div')
+    document.body.appendChild(host)
+    root = createRoot(host)
+    snapshots = []
+    api = { current: null }
+  })
+  afterEach(() => {
+    act(() => root.unmount())
+    host.remove()
+    resetEditorHistory(DEFAULT_DIAGRAM_SOURCE)
+    useEditorStore.getState().select(null)
+  })
+
+  function mountClass(annotate: boolean) {
+    resetEditorHistory(CLASS_SAMPLE)
+    act(() => {
+      root.render(<ClassHarness annotate={annotate} onEditing={(e) => snapshots.push(e)} apiRef={api} />)
+    })
+  }
+
+  it('反注 data-id 后：beginEdit({kind:class}) 拿到浮层定位（rect 非空，不再 display:none）', () => {
+    mountClass(true)
+    act(() => {
+      api.current!.beginEdit({ kind: 'class', name: '新类' })
+    })
+    expect(snapshots.at(-1)).toMatchObject({ target: { kind: 'class', name: '新类' } })
+    const editing = snapshots.at(-1) as { rect: unknown }
+    expect(editing.rect).not.toBeNull()
+  })
+
+  it('负向对照：不反注 data-id 时定位不到（rect 保持 null —— 缺陷形态）', () => {
+    mountClass(false)
+    act(() => {
+      api.current!.beginEdit({ kind: 'class', name: '新类' })
+    })
+    const editing = snapshots.at(-1) as { rect: unknown }
+    expect(editing.rect).toBeNull()
+  })
+
+  it('提交类名 → rename-class 落码', () => {
+    mountClass(true)
+    act(() => {
+      api.current!.beginEdit({ kind: 'class', name: '新类' })
+    })
+    act(() => {
+      api.current!.commit('订单')
+    })
+    expect(useEditorStore.getState().source).toContain('class 订单')
   })
 })

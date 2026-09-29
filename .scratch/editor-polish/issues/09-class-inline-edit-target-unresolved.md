@@ -79,4 +79,33 @@ sequence / mindmap 两条路径通过，**class 一条不通过**：浮层输入
 
 ## Comments
 
-（空）
+**实现（工单 09）**：走"反注 data-id"的归一化路线（与工单 08 的 flowchart 同一条后处理链），
+在 `node-data-ids.ts` 增加 class 类框的 DOM id 形态 `{svgId}-classId-{类名}-{n}` → `data-id=类名`，
+于是点选解析（data-id.ts）、高亮（highlight.ts）、内联编辑定位（inline-edit.ts 的 `findTargetElement`）、
+右键目标解析（context-menu.ts）四处**无需各自打补丁**；不再需要 class 专属适配器
+（mindmap 的 `node_N` 是位置序、反注不出源码 id，才走 adapter）。
+
+**真机实测（`npm run dev -- --port 5198`，Chromium/CDP，`localStorage.clear()` 后重载）**：
+
+- DOM 事实（修复后）：`g.node class="node default"` 的 id 为 `mmd-preview-2-classId-BankAccount-9`
+  /`...-classId-Account-10`/`...-classId-Customer-11`（实测确认 class 节点确实无原生 data-id），
+  反注后三者分别带 `data-id=BankAccount/Account/Customer`（`Account~T~` 的泛型如预期被 mermaid 从 id 里去掉）。
+- 目标 1（左键点选）：点类框 → `[data-vm-selected] = ["mmd-preview-2-classId-BankAccount-9"]`（恰好一处），
+  属性面板切到该类表单（`类名 = BankAccount`、`泛型` 空、有「删除类」按钮），结构树 `类（2）`。
+- 目标 2（右键节点菜单）：右键类框 → 菜单项 = `["添加成员","添加关系","删除类（含成员与关系）"]`（工单 06 的三项），
+  点「添加成员」（预选 `所属类 = BankAccount`）填 `String email` → 落码 `BankAccount : +String email`（源码与 localStorage 逐字一致）。
+- 目标 3（空白右键新建类 → 直入内联编辑）：空 `classDiagram`（`Alert` 文案与第 3 步一致、`g.node` 0 个）→
+  空白右键菜单 `["添加类"]` → 落码 `classDiagram\nclass 新类\n`、Alert 由 1 → 0、类框 id `mmd-preview-1-classId-新类-1` 且 `data-id=新类`；
+  `.canvas-inline-edit` **`display: block`**（不再是 `none`）、`input.value = 新类`、
+  `document.activeElement` = 该 `INPUT[aria-label=编辑节点文本]`、`offsetParent ≠ null`；
+  输入 `订单` + Enter → 源码 `classDiagram\nclass 订单\n`、浮层卸载、焦点回画布容器。
+- 回归：flowchart 点选高亮 `...-flowchart-B-1` + 右键菜单 `["从这里连线","编辑文本","应用样式","删除"]` 照旧；
+  mindmap 点选高亮 `...-node_1`（`g.node` 仍未带 data-id，未被新正则误伤）、sequence 参与者点选 + 节点菜单
+  `["添加消息","删除参与者"]` 照旧；class 关系边点选仍不选中（ADR-0007，非本单范围）、右键仍为空白菜单 `["添加类"]`。
+  控制台无错误。
+
+环境限制：本机 in-app Browser 面板不可见（viewport 0x0、`visibilityState=hidden`，rAF 不触发），
+故顶栏 Mantine 菜单（`新建`）无法展开、`innerWidth/innerHeight` 为 0 会命中窄屏布局；实测改用
+「直接写 `localStorage['visual-mmd:library']`（与各模板一致的源码）+ 重载」等价进入 class 图，
+并临时 `Object.defineProperty(window,'innerWidth')` + `resize` 打开三栏布局。截图为该行为下不可用，证据以上述 DOM 快照为准。
+
