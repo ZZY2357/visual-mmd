@@ -5,3 +5,7 @@ dev-dist
 *.tsbuildinfo
 .qoder/
 .playwright-cli/
+.workbuddy/
+.codegraph/
+.gp1-accept/
+.scratch/
