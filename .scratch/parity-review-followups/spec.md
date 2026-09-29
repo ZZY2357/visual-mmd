@@ -125,7 +125,9 @@ annotateAnchors(hostGroupsOf(...(SEQUENCE_BLOCK_LINE)), 'block', counts.blocks)
 | 范围 | **只处理用户勾选的两组**：确定性缺陷（F1–F4）+ 工单 03 补落码（F5）。重构类气味与口径断言**不纳入**（见文末） |
 | 推进顺序 | 先 F1（唯一会造成既有图表回退），其余可并行；F4 是纯字符串替换，随时可做 |
 | F1 的收口方向 | **region 不参与收尾抛错**——只对 `scope === 'block'` 的未闭合项抛 `逻辑块缺少匹配的 end`（恢复旧文案），region 未闭合则容忍。~~待定案点见 D1~~ → **D1 已于 2026-09-29 定案为 (甲) 保留 entry**（证据见工单 01） |
-| F5 的口径 | ~~待定案（needs-triage）~~ → **D5 已于 2026-09-29 定案**：菜单项不内嵌表单，改为明确的「编辑属性」入口；工单 03 阶段二承诺同步改为「经属性面板完成」（理由见工单 05） |
+| F5 的口径 | ~~待定案（needs-triage）~~ → **D5 已于 2026-09-29 定案**：菜单项不内嵌表单，改为明确的「在属性面板中编辑」入口（措辞取「在属性面板中编辑」而非「编辑属性」，后者不说明点完去哪儿改）；工单 03 阶段二承诺同步改为「经属性面板完成」（理由见工单 05） |
+| 02 去掉投影里的按名去重 | **已裁定：接受**（实施中新增，非票面范围）。`buildClassProjection` 原先按名字去重，第 2 个同名 namespace 不进投影 → 不可见也不可选中，只改表单达不到「面板不回落图表级」的验收。去掉后每个 namespace 各自成项，与 `CONTEXT.md`「元素：投影中可被选中的最小单位……拥有各自的元素 ID」同口径。易逆转，不开 ADR |
+| 03 身份标注范围超出 D3 字面枚举 | **已裁定：接受**。D3 原话「note → `rect.note`；block → 每条 `line.loopLine`」有漏洞：只标几何锚点的话，点在注释**文字**上会找不到身份（文字占注释绝大部分面积，且 `SVGTextElement` 没有 `getTotalLength`，几何兜底接不住），相对现状是回退。改为标「宿主直接子元素中的非 `<g>`」覆盖 DOM 上行与几何采样两条路径；排除 `<g>` 以免块内嵌内容被误归属成块。**这是我写定案时的遗漏，不是实现跑偏** |
 | 落盘 | 新目录 `.scratch/parity-review-followups/`，不追加进已结单的 `sequence-class-parity/spec.md` |
 | 验收惯例 | 沿用前批：spec.md + 编号工单 + 必要的新 ADR + `CONTEXT.md` 术语补充 |
 
@@ -148,14 +150,27 @@ Comments 写明。
 
 | # | 标题 | Status | Blocked by |
 |---|---|---|---|
-| 01 | 未闭合 `rect`/`box` 不再让整图解析失败 | needs-triage | — |
-| 02 | namespace 改名在重名时跟随选中 | ready-for-agent | — |
-| 03 | note / block 的位置序身份可被点选命中 | needs-triage | — |
-| 04 | 清理 CONTEXT.md 禁用词（本批新造 15 处） | ready-for-agent | — |
-| 05 | 工单 03「编辑类」菜单项的实际落码 | resolved | — |
+| 01 | 未闭合 `rect`/`box` 不再让整图解析失败 | **resolved**（`aa8c7b4`） | — |
+| 02 | namespace 改名在重名时跟随选中 | **resolved**（`91ebfec`） | — |
+| 03 | note / block 的位置序身份可被点选命中 | **resolved**（`9907446`） | — |
+| 04 | 清理 CONTEXT.md 禁用词（本批新造 15 处） | 进行中 | — |
+| 05 | 工单 03「编辑类」菜单项的实际落码 | **resolved**（`f7a48c4`） | — |
+| 06 | `beginEditLabel` 是同款空壳（05 的连带项） | ready-for-agent | 04（共用 i18n / 菜单文件） |
 
-01 标 `needs-triage` 是因为 D1 的两个方案需要定案；03 标 `needs-triage` 是因为要先实测确认
-note / block 宿主 `<g>` 的形态再定命中策略；05 标 `needs-triage` 是因为口径未定（见 D5）。
+三张 `needs-triage` 已于 2026-09-29 全部定案：D1 取 (甲)（证据见工单 01）、
+D3 取「身份下移到几何元素、同宿主共享一个 id」（证据见工单 03）、
+D5 取「不内嵌表单、改口径 + 改文案」（理由见工单 05）。
+
+06 是 05 的连带项，不是新需求：**不动它就会留下一个新的不一致** —— sequence / class 说
+「在属性面板中编辑」且真会选中，flowchart 说「编辑标签」却只关菜单。前提已核实：
+`PropertyPanel.tsx:71-75` 对 `case 'edge'` 渲染 `EdgeForm`，故 flowchart 连线在属性面板确有表单。
+
+**全量验证（2026-09-29，四票合并后）**：`npm run typecheck` 0 error；`npm test`
+**54 文件 / 804 用例全绿**（基线 53 / 789，+15 用例，既有用例无一变红或删除）。
+
+**未处理**：验收项「控制台 0 error / 0 warning」——见文末 U3，涉及项目级基线，不由 agent 自行处理。
+注：02 的实施过程中曾报「`edge-locate.test.ts` 有 2 条既存 error」，事后复检为并行编辑导致的瞬时状态，
+`npm run typecheck` 现为 0 error，不是真问题。
 
 ---
 
