@@ -3,6 +3,7 @@ import type { DiagramParser, EditIntent, ParseResult, SourceParseError } from '.
 import { frontmatterEnd } from './frontmatter'
 import { classDefElementId, linkElementId, nodeElementId } from './element-id'
 import { lineAtOffset, type Span } from './span'
+import { indentLines, insertAfter } from './insert'
 
 // 元素 ID 协议收敛在 element-id.ts；既有消费端（editing/canvas-keyboard）从此处取，
 // 不另抄一份形态。
@@ -1074,40 +1075,19 @@ export class FlowchartParser implements DiagramParser {
     return new Map([[target.id, renderNodeOcc(target.element as NodeOccData, { shape: intent.shape })]])
   }
 
-  /**
-   * 插入新行：重写锚点元素 span = 原文 + 每行 '\n' + 锚点行缩进 + 新行内容。
-   * 锚点缺省取文档最后一个元素。
-   */
-  private insertAfter(
-    doc: SourceDocument,
-    afterElementId: string | undefined,
-    newLines: (indent: string) => string[],
-  ): Map<string, string> | null {
-    const requested =
-      (afterElementId !== undefined ? getElementById(doc, afterElementId) : undefined) ??
-      doc.elements[doc.elements.length - 1]
-    if (requested === undefined) return null
-    // 新行插在锚点所在行的行尾：锚点取该行 span 最靠后的元素（链式语句的行末节点）
-    const line = lineAtOffset(doc.source, requested.span.start)
-    const anchor =
-      doc.elements
-        .filter((part) => lineAtOffset(doc.source, part.span.start) === line)
-        .sort((a, b) => b.span.end - a.span.end)[0] ?? requested
-    const indent = lineIndent(doc.source, requested.span.start)
-    const inserted = newLines(indent)
-      .map((l) => '\n' + indent + l)
-      .join('')
-    return new Map([[anchor.id, doc.source.slice(anchor.span.start, anchor.span.end) + inserted]])
-  }
-
   private resolveAddNode(
     doc: SourceDocument,
     intent: Extract<FlowchartIntent, { type: 'add-node' }>,
   ): Map<string, string> | null {
     if (!isValidNodeId(intent.nodeId)) return null
-    return this.insertAfter(doc, intent.afterElementId, () => [
-      buildNodeLine(intent.nodeId, intent.text ?? intent.nodeId, intent.shape ?? 'rectangle'),
-    ])
+    return insertAfter(doc, {
+      afterElementId: intent.afterElementId,
+      anchor: 'line-end',
+      render: (indent) =>
+        indentLines(indent, [
+          buildNodeLine(intent.nodeId, intent.text ?? intent.nodeId, intent.shape ?? 'rectangle'),
+        ]),
+    })
   }
 
   private resolveDeleteNode(
@@ -1216,16 +1196,21 @@ export class FlowchartParser implements DiagramParser {
     intent: Extract<FlowchartIntent, { type: 'add-edge' }>,
   ): Map<string, string> | null {
     if (!isValidNodeId(intent.from) || !isValidNodeId(intent.to)) return null
-    return this.insertAfter(doc, intent.afterElementId, () => [
-      buildEdgeLine(intent.from, intent.to, {
-        lineStyle: intent.lineStyle ?? 'solid',
-        head: intent.head ?? 'arrow',
-        tail: intent.tail ?? 'none',
-        bidirectional: intent.bidirectional ?? false,
-        length: intent.length ?? 1,
-        label: intent.label ?? null,
-      }),
-    ])
+    return insertAfter(doc, {
+      afterElementId: intent.afterElementId,
+      anchor: 'line-end',
+      render: (indent) =>
+        indentLines(indent, [
+          buildEdgeLine(intent.from, intent.to, {
+            lineStyle: intent.lineStyle ?? 'solid',
+            head: intent.head ?? 'arrow',
+            tail: intent.tail ?? 'none',
+            bidirectional: intent.bidirectional ?? false,
+            length: intent.length ?? 1,
+            label: intent.label ?? null,
+          }),
+        ]),
+    })
   }
 
   private resolveSetDirection(
@@ -1262,9 +1247,14 @@ export class FlowchartParser implements DiagramParser {
       key,
       value,
     }))
-    return this.insertAfter(doc, intent.afterElementId, () => [
-      renderClassDefRaw({ kind: 'classdef', name: intent.name, gap: ' ', items }),
-    ])
+    return insertAfter(doc, {
+      afterElementId: intent.afterElementId,
+      anchor: 'line-end',
+      render: (indent) =>
+        indentLines(indent, [
+          renderClassDefRaw({ kind: 'classdef', name: intent.name, gap: ' ', items }),
+        ]),
+    })
   }
 
   private classStatements(doc: SourceDocument, className: string) {
@@ -1296,7 +1286,11 @@ export class FlowchartParser implements DiagramParser {
     }
     // 无同样式语句：新增独立行，跟随该样式 classDef 行（缺省落在文档末尾）
     const cd = this.classDefPart(doc, intent.className)
-    return this.insertAfter(doc, cd?.id, () => [`class ${intent.nodeId} ${intent.className}`])
+    return insertAfter(doc, {
+      afterElementId: cd?.id,
+      anchor: 'line-end',
+      render: (indent) => indentLines(indent, [`class ${intent.nodeId} ${intent.className}`]),
+    })
   }
 
   private resolveUnapplyClass(
@@ -1357,7 +1351,11 @@ export class FlowchartParser implements DiagramParser {
   ): Map<string, string> | null {
     const title = intent.title ?? ''
     const open = title === '' ? 'subgraph' : `subgraph ${title}`
-    return this.insertAfter(doc, intent.afterElementId, () => [open, 'end'])
+    return insertAfter(doc, {
+      afterElementId: intent.afterElementId,
+      anchor: 'line-end',
+      render: (indent) => indentLines(indent, [open, 'end']),
+    })
   }
 
   private resolveDeleteSubgraph(
@@ -1388,14 +1386,6 @@ export class FlowchartParser implements DiagramParser {
     }
     return rewrites
   }
-}
-
-/** 元素所在行的行首缩进（插入新行时跟随用户缩进习惯） */
-function lineIndent(source: string, offset: number): string {
-  const lineStart = source.lastIndexOf('\n', Math.max(0, offset - 1)) + 1
-  let i = lineStart
-  while (i < offset && (source[i] === ' ' || source[i] === '\t')) i++
-  return source.slice(lineStart, i)
 }
 
 export const flowchartParser = new FlowchartParser()

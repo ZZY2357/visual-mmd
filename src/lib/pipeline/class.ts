@@ -3,6 +3,7 @@ import type { DiagramParser, EditIntent, ParseResult, SourceParseError } from '.
 import { frontmatterEnd } from './frontmatter'
 import { classDefElementId, classElementId, namespaceElementId } from './element-id'
 import type { Span } from './span'
+import { indentLines, insertAfter, lineIndent } from './insert'
 import {
   parseClassDefLine,
   renderClassDef,
@@ -673,23 +674,6 @@ export class ClassParser implements DiagramParser {
     }
   }
 
-  /** 插入新行：重写锚点元素 span = 原文 + '\n' + 锚点行缩进 + 新行内容 */
-  private insertAfter(
-    doc: SourceDocument,
-    afterElementId: string | undefined,
-    newLines: (indent: string) => string[],
-  ): Map<string, string> | null {
-    const anchor =
-      (afterElementId !== undefined ? getElementById(doc, afterElementId) : undefined) ??
-      doc.elements[doc.elements.length - 1]
-    if (anchor === undefined) return null
-    const indent = lineIndent(doc.source, anchor.span.start)
-    const inserted = newLines(indent)
-      .map((l) => '\n' + indent + l)
-      .join('')
-    return new Map([[anchor.id, doc.source.slice(anchor.span.start, anchor.span.end) + inserted]])
-  }
-
   private classDecl(doc: SourceDocument, name: string) {
     return doc.elements.find((part) => part.element.kind === 'class' && (part.element as ClassDeclData).name === name)
   }
@@ -740,7 +724,7 @@ export class ClassParser implements DiagramParser {
   ): Map<string, string> | null {
     if (!isValidClassName(intent.name)) return null
     const generic = intent.generic !== undefined && intent.generic !== '' ? `~${intent.generic}~` : ''
-    return this.insertAfter(doc, intent.afterElementId, () => [`class ${intent.name}${generic}`])
+    return insertAfter(doc, { afterElementId: intent.afterElementId, render: (indent) => indentLines(indent, [`class ${intent.name}${generic}`]) })
   }
 
   private resolveRenameClass(
@@ -859,7 +843,7 @@ export class ClassParser implements DiagramParser {
       const indent = lineIndent(doc.source, end.span.start)
       return new Map([[end.id, `${line}\n${indent}${doc.source.slice(end.span.start, end.span.end)}`]])
     }
-    return this.insertAfter(doc, anchor.id, () => [`${intent.className} : ${vis}${text}`])
+    return insertAfter(doc, { afterElementId: anchor.id, render: (indent) => indentLines(indent, [`${intent.className} : ${vis}${text}`]) })
   }
 
   private resolveSetMember(
@@ -904,7 +888,7 @@ export class ClassParser implements DiagramParser {
       colonRaw: intent.label !== undefined && intent.label !== '' ? ' : ' : '',
       label: intent.label ?? '',
     }
-    return this.insertAfter(doc, intent.afterElementId, () => [renderRelation(data)])
+    return insertAfter(doc, { afterElementId: intent.afterElementId, render: (indent) => indentLines(indent, [renderRelation(data)]) })
   }
 
   private resolveSetRelation(
@@ -950,9 +934,9 @@ export class ClassParser implements DiagramParser {
     if (text === '') return null
     if (intent.className !== undefined && intent.className !== null && intent.className !== '') {
       if (!isValidClassName(intent.className)) return null
-      return this.insertAfter(doc, intent.afterElementId, () => [`note for ${intent.className} "${text}"`])
+      return insertAfter(doc, { afterElementId: intent.afterElementId, render: (indent) => indentLines(indent, [`note for ${intent.className} "${text}"`]) })
     }
-    return this.insertAfter(doc, intent.afterElementId, () => [`note "${text}"`])
+    return insertAfter(doc, { afterElementId: intent.afterElementId, render: (indent) => indentLines(indent, [`note "${text}"`]) })
   }
 
   private resolveSetNote(
@@ -1000,9 +984,7 @@ export class ClassParser implements DiagramParser {
       key,
       value,
     }))
-    return this.insertAfter(doc, intent.afterElementId, () => [
-      renderClassDefRaw({ kind: 'classdef', name: intent.name, gap: ' ', items }),
-    ])
+    return insertAfter(doc, { afterElementId: intent.afterElementId, render: (indent) => indentLines(indent, [renderClassDefRaw({ kind: 'classdef', name: intent.name, gap: ' ', items }),]) })
   }
 
   // ----- namespace（工单 06：只做可见与可改名，不做分组编辑） -----
@@ -1039,7 +1021,7 @@ export class ClassParser implements DiagramParser {
     }
     const header = doc.elements.find((part) => part.element.kind === 'class-header')
     if (header === undefined) return null
-    return this.insertAfter(doc, header.id, () => [`direction ${value}`])
+    return insertAfter(doc, { afterElementId: header.id, render: (indent) => indentLines(indent, [`direction ${value}`]) })
   }
 }
 
@@ -1123,14 +1105,6 @@ export function namespaceIdAfterRename(before: string, after: string, elementId:
   const afterIds = namespaceIdsOf(after)
   if (afterIds === null) return null
   return afterIds[order] ?? null
-}
-
-/** 元素所在行的行首缩进（插入新行时跟随用户缩进习惯） */
-function lineIndent(source: string, offset: number): string {
-  const lineStart = source.lastIndexOf('\n', Math.max(0, offset - 1)) + 1
-  let i = lineStart
-  while (i < offset && (source[i] === ' ' || source[i] === '\t')) i++
-  return source.slice(lineStart, i)
 }
 
 export const classParser = new ClassParser()

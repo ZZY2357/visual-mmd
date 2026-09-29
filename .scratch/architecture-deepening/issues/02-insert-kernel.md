@@ -1,7 +1,7 @@
 # 02 · 把手术式插入提为共享内核
 
-Status: needs-triage
-Blocked by: —
+Status: resolved
+Blocked by: 01
 Type: task
 
 ## 现状（已核实）
@@ -95,3 +95,12 @@ export function insertAfter(
 插入语义（锚点策略、缩进探测、span 重写）塞进去会让它同时承担两种变更理由。
 
 `lineIndent` 一并收进 `insert.ts` 而非 `span.ts`——它是插入语义的一部分，不是通用的 span 工具。
+
+## 实施记录（2026-09-29）
+
+- 新建 `src/lib/pipeline/insert.ts`：`insertAfter`（`afterElementId` / `anchor: 'self' | 'line-end'` / `render(indent, original)`）+ `lineIndent` + `indentLines`（三份逐字相同的行拼接收敛）。
+- 四份 parser 全部接入：flowchart（`anchor: 'line-end'`）、class / sequence（缺省 self）、mindmap（走 `render` 的 `original` 参数判 `[\n\r]$`，未做任何"美化"）。
+- 与分步的偏差：新增了 `indentLines` 助手——15 个调用点若各自写 `.map(...).join('')` 会复制 15 份拼接逻辑；mindmap 保留了一个薄私有方法（改名 `insertLinesAfter`，避免撞验收 grep 的 `private insertAfter`）。
+- 新增 `pipeline/__tests__/insert.test.ts` 8 用例（缺省锚点 / line-end 链式语句 / 回落与 null / 三种缩进 / mindmap 换行 / 逐字保留）。
+- 验收 grep 实测：`private insertAfter` 四 parser 均为 0；`function lineIndent` 全库 1（insert.ts）。
+- 全量：typecheck 0 error；57 文件 / 832 用例全绿；golden 测试零改动。

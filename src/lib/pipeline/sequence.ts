@@ -3,6 +3,7 @@ import type { DiagramParser, EditIntent, ParseResult, SourceParseError } from '.
 import { frontmatterEnd } from './frontmatter'
 import { participantElementId, withOccurrence } from './element-id'
 import { lineAtOffset, type Span } from './span'
+import { indentLines, insertAfter, lineIndent } from './insert'
 
 /**
  * sequence 完整解析器（工单 06，语法范围以 ADR-0005 清单为准）：
@@ -686,23 +687,6 @@ export class SequenceParser implements DiagramParser {
     }
   }
 
-  /** 插入新行：重写锚点元素 span = 原文 + '\n' + 锚点行缩进 + 新行内容 */
-  private insertAfter(
-    doc: SourceDocument,
-    afterElementId: string | undefined,
-    newLines: (indent: string) => string[],
-  ): Map<string, string> | null {
-    const anchor =
-      (afterElementId !== undefined ? getElementById(doc, afterElementId) : undefined) ??
-      doc.elements[doc.elements.length - 1]
-    if (anchor === undefined) return null
-    const indent = lineIndent(doc.source, anchor.span.start)
-    const inserted = newLines(indent)
-      .map((l) => '\n' + indent + l)
-      .join('')
-    return new Map([[anchor.id, doc.source.slice(anchor.span.start, anchor.span.end) + inserted]])
-  }
-
   // ----- participant -----
 
   private resolveAddParticipant(
@@ -712,7 +696,7 @@ export class SequenceParser implements DiagramParser {
     if (!isValidParticipantId(intent.actorId)) return null
     const keyword = intent.isActor === true ? 'actor' : 'participant'
     const alias = intent.alias !== undefined && intent.alias !== '' ? ` as ${quoteAlias(intent.alias)}` : ''
-    return this.insertAfter(doc, intent.afterElementId, () => [`${keyword} ${intent.actorId}${alias}`])
+    return insertAfter(doc, { afterElementId: intent.afterElementId, render: (indent) => indentLines(indent, [`${keyword} ${intent.actorId}${alias}`]) })
   }
 
   private resolveSetParticipant(
@@ -847,7 +831,7 @@ export class SequenceParser implements DiagramParser {
       colonGap: ' ',
       text: intent.text ?? '',
     }
-    return this.insertAfter(doc, intent.afterElementId, () => [renderMessage(data)])
+    return insertAfter(doc, { afterElementId: intent.afterElementId, render: (indent) => indentLines(indent, [renderMessage(data)]) })
   }
 
   private resolveSetMessage(
@@ -890,7 +874,7 @@ export class SequenceParser implements DiagramParser {
       colonGap: ' ',
       text: intent.text ?? '',
     }
-    return this.insertAfter(doc, intent.afterElementId, () => [renderNote(data, { actors })])
+    return insertAfter(doc, { afterElementId: intent.afterElementId, render: (indent) => indentLines(indent, [renderNote(data, { actors })]) })
   }
 
   private resolveSetNote(
@@ -963,7 +947,7 @@ export class SequenceParser implements DiagramParser {
   ): Map<string, string> | null {
     const keyword = intent.keyword
     const label = intent.label !== undefined && intent.label !== '' ? ` ${intent.label}` : ''
-    return this.insertAfter(doc, intent.afterElementId, () => [`${keyword}${label}`, 'end'])
+    return insertAfter(doc, { afterElementId: intent.afterElementId, render: (indent) => indentLines(indent, [`${keyword}${label}`, 'end']) })
   }
 
   /** 块的匹配 end（按 open/end 深度计数） */
@@ -1194,13 +1178,5 @@ export type SequenceIntent =
   | { type: 'set-rect-color'; elementId: string; color: string }
   /** 改 box 分组框的标签文本（工单 06；颜色 token 原样保留） */
   | { type: 'set-box-label'; elementId: string; label: string | null }
-
-/** 元素所在行的行首缩进（插入新行时跟随用户缩进习惯） */
-function lineIndent(source: string, offset: number): string {
-  const lineStart = source.lastIndexOf('\n', Math.max(0, offset - 1)) + 1
-  let i = lineStart
-  while (i < offset && (source[i] === ' ' || source[i] === '\t')) i++
-  return source.slice(lineStart, i)
-}
 
 export const sequenceParser = new SequenceParser()

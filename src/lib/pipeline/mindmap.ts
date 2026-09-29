@@ -3,6 +3,7 @@ import type { DiagramParser, EditIntent, ParseResult, SourceParseError } from '.
 import { frontmatterEnd } from './frontmatter'
 import { mindmapNodeElementId } from './element-id'
 import type { Span } from './span'
+import { insertAfter } from './insert'
 
 /**
  * mindmap 完整解析器（工单 08，语法范围以 ADR-0005 清单为准）：
@@ -382,21 +383,16 @@ export class MindmapParser implements DiagramParser {
     return { start: startIndex, end }
   }
 
-  /** 在锚点元素（其 span 含行尾换行）之后插入若干行 */
-  private insertAfterElement(
+  /** 在锚点元素（其 span 含行尾换行）之后插入若干行：走共享内核，见 pipeline/insert.ts */
+  private insertLinesAfter(
     doc: SourceDocument,
     anchorId: string | undefined,
     lines: string[],
   ): Map<string, string> | null {
-    const anchor =
-      (anchorId !== undefined ? getElementById(doc, anchorId) : undefined) ??
-      doc.elements[doc.elements.length - 1]
-    if (anchor === undefined) return null
-    const original = doc.source.slice(anchor.span.start, anchor.span.end)
-    const anchorEol = /[\n\r]$/.test(original) ? '' : '\n'
-    // 行内容自带行尾换行；锚点缺行尾换行时补一个
-    const inserted = anchorEol + lines.join('')
-    return new Map([[anchor.id, original + inserted]])
+    return insertAfter(doc, {
+      afterElementId: anchorId,
+      render: (_indent, original) => (/[\n\r]$/.test(original) ? '' : '\n') + lines.join(''),
+    })
   }
 
   private resolveSetNodeText(
@@ -531,7 +527,7 @@ export class MindmapParser implements DiagramParser {
     if (intent.icon != null && intent.icon.trim() !== '') {
       lines.push(renderMindmapIcon({ kind: 'mindmap-icon', icon: intent.icon.trim(), indent, trailing: '', eol: '\n', depth: nodeData.depth }))
     }
-    return this.insertAfterElement(doc, anchorId, lines)
+    return this.insertLinesAfter(doc, anchorId, lines)
   }
 
   private resolveAddSibling(
@@ -562,7 +558,7 @@ export class MindmapParser implements DiagramParser {
     if (intent.icon != null && intent.icon.trim() !== '') {
       lines.push(renderMindmapIcon({ kind: 'mindmap-icon', icon: intent.icon.trim(), indent: node.indent, trailing: '', eol: '\n', depth: node.depth }))
     }
-    return this.insertAfterElement(doc, anchorId, lines)
+    return this.insertLinesAfter(doc, anchorId, lines)
   }
 
   private resolveDeleteNode(
