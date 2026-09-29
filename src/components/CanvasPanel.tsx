@@ -1,24 +1,16 @@
-import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { Alert, Box, Button, ColorInput, Group, Stack, Text, TextInput, Title, UnstyledButton } from '@mantine/core'
 import { useTranslation } from 'react-i18next'
 import type { MermaidPreview } from '../lib/use-mermaid-preview'
-import { flowchartDataIdResolver } from '../lib/canvas-selection/flowchart-adapter'
-import { mindmapDataIdResolver, mindmapDomIdOf } from '../lib/canvas-selection/mindmap-adapter'
-import type { CanvasSelection, DataIdResolver } from '../lib/canvas-selection/data-id'
-import { elementDataIdResolver, nodeDataIdResolver } from '../lib/canvas-selection/data-id'
-import { canvasIdOf, fromCanvasId } from '../lib/canvas-selection/selection-codec'
-import {
-  annotateClassRelationIdentities,
-  annotateSequenceIdentities,
-  hitTestEdgeIdentity,
-  relationShapesOf,
-} from '../lib/canvas-selection/edge-locate'
+import type { CanvasSelection } from '../lib/canvas-selection/data-id'
+import { canvasIdOf } from '../lib/canvas-selection/selection-codec'
+import { hitTestEdgeIdentity } from '../lib/canvas-selection/edge-locate'
+import { capabilitiesOf } from '../lib/canvas-selection/capabilities'
 import type { Selection } from '../lib/projection/selection'
-import type { SequenceProjection } from '../lib/projection/sequence-projection'
 import { useCanvasSelection } from '../lib/canvas-selection/use-canvas-selection'
 import { useCanvasKeyboard } from '../lib/editing/use-canvas-keyboard'
 import type { EditKeyRequest } from '../lib/editing/use-canvas-keyboard'
-import type { CanvasKeyboardProjection, CanvasNavigation, NodeExtent } from '../lib/editing/canvas-keyboard'
+import type { CanvasNavigation, NodeExtent } from '../lib/editing/canvas-keyboard'
 import { measureNodeExtents } from '../lib/editing/canvas-measure'
 import { useCanvasInlineEdit, inlineEditTextOf } from '../lib/editing/use-canvas-inline-edit'
 import type { InlineEditCloseOptions } from '../lib/editing/use-canvas-inline-edit'
@@ -26,8 +18,7 @@ import type { Rect } from '../lib/editing/inline-edit'
 import { useCanvasContextMenu } from '../lib/editing/use-canvas-context-menu'
 import { MENU_ACTIONS } from '../lib/editing/menu-actions'
 import type { ContextMenuItemId } from '../lib/editing/context-menu'
-import { AddMemberInlineForm, AddRelationInlineForm, AddClassNoteInlineForm } from './class-forms'
-import { AddMessageInlineForm, AddNoteInlineForm, AddBlockInlineForm } from './sequence-forms'
+import { NodeFormPopup } from './node-form-popup'
 import { useCanvasView } from '../lib/canvas-view/use-canvas-view'
 import type { AnyProjection } from '../lib/diagram-registry'
 import { useEditorStore } from '../store/editor'
@@ -62,67 +53,13 @@ interface CanvasPanelProps {
   projection: AnyProjection | null
 }
 
-/** 图种 → data-id resolver（工单 06/07/08/09）：flowchart 全套适配；sequence 参与者
- * 与 class 类的 data-id 即其 id（class 的 data-id 由 node-data-ids 的渲染后处理从
- * `{svgId}-classId-{类名}-{n}` 反注而来，工单 09；无法匹配时不选中）。
- * mindmap（工单 06）：mermaid 不发 data-id，但节点 g 的 DOM id 为 node_N（源码节点序），
- * 经 mindmapDataIdResolver 映射回投影节点。
- * 连线（工单 02）：class 的关系边与 sequence 的消息/注释/块按**位置序**寻址（ADR-0012），
- * data-id 为投影 elementId（`relation:1` / `message:2` …），由 edge-locate 的渲染后处理标注。 */
-function resolverOf(projection: AnyProjection): DataIdResolver {
-  if (projection.type === 'flowchart') return flowchartDataIdResolver(projection.flowchart)
-  if (projection.type === 'sequence') {
-    const nodes = nodeDataIdResolver(projection.sequence.participants.map((p) => p.actorId))
-    const edges = elementDataIdResolver([
-      ...projection.sequence.messages.map((m) => m.elementId),
-      ...projection.sequence.notes.map((n) => n.elementId),
-      ...projection.sequence.blocks.map((b) => b.elementId),
-    ])
-    return (dataId) => nodes(dataId) ?? edges(dataId)
-  }
-  if (projection.type === 'mindmap') return mindmapDataIdResolver(projection.mindmap)
-  const nodes = nodeDataIdResolver(projection.class.classes.map((c) => c.name))
-  const edges = elementDataIdResolver(projection.class.relations.map((r) => r.elementId))
-  return (dataId) => nodes(dataId) ?? edges(dataId)
-}
-
-// 选中映射（工单 03）：画布选中 ↔ 编辑器选中 ↔ data-id 的互逆映射收敛在
-// canvas-selection/selection-codec.ts（fromCanvasId / canvasIdOf），本组件只转调。
-
-/** 各图种全部节点的 data-id 列表（**投影顺序**，工单 14 §3 表格）：方位导航的候选与
- * 「无选中回落首节点」共用同一口径。flowchart = nodes[].nodeId；class = classes[].name；
- * sequence = participants[].actorId；mindmap = nodes[].elementId 经 mindmapDomIdOf
- * （node_{N-1}，与高亮 / canvasIdOf 同形态）。 */
-function nodeDataIdsOf(projection: AnyProjection): string[] {
-  if (projection.type === 'flowchart') return projection.flowchart.nodes.map((n) => n.nodeId)
-  if (projection.type === 'class') return projection.class.classes.map((c) => c.name)
-  if (projection.type === 'sequence') return projection.sequence.participants.map((p) => p.actorId)
-  const ids: string[] = []
-  for (const n of projection.mindmap.nodes) {
-    const domId = mindmapDomIdOf(n.elementId)
-    if (domId !== null) ids.push(domId) // 非 mindmap-node 形态的 elementId 不入列表（不参与导航）
-  }
-  return ids
-}
-
-/** 图种 → 画布键盘的 tagged union（工单 14：四个图种齐备；投影缺失时为 null） */
-function keyboardProjectionOf(projection: AnyProjection | null): CanvasKeyboardProjection | null {
-  if (projection === null) return null
-  if (projection.type === 'flowchart') return { kind: 'flowchart', projection: projection.flowchart }
-  if (projection.type === 'mindmap') return { kind: 'mindmap', projection: projection.mindmap }
-  if (projection.type === 'class') return { kind: 'class', projection: projection.class }
-  return { kind: 'sequence', projection: projection.sequence }
-}
-
-/** sequence 位置序标注的条数（工单 02）：块只数 block-open——`else`/`and` 是分支行，
- * 画布上不构成独立元素（其 elementId 是 `else:N`，不是位置序身份）。 */
-function sequenceEdgeCounts(projection: SequenceProjection): { messages: number; notes: number; blocks: number } {
-  return {
-    messages: projection.messages.length,
-    notes: projection.notes.length,
-    blocks: projection.blocks.filter((b) => b.keyword !== 'else' && b.keyword !== 'and').length,
-  }
-}
+// 图种分发（工单 04，ADR-0015）：data-id resolver / 选中映射 / 导航 id 列表 / 键盘投影 /
+// 连线位置序标注 / 选中回落全部收进画布能力包（canvas-selection/capabilities.ts），
+// 实例挂在 DiagramTypeRegistration.canvas 上——本组件只剩 capabilitiesOf 一次查表，
+// 不再有任何按图种手写的 if 分发链。
+//
+// 选中映射（工单 03）：画布选中 ↔ 编辑器选中 ↔ data-id 的互逆映射中，图种无关的部分
+// 收在 canvas-selection/selection-codec.ts（canvasIdOf），图种相关的 toSelection 在能力包里。
 
 /** 内联编辑浮层输入框（工单 05/02）：预填当前显示文本，回车/失焦提交、Esc 取消。
  * Enter/Esc 走「归还焦点」的提交路径（keydown，用户想继续在画布上操作）；
@@ -348,46 +285,15 @@ function AddStyleForm(props: {
   )
 }
 
-/** class/sequence 节点菜单的表单浮层外壳（工单 06）：与「添加样式」同款定位/外观，
- * 内容按 kind 选择复用属性面板的添加型小表单，另有取消按钮（提交由表单自身的按钮负责） */
-function NodeFormPopup(props: { x: number; y: number; onClose: () => void; children: ReactNode }) {
-  const { t } = useTranslation()
-  return (
-    <Box
-      style={{
-        position: 'absolute',
-        left: props.x,
-        top: props.y,
-        zIndex: 30,
-        width: 240,
-        maxHeight: '80%',
-        overflowY: 'auto',
-        background: 'var(--mantine-color-body)',
-        border: '1px solid var(--mantine-color-gray-3)',
-        borderRadius: 'var(--mantine-radius-sm)',
-        boxShadow: 'var(--mantine-shadow-md)',
-        padding: 8,
-      }}
-      onClick={(e) => e.stopPropagation()}
-      onContextMenu={(e) => e.preventDefault()}
-    >
-      <Stack gap={6}>
-        {props.children}
-        <Group gap="xs" justify="flex-end">
-          <Button size="compact-xs" variant="default" onClick={props.onClose}>
-            {t('app:propertyPanel.cancel')}
-          </Button>
-        </Group>
-      </Stack>
-    </Box>
-  )
-}
-
 export function CanvasPanel({ preview, projection }: CanvasPanelProps) {
   const { t } = useTranslation()
   const select = useEditorStore((s) => s.select)
   const selection = useEditorStore((s) => s.selection)
   const { svg, error } = preview
+
+  // 画布能力包（工单 04，ADR-0015）：本组件唯一的图种分发点——一次查表，
+  // 之后所有图种知识（resolver / 选中映射 / 导航 id / 键盘投影 / 连线标注）都经 caps 取用。
+  const caps = projection !== null ? capabilitiesOf(projection) : null
 
   // 视图（工单 03）：fit / 滚轮锚点缩放 / 背景拖拽平移；SVG 换新即重新 fit，
   // 切换图表自然重置，无需持久化。revealRect：方向键导航的自动平移入口（工单 14）
@@ -398,7 +304,7 @@ export function CanvasPanel({ preview, projection }: CanvasPanelProps) {
   // data-id 即 actorId）；mindmap 无 data-id 时 hook 内回落文本匹配。
   const { editing, onDoubleClick, beginEdit, commit, cancel } = useCanvasInlineEdit({
     projection,
-    resolver: projection !== null ? resolverOf(projection) : null,
+    resolver: caps !== null && projection !== null ? caps.dataIdResolver(projection) : null,
     svg,
     containerRef,
     view,
@@ -409,12 +315,12 @@ export function CanvasPanel({ preview, projection }: CanvasPanelProps) {
   // （选中 ↔ data-id）、useCanvasView 的 revealRect（自动平移）。measureNodeExtents 不做缓存
   // （模板规模 2–13 节点，工单接受每次现测）。
   const navigation = useMemo<CanvasNavigation | undefined>(() => {
-    if (projection === null) return undefined
-    const ids = nodeDataIdsOf(projection)
-    const resolver = resolverOf(projection)
+    if (caps === null || projection === null) return undefined
+    const ids = caps.navigationIds(projection)
+    const resolver = caps.dataIdResolver(projection)
     const toSelection = (dataId: string): Selection | null => {
       const canvasSelection = resolver(dataId)
-      return canvasSelection === null ? null : fromCanvasId(projection.type, canvasSelection)
+      return canvasSelection === null ? null : caps.toSelection(canvasSelection)
     }
     return {
       // 按投影顺序过滤出命中的节点（容器缺失 / 节点未渲染 → 不参与导航）
@@ -448,14 +354,14 @@ export function CanvasPanel({ preview, projection }: CanvasPanelProps) {
         return firstId === undefined ? null : toSelection(firstId)
       },
     }
-  }, [projection, svg, revealRect])
+  }, [caps, projection, svg, revealRect])
 
   // 右键菜单（工单 07）：菜单/连线模式/添加样式表单三个状态托管在 hook 中，
   // 编辑文本与新建节点的内联命名同样走 beginEdit。
   // 画布键盘的编辑键（工单 05）也复用这里的表单浮层状态：先声明 ctx，再接线键盘 hook。
   const ctx = useCanvasContextMenu({
     projection,
-    resolver: projection !== null ? resolverOf(projection) : null,
+    resolver: caps !== null && projection !== null ? caps.dataIdResolver(projection) : null,
     containerRef,
     onNodeCreated: beginEdit,
     newNodeText: t('app:propertyPanel.mindmapNewNode'),
@@ -467,7 +373,7 @@ export function CanvasPanel({ preview, projection }: CanvasPanelProps) {
   // flowchart 与 mindmap：Tab 加子 / Enter 加同级 / Del 删除；class 与 sequence：
   // Tab/Enter 打开**已有添加表单**（成员/关系、参与者/消息），Del 删除选中元素——
   // 这条路径复用 ctx.openFormForSelection / ctx.addParticipant，不新造浮层。
-  useCanvasKeyboard(keyboardProjectionOf(projection), {
+  useCanvasKeyboard(caps !== null && projection !== null ? caps.keyboardProjection(projection) : null, {
     containerRef,
     // 工单 05/06 接线：新建节点落码后立即进入内联命名
     onNodeCreated: beginEdit,
@@ -493,28 +399,21 @@ export function CanvasPanel({ preview, projection }: CanvasPanelProps) {
   const pendingInlineEdit = useEditorStore((s) => s.pendingInlineEdit)
   useEffect(() => {
     if (pendingInlineEdit === null || projection === null) return
-    // 请求目标必须属于当前图种（切换图表后残留请求安静丢弃）
-    const matches =
-      (projection.type === 'flowchart' && pendingInlineEdit.target.kind === 'flowchart') ||
-      (projection.type === 'mindmap' && pendingInlineEdit.target.kind === 'mindmap')
-    if (matches) beginEdit(pendingInlineEdit.target)
+    // 请求目标必须属于当前图种（切换图表后残留请求安静丢弃）——图种 id 与目标 kind 同一命名空间
+    if (projection?.type !== pendingInlineEdit.target.kind) return
+    beginEdit(pendingInlineEdit.target)
   }, [pendingInlineEdit, projection, beginEdit])
 
   // 连线位置序寻址（工单 02，ADR-0012）：渲染后把身份写进连线的 data-id——
   // class 的关系边（含标签/基数，故 shapes 由投影的 label/基数算出）、
   // sequence 的消息 / 注释 / 块（条数由投影给出，条数不符的种类整体不标）。
   // flowchart 的边仍走 mermaid data-id（ADR-0007），mindmap 无连线 → 不标注。
-  const canvasResolver = projection !== null ? resolverOf(projection) : null
-  const hasOrdinalEdges = projection !== null && (projection.type === 'class' || projection.type === 'sequence')
-  const annotateEdges =
-    projection !== null && projection.type === 'class'
-      ? (root: ParentNode) => annotateClassRelationIdentities(root, relationShapesOf(projection.class.relations))
-      : projection !== null && projection.type === 'sequence'
-        ? (root: ParentNode) => annotateSequenceIdentities(root, sequenceEdgeCounts(projection.sequence))
-        : undefined
+  const canvasResolver = caps !== null && projection !== null ? caps.dataIdResolver(projection) : null
+  // 有 edgeAnnotator 的图种（class / sequence）才有位置序连线，才需要兜底命中
+  const annotateEdges = projection !== null ? caps?.edgeAnnotator?.(projection) : undefined
   // 兜底命中：data-id 没命中时按屏幕坐标沿真实路径采样（只对位置序连线开的图种启用）
   const hitTestEdge =
-    canvasResolver === null || !hasOrdinalEdges
+    canvasResolver === null || annotateEdges === undefined
       ? undefined
       : (root: ParentNode, clientX: number, clientY: number): CanvasSelection | null => {
           const elementId = hitTestEdgeIdentity(root, clientX, clientY)
@@ -525,14 +424,12 @@ export function CanvasPanel({ preview, projection }: CanvasPanelProps) {
     svg,
     containerRef,
     resolver: canvasResolver,
-    selectedDataId: selection !== null ? canvasIdOf(selection) : null,
+    selectedDataId: selection !== null && caps !== null ? caps.canvasIdOf(selection) : null,
     annotateEdges,
     hitTestEdge,
     onSelect: (canvasSelection) => {
-      if (projection !== null) {
-        const editorSelection = fromCanvasId(projection.type, canvasSelection)
-        if (editorSelection !== null) select(editorSelection)
-      }
+      const editorSelection = caps !== null ? caps.toSelection(canvasSelection) : null
+      if (editorSelection !== null) select(editorSelection)
     },
   })
 
@@ -642,52 +539,10 @@ export function CanvasPanel({ preview, projection }: CanvasPanelProps) {
             onClose={ctx.closeStyleForm}
           />
         )}
-        {/* class/sequence 的添加型表单浮层（工单 06 成员/关系/消息；工单 04 补注释/逻辑块） */}
+        {/* class/sequence 的添加型表单浮层（工单 06 成员/关系/消息；工单 04 补注释/逻辑块；
+            工单 04-bundle：浮层连同表单分发迁往 node-form-popup.tsx） */}
         {ctx.nodeForm !== null && projection !== null && (
-          <NodeFormPopup x={ctx.nodeForm.x} y={ctx.nodeForm.y} onClose={ctx.closeNodeForm}>
-            {ctx.nodeForm.kind === 'member' && projection.type === 'class' && (
-              <AddMemberInlineForm
-                classes={projection.class.classes}
-                initialClassName={ctx.nodeForm.className}
-                afterElementId={ctx.nodeForm.anchorElementId}
-                onDone={ctx.closeNodeForm}
-              />
-            )}
-            {ctx.nodeForm.kind === 'relation' && projection.type === 'class' && (
-              <AddRelationInlineForm
-                classes={projection.class.classes}
-                initialFrom={ctx.nodeForm.className}
-                afterElementId={ctx.nodeForm.anchorElementId}
-                onDone={ctx.closeNodeForm}
-              />
-            )}
-            {ctx.nodeForm.kind === 'message' && projection.type === 'sequence' && (
-              <AddMessageInlineForm
-                participants={projection.sequence.participants}
-                initialFrom={ctx.nodeForm.from}
-                afterElementId={ctx.nodeForm.anchorElementId}
-                onDone={ctx.closeNodeForm}
-              />
-            )}
-            {ctx.nodeForm.kind === 'note' && projection.type === 'sequence' && (
-              <AddNoteInlineForm
-                participants={projection.sequence.participants}
-                afterElementId={ctx.nodeForm.anchorElementId}
-                onDone={ctx.closeNodeForm}
-              />
-            )}
-            {ctx.nodeForm.kind === 'block' && projection.type === 'sequence' && (
-              <AddBlockInlineForm afterElementId={ctx.nodeForm.anchorElementId} onDone={ctx.closeNodeForm} />
-            )}
-            {ctx.nodeForm.kind === 'note' && projection.type === 'class' && (
-              <AddClassNoteInlineForm
-                classes={projection.class.classes}
-                initialClassName={ctx.nodeForm.className}
-                afterElementId={ctx.nodeForm.anchorElementId}
-                onDone={ctx.closeNodeForm}
-              />
-            )}
-          </NodeFormPopup>
+          <NodeFormPopup state={ctx.nodeForm} projection={projection} onClose={ctx.closeNodeForm} />
         )}
       </Box>
     </Stack>

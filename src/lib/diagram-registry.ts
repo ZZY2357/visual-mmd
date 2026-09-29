@@ -9,11 +9,16 @@ import { buildFlowchartProjection, type FlowchartProjection } from './projection
 import { buildSequenceProjection, type SequenceProjection } from './projection/sequence-projection'
 import { buildClassProjection, type ClassProjection } from './projection/class-projection'
 import { buildMindmapProjection, type MindmapProjection } from './projection/mindmap-projection'
+import { flowchartCanvasCapabilities } from './canvas-selection/flowchart-adapter'
+import { sequenceCanvasCapabilities } from './canvas-selection/sequence-adapter'
+import { classCanvasCapabilities } from './canvas-selection/class-adapter'
+import { mindmapCanvasCapabilities } from './canvas-selection/mindmap-adapter'
+import type { CanvasCapabilities } from './canvas-selection/capabilities'
 import { DEFAULT_DIAGRAM_SOURCE } from './storage'
 
 /**
  * 图种注册表（工单 06 建立，供 07/08 复用）：
- * 每种图表类型注册 模板 / 解析器 / 投影构建 / 源码识别。
+ * 每种图表类型注册 模板 / 解析器 / 投影构建 / 源码识别 / 画布能力包。
  * store 的 commitIntent 与 App 的投影派生都经此分发，新图种接入只需在此注册。
  */
 
@@ -33,6 +38,9 @@ export interface DiagramTypeRegistration {
   /** 源码识别：首个语句行是否为该图种的声明 */
   detect(source: string): boolean
   buildProjection(doc: SourceDocument): AnyProjection
+  /** 画布能力包（工单 04，ADR-0015）：该图种接入画布所需的全部静态图种知识。
+   * registry 只持引用、不含实现——「加一种图」= 新建一个 adapter + 在这里挂一行。 */
+  canvas: CanvasCapabilities
 }
 
 /** 跳过 frontmatter 块、空行与注释后的首个语句行 */
@@ -103,6 +111,7 @@ export const DIAGRAM_TYPES: Record<DiagramTypeId, DiagramTypeRegistration> = {
     template: FLOWCHART_TEMPLATE,
     detect: (source) => /^(flowchart|graph)\b/i.test(firstStatementLine(source)),
     buildProjection: (doc) => ({ type: 'flowchart', flowchart: buildFlowchartProjection(doc) }),
+    canvas: flowchartCanvasCapabilities,
   },
   sequence: {
     id: 'sequence',
@@ -110,6 +119,7 @@ export const DIAGRAM_TYPES: Record<DiagramTypeId, DiagramTypeRegistration> = {
     template: SEQUENCE_TEMPLATE,
     detect: (source) => /^sequenceDiagram\b/i.test(firstStatementLine(source)),
     buildProjection: (doc) => ({ type: 'sequence', sequence: buildSequenceProjection(doc) }),
+    canvas: sequenceCanvasCapabilities,
   },
   class: {
     id: 'class',
@@ -117,6 +127,7 @@ export const DIAGRAM_TYPES: Record<DiagramTypeId, DiagramTypeRegistration> = {
     template: CLASS_TEMPLATE,
     detect: (source) => /^classDiagram\b/i.test(firstStatementLine(source)),
     buildProjection: (doc) => ({ type: 'class', class: buildClassProjection(doc) }),
+    canvas: classCanvasCapabilities,
   },
   mindmap: {
     id: 'mindmap',
@@ -124,6 +135,7 @@ export const DIAGRAM_TYPES: Record<DiagramTypeId, DiagramTypeRegistration> = {
     template: MINDMAP_TEMPLATE,
     detect: (source) => /^mindmap\b/i.test(firstStatementLine(source)),
     buildProjection: (doc) => ({ type: 'mindmap', mindmap: buildMindmapProjection(doc) }),
+    canvas: mindmapCanvasCapabilities,
   },
 }
 
