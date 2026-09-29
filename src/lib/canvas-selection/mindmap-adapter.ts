@@ -1,6 +1,7 @@
 import { parseMindmapNodeElementId } from '../pipeline/element-id'
-import type { MindmapProjection } from '../projection/mindmap-projection'
+import { resolveMindmapSelection, type MindmapProjection } from '../projection/mindmap-projection'
 import type { CanvasSelection, DataIdResolver } from './data-id'
+import type { CanvasCapabilities, ProjectionOf } from './capabilities'
 
 /**
  * mindmap 适配器（工单 06）：把 mindmap 投影接到通用画布选中能力上。
@@ -39,4 +40,24 @@ export function mindmapDataIdResolver(projection: MindmapProjection): DataIdReso
 export function mindmapDomIdOf(elementId: string): string | null {
   const ordinal = parseMindmapNodeElementId(elementId)
   return ordinal !== null ? `node_${ordinal - 1}` : null
+}
+
+/** mindmap 画布能力包（工单 04，ADR-0015）。无连线 → 不实现 edgeAnnotator。
+ * 画布选中只可能是节点（无连线），data-id 即节点 elementId（`mindmap-node:N`）；
+ * 高亮 / 导航按 DOM id 形态（`node_{N-1}`）寻址。 */
+export const mindmapCanvasCapabilities: CanvasCapabilities<ProjectionOf<'mindmap'>> = {
+  dataIdResolver: (projection) => mindmapDataIdResolver(projection.mindmap),
+  toSelection: (canvas) => (canvas.kind === 'node' ? { kind: 'mindmap-node', elementId: canvas.id } : null),
+  canvasIdOf: (selection) => (selection.kind === 'mindmap-node' ? mindmapDomIdOf(selection.elementId) : null),
+  // 非 mindmap-node 形态的 elementId 不入列表（不参与导航，与原 nodeDataIdsOf 同口径）
+  navigationIds: (projection) => {
+    const ids: string[] = []
+    for (const n of projection.mindmap.nodes) {
+      const domId = mindmapDomIdOf(n.elementId)
+      if (domId !== null) ids.push(domId)
+    }
+    return ids
+  },
+  keyboardProjection: (projection) => ({ kind: 'mindmap', projection: projection.mindmap }),
+  resolveSelection: (projection, selection) => resolveMindmapSelection(projection.mindmap, selection),
 }

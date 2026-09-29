@@ -1,7 +1,9 @@
 import {
+  resolveSelection as resolveFlowchartSelection,
   type FlowchartProjection,
   type Selection,
 } from '../projection/flowchart-projection'
+import type { CanvasCapabilities, ProjectionOf } from './capabilities'
 import {
   edgeDataIdResolver,
   nodeDataIdResolver,
@@ -32,4 +34,17 @@ export function toEditorSelection(selection: CanvasSelection): Selection | null 
     case 'element':
       return null
   }
+}
+
+/** flowchart 画布能力包（工单 04，ADR-0015）：实例挂在 DiagramTypeRegistration.canvas 上。
+ * 无位置序连线 → 不实现 edgeAnnotator（flowchart 的边走 mermaid data-id，ADR-0007）。 */
+export const flowchartCanvasCapabilities: CanvasCapabilities<ProjectionOf<'flowchart'>> = {
+  dataIdResolver: (projection) => flowchartDataIdResolver(projection.flowchart),
+  toSelection: toEditorSelection,
+  // flowchart 的 edge 选中不进高亮 data-id 链路（`L_{from}_{to}_{n}` 尽力匹配，
+  // 与 selection-codec.canvasIdOf 同约定）：只有节点可寻址
+  canvasIdOf: (selection) => (selection.kind === 'node' ? selection.nodeId : null),
+  navigationIds: (projection) => projection.flowchart.nodes.map((n) => n.nodeId),
+  keyboardProjection: (projection) => ({ kind: 'flowchart', projection: projection.flowchart }),
+  resolveSelection: (projection, selection) => resolveFlowchartSelection(projection.flowchart, selection),
 }

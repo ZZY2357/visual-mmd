@@ -1,6 +1,6 @@
 # 04 · 图种 → 画布能力 bundle（顶推项）
 
-Status: needs-triage
+Status: resolved
 Blocked by: 01, 03
 Type: task
 
@@ -122,3 +122,36 @@ export function capabilitiesOf(projection: AnyProjection): CanvasCapabilities
    那样包要持有容器引用、变有状态对象，会废掉 `use-canvas-keyboard` 现有的
    「注入假 navigation 即可测」的能力——而这是当前方位导航（ADR-0011）唯一能脱离真机验收的
    测试手段（AGENTS.md 默认不做真机验收）。
+
+## 实施记录（2026-09-29，分支 `ticket-04-canvas-capability-bundle`）
+
+### 落地
+
+- `canvas-selection/capabilities.ts`：`CanvasCapabilities` 接口（7 项能力，`edgeAnnotator?` 可选）+ `capabilitiesOf()` 查表；实例挂 `DiagramTypeRegistration.canvas`（registry 只持引用）。
+- 四个 adapter：`flowchart-adapter.ts` / `mindmap-adapter.ts` 补齐其余能力，新增 `class-adapter.ts` / `sequence-adapter.ts`（原 `resolverOf` 现场拼装的 class / sequence 逻辑整体迁入，`sequenceEdgeCounts` 一并迁入 sequence-adapter）。
+- `CanvasPanel.tsx`：删除 `resolverOf` / `nodeDataIdsOf` / `keyboardProjectionOf` / `sequenceEdgeCounts` 与 `annotateEdges` 三元链，只剩 `capabilitiesOf` 一次查表；`CanvasNavigation` 仍由组件用「能力包 + 容器」组装（ADR-0015，`extents` / `reveal` 不进包）。
+- `PropertyPanel.tsx`：删除 `resolveProjectionSelection`，改经 `caps.resolveSelection`。
+- 新增测试：`canvas-selection/__tests__/capabilities.test.ts`（4 图种 × 7 能力查表 + class/sequence resolver 对照，12 用例）、`components/__tests__/canvas-panel.test.tsx`（CanvasPanel 首个测试，vi.mock 注入假 bundle，3 用例：点击 → select、空白不选中、选中 → 高亮/清除）。
+
+### 验收 grep 实测（`grep -c 'projection.type ==='`，按匹配行数）
+
+| 范围 | 动前 | 动后 |
+| --- | --- | --- |
+| `src/components/CanvasPanel.tsx` | 20 | **0**（≤1 ✓；工单写 24，是 01/03/05 合入后的旧数字） |
+| `src/components/PropertyPanel.tsx` | 6 | **0** ✓ |
+| 全库 | 43 | 26（净减 17，未新增） |
+
+剩余 26 处分布：`selection-forms.tsx`（3，自 PropertyPanel 迁出）、`node-form-popup.tsx`（6，自 CanvasPanel 迁出）、StructureTree / use-canvas-inline-edit / 既有测试（原样未动）。
+
+### 与工单分步的偏差
+
+1. **PropertyPanel 的表单选择三元链（原 299-303）一并处理**：工单只点名了 `resolveProjectionSelection`（第 7 处分发），但验收要求 PropertyPanel 降到 0，故四个 `*SelectionForm` 连同分发一起迁出到新文件 `selection-forms.tsx`（导出 `ProjectionSelectionForm`）。
+2. **CanvasPanel 的 nodeForm 表单 JSX（6 处）与 `NodeFormPopup` 外壳迁出到新文件 `node-form-popup.tsx`**：不改它们就到不了 ≤1。属纯迁移，行为零改动。
+3. `classDefNames`（apply-style 子列表）与 `pendingInlineEdit` 的图种判断保留在 CanvasPanel，但均为 `projection?.type === …` 的**等值比较**（非分发链），新图种接入不需要动它们。
+4. 工单「24 处 / 6 个分发函数」与动前实况（20 处）的差异是 03/05 已合入所致，非本票遗漏。
+
+### 测试
+
+- 全量 `npm test`：**61 文件 / 859 用例全绿**（基线 59 / 844，本票 +2 文件 / +15 用例）；`npm run typecheck` 通过。
+- 护栏零改动全绿：`scenario-a-class-relation.test.tsx`、`use-canvas-keyboard.test.tsx`、`use-canvas-context-menu.test.tsx`（1574 行）。
+- 「加第 5 种图」= 新建一个 adapter + registration 挂一行（`canvas:` 字段，漏挂是编译错误）。
