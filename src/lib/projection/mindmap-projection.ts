@@ -1,12 +1,16 @@
 import type { SourceDocument } from '../pipeline/document'
-import type { MindmapIconData, MindmapNodeData, MindmapShapeType } from '../pipeline/mindmap'
+import { toMindmapIR, type MindmapShapeType } from '../pipeline/mindmap-ir'
 import type { Selection } from './selection'
 
 /**
  * mindmap 投影（ADR-0008）：从解析产物派生的只读结构视图，
  * 驱动结构树（树形缩进编辑界面，工单 08）与属性表单。
+ *
+ * 工单 06 spike：投影只认 IR（pipeline/mindmap-ir），不再 import
+ * pipeline/mindmap 的 *Data；icon 归属与父子解析在 IR 转换层完成。
  */
 
+/** 投影节点公开形状（IR 节点结构兼容；span/kind 为 IR 内部字段，不透出） */
 export interface ProjectionMindmapNode {
   /** `mindmap-node:N`，编辑意图据此寻址 */
   elementId: string
@@ -28,38 +32,7 @@ export interface MindmapProjection {
 
 /** 从解析产物构建 mindmap 投影（纯函数） */
 export function buildMindmapProjection(doc: SourceDocument): MindmapProjection {
-  const nodes: ProjectionMindmapNode[] = []
-  for (const part of doc.elements) {
-    if (part.element.kind === 'mindmap-node') {
-      const n = part.element as MindmapNodeData
-      // 父节点 = 最近的 depth 更小的前序节点（与解析器缩进栈语义一致）
-      let parentId: string | null = null
-      for (let i = nodes.length - 1; i >= 0; i--) {
-        if (nodes[i].depth < n.depth) {
-          parentId = nodes[i].elementId
-          break
-        }
-      }
-      nodes.push({
-        elementId: part.id,
-        text: n.text,
-        id: n.id,
-        shapeType: n.shapeType,
-        icon: null,
-        depth: n.depth,
-        parentId,
-      })
-    } else if (part.element.kind === 'mindmap-icon') {
-      // 图标行归属其前一个节点（必须紧跟，与 mermaid 语义一致）
-      const prev = nodes[nodes.length - 1]
-      const elementIndex = doc.elements.indexOf(part)
-      const prevElement = doc.elements[elementIndex - 1]
-      if (prev !== undefined && prevElement !== undefined && prevElement.element.kind === 'mindmap-node') {
-        prev.icon = (part.element as MindmapIconData).icon
-      }
-    }
-  }
-  return { nodes }
+  return toMindmapIR(doc)
 }
 
 // ---------- 选中回落 ----------

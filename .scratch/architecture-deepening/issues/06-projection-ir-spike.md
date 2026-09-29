@@ -1,6 +1,6 @@
 # 06 · parser → 投影 垫一层稳定 IR（时间盒 spike）
 
-Status: needs-triage
+Status: resolved
 Blocked by: —
 Type: prototype
 
@@ -76,3 +76,44 @@ Type: prototype
 
 No-Go 那条尤其重要——它正是未来探索者需要它才能避免重复建议的那种理由。
 （对照：本批次的能力包切分已记为 ADR-0015，正因为它是同类问题里被判定为**值得做**的那个。）
+
+## 实施记录（2026-09-29）
+
+**结论：Go** —— 三条判据全中，ADR 已落 `docs/adr/0016-projection-consumes-ir-not-parser-data.md`。
+
+**做了什么**（严守时间盒，只动 mindmap）：
+
+- 新增 `src/lib/pipeline/mindmap-ir.ts`：`MindmapNodeIR` / `MindmapDocumentIR` +
+  `toMindmapIR(doc)` 转换。IR 折叠 icon 行进节点、就地解析 parentId、
+  丢弃渲染原文（indent / openRaw / closeRaw / trailing / eol / gapAfterId）；
+  `MindmapShapeType` 经 re-export 共享（形状词表与编辑意图共用，不算泄漏）。
+- 改写 `src/lib/projection/mindmap-projection.ts`：不再 import `pipeline/mindmap` 的
+  任何 `*Data`，只 import mindmap-ir；`buildMindmapProjection` 变成 `toMindmapIR` 直通，
+  `resolveMindmapSelection` 原样保留。
+- 新增 `src/lib/pipeline/__tests__/mindmap-ir.test.ts`：5 个单测
+  （icon 元素级归属、id 可选（ADR-0009）、六种 shape 归一化 + 默认 null、
+  父子解析、span 约定）。
+
+**证据（对照判据）**：
+
+1. 投影零 `*Data` import：`grep "pipeline/mindmap'" src/lib/projection/` 仅剩 mindmap-ir。
+2. 既有测试语义断言零改动：`mindmap-golden.test.ts`、`verbatim-identity.test.ts`、
+   `mindmap-projection.test.ts` 均未动一行，全绿。全量 `npm test`：58 文件 / 837 测试通过；
+   `npm run typecheck` 干净。
+3. IR 吸收了投影里的两块真实逻辑（icon 归属 + parentId 解析），不是逐字段拷贝；
+   转换层约 70 行（含注释），未触发 100 行 No-Go 条款。
+
+**spike 同样量到的代价/边界**（已写进 ADR-0016，防止后人美化）：
+
+- mindmap 投影的公开输出本来就已是稳定形状，真正泄漏只有两处 `as` 断言；
+  本票在 mindmap 上的实际内容是「把 icon/parent 逻辑搬进 pipeline + 给形状命名」。
+  收益是解耦，不是新能力。
+- IR 是图种内形状，不解决跨图种复用；class 投影 import flowchart `ClassDefData`
+  的接缝要用同一约定逐图种推广（次选 class，勿先动 flowchart）。
+- 不引入 IR 时 TS 下没有第三条路：投影要么 import `*Data`，要么对 `AnyElement`
+  无类型读取——这条缝隙是被实测确认的，不是推断。
+
+**测试数字**：新增 5 测（mindmap-ir.test.ts）；既有 837 测零改动全绿。
+
+**ADR 落点**：`docs/adr/0016-projection-consumes-ir-not-parser-data.md`（Go 版：
+「投影只认 IR，不 import parser 的 `*Data`」新约定 + 推广顺序 + 共享词表豁免）。
