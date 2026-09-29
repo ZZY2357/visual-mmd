@@ -625,8 +625,13 @@ export class SequenceParser implements DiagramParser {
     if (!seenHeader) {
       throw parseFailure(1, '图表必须以 sequenceDiagram 声明开始')
     }
-    if (openStack.length > 0) {
-      throw parseFailure(openStack[openStack.length - 1].lineNo, '逻辑块或区域块缺少匹配的 end')
+    // 只有未闭合的逻辑块算语法错误。区域块（rect / box）的 end 属于「不解析、原样保留」，
+    // 且 region 内嵌逻辑块时 end 只够关内层逻辑块，region 永远等不到自己的 end
+    // （工单 01：此前能打开的图不能因此整图解析失败）。未闭合 region 的 rect-open /
+    // box-open entry 照旧留下，投影里仍可见、仍可改名。
+    for (let i = openStack.length - 1; i >= 0; i--) {
+      const open = openStack[i]
+      if (open.scope === 'block') throw parseFailure(open.lineNo, '逻辑块缺少匹配的 end')
     }
     return assembleDocument(source, entries)
   }

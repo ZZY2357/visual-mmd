@@ -571,6 +571,70 @@ describe('rect / box 进模型（工单 06）', () => {
   })
 })
 
+// ---------- 未闭合 rect / box 不解析失败（工单 01，D1 定案取甲：保留 entry） ----------
+
+/** 解析出的元素种类序列；null = 解析失败 */
+function parseKinds(source: string): string[] | null {
+  const parsed = sequenceParser.parse(source)
+  if (!parsed.ok) return null
+  return parsed.doc.elements.map((part) => part.element.kind)
+}
+
+/** 解析失败时的错误；解析成功则断言失败 */
+function parseError(source: string): { line: number | null; message: string } {
+  const parsed = sequenceParser.parse(source)
+  expect(parsed.ok, `预期解析失败：\n${source}`).toBe(false)
+  if (parsed.ok) throw new Error('预期解析失败')
+  return parsed.error
+}
+
+describe('未闭合 rect / box 不解析失败（工单 01）', () => {
+  it('rect 内嵌 loop 且只有一个 end：end 关 loop，rect-open 保留、无 region-end', () => {
+    const source = `sequenceDiagram
+    rect rgb(200, 150, 255)
+    loop 每日
+    甲->>乙: 打卡
+    end
+`
+    expect(parseKinds(source)).toEqual(['seq-header', 'rect-open', 'block-open', 'message', 'block-end'])
+    const parsed = sequenceParser.parse(source)
+    if (!parsed.ok) throw parsed.error
+    // 未闭合 region 留下的 open entry 照旧参与重组装，逐字保留不变（ADR-0004/0008）
+    expect(reassemble(parsed.doc)).toBe(source)
+  })
+
+  it('box 完全没有 end：解析成功，box-open 保留、无 region-end', () => {
+    const source = 'sequenceDiagram\n    participant A\n    box 分组\n        participant C\n'
+    expect(parseKinds(source)).toEqual(['seq-header', 'participant', 'box-open', 'participant'])
+  })
+
+  it('回归保护：逻辑块未闭合仍解析失败，行号指向未闭合的开行', () => {
+    expect(parseError('sequenceDiagram\n    participant A\n    loop 外层\n        A->>A: hi\n')).toEqual({
+      line: 3,
+      message: '逻辑块缺少匹配的 end',
+    })
+    // region 未闭合不报错，但包住它的 loop 未闭合仍要报错，行号指 loop
+    expect(
+      parseError('sequenceDiagram\n    loop 外层\n        rect rgb(0,0,0)\n            A->>A: hi\n    end\n'),
+    ).toEqual({ line: 2, message: '逻辑块缺少匹配的 end' })
+  })
+
+  it('正常闭合的 rect / box 仍出 open + region-end（保护工单 06 成果）', () => {
+    expect(parseKinds('sequenceDiagram\n    rect rgb(0,0,0)\n        A->>A: hi\n    end\n')).toEqual([
+      'seq-header',
+      'rect-open',
+      'message',
+      'region-end',
+    ])
+    expect(parseKinds('sequenceDiagram\n    box 分组\n        participant C\n    end\n')).toEqual([
+      'seq-header',
+      'box-open',
+      'participant',
+      'region-end',
+    ])
+  })
+})
+
 // ---------- 级联删除后的空块清理（工单 11） ----------
 
 /** 非空白行（去掉纯缩进的残留行后）——便于精确描述产物结构 */
