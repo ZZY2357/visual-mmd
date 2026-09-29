@@ -104,6 +104,33 @@ locality 落在 parser 与 codec 同处一个目录上。
 
 换目录本身成本不高（易逆转），故不为此单独开 ADR。
 
+## 收尾裁定（2026-09-29，team-lead）
+
+### 1. `canvas-keyboard.ts:130` 的拼接已一并清掉
+
+原 `const newElementId = \`mindmap-node:${end + 2}\`` 改为 `mindmapNodeElementId(end + 2)`。
+因为 codec 的实现就是 `` `mindmap-node:${ordinal}` ``，替换后**字符串逐字相同**，是零风险的等价替换，
+不是行为改动。清掉它之后，工单的验收 grep 在 `src/lib` 下**已为 0**
+（`src/lib/projection/selection.ts` 的 `selectionKey` 除外，见下）。
+该文件属工单 04 的范围，但改动只是一行且证明等价，故提前收掉，避免协议继续分裂。
+
+### 2. `header#n` / `end#n` / `direction#n` / `class#n` / `mindmap#n` **不纳入** codec
+
+已核实：`flowchart.ts:893/907/934/955` 与 `mindmap.ts:246` 用的是 **`entries.length`** ——
+全局条目计数，且**恒带后缀**；连第一个 `header` / `mindmap` 是否带后缀都是用
+`entries.some(...)` 现判的。而 `withOccurrence` 的语义是 **per-key occurrence、等于 1 时不带后缀**。
+
+两者不等价：`class#${entries.length}` 在空文档上会产出 `class#0`，而 occurrence 的下界是 1。
+硬套 codec 会**改变 ID 形态**，连带要改测试与选中链路 —— 那是另一件事，不在本票「收敛协议」的范围内。
+
+结论：保留现状，在此留痕。**若日后要统一，正确做法是先决定这两类计数要不要合并语义，
+再动 ID 形态**，不能反过来靠 codec 顺手改。
+
+### 3. `selection.ts` 的 `selectionKey` 仍不动
+
+它是另一套命名空间（`class-relation:relation:1` 对 `relation:1`），只用于 `sameSelection` 相等性比较，
+不参与 DOM 寻址。工单「不在范围内（已澄清）」一节已说明，此处重申以免后人重复提出。
+
 ## 实施记录（2026-09-29）
 
 **落点**：`src/lib/pipeline/element-id.ts`（按 Decision）。
