@@ -23,7 +23,7 @@ export const zhDict = {
       empty: '暂无可渲染的图表',
       errorTitle: '源码存在语法错误，画布已停留在最近一次合法状态',
       emptySource: '暂无内容，请在左侧代码面板输入 Mermaid 源码',
-      keyboardHint: '点击节点选中后：Delete 删除 · Tab 添加子节点 · Enter 添加同级节点',
+      keyboardHint: '点击节点选中后：方向键移动选中 · Delete 删除 · Tab 添加子节点 · Enter 添加同级节点',
       fitView: '适应窗口',
       selectHint: '点击图中的节点可在属性面板查看其属性',
       inlineEditAria: '编辑节点文本',

@@ -1,5 +1,13 @@
 import { describe, expect, it } from 'vitest'
-import { MAX_SCALE, MIN_SCALE, clampScale, fitView, isBackgroundDragTarget, zoomAtPoint } from '../view-state'
+import {
+  MAX_SCALE,
+  MIN_SCALE,
+  clampScale,
+  fitView,
+  isBackgroundDragTarget,
+  panIntoView,
+  zoomAtPoint,
+} from '../view-state'
 import { svgIntrinsicSize } from '../use-canvas-view'
 
 describe('clampScale', () => {
@@ -116,5 +124,59 @@ describe('isBackgroundDragTarget（工单 12：背景拖拽的命中判定）', 
     expect(isBackgroundDragTarget(svg)).toBe(false)
     expect(isBackgroundDragTarget(svg.querySelector('g') as Element)).toBe(false)
     expect(isBackgroundDragTarget(svg.querySelector('text') as Element)).toBe(false)
+  })
+})
+
+describe('panIntoView（工单 14 自动平移）', () => {
+  const view = { scale: 0.5, tx: 10, ty: 20 }
+  const container = { width: 400, height: 300 }
+
+  it('已完全落在边距内 → 原样返回同一个对象（视图纹丝不动）', () => {
+    const target = { left: 100, top: 100, width: 50, height: 50 }
+    expect(panIntoView(view, target, container)).toBe(view)
+  })
+
+  it('越左边界 → 最小位移，左侧恰好留 margin', () => {
+    const target = { left: 10, top: 100, width: 50, height: 50 }
+    const next = panIntoView(view, target, container)
+    expect(next).toEqual({ scale: 0.5, tx: 10 + 14, ty: 20 })
+    expect(next.tx).toBe(24) // 起点对齐到 margin
+  })
+
+  it('越右边界 → 最小位移，右侧恰好留 margin', () => {
+    const target = { left: 380, top: 100, width: 50, height: 50 }
+    const next = panIntoView(view, target, container)
+    // right = 430，可见上限 400-24 = 376 → dx = -54
+    expect(next.tx).toBe(10 - 54)
+    expect(next.ty).toBe(20)
+    expect(next.scale).toBe(0.5)
+  })
+
+  it('越上边界 → 最小位移，上侧恰好留 margin', () => {
+    const target = { left: 100, top: 5, width: 50, height: 50 }
+    const next = panIntoView(view, target, container)
+    expect(next).toEqual({ scale: 0.5, tx: 10, ty: 20 + 19 })
+  })
+
+  it('越下边界 → 最小位移，下侧恰好留 margin', () => {
+    const target = { left: 100, top: 280, width: 50, height: 50 }
+    const next = panIntoView(view, target, container)
+    // bottom = 330，可见上限 300-24 = 276 → dy = -54
+    expect(next.ty).toBe(20 - 54)
+    expect(next.tx).toBe(10)
+  })
+
+  it('节点比可见区还大 → 不做覆盖判断，取使起点对齐 margin 的位移', () => {
+    const small = { width: 100, height: 100 }
+    const target = { left: 10, top: 10, width: 200, height: 200 } // 200 + 48 > 100
+    const next = panIntoView(view, target, small)
+    expect(next).toEqual({ scale: 0.5, tx: 10 + 14, ty: 20 + 14 })
+  })
+
+  it('scale 始终不变（只改 tx/ty）', () => {
+    const target = { left: 500, top: 500, width: 50, height: 50 }
+    const next = panIntoView(view, target, container)
+    expect(next.scale).toBe(view.scale)
+    expect(next.scale).toBe(0.5)
   })
 })

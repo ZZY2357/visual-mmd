@@ -60,6 +60,41 @@ export function zoomAtPoint(view: ViewState, nextScale: number, px: number, py: 
 }
 
 /**
+ * 把目标矩形推入可见区（工单 14 自动平移）：只改 tx/ty，scale 不变。
+ * targetRect 是**当前视图下**的容器坐标矩形；margin 是四周要留的边距。
+ *
+ * 逐轴取「最小位移」：已完全落在 `[margin, size - margin]` 内的一侧位移为 0，
+ * 越界一侧位移到恰好留出 margin。`tx`/`ty` 与容器坐标是 1:1 平移，故位移可直接叠加。
+ *
+ * 取舍：当目标比可见区还大（`size + margin*2 > container`）时，两侧不可能同时满足，
+ * 此时**不做覆盖判断**，直接取「使起点对齐到 margin」的位移（宁可露出起点一侧，
+ * 也没有更好的答案）。这是工单明确要求的可测行为。
+ *
+ * - 完全可见（两轴位移都为 0）→ **原样返回同一个对象**（不新建，调用方可据此判断「视图纹丝不动」）。
+ * - 纯函数，不读 DOM。
+ */
+export function panIntoView(
+  view: ViewState,
+  targetRect: { left: number; top: number; width: number; height: number },
+  containerSize: { width: number; height: number },
+  margin = 24,
+): ViewState {
+  const dx = panAxisDelta(targetRect.left, targetRect.width, containerSize.width, margin)
+  const dy = panAxisDelta(targetRect.top, targetRect.height, containerSize.height, margin)
+  if (dx === 0 && dy === 0) return view
+  return { scale: view.scale, tx: view.tx + dx, ty: view.ty + dy }
+}
+
+/** 单轴（x 或 y）的位移量：起点 start、长度 length、可见区 size */
+function panAxisDelta(start: number, length: number, size: number, margin: number): number {
+  const end = start + length
+  if (length + margin * 2 > size) return margin - start // 比可见区大：起点对齐到 margin
+  if (start < margin) return margin - start // 越左/上
+  if (end > size - margin) return size - margin - end // 越右/下
+  return 0
+}
+
+/**
  * 交互控件选择器（与画布键盘的焦点排除表同类）：指针按下落在这些控件上时，
  * 事件属于控件自身的链路（按钮的点击、输入框的文本选择……），不是画布手势。
  */

@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState, type ReactNode } from 'react'
+import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import { Alert, Box, Button, ColorInput, Group, Stack, Text, TextInput, Title, UnstyledButton } from '@mantine/core'
 import { useTranslation } from 'react-i18next'
 import type { MermaidPreview } from '../lib/use-mermaid-preview'
@@ -9,6 +9,8 @@ import { nodeDataIdResolver } from '../lib/canvas-selection/data-id'
 import type { Selection } from '../lib/projection/selection'
 import { useCanvasSelection } from '../lib/canvas-selection/use-canvas-selection'
 import { useCanvasKeyboard } from '../lib/editing/use-canvas-keyboard'
+import type { CanvasKeyboardProjection, CanvasNavigation, NodeExtent } from '../lib/editing/canvas-keyboard'
+import { measureNodeExtents } from '../lib/editing/canvas-measure'
 import { useCanvasInlineEdit, inlineEditTextOf } from '../lib/editing/use-canvas-inline-edit'
 import type { InlineEditCloseOptions } from '../lib/editing/use-canvas-inline-edit'
 import type { Rect } from '../lib/editing/inline-edit'
@@ -30,6 +32,10 @@ import { useEditorStore } from '../store/editor'
  *
  * 视图（工单 03）：fit / 滚轮锚点缩放 / 背景拖拽平移见 src/lib/canvas-view/；
  * 变换只落在 DOM 上，导出走 preview.svg 原始字符串，不受视图影响。
+ *
+ * 方向键方位导航（工单 14 / ADR-0011）：四个图种同一套几何语义——以选中节点的可视范围
+ * 中心为锚点，按方向键所指的 45° 锥取最近节点；落点未完全可见时自动平移视图（瞬时无补间）。
+ * 本组件把测量 / 选中映射 / 自动平移打包成 CanvasNavigation 适配对象交给 useCanvasKeyboard。
  *
  * 内联编辑（工单 05）：双击节点（flowchart + mindmap）原位浮出输入框，回车/失焦
  * 提交、Esc 取消；Tab/Enter 新建节点后经 onNodeCreated 自动进入同一输入框。
@@ -87,6 +93,31 @@ function selectedDataIdOf(selection: Selection): string | null {
     default:
       return null
   }
+}
+
+/** 各图种全部节点的 data-id 列表（**投影顺序**，工单 14 §3 表格）：方位导航的候选与
+ * 「无选中回落首节点」共用同一口径。flowchart = nodes[].nodeId；class = classes[].name；
+ * sequence = participants[].actorId；mindmap = nodes[].elementId 经 mindmapDomIdOf
+ * （node_{N-1}，与高亮 / selectedDataIdOf 同形态）。 */
+function nodeDataIdsOf(projection: AnyProjection): string[] {
+  if (projection.type === 'flowchart') return projection.flowchart.nodes.map((n) => n.nodeId)
+  if (projection.type === 'class') return projection.class.classes.map((c) => c.name)
+  if (projection.type === 'sequence') return projection.sequence.participants.map((p) => p.actorId)
+  const ids: string[] = []
+  for (const n of projection.mindmap.nodes) {
+    const domId = mindmapDomIdOf(n.elementId)
+    if (domId !== null) ids.push(domId) // 非 mindmap-node 形态的 elementId 不入列表（不参与导航）
+  }
+  return ids
+}
+
+/** 图种 → 画布键盘的 tagged union（工单 14：四个图种齐备；投影缺失时为 null） */
+function keyboardProjectionOf(projection: AnyProjection | null): CanvasKeyboardProjection | null {
+  if (projection === null) return null
+  if (projection.type === 'flowchart') return { kind: 'flowchart', projection: projection.flowchart }
+  if (projection.type === 'mindmap') return { kind: 'mindmap', projection: projection.mindmap }
+  if (projection.type === 'class') return { kind: 'class', projection: projection.class }
+  return { kind: 'sequence', projection: projection.sequence }
 }
 
 /** 内联编辑浮层输入框（工单 05/02）：预填当前显示文本，回车/失焦提交、Esc 取消。
@@ -347,8 +378,8 @@ export function CanvasPanel({ preview, projection }: CanvasPanelProps) {
   const { svg, error } = preview
 
   // 视图（工单 03）：fit / 滚轮锚点缩放 / 背景拖拽平移；SVG 换新即重新 fit，
-  // 切换图表自然重置，无需持久化
-  const { containerRef, view, fit, onPointerDown, onPointerMove, onPointerUp } = useCanvasView(svg)
+  // 切换图表自然重置，无需持久化。revealRect：方向键导航的自动平移入口（工单 14）
+  const { containerRef, view, fit, revealRect, onPointerDown, onPointerMove, onPointerUp } = useCanvasView(svg)
 
   // 内联编辑（工单 05）：双击 flowchart/mindmap 节点原位浮出输入框
   const { editing, onDoubleClick, beginEdit, commit, cancel } = useCanvasInlineEdit({
@@ -362,25 +393,64 @@ export function CanvasPanel({ preview, projection }: CanvasPanelProps) {
     view,
   })
 
-  // 键盘焦点体系（工单 04，工单 06 扩展 mindmap）：容器 tabindex=0，点击画布即持有
-  // 焦点；keydown 挂在容器上，Tab/Enter/Del 仅在画布聚焦时拦截，焦点在代码面板/
-  // 输入框时完全不干扰。flowchart 与 mindmap 各有画布键盘语义（Tab 加子 / Enter 加
-  // 同级 / Del 删除），其它图种接线见后续工单
-  useCanvasKeyboard(
-    projection === null
-      ? null
-      : projection.type === 'flowchart'
-        ? { kind: 'flowchart', projection: projection.flowchart }
-        : projection.type === 'mindmap'
-          ? { kind: 'mindmap', projection: projection.mindmap }
-          : null,
-    {
-      containerRef,
-      // 工单 05/06 接线：新建节点落码后立即进入内联命名
-      onNodeCreated: beginEdit,
-      newNodeText: t('app:propertyPanel.mindmapNewNode'),
-    },
-  )
+  // 方向键方位导航的适配对象（工单 14）：DOM 测量 + 选中映射 + 自动平移，全部复用现成能力：
+  // measureNodeExtents（可视范围并集）、selectedDataIdOf / resolverOf / canvasToEditorSelection
+  // （选中 ↔ data-id）、useCanvasView 的 revealRect（自动平移）。measureNodeExtents 不做缓存
+  // （模板规模 2–13 节点，工单接受每次现测）。
+  const navigation = useMemo<CanvasNavigation | undefined>(() => {
+    if (projection === null) return undefined
+    const ids = nodeDataIdsOf(projection)
+    const resolver = resolverOf(projection)
+    const toSelection = (dataId: string): Selection | null => {
+      const canvasSelection = resolver(dataId)
+      return canvasSelection === null ? null : canvasToEditorSelection(projection, canvasSelection)
+    }
+    return {
+      // 按投影顺序过滤出命中的节点（容器缺失 / 节点未渲染 → 不参与导航）
+      extents: () => {
+        const container = containerRef.current
+        if (container === null) return []
+        const measured = measureNodeExtents(container, container, ids)
+        const out: NodeExtent[] = []
+        for (const id of ids) {
+          const rect = measured.get(id)
+          if (rect !== undefined) out.push({ dataId: id, rect })
+        }
+        return out
+      },
+      // 选中已不在投影中（源码被外部改动等）也算无锚点 → 回落首节点
+      dataIdOf: (selection) => {
+        if (selection === null) return null
+        const dataId = selectedDataIdOf(selection)
+        return dataId !== null && ids.includes(dataId) ? dataId : null
+      },
+      toSelection,
+      // 现测一次拿到矩形（工单：测量不做缓存），交给 view 自动平移
+      reveal: (dataId) => {
+        const container = containerRef.current
+        if (container === null) return
+        const rect = measureNodeExtents(container, container, [dataId]).get(dataId)
+        if (rect !== undefined) revealRect(rect)
+      },
+      firstSelection: () => {
+        const firstId = ids[0]
+        return firstId === undefined ? null : toSelection(firstId)
+      },
+    }
+  }, [projection, svg, revealRect])
+
+  // 键盘焦点体系（工单 04，工单 06 扩展 mindmap，工单 14 方向键覆盖四图种）：容器 tabindex=0，
+  // 点击画布即持有焦点；keydown 挂在容器上，Tab/Enter/Del 仅在画布聚焦时拦截，焦点在代码面板/
+  // 输入框时完全不干扰。flowchart 与 mindmap 各有编辑键语义（Tab 加子 / Enter 加同级 / Del 删除）；
+  // class / sequence 只享受方向键（编辑键命中也直接 return，不落码）。
+  useCanvasKeyboard(keyboardProjectionOf(projection), {
+    containerRef,
+    // 工单 05/06 接线：新建节点落码后立即进入内联命名
+    onNodeCreated: beginEdit,
+    newNodeText: t('app:propertyPanel.mindmapNewNode'),
+    // 工单 14：方向键方位导航 + 自动平移
+    navigation,
+  })
 
   // 右键菜单（工单 07）：菜单/连线模式/添加样式表单三个状态托管在 hook 中，
   // 编辑文本与新建节点的内联命名同样走 beginEdit

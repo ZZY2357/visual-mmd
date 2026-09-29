@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
-import { fitView, isBackgroundDragTarget, zoomAtPoint, type ViewState } from './view-state'
+import { fitView, isBackgroundDragTarget, panIntoView, zoomAtPoint, type ViewState } from './view-state'
 
 /**
  * 画布视图 Hook（工单 03）：
@@ -70,6 +70,15 @@ export function useCanvasView(svg: string | null) {
     svg.style.transform = `translate(${view.tx}px, ${view.ty}px) scale(${view.scale})`
   }, [view])
 
+  /** 把容器坐标下的矩形推入可见区（工单 14 自动平移）：只改 tx/ty、scale 不变、
+   * 瞬时无补间。用结构化类型做参数（不从 editing 依赖 Rect），视图尚未 fit（view === null）时不动。 */
+  const revealRect = useCallback((rect: { left: number; top: number; width: number; height: number }) => {
+    const container = containerRef.current
+    const current = viewRef.current
+    if (container === null || current === null) return
+    setView(panIntoView(current, rect, { width: container.clientWidth, height: container.clientHeight }))
+  }, [])
+
   // 纯滚轮缩放：以鼠标为锚点；passive: false 才能 preventDefault 阻止页面滚动
   useEffect(() => {
     const container = containerRef.current
@@ -115,5 +124,5 @@ export function useCanvasView(svg: string | null) {
     containerRef.current?.releasePointerCapture(e.pointerId)
   }
 
-  return { containerRef, view, fit, onPointerDown, onPointerMove, onPointerUp }
+  return { containerRef, view, fit, revealRect, onPointerDown, onPointerMove, onPointerUp }
 }

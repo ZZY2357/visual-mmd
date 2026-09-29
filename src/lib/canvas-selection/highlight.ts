@@ -8,6 +8,29 @@
 
 const HIGHLIGHT_ATTR = 'data-vm-selected'
 
+/** 参与 data-id 匹配的候选元素（`[data-id]` 或带 DOM id 的元素） */
+export const DATA_ID_CANDIDATE_SELECTOR = '[data-id], [id]'
+
+/**
+ * data-id 匹配谓词（工单 14 抽出共享）：`data-id` 相等、DOM id 相等、或 DOM id 以 `-{dataId}` 结尾。
+ *
+ * 工单 06/08 的由来：data-id 之外也匹配 DOM id——mermaid mindmap 节点无 data-id，
+ * 只有含 `node_N` 的 DOM id；mermaid v12 的 id 带 svgId 前缀（`{svgId}-node_N`），
+ * 故相等与"按 `-` 后缀"两种方式都比较（后缀以 `-node_N` 结尾，不会误标其它元素）。
+ *
+ * **必须只有这一份实现**：高亮（本模块）与方位导航的位置测量
+ * （`editing/canvas-measure.ts`）共用它，才能保证「高亮标出的元素」与
+ * 「参与导航的可视范围」永远是同一集合（工单 14 §4 的硬要求）。
+ */
+export function matchesDataId(el: Element, dataId: string): boolean {
+  const id = el.getAttribute('id')
+  return (
+    el.getAttribute('data-id') === dataId ||
+    id === dataId ||
+    (dataId !== '' && id !== null && id.endsWith(`-${dataId}`))
+  )
+}
+
 function findMarked(root: ParentNode): Element[] {
   return Array.from(root.querySelectorAll(`[${HIGHLIGHT_ATTR}]`))
 }
@@ -18,19 +41,8 @@ function findMarked(root: ParentNode): Element[] {
  */
 export function applyHighlight(root: ParentNode, dataId: string): void {
   clearHighlight(root)
-  // 工单 06/08：data-id 之外也匹配 DOM id——mermaid mindmap 节点无 data-id，
-  // 只有含 `node_N` 的 DOM id；mermaid v12 的 id 带 svgId 前缀（`{svgId}-node_N`），
-  // 故相等与"按 `-` 后缀"两种方式都比较（后缀以 `-node_N` 结尾，不会误标其它元素）。
-  const all = Array.from(root.querySelectorAll('[data-id], [id]'))
-  for (const el of all) {
-    const id = el.getAttribute('id')
-    if (
-      el.getAttribute('data-id') === dataId ||
-      id === dataId ||
-      (dataId !== '' && id !== null && id.endsWith(`-${dataId}`))
-    ) {
-      el.setAttribute(HIGHLIGHT_ATTR, 'true')
-    }
+  for (const el of Array.from(root.querySelectorAll(DATA_ID_CANDIDATE_SELECTOR))) {
+    if (matchesDataId(el, dataId)) el.setAttribute(HIGHLIGHT_ATTR, 'true')
   }
 }
 

@@ -6,13 +6,11 @@ import {
   isNavigationKey,
   keyToNodeAction,
   mindmapActionIntents,
-  navigationTarget,
   nextNodeId,
   nodeActionIntents,
 } from '../canvas-keyboard'
 import { buildFlowchartProjection, type FlowchartProjection } from '../../projection/flowchart-projection'
 import { buildMindmapProjection, type MindmapProjection } from '../../projection/mindmap-projection'
-import type { Selection } from '../../projection/selection'
 
 const SAMPLE = `flowchart TD
     A[开始] --> B[处理]
@@ -237,107 +235,12 @@ describe('mindmap 意图经管线落码（缩进层级，工单 06）', () => {
   })
 })
 
-// ---------- 方向键导航（工单 03） ----------
+// ---------- 方向键（工单 14）：方位导航的键位判定 ----------
 
-/** root=1，分支A=2，叶子A1=3，叶子A2=4，分支B=5 */
-const MINDMAP_NAV_SAMPLE = `mindmap
-  root((中心))
-    分支A
-      叶子A1
-      叶子A2
-    分支B
-`
-
-function navMindmap(): { kind: 'mindmap'; projection: MindmapProjection } {
-  return { kind: 'mindmap', projection: mindmapProjectionOf(MINDMAP_NAV_SAMPLE) }
-}
-
-function navFlowchart(): { kind: 'flowchart'; projection: FlowchartProjection } {
-  return { kind: 'flowchart', projection: projectionOf(SAMPLE) }
-}
-
-const mm = (elementId: string): Selection => ({ kind: 'mindmap-node', elementId })
-const fn = (nodeId: string): Selection => ({ kind: 'node', nodeId })
-
-describe('方向键键位判定（工单 03）', () => {
+describe('方向键键位判定（工单 14）', () => {
   it('四个方向键参与导航，其它键不参与', () => {
     expect(['ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown'].every(isNavigationKey)).toBe(true)
     expect(isNavigationKey('Tab')).toBe(false)
     expect(isNavigationKey('a')).toBe(false)
-  })
-})
-
-describe('mindmap 树形四向导航（工单 03）', () => {
-  const target = navMindmap()
-
-  it('← 走父节点；根节点按 ← 无操作', () => {
-    expect(navigationTarget(target, mm('mindmap-node:3'), 'ArrowLeft')).toEqual(mm('mindmap-node:2'))
-    expect(navigationTarget(target, mm('mindmap-node:2'), 'ArrowLeft')).toEqual(mm('mindmap-node:1'))
-    expect(navigationTarget(target, mm('mindmap-node:1'), 'ArrowLeft')).toBeNull()
-  })
-
-  it('→ 走第一个子节点；无子节点按 → 无操作', () => {
-    expect(navigationTarget(target, mm('mindmap-node:1'), 'ArrowRight')).toEqual(mm('mindmap-node:2'))
-    expect(navigationTarget(target, mm('mindmap-node:2'), 'ArrowRight')).toEqual(mm('mindmap-node:3'))
-    expect(navigationTarget(target, mm('mindmap-node:3'), 'ArrowRight')).toBeNull() // 叶子A1 无子
-  })
-
-  it('↑/↓ 走同父兄弟；到首/末兄弟无操作', () => {
-    expect(navigationTarget(target, mm('mindmap-node:4'), 'ArrowUp')).toEqual(mm('mindmap-node:3'))
-    expect(navigationTarget(target, mm('mindmap-node:3'), 'ArrowDown')).toEqual(mm('mindmap-node:4'))
-    expect(navigationTarget(target, mm('mindmap-node:5'), 'ArrowDown')).toBeNull() // 末兄弟
-    expect(navigationTarget(target, mm('mindmap-node:3'), 'ArrowUp')).toBeNull() // 首兄弟
-    // 跨层级不串门：分支B 的上一兄弟是分支A，不是叶子
-    expect(navigationTarget(target, mm('mindmap-node:5'), 'ArrowUp')).toEqual(mm('mindmap-node:2'))
-    // 根节点没有兄弟
-    expect(navigationTarget(target, mm('mindmap-node:1'), 'ArrowUp')).toBeNull()
-    expect(navigationTarget(target, mm('mindmap-node:1'), 'ArrowDown')).toBeNull()
-  })
-
-  it('无选中 / 选中非节点（图表级）时：任方向键选中根节点', () => {
-    expect(navigationTarget(target, null, 'ArrowRight')).toEqual(mm('mindmap-node:1'))
-    expect(navigationTarget(target, null, 'ArrowUp')).toEqual(mm('mindmap-node:1'))
-    expect(navigationTarget(target, { kind: 'diagram' }, 'ArrowDown')).toEqual(mm('mindmap-node:1'))
-    // 别图种的选中（如 flowchart 节点）同样视为「未选中本图种节点」
-    expect(navigationTarget(target, fn('A'), 'ArrowLeft')).toEqual(mm('mindmap-node:1'))
-  })
-
-  it('非方向键 / 空投影 → null', () => {
-    expect(navigationTarget(target, mm('mindmap-node:2'), 'Escape')).toBeNull()
-    expect(navigationTarget(target, mm('mindmap-node:2'), 'a')).toBeNull()
-    expect(navigationTarget({ kind: 'mindmap', projection: { nodes: [] } }, null, 'ArrowRight')).toBeNull()
-    // 选中已不存在于投影（源码被外部改动）：回落到根，不报错
-    expect(navigationTarget(target, mm('mindmap-node:99'), 'ArrowRight')).toEqual(mm('mindmap-node:1'))
-  })
-})
-
-describe('flowchart 线性导航（源码顺序，工单 03）', () => {
-  const target = navFlowchart() // 投影序：A、B、C
-
-  it('→/↓ 走下一个节点，到末尾无操作', () => {
-    expect(navigationTarget(target, fn('A'), 'ArrowRight')).toEqual(fn('B'))
-    expect(navigationTarget(target, fn('B'), 'ArrowDown')).toEqual(fn('C'))
-    expect(navigationTarget(target, fn('C'), 'ArrowRight')).toBeNull()
-    expect(navigationTarget(target, fn('C'), 'ArrowDown')).toBeNull()
-  })
-
-  it('←/↑ 走上一个节点，到开头无操作', () => {
-    expect(navigationTarget(target, fn('C'), 'ArrowLeft')).toEqual(fn('B'))
-    expect(navigationTarget(target, fn('B'), 'ArrowUp')).toEqual(fn('A'))
-    expect(navigationTarget(target, fn('A'), 'ArrowLeft')).toBeNull()
-    expect(navigationTarget(target, fn('A'), 'ArrowUp')).toBeNull()
-  })
-
-  it('无选中 / 选中非节点（图表级 / 连线）时：任方向键选中投影首个节点', () => {
-    expect(navigationTarget(target, null, 'ArrowRight')).toEqual(fn('A'))
-    expect(navigationTarget(target, null, 'ArrowLeft')).toEqual(fn('A'))
-    expect(navigationTarget(target, { kind: 'diagram' }, 'ArrowDown')).toEqual(fn('A'))
-    expect(navigationTarget(target, { kind: 'edge', from: 'A', to: 'B', occurrence: 1 }, 'ArrowUp')).toEqual(fn('A'))
-  })
-
-  it('非方向键 / 选中已不存在 / 空投影 → null（无选中时也一样）', () => {
-    expect(navigationTarget(target, fn('B'), 'x')).toBeNull()
-    expect(navigationTarget(target, fn('X'), 'ArrowRight')).toEqual(fn('A'))
-    expect(navigationTarget({ ...target, projection: { ...target.projection, nodes: [] } }, null, 'ArrowRight')).toBeNull()
   })
 })
