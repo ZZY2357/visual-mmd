@@ -1,5 +1,7 @@
 # AGENTS.md
 
+在 /tdd 或 /code-review 中，默认不做真机/浏览器测试，因为速度很慢，只有要求你做真机/浏览器测试时才做
+
 ## Agent skills
 
 ### Issue tracker
