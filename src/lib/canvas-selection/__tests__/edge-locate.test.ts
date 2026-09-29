@@ -5,6 +5,13 @@ import {
   hitTestEdgeIdentity,
   relationShapesOf,
 } from '../edge-locate'
+import {
+  elementDataIdResolver,
+  nodeDataIdResolver,
+  selectionFromEventTarget,
+  type DataIdResolver,
+} from '../data-id'
+import { annotateNodeDataIds } from '../node-data-ids'
 
 /**
  * 连线位置序寻址的 DOM 适配层（工单 02）。
@@ -211,31 +218,36 @@ describe('sequence 连线/注释/块标注（工单 02）', () => {
     ).toEqual(['message:1', 'message:2', 'message:3'])
   })
 
-  it('注释（rect.note 的宿主 g）按文档序标 note:N', () => {
+  it('注释（rect.note 及同宿主兄弟元素）按文档序标 note:N', () => {
     const host = buildSequenceSvg()
     annotateSequenceIdentities(host, counts)
-    const noteGroups = Array.from(host.querySelectorAll('rect.note')).map((r) => r.parentElement)
-    expect(noteGroups.map((g) => g?.getAttribute('data-id'))).toEqual(['note:1', 'note:2'])
-    // 注释内的文本随宿主 g 一起被覆盖，点文本也可归属
-    expect(noteGroups[0]?.querySelector('text.noteText')?.textContent).toBe('a note')
+    const noteRects = Array.from(host.querySelectorAll('rect.note'))
+    expect(noteRects.map((r) => r.getAttribute('data-id'))).toEqual(['note:1', 'note:2'])
+    // 身份下移到几何元素后，宿主 <g> 保留 mermaid 自己的 data-id（i3 / i9），不被覆盖
+    expect(noteRects.map((r) => r.parentElement?.getAttribute('data-id'))).toEqual(['i3', 'i9'])
+    // 注释内的文本共享同一身份，点文本即可归属
+    expect(noteRects[0]?.parentElement?.querySelector('text.noteText')?.getAttribute('data-id')).toBe('note:1')
+    expect(noteRects[0]?.parentElement?.querySelector('text.noteText')?.textContent).toBe('a note')
   })
 
-  it('块（line.loopLine 的宿主 g，去重）标 block:N', () => {
+  it('块（line.loopLine 及同宿主兄弟元素，按宿主去重）标 block:N', () => {
     const host = buildSequenceSvg()
     annotateSequenceIdentities(host, counts)
-    const blockGroup = host.querySelector('line.loopLine')?.parentElement
-    expect(blockGroup?.getAttribute('data-id')).toBe('block:1')
-    // 同一块的多条 loopLine 只产生一个身份
-    const distinct = new Set(Array.from(host.querySelectorAll('line.loopLine')).map((l) => l.parentElement?.getAttribute('data-id')))
+    // 同一块的多条 loopLine 共享一个身份（位置序按宿主计，不按线计）
+    const distinct = new Set(Array.from(host.querySelectorAll('line.loopLine')).map((l) => l.getAttribute('data-id')))
     expect(Array.from(distinct)).toEqual(['block:1'])
+    // 块的标签（labelBox / labelText）也共享同一身份
+    expect(host.querySelector('polygon.labelBox')?.getAttribute('data-id')).toBe('block:1')
+    expect(host.querySelector('text.labelText')?.getAttribute('data-id')).toBe('block:1')
+    expect(host.querySelector('line.loopLine')?.parentElement?.getAttribute('data-id')).toBe('i8')
   })
 
   it('某个种类条数与投影不符 → 仅该种类不标（其余照标）', () => {
     const host = buildSequenceSvg()
     annotateSequenceIdentities(host, { messages: 9, notes: 2, blocks: 1 })
     expect(host.querySelectorAll('[data-id^="message:"]')).toHaveLength(0)
-    expect(host.querySelector('rect.note')?.parentElement?.getAttribute('data-id')).toBe('note:1')
-    expect(host.querySelector('line.loopLine')?.parentElement?.getAttribute('data-id')).toBe('block:1')
+    expect(host.querySelector('rect.note')?.getAttribute('data-id')).toBe('note:1')
+    expect(host.querySelector('line.loopLine')?.getAttribute('data-id')).toBe('block:1')
   })
 
   it('幂等：重复标注不改变结果', () => {
@@ -256,8 +268,112 @@ describe('sequence 连线/注释/块标注（工单 02）', () => {
     </svg>`
     annotateSequenceIdentities(host, { messages: 0, notes: 1, blocks: 1 })
     expect(host.querySelector('rect.rect')?.getAttribute('data-id')).toBeNull()
-    expect(host.querySelector('line.loopLine')?.parentElement?.getAttribute('data-id')).toBe('block:1')
-    expect(host.querySelector('rect.note')?.parentElement?.getAttribute('data-id')).toBe('note:1')
+    expect(host.querySelector('line.loopLine')?.getAttribute('data-id')).toBe('block:1')
+    expect(host.querySelector('rect.note')?.getAttribute('data-id')).toBe('note:1')
+  })
+})
+
+/** sequence 消息（与 edge-locate 内的 SEQUENCE_MESSAGE 同形态），用于桩几何 */
+const SEQUENCE_MESSAGE_SELECTOR =
+  'line[class~="messageLine0"], line[class~="messageLine1"], path[class~="messageLine0"], path[class~="messageLine1"]'
+
+describe('sequence 注释/块的点选命中（工单 03）', () => {
+  const counts = { messages: 3, notes: 2, blocks: 1 }
+
+  /** 给 fixture 的几何元素桩上互不重叠的直线：note:1 在 y=0、note:2 在 y=40、
+   *  块的两条 loopLine 在 y=100 / y=120、三条消息在 y=200 / 220 / 240。
+   *  探测点固定取 x=0（采样的端点必被采到），避免采样步长带来的取整误差 */
+  function buildHitFixture(): HTMLElement {
+    const host = buildSequenceSvg()
+    annotateSequenceIdentities(host, counts)
+    const notes = Array.from(host.querySelectorAll('rect.note'))
+    stubStraightGeometry(notes[0], 0, 0, 100, 0)
+    stubStraightGeometry(notes[1], 0, 40, 100, 40)
+    const loops = Array.from(host.querySelectorAll('line.loopLine'))
+    stubStraightGeometry(loops[0], 0, 100, 100, 100)
+    stubStraightGeometry(loops[1], 0, 120, 100, 120)
+    const messages = Array.from(host.querySelectorAll(SEQUENCE_MESSAGE_SELECTOR))
+    stubStraightGeometry(messages[0], 0, 200, 100, 200)
+    stubStraightGeometry(messages[1], 0, 220, 100, 220)
+    stubStraightGeometry(messages[2], 0, 240, 100, 240)
+    return host
+  }
+
+  it('点在 note 的矩形上 → 命中其位置序身份 note:N', () => {
+    const host = buildHitFixture()
+    expect(hitTestEdgeIdentity(host, 0, 1, 4)).toBe('note:1')
+    expect(hitTestEdgeIdentity(host, 0, 41, 4)).toBe('note:2')
+  })
+
+  it('点在 block 的线上 → 命中 block:N；同一块的两条 loopLine 只对应一个身份', () => {
+    const host = buildHitFixture()
+    expect(hitTestEdgeIdentity(host, 0, 101, 4)).toBe('block:1')
+    // 第二条 loopLine：同一个块，同一个身份（位置序按宿主计）
+    expect(hitTestEdgeIdentity(host, 0, 121, 4)).toBe('block:1')
+    // 两条边框线之间的空白不属于任何元素
+    expect(hitTestEdgeIdentity(host, 0, 110, 4)).toBeNull()
+  })
+
+  it('消息命中行为不变（工单 02 的既有语义）；远离任何元素 → null', () => {
+    const host = buildHitFixture()
+    expect(hitTestEdgeIdentity(host, 0, 201, 4)).toBe('message:1')
+    expect(hitTestEdgeIdentity(host, 0, 221, 4)).toBe('message:2')
+    expect(hitTestEdgeIdentity(host, 0, 241, 4)).toBe('message:3')
+    expect(hitTestEdgeIdentity(host, 0, 300, 4)).toBeNull()
+  })
+
+  it('note 与消息相邻时取最近的一个（与既有 best 距离比较一致）', () => {
+    const host = document.createElement('div')
+    host.innerHTML = `<svg><g data-id="i3"><rect class="note"/></g><line class="messageLine0" data-id="i0"/></svg>`
+    annotateSequenceIdentities(host, { messages: 1, notes: 1, blocks: 0 })
+    stubStraightGeometry(host.querySelector('rect.note')!, 0, 0, 100, 0)
+    stubStraightGeometry(host.querySelector('line')!, 0, 6, 100, 6)
+    expect(hitTestEdgeIdentity(host, 0, 2, 4)).toBe('note:1') // 距 note 2、距 message 4
+    expect(hitTestEdgeIdentity(host, 0, 5, 4)).toBe('message:1') // note 已出容差，message 距 1
+    expect(hitTestEdgeIdentity(host, 0, 20, 4)).toBeNull()
+  })
+
+  it('宿主 <g> 保留 mermaid 的 iN（i3 / i8），且 iN 不参与几何命中', () => {
+    const host = buildSequenceSvg()
+    annotateSequenceIdentities(host, counts)
+    const noteHost = host.querySelector('rect.note')!.parentElement!
+    const blockHost = host.querySelector('line.loopLine')!.parentElement!
+    expect(noteHost.getAttribute('data-id')).toBe('i3')
+    expect(blockHost.getAttribute('data-id')).toBe('i8')
+    // 给宿主 <g> 桩一条几何：若 mermaid 的 iN 被当成连线身份，点这里会返回 'i3'
+    stubStraightGeometry(noteHost, 0, 900, 100, 900)
+    expect(hitTestEdgeIdentity(host, 50, 900, 4)).toBeNull()
+    // 几何命中只认子元素上的位置序身份
+    stubStraightGeometry(host.querySelector('rect.note')!, 0, 900, 100, 900)
+    expect(hitTestEdgeIdentity(host, 50, 900, 4)).toBe('note:1')
+  })
+
+  it('身份下移不被节点命中路径误吃（rect.note 与节点 rect 同标签）', () => {
+    const host = document.createElement('div')
+    host.innerHTML = `<svg class="sequenceDiagram">
+      <g class="node" data-id="甲"><rect/><text>甲</text></g>
+      <g data-id="i3"><rect class="note"/><text class="noteText">a note</text></g>
+    </svg>`
+    annotateNodeDataIds(host)
+    annotateSequenceIdentities(host, { messages: 0, notes: 1, blocks: 0 })
+    const resolver: DataIdResolver = (dataId) =>
+      nodeDataIdResolver(['甲'])(dataId) ?? elementDataIdResolver(['note:1'])(dataId)
+    // 节点反注只认 g.node：rect.note 拿到的是注释身份，不是节点 id
+    expect(host.querySelector('rect.note')?.getAttribute('data-id')).toBe('note:1')
+    expect(selectionFromEventTarget(host.querySelector('rect.note'), resolver)).toEqual({
+      kind: 'element',
+      elementId: 'note:1',
+    })
+    // 点注释文字：宿主 <g> 的 mermaid iN 不被任何 resolver 认领，靠子元素上的身份归属
+    expect(selectionFromEventTarget(host.querySelector('text.noteText'), resolver)).toEqual({
+      kind: 'element',
+      elementId: 'note:1',
+    })
+    // 节点自身照旧命中
+    expect(selectionFromEventTarget(host.querySelector('g.node > rect'), resolver)).toEqual({
+      kind: 'node',
+      id: '甲',
+    })
   })
 })
 

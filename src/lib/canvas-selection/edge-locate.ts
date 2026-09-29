@@ -136,14 +136,43 @@ export function annotateClassRelationIdentities(root: ParentNode, relations: rea
   })
 }
 
+/**
+ * 宿主 → 身份（工单 03）：位置序的**计数单位仍是宿主 `<g>`**，但身份标在该宿主的
+ * **子元素**上，而不是宿主自己。
+ *
+ * 为什么必须下移：`distanceToPath`（见下）只对有 `getTotalLength` 的几何元素工作，
+ * `<g>` 没有 → 身份留在宿主上永远进不了候选，`hitTestEdgeIdentity` 对 note / block
+ * 恒返回 null（spec 的 F3）。
+ *
+ * 同宿主**共享一个 elementId**：实测一个块有两条 `line.loopLine`（块的上下边框），
+ * 若各标一个身份，一个块就会拿到两个位置序。共享后「命中时取最近者」即「点这个块」。
+ *
+ * 标哪些子元素：宿主的**直接子元素中的非 `<g>`**。除几何锚点（`rect.note` /
+ * 每条 `line.loopLine`）外也含标签文字（`text.noteText` / `polygon.labelBox` /
+ * `text.labelText`）——身份下移后宿主 `<g>` 只剩 mermaid 自己的 `iN`，若只标几何，
+ * 点在注释文字上会沿 DOM 上行找不到身份。排除 `<g>` 是为了不把块内嵌的内容也归属成块
+ * （本模块「绝不误归属」的硬要求）。
+ */
+function annotateHostAnchors(hosts: readonly Element[], kind: EdgeIdentityKind, expected: number): void {
+  if (expected <= 0 || hosts.length !== expected) return
+  hosts.forEach((host, ordinal) => {
+    const elementId = edgeElementIdOf(kind, ordinal)
+    if (elementId === null) return
+    for (const child of Array.from(host.children)) {
+      if (child.tagName === 'g') continue
+      child.setAttribute('data-id', elementId)
+    }
+  })
+}
+
 /** sequence：标注消息线 / 注释 / 块（各自按投影顺序编号，条数不符的种类整体放弃） */
 export function annotateSequenceIdentities(
   root: ParentNode,
   counts: { messages: number; notes: number; blocks: number },
 ): void {
   annotateAnchors(Array.from(root.querySelectorAll(SEQUENCE_MESSAGE)), 'message', counts.messages)
-  annotateAnchors(hostGroupsOf(Array.from(root.querySelectorAll(SEQUENCE_NOTE_RECT))), 'note', counts.notes)
-  annotateAnchors(hostGroupsOf(Array.from(root.querySelectorAll(SEQUENCE_BLOCK_LINE))), 'block', counts.blocks)
+  annotateHostAnchors(hostGroupsOf(Array.from(root.querySelectorAll(SEQUENCE_NOTE_RECT))), 'note', counts.notes)
+  annotateHostAnchors(hostGroupsOf(Array.from(root.querySelectorAll(SEQUENCE_BLOCK_LINE))), 'block', counts.blocks)
 }
 
 /** 屏幕命中容差（CSS px）：sequence 消息线 only 1.5px 描边，给一点余量但不足以吃到空白 */
