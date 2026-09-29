@@ -168,3 +168,15 @@ export function setElseLabelIntent(elementId: string, label: string): SequenceIn
 export function deleteElseIntent(elementId: string): SequenceIntent {
   return { type: 'delete-else', elementId }
 }
+
+// ---------- rect / box 区域块（工单 06：只改名，不做分组编辑） ----------
+
+/** 改 rect 区域块的色值（原样写回，不校验颜色合法性——mermaid 侧自行处理） */
+export function setRectColorIntent(elementId: string, color: string): SequenceIntent {
+  return { type: 'set-rect-color', elementId, color }
+}
+
+/** 改 box 分组框的标签文本（空串 = 去掉标签；颜色 token 由管线原样保留） */
+export function setBoxLabelIntent(elementId: string, label: string): SequenceIntent {
+  return { type: 'set-box-label', elementId, label: label !== '' ? label : null }
+}

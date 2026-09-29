@@ -13,8 +13,8 @@ import type { AnyProjection } from '../lib/diagram-registry'
 import { useEditorStore } from '../store/editor'
 import { StructureTree } from './StructureTree'
 import { ClassDefForm, DiagramForm, EdgeForm, NodeForm, SubgraphForm } from './property-forms'
-import { BlockForm, MessageForm, NoteForm, ParticipantForm, SequenceDiagramForm } from './sequence-forms'
-import { ClassForm, ClassNoteForm, MemberForm, RelationForm } from './class-forms'
+import { BlockForm, MessageForm, NoteForm, ParticipantForm, SequenceDiagramForm, SequenceRegionForm } from './sequence-forms'
+import { ClassForm, ClassNoteForm, MemberForm, NamespaceForm, RelationForm } from './class-forms'
 import { MindmapNodeForm } from './mindmap-forms'
 import { resolveMindmapSelection, type MindmapProjection } from '../lib/projection/mindmap-projection'
 import { ThemePicker } from './ThemePicker'
@@ -126,6 +126,10 @@ function SequenceSelectionForm({
       if (b === undefined || !isBlockOpen(b)) return null
       return <BlockForm block={b} elseBranches={elseBranchesOf(projection, b.elementId)} />
     }
+    case 'seq-region': {
+      const r = projection.regions.find((x) => x.elementId === selection.elementId)
+      return r !== undefined ? <SequenceRegionForm region={r} /> : null
+    }
     default:
       return null
   }
@@ -168,6 +172,10 @@ function ClassSelectionForm({
     case 'class-note': {
       const n = projection.notes.find((x) => x.elementId === selection.elementId)
       return n !== undefined ? <ClassNoteForm note={n} /> : null
+    }
+    case 'class-namespace': {
+      const ns = projection.namespaces.find((x) => x.elementId === selection.elementId)
+      return ns !== undefined ? <NamespaceForm namespace={ns} /> : null
     }
     case 'classdef': {
       const cd = projection.classDefs.find((x) => x.name === selection.name)

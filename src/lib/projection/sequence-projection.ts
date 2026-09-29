@@ -4,12 +4,14 @@ import {
   type BlockElseData,
   type BlockKeyword,
   type BlockOpenData,
+  type BoxOpenData,
   type MessageArrow,
   type MessageData,
   type MessageAct,
   type NoteData,
   type NotePos,
   type ParticipantData,
+  type RectOpenData,
   stripAliasQuotes,
 } from '../pipeline/sequence'
 import { type Selection } from './selection'
@@ -68,6 +70,16 @@ export interface ProjectionElse {
   depth: number
 }
 
+/**
+ * rect / box 区域块（工单 06）：渲染产物无 data-id、不构成 DOM 包含（ADR-0014），
+ * 故只作结构树上的区域节点（可见 + 可改名），不做分组编辑。
+ */
+export type ProjectionRegion =
+  /** `rect <色值>`：可改名项是色值 */
+  | { elementId: string; kind: 'rect'; color: string }
+  /** `box <颜色?> <标签?>`：可改名项是标签（颜色 token 原样保留） */
+  | { elementId: string; kind: 'box'; color: string | null; label: string | null }
+
 export interface SequenceProjection {
   autonumber: boolean
   participants: ProjectionParticipant[]
@@ -75,6 +87,8 @@ export interface SequenceProjection {
   notes: ProjectionNote[]
   /** open 与 else 分支按文档顺序混排（depth 供树形展示） */
   blocks: Array<ProjectionBlock | ProjectionElse>
+  /** rect / box 区域块，按文档顺序 */
+  regions: ProjectionRegion[]
 }
 
 /**
@@ -97,6 +111,7 @@ export function buildSequenceProjection(doc: SourceDocument): SequenceProjection
   const messages: ProjectionMessage[] = []
   const notes: ProjectionNote[] = []
   const blocks: Array<ProjectionBlock | ProjectionElse> = []
+  const regions: ProjectionRegion[] = []
   const depthStack: number[] = []
   const activeDelta = new Map<string, boolean>()
 
@@ -146,6 +161,11 @@ export function buildSequenceProjection(doc: SourceDocument): SequenceProjection
       blocks.push({ elementId: part.id, keyword: e.keyword, label: e.label, depth: depthStack.length })
     } else if (data.kind === 'block-end') {
       depthStack.pop()
+    } else if (data.kind === 'rect-open') {
+      regions.push({ elementId: part.id, kind: 'rect', color: (data as RectOpenData).colorRaw })
+    } else if (data.kind === 'box-open') {
+      const b = data as BoxOpenData
+      regions.push({ elementId: part.id, kind: 'box', color: b.colorRaw, label: b.label })
     }
   }
 
@@ -163,7 +183,7 @@ export function buildSequenceProjection(doc: SourceDocument): SequenceProjection
     }
   })
 
-  return { autonumber, participants, messages, notes, blocks }
+  return { autonumber, participants, messages, notes, blocks, regions }
 }
 
 // ---------- 选中回落 ----------
@@ -187,6 +207,8 @@ export function resolveSequenceSelection(
       return projection.notes.some((n) => n.elementId === selection.elementId) ? selection : null
     case 'block':
       return projection.blocks.some((b) => b.elementId === selection.elementId) ? selection : null
+    case 'seq-region':
+      return projection.regions.some((r) => r.elementId === selection.elementId) ? selection : null
     default:
       return null
   }

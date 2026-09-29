@@ -228,6 +228,12 @@ export const zhDict = {
       messages: '消息',
       notes: '注释',
       blocks: '逻辑块',
+      // 无 data-id 的区域块：rect / box（工单 06）——只可见可改名，不做分组编辑
+      regions: '区域与分组',
+      rectRegion: 'rect（背景区域）',
+      boxRegion: 'box（分组框）',
+      rectColor: '色值（如 rgb(200, 220, 255) 或 #eee）',
+      boxLabel: '分组标签',
       autonumber: 'autonumber 自动编号',
       actorType: 'actor（小人）',
       participantType: 'participant（方框）',
@@ -279,6 +285,10 @@ export const zhDict = {
       floatingNote: '浮动 note',
       noteFor: 'note for {{cls}}',
       classDefHint: '仅常用样式项可表单化编辑，其余属性请直接在代码面板修改。',
+      // ---- class namespace（工单 06） ----
+      namespaces: '命名空间',
+      namespaceName: '命名空间名',
+      invalidNamespaceName: '命名空间名不能为空',
       // ---- mindmap（工单 08） ----
       addChild: '添加子节点',
       addSibling: '添加同级节点',

@@ -1,7 +1,15 @@
 import { describe, expect, it } from 'vitest'
 import { applyEdit } from '../pipeline'
 import { reassemble } from '../document'
-import { sequenceParser, renderNote, renderParticipant, type NoteData, type ParticipantData } from '../sequence'
+import {
+  sequenceParser,
+  renderNote,
+  renderParticipant,
+  type BoxOpenData,
+  type NoteData,
+  type ParticipantData,
+  type RectOpenData,
+} from '../sequence'
 import { SEQUENCE_TEMPLATE } from '../../diagram-registry'
 
 /**
@@ -385,7 +393,7 @@ describe('create 声明进模型（工单 01，ADR-0014）', () => {
     expect(result.source).not.toMatch(/\bB\b/)
   })
 
-  it('destroy / rect / box 仍逐字保留、不进解析结构（只解析出 box 内的 participant）', () => {
+  it('destroy 仍不解析；rect / box 及其 end 进解析结构（工单 06）', () => {
     const source = `sequenceDiagram
     participant A
     A->>B: hi
@@ -400,12 +408,164 @@ describe('create 声明进模型（工单 01，ADR-0014）', () => {
     expect(parsed.ok).toBe(true)
     if (!parsed.ok) return
     expect(reassemble(parsed.doc)).toBe(source)
+    // destroy 逐字保留、不进结构；rect/box 的开闭都成为元素
     expect(parsed.doc.elements.map((p) => p.element.kind)).toEqual([
       'seq-header',
       'participant',
       'message',
+      'rect-open',
+      'region-end',
+      'box-open',
       'participant',
+      'region-end',
     ])
+    expect(parsed.doc.elements.map((p) => p.element.kind)).not.toContain('destroy')
+  })
+})
+
+// ---------- rect / box 进模型（工单 06，ADR-0014） ----------
+
+/** 解析出的 rect-open / box-open 元素（断言用） */
+function regionOpenElements(source: string): Array<RectOpenData | BoxOpenData> {
+  const parsed = sequenceParser.parse(source)
+  expect(parsed.ok, `样例源码必须可解析：${source}`).toBe(true)
+  if (!parsed.ok) throw parsed.error
+  return parsed.doc.elements
+    .filter((part) => part.element.kind === 'rect-open' || part.element.kind === 'box-open')
+    .map((part) => part.element as RectOpenData | BoxOpenData)
+}
+
+describe('rect / box 进模型（工单 06）', () => {
+  it('rect：色值原文整段透出（gap 为关键字后的空白）', () => {
+    const [rect] = regionOpenElements('sequenceDiagram\n    rect rgb(200, 150, 255)\n    end\n')
+    expect(rect).toEqual({ kind: 'rect-open', gap: ' ', colorRaw: 'rgb(200, 150, 255)' })
+  })
+
+  it('box：颜色 token + 标签拆分（按 mermaid 的「颜色在前、描述在后」）', () => {
+    const [box] = regionOpenElements('sequenceDiagram\n    box Purple 数据库组\n    end\n')
+    expect(box).toEqual({ kind: 'box-open', gap: ' ', colorRaw: 'Purple', colorGap: ' ', label: '数据库组' })
+  })
+
+  it('box：首段非颜色（中文/单 token）时整段都是标签，colorRaw 为 null', () => {
+    expect(regionOpenElements('sequenceDiagram\n    box 数据库组\n    end\n')[0]).toEqual({
+      kind: 'box-open',
+      gap: ' ',
+      colorRaw: null,
+      colorGap: '',
+      label: '数据库组',
+    })
+    // 单 token（无描述）：mermaid 视其为颜色，但无剩余文本 → 这里保守当作标签，逐字仍一致
+    expect(regionOpenElements('sequenceDiagram\n    box Purple\n    end\n')[0]).toEqual({
+      kind: 'box-open',
+      gap: ' ',
+      colorRaw: null,
+      colorGap: '',
+      label: 'Purple',
+    })
+  })
+
+  it('box：颜色函数写法同样拆出（rgb(...) 首段）', () => {
+    const [box] = regionOpenElements('sequenceDiagram\n    box rgb(0, 0, 0) 分组\n    end\n')
+    expect(box).toEqual({ kind: 'box-open', gap: ' ', colorRaw: 'rgb(0, 0, 0)', colorGap: ' ', label: '分组' })
+  })
+
+  it('verbatim：rect / box（含嵌套与单行写法）解析→重组装逐字相同', () => {
+    const source = `sequenceDiagram
+    %% 注释
+    rect rgb(200, 150, 255)
+        box 自定义框
+            participant 内部
+        end
+    end
+    box   Purple   数据库组
+    end
+`
+    const parsed = sequenceParser.parse(source)
+    if (!parsed.ok) throw parsed.error
+    expect(reassemble(parsed.doc)).toBe(source)
+  })
+
+  it('set-rect-color：只改 rect 行的色值，内部成员逐字不变', () => {
+    const source = `sequenceDiagram
+    participant A
+    rect rgb(200, 150, 255)
+        A->>A: 自转
+    end
+`
+    const result = applyEdit(source, sequenceParser, {
+      type: 'set-rect-color',
+      elementId: 'rect:1',
+      color: 'rgb(255, 0, 0)',
+    })
+    expect(result.ok).toBe(true)
+    if (!result.ok) return
+    expect(result.source).toContain('    rect rgb(255, 0, 0)\n')
+    expect(result.source).toContain('        A->>A: 自转\n')
+    expect(result.source).not.toContain('200, 150, 255')
+  })
+
+  it('set-box-label：保留颜色 token，只改标签', () => {
+    const source = `sequenceDiagram
+    box Purple 数据库组
+        participant DB
+    end
+`
+    const result = applyEdit(source, sequenceParser, {
+      type: 'set-box-label',
+      elementId: 'box:1',
+      label: '存储层',
+    })
+    expect(result.ok).toBe(true)
+    if (!result.ok) return
+    expect(result.source).toContain('    box Purple 存储层\n')
+    expect(result.source).toContain('        participant DB\n')
+  })
+
+  it('set-box-label：无颜色 token 的 box 直接替换整段', () => {
+    const source = 'sequenceDiagram\n    box 数据库组\n    end\n'
+    const result = applyEdit(source, sequenceParser, {
+      type: 'set-box-label',
+      elementId: 'box:1',
+      label: '存储层',
+    })
+    expect(result.ok).toBe(true)
+    if (!result.ok) return
+    expect(result.source).toBe('sequenceDiagram\n    box 存储层\n    end\n')
+  })
+
+  it('目标不存在时返回错误（rect / box 意图各一）', () => {
+    expect(applyEdit('sequenceDiagram\n', sequenceParser, { type: 'set-rect-color', elementId: 'rect:9', color: '#fff' }).ok).toBe(false)
+    expect(applyEdit('sequenceDiagram\n', sequenceParser, { type: 'set-box-label', elementId: 'box:9', label: 'x' }).ok).toBe(false)
+  })
+
+  it('嵌套栈正确：loop 内的 rect 的 end 不会误配成 loop 的 end', () => {
+    const source = `sequenceDiagram
+    participant A
+    loop 外层
+        rect rgb(0,0,0)
+            A->>A: hi
+        end
+    end
+`
+    const parsed = sequenceParser.parse(source)
+    expect(parsed.ok).toBe(true)
+    if (!parsed.ok) return
+    expect(parsed.doc.elements.map((p) => p.element.kind)).toEqual([
+      'seq-header',
+      'participant',
+      'block-open',
+      'rect-open',
+      'message',
+      'region-end',
+      'block-end',
+    ])
+    // 删 loop 应连同内部 rect 一起移除（open 到匹配 end 的区间正确）
+    const result = applyEdit(source, sequenceParser, { type: 'delete-block', elementId: 'block:1' })
+    expect(result.ok).toBe(true)
+    if (!result.ok) return
+    expect(result.source).not.toContain('loop')
+    expect(result.source).not.toContain('rect')
+    expect(result.source).not.toMatch(/^[ \t]*end[ \t]*$/m)
   })
 })
 

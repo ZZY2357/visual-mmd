@@ -11,7 +11,8 @@ import { useEditorStore } from '../store/editor'
 /**
  * 结构树（工单 04）：属性面板上半区，展示图中全部元素，
  * 点击选中并定位到下半区的属性表单。
- * sequence 分支（工单 06）：参与者 / 消息 / note / 逻辑块按嵌套深度展示。
+ * sequence 分支（工单 06）：参与者 / 消息 / note / 逻辑块 / rect-box 区域按嵌套深度展示。
+ * class 分支（工单 06）：类 / 命名空间 / 成员 / 关系 / note / 样式。
  * mindmap 分支（工单 08）：树形缩进即主编辑界面——层级节点直接在树中增删。
  */
 
@@ -221,6 +222,20 @@ function SequenceTree({ projection }: { projection: Extract<AnyProjection, { typ
           onSelect={() => select({ kind: 'block', elementId: b.elementId })}
         />
       ))}
+
+      <Text size="xs" c="dimmed" mt={4} px="xs">
+        {t('app:propertyPanel.regions')}（{projection.regions.length}）
+      </Text>
+      {projection.regions.map((r) => (
+        <TreeItem
+          key={r.elementId}
+          label={r.kind === 'box' ? (r.label ?? t('app:propertyPanel.boxRegion')) : t('app:propertyPanel.rectRegion')}
+          detail={r.kind === 'box' ? (r.color ?? undefined) : r.color}
+          active={is({ kind: 'seq-region', elementId: r.elementId })}
+          depth={1}
+          onSelect={() => select({ kind: 'seq-region', elementId: r.elementId })}
+        />
+      ))}
     </Stack>
   )
 }
@@ -252,6 +267,19 @@ function ClassTree({ projection }: { projection: Extract<AnyProjection, { type: 
           active={is({ kind: 'class', name: c.name })}
           depth={1}
           onSelect={() => select({ kind: 'class', name: c.name })}
+        />
+      ))}
+
+      <Text size="xs" c="dimmed" mt={4} px="xs">
+        {t('app:propertyPanel.namespaces')}（{projection.namespaces.length}）
+      </Text>
+      {projection.namespaces.map((ns) => (
+        <TreeItem
+          key={ns.elementId}
+          label={ns.name}
+          active={is({ kind: 'class-namespace', elementId: ns.elementId })}
+          depth={1}
+          onSelect={() => select({ kind: 'class-namespace', elementId: ns.elementId })}
         />
       ))}
 

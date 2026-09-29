@@ -16,9 +16,11 @@ import { lineAtOffset, type Span } from './span'
  * - activate / deactivate（含消息简写 +/-：`A->>+B` 激活 B、`A-->>-B` 停用 B）
  * - note over / left of / right of
  * - 逻辑块：loop / alt-else / opt / par-and / critical / break（含嵌套）
+ * - rect / box 区域块（工单 06，ADR-0014）：渲染产物无 data-id、不构成 DOM 包含，
+ *   只做「解析 + 结构树可见 + 可改名」，不做分组编辑
  *
- * 不解析、原样保留（清单外语法不报错，ADR-0008）：destroy、rect、box、
- * 注释、空行、以及一切无法识别的行。
+ * 不解析、原样保留（清单外语法不报错，ADR-0008）：destroy、注释、空行、
+ * 以及一切无法识别的行。
  *
  * span 约定：元素 span 从该行首个非空白字符起、到行尾（不含换行）；
  * 行首缩进与换行永远留在 verbatim。
@@ -118,6 +120,39 @@ export interface BlockEndData {
   kind: 'block-end'
 }
 
+/**
+ * `rect <色值>` 区域块的开行（工单 06）。实测渲染为 `<rect class="rect">`、无 data-id，
+ * 是 `<svg>` 的直接子元素（不构成 DOM 包含）；故只做可见与可改名。
+ */
+export interface RectOpenData {
+  kind: 'rect-open'
+  /** `rect` 与色值之间的空白 */
+  gap: string
+  /** 色值原文（`rect` 之后的整段，逐字保留） */
+  colorRaw: string
+}
+
+/**
+ * `box <颜色?> <标签?>` 参与者分组框的开行（工单 06）。实测是图形层叠而非 DOM 父子
+ * （`participant DB` 仍照常获得 `g[DB]`），故同样只做可见与可改名。
+ */
+export interface BoxOpenData {
+  kind: 'box-open'
+  /** `box` 与内容之间的空白 */
+  gap: string
+  /** 前置颜色 token 原文（如 `Purple` / `rgb(...)`）；无颜色时为 null */
+  colorRaw: string | null
+  /** 颜色与标签之间的空白；无颜色时为 '' */
+  colorGap: string
+  /** 标签文本；无标签时为 null */
+  label: string | null
+}
+
+/** rect / box（工单 06 统称「区域」）的收尾 `end` 行 */
+export interface RegionEndData {
+  kind: 'region-end'
+}
+
 export type SequenceElementData =
   | SeqHeaderData
   | ParticipantData
@@ -128,6 +163,9 @@ export type SequenceElementData =
   | BlockOpenData
   | BlockElseData
   | BlockEndData
+  | RectOpenData
+  | BoxOpenData
+  | RegionEndData
 
 // ---------- 渲染 ----------
 
@@ -192,6 +230,19 @@ export function renderBlockElse(d: BlockElseData, changes: { label?: string | nu
   return label === null || label === '' ? d.keyword : `${d.keyword}${d.gap}${label}`
 }
 
+export function renderRectOpen(d: RectOpenData, changes: { color?: string } = {}): string {
+  return `rect${d.gap}${changes.color ?? d.colorRaw}`
+}
+
+export function renderBoxOpen(d: BoxOpenData, changes: { label?: string | null } = {}): string {
+  const label = changes.label !== undefined ? changes.label : d.label
+  // 无颜色：整行内容就是标签；有颜色：颜色 token 逐字保留，只换标签
+  if (d.colorRaw === null) return `box${d.gap}${label ?? ''}`
+  return label === null || label === ''
+    ? `box${d.gap}${d.colorRaw}`
+    : `box${d.gap}${d.colorRaw}${d.colorGap}${label}`
+}
+
 // ---------- 行级解析 ----------
 
 const HEADER_RE = /^([ \t]*)(sequenceDiagram)([ \t\r]*)$/i
@@ -212,6 +263,17 @@ const ACTIVATION_RE = /^(activate|deactivate)([ \t]+)(\S+)[ \t]*$/i
 const AUTONUMBER_RE = /^autonumber([ \t]+.*)?[ \t]*$/i
 const BLOCK_OPEN_RE = /^(loop|alt|opt|par|critical|break)(?:[ \t]+(.*?))?[ \t]*$/i
 const BLOCK_ELSE_RE = /^(else|and)(?:[ \t]+(.*?))?[ \t]*$/i
+/** 区域块开行（工单 06）：`rect <色值>`；`box <颜色?> <标签?>` */
+const RECT_OPEN_RE = /^rect([ \t]+)(.*)$/i
+const BOX_OPEN_RE = /^box([ \t]+)(.*)$/i
+/**
+ * box 行尾的「颜色 + 标签」拆分，按 mermaid 的 parseBoxData 形状（颜色在前、描述在后）：
+ * 首段是 `rgb()/rgba()/hsl()/hsla()` 调用或一个单词。mermaid 还会用 window.CSS.supports
+ * 校验单词是否为合法颜色名——解析器是纯函数（ADR-0004）不碰浏览器 API，故这里保守处理：
+ * 仅当首段之后仍有非空白文本时才把它当颜色 token（`box Purple 组` → 颜色 Purple + 标签「组」），
+ * 否则整段都是标签。逐字回写不受此拆分影响（renderBoxOpen 原样拼回）。
+ */
+const BOX_HEAD_RE = /^((?:rgba?|hsla?)\s*\(.*\)|\w*)([\s\S]*)$/
 /**
  * 消息：from 箭头 [act] to : 文本（from 懒惰匹配，避免吞掉箭头字符）。
  * 箭头按最长优先：`-->>`（虚线+箭头头，mermaid 亦接受）归一为 `-->` 语义；
@@ -360,6 +422,41 @@ function classifyLine(line: string, lineStart: number, lineNo: number, entries: 
     return
   }
 
+  const rect = RECT_OPEN_RE.exec(raw)
+  if (rect !== null) {
+    counters.rect++
+    entries.push({
+      span,
+      id: `rect:${counters.rect}`,
+      data: { kind: 'rect-open', gap: rect[1], colorRaw: rect[2] },
+    })
+    return
+  }
+
+  const box = BOX_OPEN_RE.exec(raw)
+  if (box !== null) {
+    counters.box++
+    const head = box[2]
+    const m = BOX_HEAD_RE.exec(head)
+    const first = m?.[1] ?? ''
+    const rest = m?.[2] ?? ''
+    // 首段之后仍有非空白文本 → 首段是颜色 token，其后是标签；否则整段都是标签
+    const hasColor = first !== '' && /\S/.test(rest)
+    const colorGap = hasColor ? (/^[ \t]*/.exec(rest)?.[0] ?? '') : ''
+    entries.push({
+      span,
+      id: `box:${counters.box}`,
+      data: {
+        kind: 'box-open',
+        gap: box[1],
+        colorRaw: hasColor ? first : null,
+        colorGap,
+        label: hasColor ? rest.slice(colorGap.length) : head,
+      },
+    })
+    return
+  }
+
   const message = MESSAGE_RE.exec(raw)
   // from 以 - / > 结尾说明把箭头字符吃进了 from（如清单外的 `A--xB`），不按消息解析
   if (message !== null && !/[->]$/.test(message[1])) {
@@ -383,7 +480,7 @@ function classifyLine(line: string, lineStart: number, lineNo: number, entries: 
     return
   }
 
-  // 其余（destroy、rect、box、注释、无法识别的指令）不解析，verbatim 逐字保留
+  // 其余（destroy、注释、无法识别的指令）不解析，verbatim 逐字保留
   void lineNo
 }
 
@@ -394,6 +491,8 @@ interface Counters {
   block: number
   else: number
   autonumber: number
+  rect: number
+  box: number
   participant: Map<string, number>
 }
 
@@ -430,9 +529,14 @@ export class SequenceParser implements DiagramParser {
       block: 0,
       else: 0,
       autonumber: 0,
+      rect: 0,
+      box: 0,
       participant: new Map(),
     }
-    const blockStack: number[] = []
+    // 未闭合的「开行」栈：逻辑块（loop/alt/…）与区域块（rect/box，工单 06）共用，
+    // `end` 关闭最内层。类型分开记录，好让 rect/box 的 end 出 `region-end`、
+    // 不干扰逻辑块的 open/end 配对（matchingEnd / blockShapes / pruneEmptyBlocks）。
+    const openStack: Array<{ lineNo: number; scope: 'block' | 'region' }> = []
     let seenHeader = false
     // 文首 frontmatter 块（主题等配置）不参与解析，整体 verbatim 保留（工单 11）
     const bodyStart = frontmatterEnd(source)
@@ -459,18 +563,24 @@ export class SequenceParser implements DiagramParser {
             data: { kind: 'seq-header', keyword: header[2], trailing: header[3] ?? '' },
           })
         } else if (trimmed === 'end') {
-          if (blockStack.length === 0) {
-            // 清单外块（rect/box）的 end：不解析，原样保留
-          } else {
-            blockStack.pop()
+          const top = openStack.pop()
+          if (top !== undefined) {
             const firstChar = line.length - line.trimStart().length
-            entries.push({ span: { start: cursor + firstChar, end: cursor + line.length }, id: `end:${lineNo}`, data: { kind: 'block-end' } })
+            const span = { start: cursor + firstChar, end: cursor + line.length }
+            entries.push(
+              top.scope === 'region'
+                ? { span, id: `region-end:${lineNo}`, data: { kind: 'region-end' } }
+                : { span, id: `end:${lineNo}`, data: { kind: 'block-end' } },
+            )
           }
+          // 无匹配开行的 end：不解析，原样保留（清单外的 end）
         } else {
           classifyLine(line, cursor, lineNo, entries, counters)
           const last = entries[entries.length - 1]
-          if (last !== undefined && last.span.start >= cursor && last.data.kind === 'block-open') {
-            blockStack.push(lineNo)
+          if (last !== undefined && last.span.start >= cursor) {
+            const kind = last.data.kind
+            if (kind === 'block-open') openStack.push({ lineNo, scope: 'block' })
+            else if (kind === 'rect-open' || kind === 'box-open') openStack.push({ lineNo, scope: 'region' })
           }
         }
       }
@@ -482,8 +592,8 @@ export class SequenceParser implements DiagramParser {
     if (!seenHeader) {
       throw parseFailure(1, '图表必须以 sequenceDiagram 声明开始')
     }
-    if (blockStack.length > 0) {
-      throw parseFailure(blockStack[blockStack.length - 1], '逻辑块缺少匹配的 end')
+    if (openStack.length > 0) {
+      throw parseFailure(openStack[openStack.length - 1].lineNo, '逻辑块或区域块缺少匹配的 end')
     }
     return assembleDocument(source, entries)
   }
@@ -528,6 +638,10 @@ export class SequenceParser implements DiagramParser {
         return this.resolveDeleteElse(doc, intent as never)
       case 'delete-block':
         return this.resolveDeleteBlock(doc, intent as never)
+      case 'set-rect-color':
+        return this.resolveSetRectColor(doc, intent as never)
+      case 'set-box-label':
+        return this.resolveSetBoxLabel(doc, intent as never)
       default:
         return null
     }
@@ -958,6 +1072,26 @@ export class SequenceParser implements DiagramParser {
     }
     return rewrites
   }
+
+  // ----- rect / box 区域块（工单 06：只做可见与可改名，不做分组编辑） -----
+
+  private resolveSetRectColor(
+    doc: SourceDocument,
+    intent: Extract<SequenceIntent, { type: 'set-rect-color' }>,
+  ): Map<string, string> | null {
+    const part = getElementById(doc, intent.elementId)
+    if (part === undefined || part.element.kind !== 'rect-open') return null
+    return new Map([[part.id, renderRectOpen(part.element as RectOpenData, { color: intent.color })]])
+  }
+
+  private resolveSetBoxLabel(
+    doc: SourceDocument,
+    intent: Extract<SequenceIntent, { type: 'set-box-label' }>,
+  ): Map<string, string> | null {
+    const part = getElementById(doc, intent.elementId)
+    if (part === undefined || part.element.kind !== 'box-open') return null
+    return new Map([[part.id, renderBoxOpen(part.element as BoxOpenData, { label: intent.label })]])
+  }
 }
 
 /** 新建参与者 id 的合法性校验（表单层复用，与意图落地侧同一规则） */
@@ -1006,6 +1140,10 @@ export type SequenceIntent =
   | { type: 'delete-else'; elementId: string }
   /** 删除逻辑块（open 到匹配 end 的全部元素） */
   | { type: 'delete-block'; elementId: string }
+  /** 改 rect 区域块的色值（工单 06） */
+  | { type: 'set-rect-color'; elementId: string; color: string }
+  /** 改 box 分组框的标签文本（工单 06；颜色 token 原样保留） */
+  | { type: 'set-box-label'; elementId: string; label: string | null }
 
 /** 元素所在行的行首缩进（插入新行时跟随用户缩进习惯） */
 function lineIndent(source: string, offset: number): string {

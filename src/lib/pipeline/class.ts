@@ -21,6 +21,8 @@ import {
  *   -->（关联）、..>（依赖），含标签与 "基数"
  * - note for X "文本" / note "浮动文本"
  * - classDef（与 flowchart 同语法，复用其解析与渲染）
+ * - namespace Foo { ... }（工单 06，ADR-0014）：渲染为视觉边框、不构成 DOM 包含
+ *   （`childDataIds: []`），只做「解析 + 结构树可见 + 可改名」，不做分组编辑
  *
  * 不解析、原样保留（清单外语法不报错，ADR-0008）：linkStyle、CSS 注入
  * （cssClass / style）、direction、注释、空行、以及一切无法识别的行。
@@ -175,12 +177,41 @@ export function renderNote(d: NoteData, changes: { forClass?: string | null; tex
   return `note${d.gap}for${d.forGap ?? ' '}${forClass}${d.gap2}${d.quote}${text}${d.quote}${d.trailing}`
 }
 
+/**
+ * `namespace <名字> { ... }` 的开行（工单 06）。实测渲染为 `<g class="cluster undefined">`、
+ * 无 data-id，且内部的类**不在** cluster 内（`childDataIds: []`）——只是视觉边框，
+ * 故只做可见与可改名，不做「把类移进 namespace」这类分组编辑。
+ *
+ * 与类的花括号块配对：namespace 开行与 class 开行分别压在**同类**的块栈上，
+ * 收尾 `}` 按栈顶类型出 `namespace-end` / `class-end`（两类块各自闭合，互不串味）。
+ * 只支持「`{` 在同一行」的写法（含单行 `namespace Foo { class A }`，整行原样保留、不拆内联类）；
+ * `{` 换行的写法保持 verbatim 不解析。
+ */
+export interface NamespaceData {
+  kind: 'namespace'
+  /** `namespace` 与名字之间的空白 */
+  gap: string
+  name: string
+  /** 名字之后到行尾的原文（如 ` {`、` { class A }`）；逐字保留 */
+  tail: string
+}
+
+export function renderNamespace(d: NamespaceData, changes: { name?: string } = {}): string {
+  return `namespace${d.gap}${changes.name ?? d.name}${d.tail}`
+}
+
+export interface NamespaceEndData {
+  kind: 'namespace-end'
+}
+
 export type ClassElementData =
   | ClassHeaderData
   | ClassDeclData
   | MemberData
   | RelationData
   | NoteData
+  | NamespaceData
+  | NamespaceEndData
   | ClassDefData
   | { kind: 'class-end' }
 
@@ -188,6 +219,8 @@ export type ClassElementData =
 
 const HEADER_RE = /^([ \t]*)(classDiagram)([ \t\r]*)$/i
 const CLASS_DECL_RE = /^class([ \t]+)([^\s~{]+)(~[^~]*~)?([ \t]*\{[ \t\r]*|[ \t\r]*)$/
+/** namespace 开行：`namespace <名字> {`（`{` 必须与名字同行；其余形式保持 verbatim） */
+const NAMESPACE_RE = /^namespace([ \t]+)(\S+)([\s\S]*)$/
 const ONE_LINE_MEMBER_RE = /^([^\s~:{}]+)((?:[ \t]*):[ \t]*)((?:[+\-#~])?)([ \t]*)(.*)$/
 const NOTE_FOR_RE = /^note([ \t]+)for([ \t]+)([^\s"']+)([ \t]+)(["'])(.*)\5([ \t\r]*)$/i
 const NOTE_FLOAT_RE = /^note([ \t]+)(["'])(.*)\2([ \t\r]*)$/i
@@ -313,6 +346,16 @@ function parseClassDeclLine(line: string, start: number): ClassDeclData | null {
   }
 }
 
+function parseNamespaceLine(line: string, start: number): NamespaceData | null {
+  const m = NAMESPACE_RE.exec(line.slice(start))
+  if (m === null) return null
+  const tail = m[3]
+  // 只认同一行开 `{` 的写法：`namespace Foo {`（多行）与 `namespace Foo { class A }`（单行）。
+  // `{` 换行的写法（mermaid 也接受）保持 verbatim，不在此解析。
+  if (!tail.trimStart().startsWith('{')) return null
+  return { kind: 'namespace', gap: m[1], name: m[2], tail }
+}
+
 function parseNoteLine(line: string, start: number): NoteData | null {
   const forMatch = NOTE_FOR_RE.exec(line.slice(start))
   if (forMatch !== null) {
@@ -348,17 +391,19 @@ function classifyLine(line: string, lineStart: number, lineNo: number, entries: 
   const trimmed = line.trim()
   const span = { start: lineStart + firstChar, end: lineStart + line.length }
 
-  if (trimmed === '}') {
-    counters.end++
-    entries.push({ span, id: `class-end:${counters.end}`, data: { kind: 'class-end' } })
-    return
-  }
-
   const decl = parseClassDeclLine(line, firstChar)
   if (decl !== null) {
     counters.class.set(decl.name, (counters.class.get(decl.name) ?? 0) + 1)
     const count = counters.class.get(decl.name) as number
     entries.push({ span, id: `class:${decl.name}` + (count > 1 ? `#${count}` : ''), data: decl })
+    return
+  }
+
+  const ns = parseNamespaceLine(line, firstChar)
+  if (ns !== null) {
+    counters.namespace.set(ns.name, (counters.namespace.get(ns.name) ?? 0) + 1)
+    const count = counters.namespace.get(ns.name) as number
+    entries.push({ span, id: `namespace:${ns.name}` + (count > 1 ? `#${count}` : ''), data: ns })
     return
   }
 
@@ -414,6 +459,7 @@ function classifyLine(line: string, lineStart: number, lineNo: number, entries: 
 
 interface Counters {
   class: Map<string, number>
+  namespace: Map<string, number>
   classDef: Map<string, number>
   member: number
   relation: number
@@ -441,13 +487,16 @@ export class ClassParser implements DiagramParser {
     const entries: RawEntry[] = []
     const counters: Counters = {
       class: new Map(),
+      namespace: new Map(),
       classDef: new Map(),
       member: 0,
       relation: 0,
       note: 0,
       end: 0,
     }
-    const blockStack: number[] = []
+    // 未闭合的 `{` 栈：类花括号块与 namespace 块分开记，收尾 `}` 按栈顶类型出对应 end
+    // （题面要求「类声明也用 {}，正则要能区分」——靠这里的类型栈区分，两族块互不串味）。
+    const blockStack: Array<{ lineNo: number; kind: 'class' | 'namespace' }> = []
     let seenHeader = false
     // 文首 frontmatter 块（主题等配置）不参与解析，整体 verbatim 保留（工单 11）
     const bodyStart = frontmatterEnd(source)
@@ -474,16 +523,33 @@ export class ClassParser implements DiagramParser {
             data: { kind: 'class-header', keyword: header[2], trailing: header[3] ?? '' },
           })
         } else if (trimmed === '}') {
-          if (blockStack.length === 0) {
+          const top = blockStack.pop()
+          if (top === undefined) {
             throw parseFailure(lineNo, '多余的 }（没有与之匹配的类花括号块）')
           }
-          blockStack.pop()
-          classifyLine(line, cursor, lineNo, entries, counters, blockStack.length > 0)
+          const firstChar = line.length - line.trimStart().length
+          const span = { start: cursor + firstChar, end: cursor + line.length }
+          if (top.kind === 'namespace') {
+            entries.push({ span, id: `namespace-end:${lineNo}`, data: { kind: 'namespace-end' } })
+          } else {
+            counters.end++
+            entries.push({ span, id: `class-end:${counters.end}`, data: { kind: 'class-end' } })
+          }
         } else {
-          classifyLine(line, cursor, lineNo, entries, counters, blockStack.length > 0)
+          // 只有「块栈顶是类块」时才把行当作块内成员——namespace 体内只允许类/嵌套 namespace
+          const top = blockStack[blockStack.length - 1]
+          classifyLine(line, cursor, lineNo, entries, counters, top?.kind === 'class')
           const last = entries[entries.length - 1]
-          if (last !== undefined && last.span.start >= cursor && last.data.kind === 'class' && (last.data as ClassDeclData).openBrace) {
-            blockStack.push(lineNo)
+          if (last !== undefined && last.span.start >= cursor) {
+            if (last.data.kind === 'class' && (last.data as ClassDeclData).openBrace) {
+              blockStack.push({ lineNo, kind: 'class' })
+            } else if (
+              last.data.kind === 'namespace' &&
+              // 单行写法 `namespace Foo { class A }` 同行即闭合，不进栈
+              (last.data as NamespaceData).tail.trimEnd().endsWith('{')
+            ) {
+              blockStack.push({ lineNo, kind: 'namespace' })
+            }
           }
         }
       }
@@ -496,7 +562,8 @@ export class ClassParser implements DiagramParser {
       throw parseFailure(1, '图表必须以 classDiagram 声明开始')
     }
     if (blockStack.length > 0) {
-      throw parseFailure(blockStack[blockStack.length - 1], '类花括号块缺少匹配的 }')
+      const open = blockStack[blockStack.length - 1]
+      throw parseFailure(open.lineNo, open.kind === 'namespace' ? 'namespace 缺少匹配的 }' : '类花括号块缺少匹配的 }')
     }
     return assembleDocument(source, entries)
   }
@@ -535,6 +602,8 @@ export class ClassParser implements DiagramParser {
         return this.resolveSetClassDefProp(doc, intent as never)
       case 'add-classdef':
         return this.resolveAddClassDef(doc, intent as never)
+      case 'set-namespace-name':
+        return this.resolveSetNamespaceName(doc, intent as never)
       default:
         return null
     }
@@ -867,6 +936,18 @@ export class ClassParser implements DiagramParser {
       renderClassDefRaw({ kind: 'classdef', name: intent.name, gap: ' ', items }),
     ])
   }
+
+  // ----- namespace（工单 06：只做可见与可改名，不做分组编辑） -----
+
+  private resolveSetNamespaceName(
+    doc: SourceDocument,
+    intent: Extract<ClassIntent, { type: 'set-namespace-name' }>,
+  ): Map<string, string> | null {
+    const part = getElementById(doc, intent.elementId)
+    if (part === undefined || part.element.kind !== 'namespace') return null
+    if (intent.name === '') return null
+    return new Map([[part.id, renderNamespace(part.element as NamespaceData, { name: intent.name })]])
+  }
 }
 
 /** 新建类名的合法性校验（表单层复用，与意图落地侧同一规则） */
@@ -913,6 +994,8 @@ export type ClassIntent =
   | { type: 'set-classdef-prop'; name: string; prop: string; value: string }
   /** 新增 classDef 行 */
   | { type: 'add-classdef'; name: string; props?: Record<string, string>; afterElementId?: string }
+  /** 改 namespace 名（工单 06；行尾原文逐字保留） */
+  | { type: 'set-namespace-name'; elementId: string; name: string }
 
 /** 元素所在行的行首缩进（插入新行时跟随用户缩进习惯） */
 function lineIndent(source: string, offset: number): string {

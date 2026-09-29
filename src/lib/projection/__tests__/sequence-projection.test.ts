@@ -255,7 +255,7 @@ describe('create 引入的参与者进投影（工单 01）', () => {
     expect(proj.messages).toHaveLength(2)
   })
 
-  it('destroy / rect / box 不进投影（参与者集合只含真实声明与引用）', () => {
+  it('destroy 不进投影；rect / box 只进 regions、不改变参与者集合（工单 06）', () => {
     const proj = project(
       `sequenceDiagram
     participant B
@@ -271,5 +271,47 @@ describe('create 引入的参与者进投影（工单 01）', () => {
 
     expect(proj.participants.map((p) => p.actorId)).toEqual(['B', 'A', 'C'])
     expect(proj.participants.every((p) => p.created !== true)).toBe(true)
+    expect(proj.regions).toEqual([
+      { elementId: 'rect:1', kind: 'rect', color: 'rgb(0, 0, 0)' },
+      { elementId: 'box:1', kind: 'box', color: null, label: '分组' },
+    ])
+  })
+})
+
+// ---------- rect / box 进投影（工单 06，ADR-0014） ----------
+
+describe('rect / box 进投影为区域节点（工单 06）', () => {
+  it('rect 与 box 按文档顺序各自成项；box 透出颜色与标签', () => {
+    const proj = project(
+      `sequenceDiagram
+    rect rgb(200, 150, 255)
+    end
+    box Purple 数据库组
+        participant DB
+    end
+    rect #eee
+    end
+`,
+    )
+
+    expect(proj.regions).toEqual([
+      { elementId: 'rect:1', kind: 'rect', color: 'rgb(200, 150, 255)' },
+      { elementId: 'box:1', kind: 'box', color: 'Purple', label: '数据库组' },
+      { elementId: 'rect:2', kind: 'rect', color: '#eee' },
+    ])
+  })
+
+  it('无 rect / box 时 regions 为空数组（既有图形不回归）', () => {
+    const proj = project('sequenceDiagram\n    A->>B: hi\n')
+    expect(proj.regions).toEqual([])
+  })
+
+  it('resolveSequenceSelection：区域节点按 elementId 命中', () => {
+    const proj = project('sequenceDiagram\n    rect rgb(0,0,0)\n    end\n')
+    expect(resolveSequenceSelection(proj, { kind: 'seq-region', elementId: 'rect:1' })).toEqual({
+      kind: 'seq-region',
+      elementId: 'rect:1',
+    })
+    expect(resolveSequenceSelection(proj, { kind: 'seq-region', elementId: 'rect:9' })).toBeNull()
   })
 })

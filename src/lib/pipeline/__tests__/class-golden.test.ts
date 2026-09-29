@@ -118,4 +118,27 @@ describe('金样合法性（class）', () => {
     expect(result.source).toContain('class 新类')
     await expect(mermaid.parse(result.source)).resolves.toBeTruthy()
   })
+
+  it('namespace 改名后产物 parse 通过（工单 06）', async () => {
+    const source = `classDiagram
+namespace Shapes {
+    class Circle {
+        +double r
+    }
+}
+`
+    await expect(mermaid.parse(source)).resolves.toBeTruthy()
+
+    const result = applyEdit(source, classParser, {
+      type: 'set-namespace-name',
+      elementId: 'namespace:Shapes',
+      name: 'Geometry',
+    })
+    expect(result.ok).toBe(true)
+    if (!result.ok) return
+    expect(result.source).toContain('namespace Geometry {\n')
+    expect(result.source).toContain('    class Circle {\n')
+    expect(result.source).toContain('        +double r\n')
+    await expect(mermaid.parse(result.source)).resolves.toBeTruthy()
+  })
 })

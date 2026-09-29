@@ -1,6 +1,9 @@
 /**
  * 编辑器共享选中类型（工单 06 起）：flowchart 与 sequence 的选中种类并集。
  * 各图种的 resolveSelection 逻辑留在各自投影模块中。
+ *
+ * 注（工单 06）：`seq-region`（rect / box）与 `class-namespace` 这类无 data-id 的结构
+ * 只能从结构树点选——画布上没有可命中的 DOM 元素（ADR-0014）。
  */
 
 export type Selection =
@@ -15,11 +18,15 @@ export type Selection =
   | { kind: 'message'; elementId: string }
   | { kind: 'note'; elementId: string }
   | { kind: 'block'; elementId: string }
+  /** rect / box 区域块（工单 06：无 data-id、不进画布命中集合，只从结构树选中） */
+  | { kind: 'seq-region'; elementId: string }
   // class（工单 07）
   | { kind: 'class'; name: string }
   | { kind: 'class-member'; elementId: string }
   | { kind: 'class-relation'; elementId: string }
   | { kind: 'class-note'; elementId: string }
+  /** namespace 命名分组（工单 06：无 data-id、不构成 DOM 包含，只从结构树选中） */
+  | { kind: 'class-namespace'; elementId: string }
   // mindmap（工单 08）
   | { kind: 'mindmap-node'; elementId: string }
 
@@ -45,6 +52,8 @@ export function selectionKey(sel: Selection): string {
       return `note:${sel.elementId}`
     case 'block':
       return `block:${sel.elementId}`
+    case 'seq-region':
+      return `seq-region:${sel.elementId}`
     case 'class':
       return `class:${sel.name}`
     case 'class-member':
@@ -53,6 +62,8 @@ export function selectionKey(sel: Selection): string {
       return `class-relation:${sel.elementId}`
     case 'class-note':
       return `class-note:${sel.elementId}`
+    case 'class-namespace':
+      return `class-namespace:${sel.elementId}`
     case 'mindmap-node':
       return `mindmap-node:${sel.elementId}`
   }

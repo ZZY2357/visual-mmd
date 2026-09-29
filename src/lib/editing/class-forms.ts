@@ -119,3 +119,15 @@ export function setNoteIntent(elementId: string, form: { className?: string | nu
 export function deleteNoteIntent(elementId: string): ClassIntent {
   return { type: 'delete-note', elementId }
 }
+
+// ---------- namespace（工单 06：只改名，不做分组编辑） ----------
+
+/** 改 namespace 名（空串不落码——命名空间必须有名字，返回 null 由表单侧显示错误） */
+export function setNamespaceNameIntent(
+  elementId: string,
+  name: string,
+): Extract<ClassIntent, { type: 'set-namespace-name' }> | null {
+  const trimmed = name.trim()
+  if (trimmed === '') return null
+  return { type: 'set-namespace-name', elementId, name: trimmed }
+}

@@ -17,10 +17,12 @@ import {
   renameParticipantIntent,
   setAutonumberIntent,
   setBlockLabelIntent,
+  setBoxLabelIntent,
   setElseLabelIntent,
   setMessageIntent,
   setNoteIntent,
   setParticipantAliasIntent,
+  setRectColorIntent,
   toggleActivationIntent,
 } from '../lib/editing/sequence-forms'
 import type {
@@ -29,6 +31,7 @@ import type {
   ProjectionMessage,
   ProjectionNote,
   ProjectionParticipant,
+  ProjectionRegion,
   SequenceProjection,
 } from '../lib/projection/sequence-projection'
 import { useEditorStore } from '../store/editor'
@@ -310,6 +313,63 @@ function ElseForm({ branch }: { branch: ProjectionElse }) {
       >
         {t('app:propertyPanel.delete')}
       </Button>
+    </Stack>
+  )
+}
+
+// ---------- rect / box 区域块（工单 06：只改名，不做分组编辑） ----------
+
+/** rect / box 区域块属性表单：rect 改色值、box 改标签（颜色 token 由管线保留）。 */
+export function SequenceRegionForm({ region }: { region: ProjectionRegion }) {
+  if (region.kind === 'rect') return <RectColorForm elementId={region.elementId} color={region.color} />
+  return <BoxLabelForm elementId={region.elementId} label={region.label} color={region.color} />
+}
+
+function RectColorForm({ elementId, color }: { elementId: string; color: string }) {
+  const t = useTranslation().t
+  const commitIntent = useCommit()
+  const colorDraft = useDraft(color, (next) => {
+    commitIntent(setRectColorIntent(elementId, next))
+  })
+  return (
+    <Stack gap="sm">
+      <Text size="sm" c="dimmed">
+        {t('app:propertyPanel.rectRegion')}
+      </Text>
+      <TextInput
+        label={t('app:propertyPanel.rectColor')}
+        value={colorDraft.draft}
+        onChange={(e) => colorDraft.setDraft(e.currentTarget.value)}
+        onBlur={colorDraft.commit}
+        onKeyDown={(e) => {
+          if (e.key === 'Enter') colorDraft.commit()
+        }}
+      />
+    </Stack>
+  )
+}
+
+function BoxLabelForm({ elementId, label, color }: { elementId: string; label: string | null; color: string | null }) {
+  const t = useTranslation().t
+  const commitIntent = useCommit()
+  const labelDraft = useDraft(label ?? '', (next) => {
+    commitIntent(setBoxLabelIntent(elementId, next))
+  })
+  return (
+    <Stack gap="sm">
+      <Text size="sm" c="dimmed">
+        {t('app:propertyPanel.boxRegion')}
+        {color !== null ? ` · ${color}` : ''}
+      </Text>
+      <TextInput
+        label={t('app:propertyPanel.boxLabel')}
+        value={labelDraft.draft}
+        onChange={(e) => labelDraft.setDraft(e.currentTarget.value)}
+        onBlur={labelDraft.commit}
+        onKeyDown={(e) => {
+          if (e.key === 'Enter') labelDraft.commit()
+        }}
+      />
     </Stack>
   )
 }

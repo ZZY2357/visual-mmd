@@ -172,4 +172,28 @@ describe('金样合法性（sequence）', () => {
   it('对照：空 loop 源文本本身也能 parse 通过（故金样合法性不足以拦住该缺陷）', async () => {
     await expect(mermaid.parse('sequenceDiagram\n    actor A\n    loop 每次编辑\n    end\n')).resolves.toBeTruthy()
   })
+
+  it('rect / box 改色值与标签后产物 parse 通过（工单 06）', async () => {
+    const source = `sequenceDiagram
+    rect rgb(200, 150, 255)
+        A->>B: hi
+    end
+    box Purple 数据库组
+        participant DB
+    end
+`
+    await expect(mermaid.parse(source)).resolves.toBeTruthy()
+
+    const rect = applyEdit(source, sequenceParser, { type: 'set-rect-color', elementId: 'rect:1', color: 'rgb(255, 0, 0)' })
+    expect(rect.ok).toBe(true)
+    if (!rect.ok) return
+    expect(rect.source).toContain('    rect rgb(255, 0, 0)\n')
+    await expect(mermaid.parse(rect.source)).resolves.toBeTruthy()
+
+    const box = applyEdit(source, sequenceParser, { type: 'set-box-label', elementId: 'box:1', label: '存储层' })
+    expect(box.ok).toBe(true)
+    if (!box.ok) return
+    expect(box.source).toContain('    box Purple 存储层\n')
+    await expect(mermaid.parse(box.source)).resolves.toBeTruthy()
+  })
 })

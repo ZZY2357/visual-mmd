@@ -2,6 +2,7 @@ import type { SourceDocument } from '../pipeline/document'
 import {
   type ClassDeclData,
   type MemberData,
+  type NamespaceData,
   type NoteData,
   type RelationData,
   type RelationKind,
@@ -63,12 +64,24 @@ export interface ProjectionClassDef {
   props: Record<string, string>
 }
 
+/**
+ * namespace（工单 06）：渲染产物无 data-id、且不构成 DOM 包含（`childDataIds: []`），
+ * 故只作结构树上的命名分组节点（可见 + 可改名），不做分组编辑。
+ */
+export interface ProjectionNamespace {
+  /** `namespace:<名字>`，编辑意图据此寻址 */
+  elementId: string
+  name: string
+}
+
 export interface ClassProjection {
   classes: ProjectionClass[]
   members: ProjectionMember[]
   relations: ProjectionRelation[]
   notes: ProjectionNote[]
   classDefs: ProjectionClassDef[]
+  /** namespace 命名分组，按首次出现顺序 */
+  namespaces: ProjectionNamespace[]
 }
 
 /** 从解析产物构建 class 投影（纯函数） */
@@ -79,6 +92,8 @@ export function buildClassProjection(doc: SourceDocument): ClassProjection {
   const relations: ProjectionRelation[] = []
   const notes: ProjectionNote[] = []
   const classDefs: ProjectionClassDef[] = []
+  const namespaces: ProjectionNamespace[] = []
+  const namespaceSeen = new Set<string>()
   // 块内成员的宿主：最近一个开块的类声明
   let currentBlockOwner: string | null = null
 
@@ -128,10 +143,16 @@ export function buildClassProjection(doc: SourceDocument): ClassProjection {
       }
     } else if (data.kind === 'class-end') {
       currentBlockOwner = null
+    } else if (data.kind === 'namespace') {
+      const ns = data as NamespaceData
+      if (!namespaceSeen.has(ns.name)) {
+        namespaceSeen.add(ns.name)
+        namespaces.push({ elementId: part.id, name: ns.name })
+      }
     }
   }
 
-  return { classes, members, relations, notes, classDefs }
+  return { classes, members, relations, notes, classDefs, namespaces }
 }
 
 // ---------- 选中回落 ----------
@@ -152,6 +173,8 @@ export function resolveClassSelection(projection: ClassProjection, selection: Se
       return projection.relations.some((r) => r.elementId === selection.elementId) ? selection : null
     case 'class-note':
       return projection.notes.some((n) => n.elementId === selection.elementId) ? selection : null
+    case 'class-namespace':
+      return projection.namespaces.some((n) => n.elementId === selection.elementId) ? selection : null
     default:
       return null
   }

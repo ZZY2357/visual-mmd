@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { applyEdit } from '../pipeline'
 import { reassemble } from '../document'
-import { classParser } from '../class'
+import { classParser, type NamespaceData } from '../class'
 
 /**
  * class 解析器测试（工单 07，ADR-0004/0008）：
@@ -35,6 +35,11 @@ const FULL_COVERAGE = `classDiagram
     note "浮动注释"
 
     classDef styled fill:#f9f,stroke:#333,stroke-width:4px
+
+    namespace Shapes {
+        class Circle
+        class Triangle
+    }
 
     linkStyle 0 stroke:red
     cssClass "Square" styled
@@ -247,6 +252,141 @@ describe('手术式改写（class）：只重写目标元素 span，其余逐字
 
   it('目标元素不存在时返回错误', () => {
     const result = applyEdit(SOURCE, classParser, { type: 'set-relation', elementId: 'relation:99', label: 'x' })
+    expect(result.ok).toBe(false)
+  })
+})
+
+// ---------- namespace 进模型（工单 06，ADR-0014） ----------
+
+/** 解析出的 namespace 元素（断言用） */
+function namespaceElements(source: string): NamespaceData[] {
+  const parsed = classParser.parse(source)
+  expect(parsed.ok, `样例源码必须可解析：${source}`).toBe(true)
+  if (!parsed.ok) throw parsed.error
+  return parsed.doc.elements
+    .filter((part) => part.element.kind === 'namespace')
+    .map((part) => part.element as NamespaceData)
+}
+
+describe('namespace 进模型（工单 06）', () => {
+  it('解析出 namespace 名与行尾原文，类声明照常解析', () => {
+    const source = `classDiagram
+namespace Shapes {
+    class Circle
+}
+`
+    const parsed = classParser.parse(source)
+    expect(parsed.ok).toBe(true)
+    if (!parsed.ok) return
+    expect(parsed.doc.elements.map((p) => p.element.kind)).toEqual([
+      'class-header',
+      'namespace',
+      'class',
+      'namespace-end',
+    ])
+    expect(namespaceElements(source)[0]).toEqual({ kind: 'namespace', gap: ' ', name: 'Shapes', tail: ' {' })
+    expect(reassemble(parsed.doc)).toBe(source)
+  })
+
+  it('花括号配对不串味：class 块与 namespace 块各自闭合', () => {
+    const source = `classDiagram
+class A {
+    +int x
+}
+namespace N {
+    class B
+}
+`
+    const parsed = classParser.parse(source)
+    expect(parsed.ok).toBe(true)
+    if (!parsed.ok) return
+    expect(parsed.doc.elements.map((p) => p.element.kind)).toEqual([
+      'class-header',
+      'class',
+      'member',
+      'class-end',
+      'namespace',
+      'class',
+      'namespace-end',
+    ])
+    expect(reassemble(parsed.doc)).toBe(source)
+  })
+
+  it('单行写法 `namespace Foo { class A }`：整行进模型、逐字保留、内联类不拆分', () => {
+    const source = 'classDiagram\nnamespace Foo { class A }\n'
+    const parsed = classParser.parse(source)
+    expect(parsed.ok).toBe(true)
+    if (!parsed.ok) return
+    expect(parsed.doc.elements.map((p) => p.element.kind)).toEqual(['class-header', 'namespace'])
+    expect(namespaceElements(source)[0]).toEqual({ kind: 'namespace', gap: ' ', name: 'Foo', tail: ' { class A }' })
+    expect(reassemble(parsed.doc)).toBe(source)
+  })
+
+  it('verbatim：带缩进 / 注释的 namespace 源码解析→重组装逐字相同', () => {
+    const source = `classDiagram
+    %% 注释
+    namespace BaseShapes {
+        class Triangle
+        class Rectangle
+    }
+`
+    const parsed = classParser.parse(source)
+    if (!parsed.ok) throw parsed.error
+    expect(reassemble(parsed.doc)).toBe(source)
+  })
+
+  it('set-namespace-name：只改命名空间行，内部类逐字不变', () => {
+    const source = `classDiagram
+namespace Shapes {
+    class Circle
+}
+`
+    const result = applyEdit(source, classParser, {
+      type: 'set-namespace-name',
+      elementId: 'namespace:Shapes',
+      name: 'Geometry',
+    })
+    expect(result.ok).toBe(true)
+    if (!result.ok) return
+    expect(result.source).toContain('namespace Geometry {\n')
+    expect(result.source).toContain('    class Circle\n')
+    expect(result.source).not.toContain('namespace Shapes')
+  })
+
+  it('set-namespace-name：单行写法只换名字，行尾原文保留', () => {
+    const source = 'classDiagram\nnamespace Foo { class A }\n'
+    const result = applyEdit(source, classParser, {
+      type: 'set-namespace-name',
+      elementId: 'namespace:Foo',
+      name: 'Bar',
+    })
+    expect(result.ok).toBe(true)
+    if (!result.ok) return
+    expect(result.source).toBe('classDiagram\nnamespace Bar { class A }\n')
+  })
+
+  it('rename-class 不触碰 namespace 行（成员行不被移动，工单边界）', () => {
+    const source = `classDiagram
+namespace Shapes {
+    class Circle {
+        +double r
+    }
+}
+`
+    const result = applyEdit(source, classParser, { type: 'rename-class', name: 'Circle', newName: 'Ring' })
+    expect(result.ok).toBe(true)
+    if (!result.ok) return
+    expect(result.source).toContain('namespace Shapes {\n')
+    expect(result.source).toContain('    class Ring {\n')
+    expect(result.source).toContain('        +double r\n')
+  })
+
+  it('目标不存在时返回错误', () => {
+    const result = applyEdit('classDiagram\n', classParser, {
+      type: 'set-namespace-name',
+      elementId: 'namespace:不存在',
+      name: 'X',
+    })
     expect(result.ok).toBe(false)
   })
 })

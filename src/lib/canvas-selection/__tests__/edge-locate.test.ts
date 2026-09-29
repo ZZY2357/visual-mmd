@@ -245,6 +245,20 @@ describe('sequence 连线/注释/块标注（工单 02）', () => {
     annotateSequenceIdentities(host, counts)
     expect(host.innerHTML).toBe(first)
   })
+
+  it('rect 区域块（rect.rect，工单 06）不是标注对象：无 data-id、不进命中集合', () => {
+    const host = document.createElement('div')
+    // 区域矩形是 <svg> 的直接子元素、无 data-id（实测）；块与注释照旧
+    host.innerHTML = `<svg class="sequenceDiagram">
+      <rect class="rect"/>
+      <g data-id="i8"><line class="loopLine"/></g>
+      <g data-id="i3"><rect class="note"/><text class="noteText">a note</text></g>
+    </svg>`
+    annotateSequenceIdentities(host, { messages: 0, notes: 1, blocks: 1 })
+    expect(host.querySelector('rect.rect')?.getAttribute('data-id')).toBeNull()
+    expect(host.querySelector('line.loopLine')?.parentElement?.getAttribute('data-id')).toBe('block:1')
+    expect(host.querySelector('rect.note')?.parentElement?.getAttribute('data-id')).toBe('note:1')
+  })
 })
 
 describe('连线命中判定：沿真实路径采样（工单 02）', () => {

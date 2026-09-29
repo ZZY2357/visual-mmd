@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { Button, Group, Select, Stack, Text, TextInput } from '@mantine/core'
 import { useTranslation } from 'react-i18next'
-import type { ProjectionClass, ProjectionMember, ProjectionNote, ProjectionRelation } from '../lib/projection/class-projection'
+import type { ProjectionClass, ProjectionMember, ProjectionNamespace, ProjectionNote, ProjectionRelation } from '../lib/projection/class-projection'
 import { useEditorStore } from '../store/editor'
 import { useDraft } from './property-forms'
 import {
@@ -17,6 +17,7 @@ import {
   renameClassIntent,
   setClassGenericIntent,
   setMemberIntent,
+  setNamespaceNameIntent,
   setNoteIntent,
   setRelationIntent,
 } from '../lib/editing/class-forms'
@@ -236,6 +237,43 @@ export function ClassNoteForm({ note }: { note: ProjectionNote }) {
       >
         {t('app:propertyPanel.deleteNote')}
       </Button>
+    </Stack>
+  )
+}
+
+// ---------- namespace（工单 06：只改名，不做分组编辑） ----------
+
+/** namespace 属性表单：改命名空间名（行尾原文由管线逐字保留）。 */
+export function NamespaceForm({ namespace }: { namespace: ProjectionNamespace }) {
+  const t = useTranslation().t
+  const commitIntent = useCommit()
+  const nameDraft = useDraft(namespace.name, (next) => {
+    const intent = setNamespaceNameIntent(namespace.elementId, next)
+    if (intent !== null && commitIntent(intent)) {
+      // 改名后元素 id 随之变化（namespace:<名字>）：跟随选中，避免表单回落图表级
+      useEditorStore.getState().select({ kind: 'class-namespace', elementId: `namespace:${intent.name}` })
+    }
+  })
+
+  return (
+    <Stack gap="sm">
+      <Text size="sm" c="dimmed">
+        {t('app:propertyPanel.namespaces')}
+      </Text>
+      <TextInput
+        label={t('app:propertyPanel.namespaceName')}
+        value={nameDraft.draft}
+        onChange={(e) => nameDraft.setDraft(e.currentTarget.value)}
+        onBlur={nameDraft.commit}
+        onKeyDown={(e) => {
+          if (e.key === 'Enter') nameDraft.commit()
+        }}
+        error={
+          setNamespaceNameIntent(namespace.elementId, nameDraft.draft) === null && nameDraft.draft !== namespace.name
+            ? t('app:propertyPanel.invalidNamespaceName')
+            : undefined
+        }
+      />
     </Stack>
   )
 }
