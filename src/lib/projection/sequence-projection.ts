@@ -75,12 +75,22 @@ export interface SequenceProjection {
   blocks: Array<ProjectionBlock | ProjectionElse>
 }
 
-/** 从解析产物构建 sequence 投影（纯函数） */
+/**
+ * 从解析产物构建 sequence 投影（纯函数）。
+ *
+ * 参与者按 actorId 合并：隐式引用（消息 / note / activate 里先出现）与显式声明
+ * （`participant` / `actor`）合成同一个投影参与者——mermaid 侧同样只渲染一个；
+ * 有显式声明时以声明信息为准（alias 显示文本、actor 小人样式、elementId 寻址）。
+ * 顺序取「首次出现顺序」（声明与引用都算出现），与 mermaid 的 actor 插入顺序一致。
+ */
 export function buildSequenceProjection(doc: SourceDocument): SequenceProjection {
   const autonumber = doc.elements.some((part) => part.element.kind === 'autonumber')
 
+  /** actorId → 显式声明（同名声明后者覆盖前者，与 mermaid 的 addActor 覆盖语义一致） */
   const declared = new Map<string, ProjectionParticipant>()
-  const referenced: string[] = []
+  /** actorId 首次出现顺序（声明或引用；去重靠 touched） */
+  const order: string[] = []
+  const touched = new Set<string>()
   const messages: ProjectionMessage[] = []
   const notes: ProjectionNote[] = []
   const blocks: Array<ProjectionBlock | ProjectionElse> = []
@@ -88,13 +98,16 @@ export function buildSequenceProjection(doc: SourceDocument): SequenceProjection
   const activeDelta = new Map<string, boolean>()
 
   const touch = (actorId: string) => {
-    if (!declared.has(actorId) && !referenced.includes(actorId)) referenced.push(actorId)
+    if (touched.has(actorId)) return
+    touched.add(actorId)
+    order.push(actorId)
   }
 
   for (const part of doc.elements) {
     const data = part.element
     if (data.kind === 'participant') {
       const p = data as ParticipantData
+      touch(p.actorId)
       declared.set(p.actorId, {
         actorId: p.actorId,
         alias: p.aliasRaw !== null ? stripAliasQuotes(p.aliasRaw) : null,
@@ -130,19 +143,19 @@ export function buildSequenceProjection(doc: SourceDocument): SequenceProjection
     }
   }
 
-  const participants: ProjectionParticipant[] = [...declared.values()]
-  for (const actorId of referenced) {
-    participants.push({
+  // 组装：按首次出现顺序，每个 actorId 恰好一项；有声明用声明信息，否则为隐式参与者
+  const participants: ProjectionParticipant[] = order.map((actorId) => {
+    const decl = declared.get(actorId)
+    const active = activeDelta.get(actorId) ?? false
+    if (decl !== undefined) return { ...decl, active }
+    return {
       actorId,
       alias: null,
       keyword: 'participant',
       elementId: `participant:${actorId}`,
-      active: activeDelta.get(actorId) ?? false,
-    })
-  }
-  for (const p of participants) {
-    p.active = activeDelta.get(p.actorId) ?? false
-  }
+      active,
+    }
+  })
 
   return { autonumber, participants, messages, notes, blocks }
 }
