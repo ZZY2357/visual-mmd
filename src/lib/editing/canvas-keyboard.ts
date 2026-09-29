@@ -1,6 +1,7 @@
 import type { ClassIntent } from '../pipeline/class'
 import type { FlowchartIntent } from '../pipeline/flowchart'
 import { nodeElementId } from '../pipeline/flowchart'
+import { mindmapNodeElementId } from '../pipeline/element-id'
 import type { MindmapIntent } from '../pipeline/mindmap'
 import type { SequenceIntent } from '../pipeline/sequence'
 import type { ClassProjection } from '../projection/class-projection'
@@ -127,7 +128,7 @@ export function mindmapActionIntents(
   // 子树末节点：后续 depth 更大的连续节点（图标行不入投影，不占序号）
   let end = index
   while (end + 1 < projection.nodes.length && projection.nodes[end + 1].depth > node.depth) end++
-  const newElementId = `mindmap-node:${end + 2}`
+  const newElementId = mindmapNodeElementId(end + 2)
   if (action === 'add-child' || node.parentId === null) {
     return { intents: [{ type: 'add-child', parentElementId: elementId, text: defaultText }], newElementId }
   }
