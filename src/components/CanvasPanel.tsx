@@ -519,7 +519,7 @@ export function CanvasPanel({ preview, projection }: CanvasPanelProps) {
   })
   const classDefNames = projection?.type === 'flowchart' ? projection.flowchart.classDefs.map((c) => c.name) : []
 
-  // 菜单项 → 动作分发（编辑标签/基数/文本：右键时已选中该连线，右侧表单承接）
+  // 菜单项 → 动作分发（标签 / 基数 / 文本：菜单项本身负责选中该连线，右侧表单承接编辑）
   const onMenuItem = (id: ContextMenuItemId): void => {
     if (id === 'add-node') ctx.addNode()
     else if (id === 'link-mode') ctx.enterLinkMode()
