@@ -45,6 +45,10 @@ export interface ProjectionRelation {
   elementId: string
   from: string
   to: string
+  /** 起点类泛型（去 ~ 后）；无泛型时 null */
+  fromGeneric: string | null
+  /** 终点类泛型（去 ~ 后）；无泛型时 null */
+  toGeneric: string | null
   kind: RelationKind
   /** 基数（去引号后）；无基数时 null */
   cardFrom: string | null
@@ -134,6 +138,8 @@ export function buildClassProjection(doc: SourceDocument): ClassProjection {
         elementId: part.id,
         from: r.from,
         to: r.to,
+        fromGeneric: r.fromGenericRaw !== null ? r.fromGenericRaw.slice(1, -1) : null,
+        toGeneric: r.toGenericRaw !== null ? r.toGenericRaw.slice(1, -1) : null,
         kind: r.arrow,
         cardFrom: cardOf(r.preArrowRaw),
         cardTo: cardOf(r.postArrowRaw),

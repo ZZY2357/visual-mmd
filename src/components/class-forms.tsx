@@ -152,11 +152,25 @@ export function MemberForm({ member }: { member: ProjectionMember }) {
 export function RelationForm({ relation }: { relation: ProjectionRelation }) {
   const t = useTranslation().t
   const commitIntent = useCommit()
-  const apply = (partial: { kind?: RelationKind; cardFrom?: string | null; cardTo?: string | null; label?: string | null }) => {
+  const apply = (partial: {
+    kind?: RelationKind
+    fromGeneric?: string | null
+    toGeneric?: string | null
+    cardFrom?: string | null
+    cardTo?: string | null
+    label?: string | null
+  }) => {
     commitIntent(setRelationIntent(relation.elementId, partial))
   }
   const labelDraft = useDraft(relation.label ?? '', (next) => {
     apply({ label: next !== '' ? next : null })
+  })
+  // 端点泛型（工单 08）：`Foo~T~ --> Bar~U~`，留空即无泛型
+  const fromGenericDraft = useDraft(relation.fromGeneric ?? '', (next) => {
+    apply({ fromGeneric: next !== '' ? next : null })
+  })
+  const toGenericDraft = useDraft(relation.toGeneric ?? '', (next) => {
+    apply({ toGeneric: next !== '' ? next : null })
   })
 
   return (
@@ -164,6 +178,26 @@ export function RelationForm({ relation }: { relation: ProjectionRelation }) {
       <Text size="sm" c="dimmed">
         {relation.from} → {relation.to}
       </Text>
+      <Group grow>
+        <TextInput
+          label={t('app:propertyPanel.relationFromGeneric')}
+          value={fromGenericDraft.draft}
+          onChange={(e) => fromGenericDraft.setDraft(e.currentTarget.value)}
+          onBlur={fromGenericDraft.commit}
+          onKeyDown={(e) => {
+            if (e.key === 'Enter') fromGenericDraft.commit()
+          }}
+        />
+        <TextInput
+          label={t('app:propertyPanel.relationToGeneric')}
+          value={toGenericDraft.draft}
+          onChange={(e) => toGenericDraft.setDraft(e.currentTarget.value)}
+          onBlur={toGenericDraft.commit}
+          onKeyDown={(e) => {
+            if (e.key === 'Enter') toGenericDraft.commit()
+          }}
+        />
+      </Group>
       <Select
         label={t('app:propertyPanel.relationKind')}
         data={RELATION_KIND_OPTIONS.map((k) => ({ value: k, label: relationKindLabel(t, k) }))}

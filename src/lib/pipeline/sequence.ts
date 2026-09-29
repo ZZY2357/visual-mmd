@@ -75,7 +75,12 @@ export interface MessageData {
 
 export interface AutonumberData {
   kind: 'autonumber'
+  /** 整行原文（trim 后）；未改任何字段时逐字回写 */
   raw: string
+  /** 起始值原文（第一个 token）；无参数时为 null */
+  start: string | null
+  /** 步长原文（第二个 token）；无步长时为 null */
+  step: string | null
 }
 
 export interface ActivationData {
@@ -204,9 +209,34 @@ export function renderMessage(d: MessageData, changes: Partial<Pick<MessageData,
   return `${from}${d.gap1}${arrowToken}${act}${d.gap2}${to}:${d.colonGap}${text}`
 }
 
-export function renderActivation(d: ActivationData, changes: { keyword?: 'activate' | 'deactivate' } = {}): string {
+export function renderActivation(
+  d: ActivationData,
+  changes: { keyword?: 'activate' | 'deactivate'; actorId?: string } = {},
+): string {
   const keyword = changes.keyword ?? d.keyword
-  return `${keyword}${d.gap}${d.actorId}`
+  const actorId = changes.actorId ?? d.actorId
+  return `${keyword}${d.gap}${actorId}`
+}
+
+/** 参数值归一：null / undefined / 空串 → 无该参数 */
+function autonumberValue(v: string | null | undefined): string | null {
+  return v === null || v === undefined || v === '' ? null : v
+}
+
+/**
+ * autonumber 行（工单 08）：未改字段时逐字回写 `raw`（保留用户的多空白写法）；
+ * 改动后按 mermaid 规范重建 `autonumber [start] [step]`——
+ * 步长只有在起始值存在时才有意义，起始值被清空时步长一并去掉。
+ */
+export function renderAutonumber(
+  d: AutonumberData,
+  changes: { start?: string | null; step?: string | null } = {},
+): string {
+  if (changes.start === undefined && changes.step === undefined) return d.raw
+  const start = autonumberValue(changes.start !== undefined ? changes.start : d.start)
+  const step = autonumberValue(changes.step !== undefined ? changes.step : d.step)
+  if (start === null) return 'autonumber'
+  return step === null ? `autonumber ${start}` : `autonumber ${start} ${step}`
 }
 
 export function renderNote(d: NoteData, changes: Partial<Pick<NoteData, 'pos' | 'actors' | 'text'>> = {}): string {
@@ -330,10 +360,13 @@ function classifyLine(line: string, lineStart: number, lineNo: number, entries: 
   const autonumber = AUTONUMBER_RE.exec(raw)
   if (autonumber !== null) {
     counters.autonumber++
+    // 参数按空白切分：第一个 token = 起始值、第二个 = 步长（工单 08）。
+    // 第三个及以后即使存在（非法语法）也只进 raw、改写时才消解。
+    const tokens = raw.slice('autonumber'.length).trim().split(/[ \t]+/).filter((t) => t !== '')
     entries.push({
       span,
       id: counters.autonumber > 1 ? `autonumber#${counters.autonumber}` : 'autonumber',
-      data: { kind: 'autonumber', raw },
+      data: { kind: 'autonumber', raw, start: tokens[0] ?? null, step: tokens[1] ?? null },
     })
     return
   }
@@ -713,9 +746,7 @@ export class SequenceParser implements DiagramParser {
       } else if (data.kind === 'activation') {
         const act = data as ActivationData
         if (act.actorId === intent.actorId) {
-          rewrites.set(part.id, renderActivation(act, {}))
-          // renderActivation 不支持改 id：手工拼
-          rewrites.set(part.id, `${act.keyword}${act.gap}${intent.newId}`)
+          rewrites.set(part.id, renderActivation(act, { actorId: intent.newId }))
         }
       }
     }
@@ -899,11 +930,20 @@ export class SequenceParser implements DiagramParser {
     intent: Extract<SequenceIntent, { type: 'set-autonumber' }>,
   ): Map<string, string> | null {
     const existing = doc.elements.find((part) => part.element.kind === 'autonumber')
+    const hasParams = intent.start !== undefined || intent.step !== undefined
     if (intent.enabled) {
-      if (existing !== undefined) return new Map()
+      if (existing !== undefined) {
+        // 行已存在：只调开关时不改动，带参数时原地改写该行（工单 08）
+        if (!hasParams) return new Map()
+        return new Map([
+          [existing.id, renderAutonumber(existing.element as AutonumberData, { start: intent.start, step: intent.step })],
+        ])
+      }
       const header = doc.elements.find((part) => part.element.kind === 'seq-header')
       if (header === undefined) return null
-      return new Map([[header.id, doc.source.slice(header.span.start, header.span.end) + '\nautonumber']])
+      const base: AutonumberData = { kind: 'autonumber', raw: 'autonumber', start: null, step: null }
+      const line = hasParams ? renderAutonumber(base, { start: intent.start, step: intent.step }) : 'autonumber'
+      return new Map([[header.id, doc.source.slice(header.span.start, header.span.end) + `\n${line}`]])
     }
     if (existing === undefined) return new Map()
     return new Map([[existing.id, '']])
@@ -1126,8 +1166,12 @@ export type SequenceIntent =
   /** 改 note（位置 / 参与者 / 文本） */
   | { type: 'set-note'; elementId: string; pos?: NotePos; actors?: string[]; text?: string }
   | { type: 'delete-note'; elementId: string }
-  /** 开/关 autonumber（开：header 后插入；关：删除 autonumber 行） */
-  | { type: 'set-autonumber'; enabled: boolean }
+  /**
+   * 开/关 autonumber（开：header 后插入；关：删除 autonumber 行）。
+   * `start` / `step`（工单 08）缺省 = 保持不变；给定时原地改写起始值 / 步长，
+   * 行不存在则按参数新建。`null` = 清空该参数（步长随起始值一并清空）。
+   */
+  | { type: 'set-autonumber'; enabled: boolean; start?: string | null; step?: string | null }
   /** 新增逻辑块（open + end 两行） */
   | { type: 'add-block'; keyword: BlockKeyword; label?: string; afterElementId?: string }
   /** 改逻辑块标签 */

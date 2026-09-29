@@ -1,6 +1,7 @@
 import type { SourceDocument } from '../pipeline/document'
 import {
   type ActivationData,
+  type AutonumberData,
   type BlockElseData,
   type BlockKeyword,
   type BlockOpenData,
@@ -82,6 +83,10 @@ export type ProjectionRegion =
 
 export interface SequenceProjection {
   autonumber: boolean
+  /** autonumber 起始值原文（工单 08）；无参数时为 null */
+  autonumberStart: string | null
+  /** autonumber 步长原文（工单 08）；无步长时为 null */
+  autonumberStep: string | null
   participants: ProjectionParticipant[]
   messages: ProjectionMessage[]
   notes: ProjectionNote[]
@@ -101,7 +106,12 @@ export interface SequenceProjection {
  * 顺序取「首次出现顺序」（声明与引用都算出现），与 mermaid 的 actor 插入顺序一致。
  */
 export function buildSequenceProjection(doc: SourceDocument): SequenceProjection {
-  const autonumber = doc.elements.some((part) => part.element.kind === 'autonumber')
+  // autonumber 行（工单 08）：开关由「行是否存在」决定，起始值 / 步长取该行参数
+  const autonumberPart = doc.elements.find((part) => part.element.kind === 'autonumber')
+  const autonumber = autonumberPart !== undefined
+  const autonumberData = autonumberPart !== undefined ? (autonumberPart.element as AutonumberData) : null
+  const autonumberStart = autonumberData !== null ? autonumberData.start : null
+  const autonumberStep = autonumberData !== null ? autonumberData.step : null
 
   /** actorId → 显式声明（同名声明后者覆盖前者，与 mermaid 的 addActor 覆盖语义一致） */
   const declared = new Map<string, ProjectionParticipant>()
@@ -183,7 +193,7 @@ export function buildSequenceProjection(doc: SourceDocument): SequenceProjection
     }
   })
 
-  return { autonumber, participants, messages, notes, blocks, regions }
+  return { autonumber, autonumberStart, autonumberStep, participants, messages, notes, blocks, regions }
 }
 
 // ---------- 选中回落 ----------

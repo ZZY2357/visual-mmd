@@ -3,8 +3,10 @@ import { applyEdit } from '../pipeline'
 import { reassemble } from '../document'
 import {
   sequenceParser,
+  renderAutonumber,
   renderNote,
   renderParticipant,
+  type AutonumberData,
   type BoxOpenData,
   type NoteData,
   type ParticipantData,
@@ -905,6 +907,158 @@ describe('Note left of / right of 解析参与者（工单 13）', () => {
     if (!result.ok) return
     expect(result.source).toContain('Note right of Client: 注释')
     expect(result.source).not.toContain('甲')
+  })
+})
+
+// ---------- autonumber 起始值 / 步长（工单 08） ----------
+
+/** 解析出的 autonumber 元素（断言用） */
+function autonumberElements(source: string): AutonumberData[] {
+  const parsed = sequenceParser.parse(source)
+  expect(parsed.ok, `样例源码必须可解析：${source}`).toBe(true)
+  if (!parsed.ok) throw parsed.error
+  return parsed.doc.elements
+    .filter((part) => part.element.kind === 'autonumber')
+    .map((part) => part.element as AutonumberData)
+}
+
+describe('autonumber 起始值 / 步长（工单 08）', () => {
+  it('解析：无参 / 仅起始值 / 起始值+步长 三种形态', () => {
+    expect(autonumberElements('sequenceDiagram\n    autonumber\n')[0]).toEqual({
+      kind: 'autonumber',
+      raw: 'autonumber',
+      start: null,
+      step: null,
+    })
+    expect(autonumberElements('sequenceDiagram\n    autonumber 10\n')[0]).toEqual({
+      kind: 'autonumber',
+      raw: 'autonumber 10',
+      start: '10',
+      step: null,
+    })
+    expect(autonumberElements('sequenceDiagram\n    autonumber 10 10\n')[0]).toEqual({
+      kind: 'autonumber',
+      raw: 'autonumber 10 10',
+      start: '10',
+      step: '10',
+    })
+  })
+
+  it('renderAutonumber：未改字段时逐字回写（多空白保留）', () => {
+    const [d] = autonumberElements('sequenceDiagram\n    autonumber  10   10\n')
+    expect(renderAutonumber(d, {})).toBe('autonumber  10   10')
+  })
+
+  it('verbatim：autonumber 带参数解析 → 重组装逐字相同', () => {
+    const source = 'sequenceDiagram\n    autonumber  10   10\n    A->>B: 你好\n'
+    const parsed = sequenceParser.parse(source)
+    if (!parsed.ok) throw parsed.error
+    expect(reassemble(parsed.doc)).toBe(source)
+  })
+
+  it('set-autonumber：行已存在时原地改起始值（步长保留）', () => {
+    const source = 'sequenceDiagram\n    autonumber 10 10\n    A->>B: hi\n'
+    const result = applyEdit(source, sequenceParser, { type: 'set-autonumber', enabled: true, start: '5' })
+    expect(result.ok).toBe(true)
+    if (!result.ok) return
+    expect(result.source).toBe('sequenceDiagram\n    autonumber 5 10\n    A->>B: hi\n')
+  })
+
+  it('set-autonumber：改步长（起始值保留）', () => {
+    const source = 'sequenceDiagram\n    autonumber 5 10\n    A->>B: hi\n'
+    const result = applyEdit(source, sequenceParser, { type: 'set-autonumber', enabled: true, step: '2' })
+    expect(result.ok).toBe(true)
+    if (!result.ok) return
+    expect(result.source).toContain('autonumber 5 2')
+  })
+
+  it('set-autonumber：无参行 + 起始值/步长 → 一次补齐 `autonumber 10 10`', () => {
+    const source = 'sequenceDiagram\n    autonumber\n    A->>B: hi\n'
+    const result = applyEdit(source, sequenceParser, { type: 'set-autonumber', enabled: true, start: '10', step: '10' })
+    expect(result.ok).toBe(true)
+    if (!result.ok) return
+    expect(result.source).toBe('sequenceDiagram\n    autonumber 10 10\n    A->>B: hi\n')
+  })
+
+  it('set-autonumber：清空起始值退化为 `autonumber`（步长一并去掉）', () => {
+    const source = 'sequenceDiagram\n    autonumber 10 10\n    A->>B: hi\n'
+    const result = applyEdit(source, sequenceParser, { type: 'set-autonumber', enabled: true, start: null, step: null })
+    expect(result.ok).toBe(true)
+    if (!result.ok) return
+    expect(result.source).toBe('sequenceDiagram\n    autonumber\n    A->>B: hi\n')
+  })
+
+  it('set-autonumber 开 + 参数：无 autonumber 行时插到 header 后并带参数', () => {
+    const source = 'sequenceDiagram\n    A->>B: hi\n'
+    const result = applyEdit(source, sequenceParser, { type: 'set-autonumber', enabled: true, start: '5' })
+    expect(result.ok).toBe(true)
+    if (!result.ok) return
+    expect(result.source).toBe('sequenceDiagram\nautonumber 5\n    A->>B: hi\n')
+  })
+
+  it('set-autonumber 关：删除带参数的行，其余逐字不变', () => {
+    const source = 'sequenceDiagram\n    %% 注释\n    autonumber 10 10\n    A->>B: hi\n'
+    const result = applyEdit(source, sequenceParser, { type: 'set-autonumber', enabled: false })
+    expect(result.ok).toBe(true)
+    if (!result.ok) return
+    expect(result.source).not.toContain('autonumber')
+    expect(result.source).toContain('%% 注释')
+    expect(result.source).toContain('A->>B: hi')
+  })
+})
+
+// ---------- activation 的 actorId 可写回（工单 08） ----------
+
+describe('activate / deactivate 的 actorId 可写回（工单 08）', () => {
+  it('rename-participant：activate / deactivate 行一并改名', () => {
+    const source = `sequenceDiagram
+    participant A
+    activate A
+    A->>B: hi
+    deactivate A
+`
+    const result = applyEdit(source, sequenceParser, { type: 'rename-participant', actorId: 'A', newId: 'Client' })
+    expect(result.ok).toBe(true)
+    if (!result.ok) return
+    expect(result.source).toContain('participant Client')
+    expect(result.source).toContain('    activate Client\n')
+    expect(result.source).toContain('    deactivate Client\n')
+    expect(result.source).not.toMatch(/\bA\b/)
+  })
+
+  it('rename-participant：activate 行内空白逐字保留', () => {
+    const source = 'sequenceDiagram\n    participant A\n    activate   A\n'
+    const result = applyEdit(source, sequenceParser, { type: 'rename-participant', actorId: 'A', newId: 'Client' })
+    expect(result.ok).toBe(true)
+    if (!result.ok) return
+    expect(result.source).toContain('activate   Client')
+  })
+})
+
+// ---------- note 参与者集合可写回（工单 08） ----------
+
+describe('note 参与者集合可写回（工单 08）', () => {
+  it('set-note actors：over 多参与者集合改写，文本与位置逐字保留', () => {
+    const source = 'sequenceDiagram\n    Note over A,B: 一句说明\n'
+    const result = applyEdit(source, sequenceParser, { type: 'set-note', elementId: 'note:1', actors: ['A', 'C'] })
+    expect(result.ok).toBe(true)
+    if (!result.ok) return
+    expect(result.source).toBe('sequenceDiagram\n    Note over A,C: 一句说明\n')
+  })
+
+  it('set-note actors：解析不出（null）的 note 也能改成参与者集合', () => {
+    const source = 'sequenceDiagram\n    Note over A B C: 说明\n'
+    // 前提：三个带空格的 token 解析不出参与者 → actors 为 null
+    expect(noteElements(source)[0]?.actors).toBeNull()
+    const result = applyEdit(source, sequenceParser, { type: 'set-note', elementId: 'note:1', actors: ['A', 'B'] })
+    expect(result.ok).toBe(true)
+    if (!result.ok) return
+    expect(result.source).toBe('sequenceDiagram\n    Note over A,B: 说明\n')
+  })
+
+  it('set-note actors 空数组：不落码（note 至少要有一个参与者）', () => {
+    const source = 'sequenceDiagram\n    Note over A,B: 说明\n'
+    expect(applyEdit(source, sequenceParser, { type: 'set-note', elementId: 'note:1', actors: [] }).ok).toBe(false)
   })
 })
 

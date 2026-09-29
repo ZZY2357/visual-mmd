@@ -103,9 +103,10 @@ export function addMessageIntent(form: AddMessageForm): SequenceIntent | null {
 
 // ---------- note 表单 → 意图 ----------
 
+/** 改 note（位置 / 参与者集合 / 文本）；`actors` 至少一个（空数组由管线拒绝） */
 export function setNoteIntent(
   elementId: string,
-  form: { pos?: NotePos; text?: string },
+  form: { pos?: NotePos; actors?: string[]; text?: string },
 ): SequenceIntent {
   return { type: 'set-note', elementId, ...form }
 }
@@ -138,6 +139,18 @@ export function addNoteIntent(form: AddNoteForm): SequenceIntent | null {
 
 export function setAutonumberIntent(enabled: boolean): SequenceIntent {
   return { type: 'set-autonumber', enabled }
+}
+
+/**
+ * 改 autonumber 起始值 / 步长（工单 08）。`enabled: true` 保证行存在：
+ * 行已有则原地改写，没有则按参数新建。未给出的字段保持不变。
+ * 合法性由表单把关（非负整数；空串 = 清空该参数）。
+ */
+export function setAutonumberParamsIntent(params: {
+  start?: string | null
+  step?: string | null
+}): SequenceIntent {
+  return { type: 'set-autonumber', enabled: true, ...params }
 }
 
 export interface AddBlockForm {

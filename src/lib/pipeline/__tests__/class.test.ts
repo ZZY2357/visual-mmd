@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { applyEdit } from '../pipeline'
 import { reassemble } from '../document'
-import { classParser, type ClassDirectionData, type NamespaceData } from '../class'
+import { classParser, type ClassDirectionData, type NamespaceData, type RelationData } from '../class'
 
 /**
  * class 解析器测试（工单 07，ADR-0004/0008）：
@@ -253,6 +253,75 @@ describe('手术式改写（class）：只重写目标元素 span，其余逐字
   it('目标元素不存在时返回错误', () => {
     const result = applyEdit(SOURCE, classParser, { type: 'set-relation', elementId: 'relation:99', label: 'x' })
     expect(result.ok).toBe(false)
+  })
+})
+
+// ---------- 关系端点泛型可写回（工单 08） ----------
+
+/** 解析出的 relation 元素（断言用） */
+function relationElements(source: string): RelationData[] {
+  const parsed = classParser.parse(source)
+  expect(parsed.ok, `样例源码必须可解析：${source}`).toBe(true)
+  if (!parsed.ok) throw parsed.error
+  return parsed.doc.elements
+    .filter((part) => part.element.kind === 'relation')
+    .map((part) => part.element as RelationData)
+}
+
+describe('关系端点泛型可写回（工单 08）', () => {
+  it('解析：`Foo~T~ --> Bar` 的起点泛型原文透出', () => {
+    const [r] = relationElements('classDiagram\n    Foo~T~ --> Bar\n')
+    expect(r?.from).toBe('Foo')
+    expect(r?.fromGenericRaw).toBe('~T~')
+    expect(r?.to).toBe('Bar')
+    expect(r?.toGenericRaw).toBeNull()
+  })
+
+  it('verbatim：端点泛型解析 → 重组装逐字相同', () => {
+    const source = 'classDiagram\n    Foo~T~ --> Bar~U~\n    A..>B\n'
+    const parsed = classParser.parse(source)
+    if (!parsed.ok) throw parsed.error
+    expect(reassemble(parsed.doc)).toBe(source)
+  })
+
+  it('set-relation：改起点泛型', () => {
+    const source = 'classDiagram\n    Foo~T~ --> Bar\n'
+    const result = applyEdit(source, classParser, { type: 'set-relation', elementId: 'relation:1', fromGeneric: 'U' })
+    expect(result.ok).toBe(true)
+    if (!result.ok) return
+    expect(result.source).toBe('classDiagram\n    Foo~U~ --> Bar\n')
+  })
+
+  it('set-relation：无泛型 → 加终点泛型', () => {
+    const source = 'classDiagram\n    Foo --> Bar\n'
+    const result = applyEdit(source, classParser, { type: 'set-relation', elementId: 'relation:1', toGeneric: 'T' })
+    expect(result.ok).toBe(true)
+    if (!result.ok) return
+    expect(result.source).toBe('classDiagram\n    Foo --> Bar~T~\n')
+  })
+
+  it('set-relation：去起点泛型（null）', () => {
+    const source = 'classDiagram\n    Foo~T~ --> Bar~U~\n'
+    const result = applyEdit(source, classParser, { type: 'set-relation', elementId: 'relation:1', fromGeneric: null })
+    expect(result.ok).toBe(true)
+    if (!result.ok) return
+    expect(result.source).toBe('classDiagram\n    Foo --> Bar~U~\n')
+  })
+
+  it('set-relation：改泛型时不动基数与标签', () => {
+    const source = 'classDiagram\n    Dog~T~ "1" *-- "0..*" Bone~U~ : 咬\n'
+    const result = applyEdit(source, classParser, { type: 'set-relation', elementId: 'relation:1', fromGeneric: 'X' })
+    expect(result.ok).toBe(true)
+    if (!result.ok) return
+    expect(result.source).toBe('classDiagram\n    Dog~X~ "1" *-- "0..*" Bone~U~ : 咬\n')
+  })
+
+  it('set-relation：未给泛型字段时泛型逐字保留（对照）', () => {
+    const source = 'classDiagram\n    Foo~T~ --> Bar~U~\n'
+    const result = applyEdit(source, classParser, { type: 'set-relation', elementId: 'relation:1', kind: '*--' })
+    expect(result.ok).toBe(true)
+    if (!result.ok) return
+    expect(result.source).toBe('classDiagram\n    Foo~T~ *-- Bar~U~\n')
   })
 })
 

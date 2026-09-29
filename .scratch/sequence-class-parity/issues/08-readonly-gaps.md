@@ -1,6 +1,6 @@
 # 08 只读不可编的五处缺口（补齐写回）
 
-Status: pending
+Status: resolved
 
 **Blocked by: 01、02**（01 动了 sequence 投影；02 定了连线身份，关系端点与之相关）
 
@@ -53,9 +53,75 @@ Status: pending
 
 ## 验收
 
-- [ ] `autonumber 10 10`：表单能改起始值与步长，落码正确。
-- [ ] 重命名一个被 `activate` 的参与者：activate 行跟着改（且不再走手工拼串路径）。
-- [ ] note 的多参与者列表：能改参与者集合，落码正确。
-- [ ] class 关系端点的泛型（如 `Foo~T~ --> Bar`）：能改，落码正确。
-- [ ] 类声明 `tail`：给出结论（做或不做），并在 Comments 写明理由。
-- [ ] 控制台 0 error / 0 warning。
+- [x] `autonumber 10 10`：表单能改起始值与步长，落码正确。
+- [x] 重命名一个被 `activate` 的参与者：activate 行跟着改（且不再走手工拼串路径）。
+- [x] note 的多参与者列表：能改参与者集合，落码正确。
+- [x] class 关系端点的泛型（如 `Foo~T~ --> Bar`）：能改，落码正确。
+- [x] 类声明 `tail`：给出结论（做或不做），并在 Comments 写明理由。
+- [ ] 控制台 0 error / 0 warning。（本轮未做真机确认——用户指示跳过真机验收）
+
+## Comments
+
+### 五条逐条的做/不做结论与理由
+
+1. **autonumber 起始值 / 步长 —— 做。**
+   `AutonumberData` 增加 `start` / `step`（按空白切出的第 1、2 个 token 原文，原样保留），新增
+   `renderAutonumber`：未改字段时逐字回写 `raw`（保留 `autonumber  10   10` 这类多空白写法），
+   改动后按 mermaid 规范重建 `autonumber [start] [step]`；起始值被清空时步长一并去掉（`autonumber <step>`
+   在 mermaid 里无意义）。`set-autonumber` 扩参 `start?` / `step?`（缺省 = 保持不变）：行已存在则原地改写，
+   不存在则按参数插到 header 后。表单补两个数字输入（`type="number"`，非负整数校验，失焦/回车提交）。
+   注意点落实：`autonumber 10 10` 与单独一行的语法形态不同，写回路径单列（存在 / 新建）并各有用例。
+
+2. **activate / deactivate 的 actorId —— 做。**
+   `renderActivation` 的 changes 补 `actorId?`；`resolveRenameParticipant` 里删掉手工拼串
+   （原 `:717-718` 的先 `renderActivation(act, {})` 再 `\`${act.keyword}${act.gap}${intent.newId}\``），
+   改为一次 `renderActivation(act, { actorId: intent.newId })`。等价性见下。
+
+3. **note 的参与者列表 —— 做（选「前端可编」方案）。**
+   选此方案的理由：解析层与投影层**本就已把 `actors` 解析出来**（`NoteData.actors` 非 null 时原样透出），
+   缺的只是表单没有对应控件——`set-note` 的 `actors` 字段早已存在且落地正确。方案 (a)「投影保留原始串」
+   并不能独立兑现「可编」（仍要再加一层 UI 与一个「原始 mid 写回」的新概念，与 `NoteData.mid` 重复），
+   反而把"语法串"渗进模型。故：投影保持忠实（`actors: null` = 真解析不出，未触碰时 `mid` 逐字保留），
+   `NoteForm` 增加「参与者（逗号分隔）」输入，复用 `set-note.actors`；`actors` 为 null 的行从空起步，
+   输入后落码为规范 `Note over A,B: …`。管线侧对空集合的拒绝保持不变（note 至少要有一个参与者）。
+
+4. **关系端点泛型 —— 做。**
+   `renderRelation` 的 changes 补 `fromGeneric` / `toGeneric`（string | null，规范渲染 `~X~`，空/null = 无泛型；
+   未给字段逐字保留原 `*GenericRaw`）；`set-relation` 与 `setRelationIntent` 补两字段；
+   `ProjectionRelation` 补 `fromGeneric` / `toGeneric`（去 `~` 后）；`RelationForm` 补两个输入。
+
+5. **类声明 `tail` —— 不做（采纳工单推荐）。**
+   `tail` 是「名字（含泛型）之后到行尾的原文」（`ClassDeclData.tail`，如 ` {`、`{`、` { class A }`），
+   本质是**语法边界**而非可编辑字段：它承载开块的花括号、行尾注释或任何 mermaid 后续语法的界标。
+   给一个自由文本输入让它可编，等于让用户替解析器猜语义——写错一个字符就会改变块结构或产出非法源码，
+   而它当前正是「改 name/generic 时逐字保留其余一切」这条 verbatim 承诺的载体。缺的从来不是"可编辑"，
+   而是"无需编辑"。故明确不做，也不为它开表单入口。
+
+### 第 2 条：手工拼串删除与 `rename-participant` 等价性验证
+
+- **删除**：`src/lib/pipeline/sequence.ts` 的 `resolveRenameParticipant` 中，原先是两行连续 `rewrites.set`——
+  第一行 `renderActivation(act, {})` 的产物被第二行手工拼串 `\`${act.keyword}${act.gap}${intent.newId}\``
+  立即覆盖（死代码），现合并为 `renderActivation(act, { actorId: intent.newId })`。
+- **字节等价证明**：`renderActivation(d, changes)` = `\`${changes.keyword ?? d.keyword}${d.gap}${changes.actorId ?? d.actorId}\``。
+  仅传 `actorId` 时 = `\`${act.keyword}${act.gap}${newId}\``，与旧的手工拼串**逐字节相同**（`keyword`/`gap` 均取原值）。
+  因此改写表对任意输入完全一致，行为等价。
+- **回归保护**：既有 `rename-participant` 用例全部保持绿——「声明 + 全部引用一起改，别名保留」
+  （含消息、`Note over`）、「create 行与全部引用一起改名」、「Note right of 甲 的参与者一并改名」。
+  新增用例补上此前未覆盖的 activation 路径：`activate`/`deactivate` 行一并改名 + 行内空白逐字保留。
+
+### 测试结果
+
+- `npm run typecheck`：通过（`tsc -b --noEmit`，0 error）。
+- `npm test`：**52 个测试文件 / 786 个用例，全绿**（基线 51 / 752 → 净增 1 文件 / 34 用例，只增不减）。
+- 新增/扩展用例分布：`sequence.test.ts`（autonumber 解析/写回/verbatim 9、activation 改名 2、note 集合 3）、
+  `class.test.ts`（端点泛型 7）、`sequence-projection.test.ts`（autonumber 进投影 4）、
+  `class-projection.test.ts`（端点泛型进投影 1）、新增 `components/__tests__/readonly-gaps-forms.test.tsx`（8）。
+
+### 待真机确认清单
+
+- 控制台 0 error / 0 warning（验收第 6 项）：本轮未做真机确认——用户指示跳过真机验收。
+  说明：本票只新增表单输入与 render/intent 字段，未新增任何 `console.*`；单测层面无新增 React error/warning
+  （既有 `code-panel.test.tsx` 的 react-i18next warning 为先前既有噪声，与本票无关）。
+- 待真机走查项：`autonumber` 开状态下起始值/步长输入与 mermaid 渲染编号是否一致；`Note over A,B` 改参与者后
+  画布注释跨度是否随之更新；`Foo~T~ --> Bar` 改泛型后类图端点标签是否重绘。
+

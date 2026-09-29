@@ -201,6 +201,37 @@ describe('buildSequenceProjection：参与者按 actorId 合并（工单 10）',
   })
 })
 
+// ---------- autonumber 起始值 / 步长进投影（工单 08） ----------
+
+describe('autonumber 起始值 / 步长进投影（工单 08）', () => {
+  it('无 autonumber 行：autonumber=false，start/step 均为 null', () => {
+    const proj = project('sequenceDiagram\n    A->>B: hi\n')
+    expect(proj.autonumber).toBe(false)
+    expect(proj.autonumberStart).toBeNull()
+    expect(proj.autonumberStep).toBeNull()
+  })
+
+  it('无参 autonumber：start/step 均为 null', () => {
+    const proj = project('sequenceDiagram\n    autonumber\n    A->>B: hi\n')
+    expect(proj.autonumber).toBe(true)
+    expect(proj.autonumberStart).toBeNull()
+    expect(proj.autonumberStep).toBeNull()
+  })
+
+  it('autonumber 10 10：起始值与步长原文透出', () => {
+    const proj = project('sequenceDiagram\n    autonumber 10 10\n    A->>B: hi\n')
+    expect(proj.autonumber).toBe(true)
+    expect(proj.autonumberStart).toBe('10')
+    expect(proj.autonumberStep).toBe('10')
+  })
+
+  it('autonumber 5：只有起始值', () => {
+    const proj = project('sequenceDiagram\n    autonumber 5\n    A->>B: hi\n')
+    expect(proj.autonumberStart).toBe('5')
+    expect(proj.autonumberStep).toBeNull()
+  })
+})
+
 describe('resolveSequenceSelection：合并后按 actorId 命中（工单 10）', () => {
   it('选中在消息中先出现的参与者仍解析到投影项', () => {
     const proj = project('sequenceDiagram\n    A->>B: hi\n    participant B as Bee\n')

@@ -92,7 +92,14 @@ export function addRelationIntent(form: AddRelationForm): ClassIntent | null {
 
 export function setRelationIntent(
   elementId: string,
-  form: { kind?: RelationKind; cardFrom?: string | null; cardTo?: string | null; label?: string | null },
+  form: {
+    kind?: RelationKind
+    fromGeneric?: string | null
+    toGeneric?: string | null
+    cardFrom?: string | null
+    cardTo?: string | null
+    label?: string | null
+  },
 ): ClassIntent {
   return { type: 'set-relation', elementId, ...form }
 }

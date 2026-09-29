@@ -56,6 +56,18 @@ namespace Other {
   })
 })
 
+// ---------- 关系端点泛型进投影（工单 08） ----------
+
+describe('关系端点泛型进投影（工单 08）', () => {
+  it('fromGeneric / toGeneric 去 ~ 后透出；无泛型为 null', () => {
+    const proj = project('classDiagram\n    Foo~T~ --> Bar~U~\n    A --> B\n')
+    expect(proj.relations.map((r) => [r.fromGeneric, r.toGeneric])).toEqual([
+      ['T', 'U'],
+      [null, null],
+    ])
+  })
+})
+
 // ---------- direction（工单 07） ----------
 
 describe('direction 进 class 投影（工单 07）', () => {

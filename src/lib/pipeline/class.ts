@@ -138,12 +138,29 @@ function cardRaw(card: string | null): string {
   return card === null || card === '' ? ' ' : ` "${card}" `
 }
 
+/** 泛型新值的规范渲染（`~X~`；空 / null = 无泛型） */
+function genericRaw(generic: string | null): string {
+  return generic === null || generic === '' ? '' : `~${generic}~`
+}
+
 export function renderRelation(
   d: RelationData,
-  changes: { from?: string; to?: string; arrow?: RelationKind; cardFrom?: string | null; cardTo?: string | null; label?: string | null } = {},
+  changes: {
+    from?: string
+    to?: string
+    fromGeneric?: string | null
+    toGeneric?: string | null
+    arrow?: RelationKind
+    cardFrom?: string | null
+    cardTo?: string | null
+    label?: string | null
+  } = {},
 ): string {
   const from = changes.from ?? d.from
   const to = changes.to ?? d.to
+  const fromGeneric =
+    changes.fromGeneric === undefined ? (d.fromGenericRaw ?? '') : genericRaw(changes.fromGeneric)
+  const toGeneric = changes.toGeneric === undefined ? (d.toGenericRaw ?? '') : genericRaw(changes.toGeneric)
   const arrow = changes.arrow ?? d.arrow
   const preArrow = changes.cardFrom !== undefined ? cardRaw(changes.cardFrom) : d.preArrowRaw
   const postArrow = changes.cardTo !== undefined ? cardRaw(changes.cardTo) : d.postArrowRaw
@@ -151,7 +168,7 @@ export function renderRelation(
   if (changes.label !== undefined) {
     tail = changes.label === null || changes.label === '' ? '' : ` : ${changes.label}`
   }
-  return `${from}${d.fromGenericRaw ?? ''}${preArrow}${arrow}${postArrow}${to}${d.toGenericRaw ?? ''}${tail}`
+  return `${from}${fromGeneric}${preArrow}${arrow}${postArrow}${to}${toGeneric}${tail}`
 }
 
 export interface NoteData {
@@ -898,11 +915,15 @@ export class ClassParser implements DiagramParser {
     const r = part.element as RelationData
     const changes: {
       arrow?: RelationKind
+      fromGeneric?: string | null
+      toGeneric?: string | null
       cardFrom?: string | null
       cardTo?: string | null
       label?: string | null
     } = {}
     if (intent.kind !== undefined) changes.arrow = intent.kind
+    if (intent.fromGeneric !== undefined) changes.fromGeneric = intent.fromGeneric
+    if (intent.toGeneric !== undefined) changes.toGeneric = intent.toGeneric
     if (intent.cardFrom !== undefined) changes.cardFrom = intent.cardFrom
     if (intent.cardTo !== undefined) changes.cardTo = intent.cardTo
     if (intent.label !== undefined) changes.label = intent.label
@@ -1053,8 +1074,17 @@ export type ClassIntent =
       label?: string
       afterElementId?: string
     }
-  /** 改关系（类型 / 基数 / 标签）；未给出的字段保持不变 */
-  | { type: 'set-relation'; elementId: string; kind?: RelationKind; cardFrom?: string | null; cardTo?: string | null; label?: string | null }
+  /** 改关系（类型 / 端点泛型 / 基数 / 标签）；未给出的字段保持不变 */
+  | {
+      type: 'set-relation'
+      elementId: string
+      kind?: RelationKind
+      fromGeneric?: string | null
+      toGeneric?: string | null
+      cardFrom?: string | null
+      cardTo?: string | null
+      label?: string | null
+    }
   | { type: 'delete-relation'; elementId: string }
   /** 新增 note（className 缺省为浮动 note） */
   | { type: 'add-note'; className?: string | null; text?: string; afterElementId?: string }

@@ -16,6 +16,7 @@ import {
   deleteParticipantIntent,
   renameParticipantIntent,
   setAutonumberIntent,
+  setAutonumberParamsIntent,
   setBlockLabelIntent,
   setBoxLabelIntent,
   setElseLabelIntent,
@@ -57,15 +58,60 @@ function messageArrowLabel(t: (k: string) => string, arrow: MessageArrow): strin
 
 // ---------- 图表（autonumber） ----------
 
+/** 起始值 / 步长的合法性：空串 = 清空该参数，其余必须是非负整数（mermaid 要求） */
+function isAutonumberParam(value: string): boolean {
+  return value === '' || /^\d+$/.test(value)
+}
+
 export function SequenceDiagramForm({ projection }: { projection: SequenceProjection }) {
   const t = useTranslation().t
   const commitIntent = useCommit()
+  const startDraft = useDraft(projection.autonumberStart ?? '', (next) => {
+    if (!isAutonumberParam(next)) return
+    commitIntent(setAutonumberParamsIntent({ start: next === '' ? null : next }))
+  })
+  const stepDraft = useDraft(projection.autonumberStep ?? '', (next) => {
+    if (!isAutonumberParam(next)) return
+    commitIntent(setAutonumberParamsIntent({ step: next === '' ? null : next }))
+  })
   return (
-    <Switch
-      label={t('app:propertyPanel.autonumber')}
-      checked={projection.autonumber}
-      onChange={(e) => commitIntent(setAutonumberIntent(e.currentTarget.checked))}
-    />
+    <Stack gap="sm">
+      <Switch
+        label={t('app:propertyPanel.autonumber')}
+        checked={projection.autonumber}
+        onChange={(e) => commitIntent(setAutonumberIntent(e.currentTarget.checked))}
+      />
+      {projection.autonumber && (
+        <Group grow align="flex-start">
+          <TextInput
+            label={t('app:propertyPanel.autonumberStart')}
+            type="number"
+            min={0}
+            placeholder="1"
+            value={startDraft.draft}
+            onChange={(e) => startDraft.setDraft(e.currentTarget.value)}
+            onBlur={startDraft.commit}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter') startDraft.commit()
+            }}
+            error={isAutonumberParam(startDraft.draft) ? undefined : t('app:propertyPanel.autonumberInvalid')}
+          />
+          <TextInput
+            label={t('app:propertyPanel.autonumberStep')}
+            type="number"
+            min={0}
+            placeholder="1"
+            value={stepDraft.draft}
+            onChange={(e) => stepDraft.setDraft(e.currentTarget.value)}
+            onBlur={stepDraft.commit}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter') stepDraft.commit()
+            }}
+            error={isAutonumberParam(stepDraft.draft) ? undefined : t('app:propertyPanel.autonumberInvalid')}
+          />
+        </Group>
+      )}
+    </Stack>
   )
 }
 
@@ -194,15 +240,36 @@ export function NoteForm({ note }: { note: ProjectionNote }) {
   const textDraft = useDraft(note.text, (next) => {
     commitIntent(setNoteIntent(note.elementId, { text: next }))
   })
+  // 参与者集合可编（工单 08）：逗号分隔的 id 列表，复用 set-note 的 actors 字段。
+  // 解析不出的 note（actors 为 null）从空起步，输入后落码为规范写法。
+  const actorsDraft = useDraft(note.actors !== null ? note.actors.join(', ') : '', (next) => {
+    const actors = next
+      .split(',')
+      .map((a) => a.trim())
+      .filter((a) => a !== '')
+    if (actors.length === 0) return
+    commitIntent(setNoteIntent(note.elementId, { actors }))
+  })
   const applyPos = (pos: NotePos) => {
     commitIntent(setNoteIntent(note.elementId, { pos }))
   }
 
   return (
     <Stack gap="sm">
-      <Text size="sm" c="dimmed">
-        {note.actors !== null ? note.actors.join(', ') : t('app:propertyPanel.noteUnknownActors')}
-      </Text>
+      {note.actors === null && (
+        <Text size="xs" c="dimmed">
+          {t('app:propertyPanel.noteUnknownActors')}
+        </Text>
+      )}
+      <TextInput
+        label={t('app:propertyPanel.noteActors')}
+        value={actorsDraft.draft}
+        onChange={(e) => actorsDraft.setDraft(e.currentTarget.value)}
+        onBlur={actorsDraft.commit}
+        onKeyDown={(e) => {
+          if (e.key === 'Enter') actorsDraft.commit()
+        }}
+      />
       <Select
         label={t('app:propertyPanel.notePosition')}
         data={NOTE_POS_OPTIONS.map((p) => ({ value: p, label: t(`app:notePos.${p}`) }))}
