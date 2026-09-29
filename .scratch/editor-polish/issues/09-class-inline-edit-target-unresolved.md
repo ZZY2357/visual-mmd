@@ -1,6 +1,6 @@
 # 09 class 图节点缺 data-id：新建类后内联命名浮层不可用
 
-Status: needs-triage
+Status: resolved
 
 来源：工单 07 手工验收「04 空图空白右键」的通用条目「创建后应**直入内联编辑**（浮出输入框让你命名）」。
 sequence / mindmap 两条路径通过，**class 一条不通过**：浮层输入框确实被渲染出来，但 `rect === null`

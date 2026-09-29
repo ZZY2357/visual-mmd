@@ -1,6 +1,6 @@
 # 08 顶层 theme 行（config 块之外）不回显也不被清除
 
-Status: needs-triage
+Status: resolved
 
 来源：工单 07 手工验收「01 主题」第 4、5 条。**这是口径张力，不是已确认的缺陷**，需人工裁决：
 工单 01 / 07 的文字写作「手写 `theme: redux-color` → 选择器回显 `redux-color`」、

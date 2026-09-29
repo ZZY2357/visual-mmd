@@ -1,6 +1,6 @@
 # 10 sequence「添加消息」在对方声明之前落码：结构树出现重复参与者 + React 重复 key 报错
 
-Status: needs-triage
+Status: resolved
 
 来源：工单 07 手工验收「06 class/sequence 节点右键」的 sequence 条目「加消息落码正确」的旁证
 （控制台报错）。**与失败单 09 不是同一根因**（09 是 class 节点缺 `data-id` 导致寻址失效；本单是
@@ -55,4 +55,29 @@ sequence 投影未按 actorId 合并隐式参与者）。
 
 ## Comments
 
-（空）
+### 修复（2026-09-29）：投影按 actorId 合并隐式与显式参与者
+
+根因在 `src/lib/projection/sequence-projection.ts`：原实现用 `declared` / `referenced` 两个 Map 分别
+收集显式声明与消息里隐式出现的参与者，最后按「先 declared 后 referenced」拼装。当消息里的参与者出现在
+其声明**之前**时，`touch()` 命中不了 `declared`（此时还没读到那行声明），于是先落入 `referenced`；
+随后读到的 `participant X as Y` 又把它放进 `declared` —— 同一个 actorId 在两个 Map 里各占一份，拼装时
+两段都进数组，结构树便出现重复项，React 以 actorId 为 key 遂报 `Encountered two children with the same key`。
+
+改法：改成「**首次出现顺序** + **按 actorId 归一的单一信息表**」双重结构 ——
+
+- 新增 `order: string[]` 记录每个 actorId 首次出现的顺序（消息里的隐式引用与显式声明都算首现）；
+- `declared: Map<actorId, ...>` 仍持声明信息（显示名 / actor 标记 / 是否为 actor），
+  隐式引用时 `touch()` 也会把该 actorId 登记进 `order`；
+- 显式声明分支除了写 `declared`，也 `touch()` 一次（保证"先消息后声明"形态下顺序取首现位置）；
+- 拼装改为 `order.map(actorId => declared.has(actorId) ? { ...declared, active } : implicit)`，
+  于是**每个 actorId 恰好出现一次**，且信息以显式声明为准（显示名不会被隐式引用冲掉）。
+
+落码/插入位置逻辑未动（锚点仍为右键参与者的声明），故"落码在对方声明之前"这一形态照旧，只是投影不再重复。
+
+验证：
+
+- 新增 `src/lib/projection/__tests__/sequence-projection.test.ts`（16 例），覆盖：先消息后声明不重复、
+  隐式引用与显式声明合并取声明信息、首现顺序、actor 标记、仅隐式参与者仍列出、`active` 归属等。
+- `npm test` → 44 文件 / **535 条全过**；`npm run typecheck` → 退出码 0。
+- 合并回 main 后复跑：44 文件 / 562 条全过（含本单 16 例）。
+

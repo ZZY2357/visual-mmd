@@ -1,6 +1,6 @@
 # 11 删除参与者级联后残留空 loop / alt 块（该源码在 mermaid 侧产出成批 NaN 属性 console error）
 
-Status: needs-triage
+Status: resolved
 
 来源：工单 07 手工验收「07 回归」的题外确认项（前一节 06 只记录为"残留空白行 + 空 loop"，
 并把 NaN 报错归因给 mermaid；本节按编排方要求确认**空块是不是 app 侧级联删除制造的**）。
@@ -89,4 +89,34 @@ Status: needs-triage
 
 ## Comments
 
-（空）
+### 修复（2026-09-29）：级联删除后清理"本次删空"的块
+
+在 `src/lib/pipeline/sequence.ts` 的删除参与者回收逻辑里，`resolveDeleteParticipant` 收集完要删的语句后
+（`sequence.ts:591-603`）追加一步 `pruneEmptyBlocks(doc, deleted)`（`sequence.ts:825-862`）。
+
+算法（迭代到不动点，保证内层块先被移除、外层块随之判空）：
+
+1. `blockShapes` 用栈把 `block-open` / `block-else` / `block-end` 配成块形状；
+2. 对每个未删块，以 `open` → 仍存活的 `else`/`and` 行 → `end` 切出**分支**（相邻两界之间即一个分支）；
+3. 每个分支算两个布尔：
+   - `empty`：区间内无"未删除"元素（分支已无语句）；
+   - `touched`：区间内存在"本次被删除"的元素（空是本次删出来的，非原本就空）；
+4. 若存在 `empty && touched` 的分支：
+   - **所有分支都空** → 整块移除（`open` + 全部 else 行 + `end`），标 `changed` 继续迭代；
+   - 否则只摘"被删空的那个分支"的分界行：首分支由 `open` 起头不可删，摘**终止**它的 `else`；
+     其余分支摘**起头**它的 `else`；
+5. `changed` 为真就重扫（一遍内层删除可能让外层变空）。
+
+**verbatim 底线**：只清理 `touched`（本次删除造成）的空，原本就空的块/分支不碰 —— 未被编辑触碰的文本仍逐字保留。
+
+残留的"只有空格的空白行"（被删语句原位留下的）不在本单范围：它不构成空块、不触发 NaN 渲染，
+且属 verbatim 保留区；若后续要清理需另开单。
+
+验证：
+
+- `src/lib/pipeline/__tests__/sequence.test.ts` 新增 12 例 + `expectNoEmptyBranch` 不变量断言；
+  覆盖空 loop / 空 alt / 多分支只空一支 / 整块删空 / 嵌套块不动点 / 原本就空不碰；
+  `sequence-golden.test.ts` 新增 19 行金样。
+- `npm test` → 43 文件 / **531 条全过**；`npm run typecheck` → 退出码 0。
+- 合并回 main 后复跑：44 文件 / 562 条全过。
+
