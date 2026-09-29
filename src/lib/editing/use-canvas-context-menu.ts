@@ -20,6 +20,7 @@ import {
 } from './sequence-forms'
 import type { CanvasInlineEditTarget } from './inline-edit'
 import type { Selection } from '../projection/selection'
+import { selectionOfMenuTarget } from '../canvas-selection/selection-codec'
 import {
   contextMenuItems,
   contextMenuTargetFromSelection,
@@ -201,19 +202,12 @@ export function useCanvasContextMenu(
   const closeStyleForm = useCallback(() => setStyleForm(null), [])
   const closeNodeForm = useCallback(() => setNodeForm(null), [])
 
-  /** 右键目标 → 编辑器选中（属性面板联动：连线的字段编辑依赖该选中） */
+  /** 右键目标 → 编辑器选中（属性面板联动：连线的字段编辑依赖该选中）。
+   * 映射本体在 canvas-selection/selection-codec.ts（工单 03）；blank 目标不 select。 */
   const selectTarget = useCallback((target: ContextMenuTarget): void => {
     const { select } = useEditorStore.getState()
-    if (target.kind === 'flowchart-node') select({ kind: 'node', nodeId: target.nodeId })
-    else if (target.kind === 'flowchart-edge')
-      select({ kind: 'edge', from: target.from, to: target.to, occurrence: target.occurrence })
-    else if (target.kind === 'mindmap-node') select({ kind: 'mindmap-node', elementId: target.elementId })
-    else if (target.kind === 'class-node') select({ kind: 'class', name: target.name })
-    else if (target.kind === 'sequence-participant') select({ kind: 'participant', actorId: target.actorId })
-    else if (target.kind === 'class-relation') select({ kind: 'class-relation', elementId: target.elementId })
-    else if (target.kind === 'sequence-message') select({ kind: 'message', elementId: target.elementId })
-    else if (target.kind === 'sequence-note') select({ kind: 'note', elementId: target.elementId })
-    else if (target.kind === 'sequence-block') select({ kind: 'block', elementId: target.elementId })
+    const selection = selectionOfMenuTarget(target)
+    if (selection !== null) select(selection)
   }, [])
 
   /** 右键：阻止默认菜单；解析目标 → 选中联动 → 弹出菜单（无可弹项安静关闭） */

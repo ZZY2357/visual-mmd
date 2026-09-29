@@ -1,6 +1,6 @@
 import type { DiagramTypeId } from '../diagram-registry'
 import type { CanvasSelection } from '../canvas-selection/data-id'
-import { edgeSelectionOf } from '../canvas-selection/edge-adapter'
+import { menuTargetOfCanvas } from '../canvas-selection/selection-codec'
 
 /**
  * 右键菜单（工单 07/04/06/03）：单一菜单随右键目标变化。
@@ -76,7 +76,8 @@ export type ContextMenuItemId =
   | 'delete-block'
 
 /**
- * 画布选中 → 菜单目标：节点/连线按图种改写 kind（四种图种的节点都有菜单）；
+ * 画布选中 → 菜单目标（工单 03 起为 `canvas-selection/selection-codec.ts` 的
+ * `menuTargetOfCanvas` 的转调别名）：节点/连线按图种改写 kind（四种图种的节点都有菜单）；
  * 连线 flowchart 走 mermaid data-id，class / sequence 走**位置序身份**（工单 02，
  * 经 edgeSelectionOf 收窄到本图种可寻址的种类）；空白处一律返回 blank（图种随目标携带）。
  */
@@ -84,33 +85,7 @@ export function contextMenuTargetFromSelection(
   selection: CanvasSelection | null,
   diagramType: DiagramTypeId,
 ): ContextMenuTarget | null {
-  if (selection === null) return { kind: 'blank', diagramType }
-  if (selection.kind === 'node') {
-    if (diagramType === 'flowchart') return { kind: 'flowchart-node', nodeId: selection.id }
-    if (diagramType === 'mindmap') return { kind: 'mindmap-node', elementId: selection.id }
-    if (diagramType === 'class') return { kind: 'class-node', name: selection.id }
-    return { kind: 'sequence-participant', actorId: selection.id }
-  }
-  if (selection.kind === 'element') {
-    // 复用「身份 → 编辑器选中」的收窄逻辑，保证路由与选中永远认同一批种类
-    const editorSelection = edgeSelectionOf(diagramType, selection.elementId)
-    if (editorSelection === null) return null
-    switch (editorSelection.kind) {
-      case 'class-relation':
-        return { kind: 'class-relation', elementId: editorSelection.elementId }
-      case 'message':
-        return { kind: 'sequence-message', elementId: editorSelection.elementId }
-      case 'note':
-        return { kind: 'sequence-note', elementId: editorSelection.elementId }
-      case 'block':
-        return { kind: 'sequence-block', elementId: editorSelection.elementId }
-      default:
-        return null
-    }
-  }
-  return diagramType === 'flowchart'
-    ? { kind: 'flowchart-edge', from: selection.from, to: selection.to, occurrence: selection.occurrence }
-    : null
+  return menuTargetOfCanvas(diagramType, selection)
 }
 
 /** 空白菜单项按图种：flowchart 维持既有四项，其余图种各一个「添加到空图」的入口。

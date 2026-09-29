@@ -1,0 +1,153 @@
+import type { DiagramTypeId } from '../diagram-registry'
+import type { Selection } from '../projection/selection'
+import type { CanvasSelection } from './data-id'
+import { toEditorSelection } from './flowchart-adapter'
+import { edgeSelectionOf } from './edge-adapter'
+import { mindmapDomIdOf } from './mindmap-adapter'
+import type { ContextMenuTarget } from '../editing/context-menu'
+
+/**
+ * 选中的互逆映射收敛（工单 03）：Selection ↔ 画布 data-id ↔ ContextMenuTarget。
+ *
+ * 这三件事原先散成五份手写映射（CanvasPanel 的 `canvasToEditorSelection` /
+ * `selectedDataIdOf`、`selectTarget` 的 9 分支、`contextMenuTargetFromSelection`、
+ * `navigation.toSelection` 的组合），互为逆向却各写一遍——穷尽性靠人眼维护，
+ * 任何一处漏一个 kind 的症状是「右键选中了但属性面板空白」：不抛错、不报红，静默。
+ * 本模块把互为逆向的两对收进同一处：正解反解成对提供，改协议只改一个文件。
+ *
+ * 穷尽性的做法（已定案）：**不做类型层 `assertNever`**。画布本来就只可寻址一部分
+ * kind（`diagram` / `subgraph` / `classdef` / `class-member` / `class-note` /
+ * `seq-region` / `class-namespace` 无 data-id；flowchart 的 `edge` 走 mermaid
+ * `L_{from}_{to}_{n}` 尽力匹配，不进高亮 data-id 链路），`default: return null`
+ * 是有意的。改用「显式可寻址表 + 遍历全部 16 个 kind 的测试」
+ * （`__tests__/selection-codec.test.ts` 的 `ADDRESSABLE` 表）——新增 kind 时测试
+ * 逼你回答「它可寻址吗」，漏答是测试失败而不是线上静默。
+ *
+ * 形状沿用 `edge-identity.ts`（ADR-0012 已验证的 codec 样板）：纯函数、无 DOM、无
+ * React；映射不出就返回 null，绝不凭空造出身份。依赖 01：`mindmapDomIdOf` 这类
+ * 形态转换走 `pipeline/element-id.ts` 的 codec，本模块不自己拼串。
+ *
+ * 注意（工单 03 Decision）：`resolve*Selection`（「选中的图元在投影里还存在吗」）
+ * **不在此处**——它属投影自己的事，四份各自 switch 的 kind 互不重叠，归工单 04
+ * 的 `CanvasCapabilities.resolveSelection`。`projection/selection.ts` 的
+ * `selectionKey` 是另一套命名空间（sameSelection 相等性比较用），也不在此处。
+ */
+
+/**
+ * Selection → 画布 data-id（高亮用）。
+ * 画布上不可寻址的 kind（diagram / subgraph / classdef / class-member / class-note /
+ * seq-region / class-namespace，以及 flowchart 的 edge）返回 null——安静地不高亮。
+ */
+export function canvasIdOf(selection: Selection): string | null {
+  switch (selection.kind) {
+    case 'node':
+      return selection.nodeId
+    case 'participant':
+      return selection.actorId
+    case 'class':
+      return selection.name
+    // 位置序连线（工单 02）：elementId 即渲染后标注的 data-id。class 的成员/注释
+    // 未纳入寻址，画布上没有对应 data-id，返回后安静地不高亮。
+    case 'class-relation':
+    case 'message':
+    case 'note':
+    case 'block':
+      return selection.elementId
+    case 'mindmap-node':
+      // mindmap 无 data-id：高亮按节点 DOM id（node_{N-1}）匹配（highlight 已支持）
+      return mindmapDomIdOf(selection.elementId)
+    default:
+      return null
+  }
+}
+
+/**
+ * 画布 CanvasSelection + 图种 → Selection。
+ * flowchart 走 `toEditorSelection`（节点按 ADR-0007、边按 `L_{from}_{to}_{n}` 尽力匹配），
+ * 与其它三个图种不同——保留这个分支，不为统一而统一。
+ * mindmap 画布选中只可能是节点（无连线）；canvas id 即 elementId（`mindmap-node:N`）。
+ * 位置序连线（工单 02）：elementId 直接落成 class-relation / message / note / block。
+ */
+export function fromCanvasId(diagramType: DiagramTypeId, canvas: CanvasSelection): Selection | null {
+  if (diagramType === 'flowchart') return toEditorSelection(canvas)
+  if (diagramType === 'mindmap') {
+    return canvas.kind === 'node' ? { kind: 'mindmap-node', elementId: canvas.id } : null
+  }
+  if (canvas.kind === 'element') return edgeSelectionOf(diagramType, canvas.elementId)
+  if (canvas.kind === 'node') {
+    return diagramType === 'sequence'
+      ? { kind: 'participant', actorId: canvas.id }
+      : { kind: 'class', name: canvas.id }
+  }
+  return null
+}
+
+/**
+ * ContextMenuTarget → Selection（右键目标 → 属性面板联动）。
+ * blank 目标什么都不选（既有语义：空白菜单不 select）返回 null；其余 9 个元素目标
+ * 一一对应各自的 Selection kind。
+ */
+export function selectionOfMenuTarget(target: ContextMenuTarget): Selection | null {
+  switch (target.kind) {
+    case 'flowchart-node':
+      return { kind: 'node', nodeId: target.nodeId }
+    case 'flowchart-edge':
+      return { kind: 'edge', from: target.from, to: target.to, occurrence: target.occurrence }
+    case 'mindmap-node':
+      return { kind: 'mindmap-node', elementId: target.elementId }
+    case 'class-node':
+      return { kind: 'class', name: target.name }
+    case 'sequence-participant':
+      return { kind: 'participant', actorId: target.actorId }
+    case 'class-relation':
+      return { kind: 'class-relation', elementId: target.elementId }
+    case 'sequence-message':
+      return { kind: 'message', elementId: target.elementId }
+    case 'sequence-note':
+      return { kind: 'note', elementId: target.elementId }
+    case 'sequence-block':
+      return { kind: 'block', elementId: target.elementId }
+    case 'blank':
+      return null
+  }
+}
+
+/**
+ * CanvasSelection + 图种 → ContextMenuTarget：节点/连线按图种改写 kind（四种图种的
+ * 节点都有菜单）；连线 flowchart 走 mermaid data-id，class / sequence 走**位置序身份**
+ * （工单 02，经 edgeSelectionOf 收窄到本图种可寻址的种类）；空白处（canvas === null）
+ * 一律返回 blank（图种随目标携带）；无法映射为菜单目标时返回 null——安静地不弹菜单，
+ * 不崩溃。
+ */
+export function menuTargetOfCanvas(
+  diagramType: DiagramTypeId,
+  canvas: CanvasSelection | null,
+): ContextMenuTarget | null {
+  if (canvas === null) return { kind: 'blank', diagramType }
+  if (canvas.kind === 'node') {
+    if (diagramType === 'flowchart') return { kind: 'flowchart-node', nodeId: canvas.id }
+    if (diagramType === 'mindmap') return { kind: 'mindmap-node', elementId: canvas.id }
+    if (diagramType === 'class') return { kind: 'class-node', name: canvas.id }
+    return { kind: 'sequence-participant', actorId: canvas.id }
+  }
+  if (canvas.kind === 'element') {
+    // 复用「身份 → 编辑器选中」的收窄逻辑，保证路由与选中永远认同一批种类
+    const editorSelection = edgeSelectionOf(diagramType, canvas.elementId)
+    if (editorSelection === null) return null
+    switch (editorSelection.kind) {
+      case 'class-relation':
+        return { kind: 'class-relation', elementId: editorSelection.elementId }
+      case 'message':
+        return { kind: 'sequence-message', elementId: editorSelection.elementId }
+      case 'note':
+        return { kind: 'sequence-note', elementId: editorSelection.elementId }
+      case 'block':
+        return { kind: 'sequence-block', elementId: editorSelection.elementId }
+      default:
+        return null
+    }
+  }
+  return diagramType === 'flowchart'
+    ? { kind: 'flowchart-edge', from: canvas.from, to: canvas.to, occurrence: canvas.occurrence }
+    : null
+}
