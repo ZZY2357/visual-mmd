@@ -1100,6 +1100,30 @@ export type ClassIntent =
   /** 设置图表方向（工单 07）；null = 删除 direction 行（跟随 mermaid 默认） */
   | { type: 'set-direction'; direction: string | null }
 
+/** 源码里各 namespace 元素的 elementId，按出现顺序（解析失败时 null） */
+function namespaceIdsOf(source: string): string[] | null {
+  const parsed = classParser.parse(source)
+  if (!parsed.ok) return null
+  return parsed.doc.elements.filter((part) => part.element.kind === 'namespace').map((part) => part.id)
+}
+
+/**
+ * 改名（set-namespace-name）落码后该 namespace 的真实 elementId（工单 02 / spec F2）。
+ *
+ * 重名序号（`namespace:<名>#N`）是解析器的知识，调用方不复刻：这里重新解析改名后的
+ * 源码，由解析器给出 id。改名只替换行内文本，元素在 namespace 出现序列里的位置不变，
+ * 故按位置在新旧源码间对齐。解析失败 / 找不到时返回 null（调用方保持原选中，不回落）。
+ */
+export function namespaceIdAfterRename(before: string, after: string, elementId: string): string | null {
+  const beforeIds = namespaceIdsOf(before)
+  if (beforeIds === null) return null
+  const order = beforeIds.indexOf(elementId)
+  if (order < 0) return null
+  const afterIds = namespaceIdsOf(after)
+  if (afterIds === null) return null
+  return afterIds[order] ?? null
+}
+
 /** 元素所在行的行首缩进（插入新行时跟随用户缩进习惯） */
 function lineIndent(source: string, offset: number): string {
   const lineStart = source.lastIndexOf('\n', Math.max(0, offset - 1)) + 1

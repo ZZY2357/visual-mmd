@@ -40,6 +40,27 @@ namespace Other {
     expect(proj.namespaces).toEqual([{ elementId: 'namespace:Foo', name: 'Foo' }])
   })
 
+  it('同名 namespace 各自成项：带重名序号的 id 也在投影里（工单 02，否则不可见不可选）', () => {
+    const proj = project(
+      `classDiagram
+namespace Foo {
+    class Circle
+}
+namespace Foo {
+    class Square
+}
+`,
+    )
+
+    expect(proj.namespaces).toEqual([
+      { elementId: 'namespace:Foo', name: 'Foo' },
+      { elementId: 'namespace:Foo#2', name: 'Foo' },
+    ])
+    expect(
+      resolveClassSelection(proj, { kind: 'class-namespace', elementId: 'namespace:Foo#2' }),
+    ).toEqual({ kind: 'class-namespace', elementId: 'namespace:Foo#2' })
+  })
+
   it('无 namespace 时为空数组（既有类图不回归）', () => {
     const proj = project('classDiagram\nclass A\nA <|-- B\n')
     expect(proj.namespaces).toEqual([])

@@ -90,7 +90,11 @@ export interface ClassProjection {
   relations: ProjectionRelation[]
   notes: ProjectionNote[]
   classDefs: ProjectionClassDef[]
-  /** namespace 命名分组，按首次出现顺序 */
+  /**
+   * namespace 命名分组，按出现顺序。
+   * 同名 namespace 各自成项：解析器给第 2 次及以后出现的同名者带重名序号
+   * （`namespace:<名>#2`），去重会让它们既不可见也不可选中（工单 02 / spec F2）。
+   */
   namespaces: ProjectionNamespace[]
 }
 
@@ -103,7 +107,6 @@ export function buildClassProjection(doc: SourceDocument): ClassProjection {
   const notes: ProjectionNote[] = []
   const classDefs: ProjectionClassDef[] = []
   const namespaces: ProjectionNamespace[] = []
-  const namespaceSeen = new Set<string>()
   // 图表方向取首个 direction 行（与 set-direction 的改写落地侧同口径）
   let direction: string | null = null
   // 块内成员的宿主：最近一个开块的类声明
@@ -161,10 +164,7 @@ export function buildClassProjection(doc: SourceDocument): ClassProjection {
       currentBlockOwner = null
     } else if (data.kind === 'namespace') {
       const ns = data as NamespaceData
-      if (!namespaceSeen.has(ns.name)) {
-        namespaceSeen.add(ns.name)
-        namespaces.push({ elementId: part.id, name: ns.name })
-      }
+      namespaces.push({ elementId: part.id, name: ns.name })
     }
   }
 

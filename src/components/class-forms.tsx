@@ -22,6 +22,7 @@ import {
   setRelationIntent,
 } from '../lib/editing/class-forms'
 import type { RelationKind, Visibility } from '../lib/pipeline/class'
+import { namespaceIdAfterRename } from '../lib/pipeline/class'
 
 /**
  * class 属性表单集合（工单 07）：全部表单值变化都映射为编辑意图，经
@@ -283,10 +284,13 @@ export function NamespaceForm({ namespace }: { namespace: ProjectionNamespace })
   const commitIntent = useCommit()
   const nameDraft = useDraft(namespace.name, (next) => {
     const intent = setNamespaceNameIntent(namespace.elementId, next)
-    if (intent !== null && commitIntent(intent)) {
-      // 改名后元素 id 随之变化（namespace:<名字>）：跟随选中，避免表单回落图表级
-      useEditorStore.getState().select({ kind: 'class-namespace', elementId: `namespace:${intent.name}` })
-    }
+    if (intent === null) return
+    const before = useEditorStore.getState().source
+    if (!commitIntent(intent)) return
+    // 改名后元素 id 由解析器给出（重名时带 `#N` 序号）：从落码结果里取回真实 id 再跟随选中，
+    // 表单不自己拼 id（拼错了会选中落空、面板回落图表级，用户看不到刚改的名字）
+    const renamed = namespaceIdAfterRename(before, useEditorStore.getState().source, namespace.elementId)
+    if (renamed !== null) useEditorStore.getState().select({ kind: 'class-namespace', elementId: renamed })
   })
 
   return (
