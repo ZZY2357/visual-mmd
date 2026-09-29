@@ -126,10 +126,19 @@ class：类与成员（含可见性、行式/块式）、泛型、6 种关系、
 
 ## 验收场景（完成判据 = 这两条能闭眼走完）
 
-**场景 A（类图）**：加类 → 加两个成员 → 连到另一个类 → 双击线上标上 `1..*` 与标签 →
+**场景 A（类图）**：加类 → 加两个成员 → 连到另一个类 → 点选这条线并在右侧表单标基数与标签 →
 点选这条线并在右侧改成 `*--`。
 
+> **场景 A 第四步的调整（工单 02 裁定 / 工单 09 落盘）**：原写「**双击**线上标上 `1..*` 与标签」。
+> 但本 spec 的决策是「双击只用于 class 类名与 sequence 别名，连线不做内联编辑」，且基数文本从 `span`
+> 到 `<svg>` 全程无 data-id。工单 02 据此把「点关系标签 / 点基数文本」裁定为**归属到边**，故第四步
+> 改写为「点选这条线 → 右侧 `RelationForm` 标基数与标签」。
+
 **场景 B（时序图）**：加参与者 → 互发三条消息 → 包一个 alt 块并写条件 → 右键一条消息改箭头并删掉它。
+
+> **场景 B 的「包一个 alt 块」只能「新增 alt 块并写条件」（工单 04 的既有边界 / 工单 09 落盘）**：
+> `add-block` 只落 `open` + `end`，而 `add-message` / `add-note` 的 `insertAfter` 锚点语义决定新行落在
+> 块**外**——没有任何「块内插入」入口，无法把已有消息包进块。列为**遗留缺口**（见下方「范围修正」）。
 
 走不完 = 表单再多也是假的。
 
@@ -239,16 +248,34 @@ class：类与成员（含可见性、行式/块式）、泛型、6 种关系、
 **推进顺序**：模型层先行（01）→ 连线地基（02）→ 交互层（03/04）→ 编辑键（05）→
 独立能力（06/07/08，可与 03-05 并行）→ 验收（09）。
 
-- 01 `create` 进投影模型（`01-sequence-create-enters-model.md`）—— **无前置阻塞，必须先行**
-- 02 连线的元素身份：位置序寻址（`02-edge-identity-ordinal-addressing.md`）—— **Blocked by: 01**
-- 03 连线的右键菜单（`03-edge-context-menu.md`）—— **Blocked by: 02**
-- 04 补全添加入口（`04-missing-add-entrypoints.md`）—— **Blocked by: 02**
-- 05 编辑键与双击内联编辑（`05-edit-keys-and-inline-edit.md`）—— **Blocked by: 03、04**
-- 06 无 data-id 的结构：`rect`/`box`/`namespace`（`06-grouping-syntaxes-visible-renameable.md`）
-  —— **Blocked by: 01**
-- 07 `direction` 表单（`07-direction-form.md`）—— **Blocked by: 01**（无硬依赖，可并行）
-- 08 只读不可编的五处缺口（`08-readonly-gaps.md`）—— **Blocked by: 01、02**
-- 09 验收收尾（`09-acceptance.md`）—— **Blocked by: 01-08**
+**状态（2026-09-29 工单 09 验收收尾落盘）**：01–09 **全部 resolved**。
+
+- 01 `create` 进投影模型（`01-sequence-create-enters-model.md`）—— **resolved**（无前置阻塞，先行）
+- 02 连线的元素身份：位置序寻址（`02-edge-identity-ordinal-addressing.md`）—— **resolved**
+- 03 连线的右键菜单（`03-edge-context-menu.md`）—— **resolved**
+- 04 补全添加入口（`04-missing-add-entrypoints.md`）—— **resolved**
+- 05 编辑键与双击内联编辑（`05-edit-keys-and-inline-edit.md`）—— **resolved**
+- 06 无 data-id 的结构：`rect`/`box`/`namespace`（`06-grouping-syntaxes-visible-renameable.md`）—— **resolved**
+- 07 `direction` 表单（`07-direction-form.md`）—— **resolved**（范围收敛到 class，见「范围修正」）
+- 08 只读不可编的五处缺口（`08-readonly-gaps.md`）—— **resolved**（类声明 `tail` 不做，见「范围修正」）
+- 09 验收收尾（`09-acceptance.md`）—— **resolved**
+
+### 范围修正（工单 09 落盘）
+
+- **工单 07 的 sequence 部分划掉**：mermaid 12.0.0 **没有** `sequenceDiagram` 的 `direction` 语法——
+  实测 `sequenceDiagram\ndirection LR` → `Parse error on line 2`，而 `classDiagram\ndirection LR` 与
+  `flowchart LR` 通过（工单 07 Comments / 工单 09 Comments 有同一记录，`sequence.test.ts` 有锁死断言）。
+  给 sequence 做方向表单只能产出语法错误源码，直接违反「源码始终是合法 mermaid」。故 07 的范围
+  **只取 class**；决策记录 `direction` 的「与 flowchart 同类选项对齐」正指向 flowchart 家族
+  （flowchart / ER / class / state），原工单标题里的 sequence 部分是误扩。
+- **工单 08 的类声明 `tail` 明确不做**：`tail` 是「类名（含泛型）之后到行尾的原文」，承载开块花括号、
+  行尾注释等**语法界标**，属语法边界而非可编辑字段；给它自由文本入口等于让用户替解析器猜语义。
+  它正是「改 name/generic 时逐字保留其余一切」这条 verbatim 承诺的载体——缺的不是「可编辑」，而是
+  「无需编辑」（工单 08 Comments 第 5 条）。
+- **场景 B「把已有消息包进块」记为遗留缺口**：`add-block` 只落 `open` + `end`；`add-message` /
+  `add-note` 的 `afterElementId` 锚点语义（`insertAfter` 把新行紧贴锚点、后插的更靠近锚点）决定新行落在
+  块**外**，没有任何「块内插入」入口。真正支持需动 pipeline（新增「块内插入」的锚点语义），超出本批
+  「纯 UI 接线、不新增 pipeline 意图」的边界，留给后续批次（工单 04 Comments「遗留风险」有同一记录）。
 
 ## ADR
 

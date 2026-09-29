@@ -91,3 +91,8 @@
    - `destroy` 一个不存在的参与者 → 仍**静默忽略**。
 5. **工单 14 的可视范围口径不受影响**：`rect`/`box`/`namespace` 矩形仍无 data-id，
    故仍不进方位导航的候选集合。
+6. **class 标签 / 基数的位置序归属**（工单 02）：`annotateClassRelationIdentities` 把
+   `g.edgeLabels` 的**直接子元素**按「逐条关系一个 label 组、紧随其 terminals 组」的期望序列
+   对齐到关系序（条数 / 顺序任一不符即整体放弃标注）；sequence 的注释 / 块标注同理依赖
+   `rect.note` / `line.loopLine` 的宿主 `g` 结构。升版若改这些结构，对应种类退化为
+   「点标签 / 点基数不响应」，**不会点错关系**（这条是工单 02 引入的新的 mermaid 结构依赖）。
