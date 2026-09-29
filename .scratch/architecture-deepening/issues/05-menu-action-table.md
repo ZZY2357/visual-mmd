@@ -1,6 +1,6 @@
 # 05 · 菜单项动作分发从 26 分支链改成表
 
-Status: needs-triage
+Status: resolved
 Blocked by: —
 Type: task
 
@@ -85,3 +85,24 @@ const onMenuItem = (id: ContextMenuItemId): void => {
 合在一起会让同一个文件承担两种变更理由。
 
 不为此开 ADR：这是显而易见的选择，没有值得记住的被否决方案。
+
+## 实施记录
+
+2026-09-29，分支 `ticket-05-menu-actions`。
+
+- 新增 `src/lib/editing/menu-actions.ts`：`MENU_ACTIONS: Record<ContextMenuItemId, MenuAction>`（27 键，含删除组 6 行、`link-from-here` narrow 原样搬）。
+- `CanvasPanel.tsx` 的 `onMenuItem` 换成一行查表 `MENU_ACTIONS[id](ctx, ctx.menu?.target)`，26 分支链删除。
+- 新增 `src/lib/editing/__tests__/menu-actions.test.ts`：断言 `MENU_ACTIONS` 键集合与 `contextMenuItems` 对全部目标形状（blank × 4 图种 + 其余 9 种 kind）返回 id 的并集一致。
+
+### 验收 grep 实测
+
+- `grep -c "else if (id ===" CanvasPanel.tsx` → `0`（不再有分发链；唯一残留的 `id === 'apply-style'` 是菜单渲染的子菜单开关三元，非分发）。
+- 新加菜单项改动点 4 → 3，第 3 处（动作表）由 `Record` 编译期兜底。
+
+### 与分步的偏差（1 处，需知悉）
+
+union 里有 `apply-style`（27 个 id），但原 26 分支链里**没有**它——它在 CanvasPanel 中被渲染成子菜单开关，点样式名直接调 `ctx.applyStyle(name)`，从不经 `onMenuItem`。由于 `Record` 要求穷尽，表里保留了 `'apply-style'` 键，但实现为显式 no-op 并注释说明不可达（`ctx.applyStyle` 签名要求 className 参数，无参调用不成立）。穷尽性测试因此是「键集合 == 菜单 id 并集」直接相等，无需例外。
+
+### 测试
+
+全量 `npm test`：**58 文件 834 用例全绿**（基线 57/832，+1 文件 +2 用例）。`npm run typecheck` 绿。行为层 `context-menu.test.ts` 与 `use-canvas-context-menu.test.tsx` 零改动全绿。
