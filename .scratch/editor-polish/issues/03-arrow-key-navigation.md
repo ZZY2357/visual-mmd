@@ -2,7 +2,12 @@
 
 Status: resolved
 
+Superseded by: 14（语义已作废：树形四向 / 源码顺序线性 → 方位导航，见 ADR-0011）
+
 Blocked by: 02
+
+> 本节以下的需求与验收记录的是**改前**的语义，已被 14 取代，保留以存档（03 的验收记录 `07-acceptance.md:177-244`
+> 是「改前行为」的权威证据）。要改方向键请看 14。
 
 ## 需求
 
@@ -52,3 +57,10 @@ Blocked by: 02
   `isNavigationKey` / `navigationTarget`，hook 侧仅在命中后 `preventDefault` + `select()`。
 - 决策：「无选中」含 `null` / 图表级选中 / 别种元素 / 选中已不在投影中——都回落为选中首个节点
   （应用初始选中就是图表级，否则开机按方向键没有落点）。
+- **2026-09-29 作废（→ 14）**：本单的落点定义（flowchart = 源码顺序、mindmap = 父/子/兄弟）与屏幕方位无关，
+  而 mermaid 的布局引擎（flowchart = dagre、mindmap = cose-bilkent）不保证源码顺序与屏幕方位一致，
+  用户报的「上下左右键切换选中特别严重」即由此而来（真机实测：flowchart 从 B 按 `→` 落到正下方的 C、
+  从 C 按 `→` 落到右上的 D；mindmap 从「双面板同步」按 `↓` 落到右上的「属性面板」）。
+  取代者 14 改为**方位导航**（45° 锥内取最近），并覆盖四个图种、补自动平移、修修饰键缺陷；取舍见 ADR-0011。
+  `navigationTarget` 及其两个分支函数在 14 中删除；`isNavigationKey` / `keyToNodeAction` /
+  `nodeActionIntents` / `mindmapActionIntents` 保留（mindmap 的父子兄弟关系仍由 Tab/Enter 的落码使用）。
