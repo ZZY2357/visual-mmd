@@ -104,6 +104,31 @@ describe('金样合法性（sequence）', () => {
     await expect(mermaid.parse(result.source)).resolves.toBeTruthy()
   })
 
+  it('create 引入的参与者改别名后产物 parse 通过（create 前缀保留，工单 01）', async () => {
+    const source = `sequenceDiagram
+    create participant B as Bee
+    A->>B: hi
+`
+    const result = applyEdit(source, sequenceParser, { type: 'set-participant', actorId: 'B', alias: '乙' })
+    expect(result.ok).toBe(true)
+    if (!result.ok) return
+    expect(result.source).toContain('create participant B as 乙')
+    await expect(mermaid.parse(result.source)).resolves.toBeTruthy()
+  })
+
+  it('create 引入的参与者改名后产物 parse 通过（create 行与消息引用一起改，工单 01）', async () => {
+    const source = `sequenceDiagram
+    create participant B as Bee
+    A->>B: hi
+`
+    const result = applyEdit(source, sequenceParser, { type: 'rename-participant', actorId: 'B', newId: 'Srv' })
+    expect(result.ok).toBe(true)
+    if (!result.ok) return
+    expect(result.source).toContain('create participant Srv as Bee')
+    expect(result.source).toContain('A->>Srv: hi')
+    await expect(mermaid.parse(result.source)).resolves.toBeTruthy()
+  })
+
   it('只有表头的 sequenceDiagram：add-participant 落码后 parse 通过（不带 alias）', async () => {
     const empty = 'sequenceDiagram\n'
     const result = applyEdit(empty, sequenceParser, { type: 'add-participant', actorId: '新参与者' })

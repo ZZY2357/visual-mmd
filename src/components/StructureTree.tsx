@@ -162,7 +162,14 @@ function SequenceTree({ projection }: { projection: Extract<AnyProjection, { typ
         <TreeItem
           key={p.actorId}
           label={p.alias ?? p.actorId}
-          detail={p.alias !== null ? p.actorId : p.active ? 'activate' : undefined}
+          detail={
+            [
+              p.alias !== null ? p.actorId : p.active ? 'activate' : undefined,
+              p.created === true ? t('app:propertyPanel.createdByCreate') : undefined,
+            ]
+              .filter((x) => x !== undefined)
+              .join(' · ') || undefined
+          }
           active={is({ kind: 'participant', actorId: p.actorId })}
           depth={1}
           onSelect={() => select({ kind: 'participant', actorId: p.actorId })}

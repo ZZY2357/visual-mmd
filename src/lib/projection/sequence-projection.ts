@@ -28,6 +28,8 @@ export interface ProjectionParticipant {
   elementId: string
   /** 当前净激活状态（+ / activate 开，- / deactivate 关） */
   active: boolean
+  /** 由 `create` 引入（生命起点，ADR-0014）；普通声明/隐式引用缺省不设此字段 */
+  created?: boolean
 }
 
 export interface ProjectionMessage {
@@ -79,7 +81,8 @@ export interface SequenceProjection {
  * 从解析产物构建 sequence 投影（纯函数）。
  *
  * 参与者按 actorId 合并：隐式引用（消息 / note / activate 里先出现）与显式声明
- * （`participant` / `actor`）合成同一个投影参与者——mermaid 侧同样只渲染一个；
+ * （`participant` / `actor` / `create participant` / `create actor`）合成同一个投影参与者
+ * ——mermaid 侧同样只渲染一个；
  * 有显式声明时以声明信息为准（alias 显示文本、actor 小人样式、elementId 寻址）。
  * 顺序取「首次出现顺序」（声明与引用都算出现），与 mermaid 的 actor 插入顺序一致。
  */
@@ -108,13 +111,16 @@ export function buildSequenceProjection(doc: SourceDocument): SequenceProjection
     if (data.kind === 'participant') {
       const p = data as ParticipantData
       touch(p.actorId)
-      declared.set(p.actorId, {
+      const decl: ProjectionParticipant = {
         actorId: p.actorId,
         alias: p.aliasRaw !== null ? stripAliasQuotes(p.aliasRaw) : null,
         keyword: p.keyword,
         elementId: part.id,
         active: false,
-      })
+      }
+      // 只有 `create` 引入的参与者才带生命起点标记（可选字段缺省，结构树据此决定是否加徽标）
+      if (p.createPrefixRaw !== null) decl.created = true
+      declared.set(p.actorId, decl)
     } else if (data.kind === 'message') {
       const m = data as MessageData
       touch(m.from)

@@ -212,6 +212,7 @@ export const zhDict = {
       actorType: 'actor（小人）',
       participantType: 'participant（方框）',
       lifelineActive: '生命线已激活',
+      createdByCreate: '由 create 引入',
       participantAlias: '显示名（as 别名）',
       participantId: '参与者 ID',
       invalidParticipantId: 'ID 不能含空格、冒号或逗号（且不为 end）',

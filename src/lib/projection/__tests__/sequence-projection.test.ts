@@ -211,3 +211,65 @@ describe('resolveSequenceSelection：合并后按 actorId 命中（工单 10）'
     expect(resolveSequenceSelection(proj, { kind: 'participant', actorId: '不存在' })).toBeNull()
   })
 })
+
+// ---------- create 引入的参与者（工单 01，ADR-0014） ----------
+
+describe('create 引入的参与者进投影（工单 01）', () => {
+  it('create participant B：进投影、created 标记为真、elementId 指向声明行', () => {
+    const proj = project('sequenceDiagram\n    create participant B as Bee\n    A->>B: hi\n')
+
+    expect(proj.participants.map((p) => p.actorId)).toEqual(['B', 'A'])
+    expect(proj.participants[0]).toMatchObject({
+      actorId: 'B',
+      alias: 'Bee',
+      keyword: 'participant',
+      elementId: 'participant:B',
+      active: false,
+      created: true,
+    })
+  })
+
+  it('create actor 关键字透出为 actor', () => {
+    const proj = project('sequenceDiagram\n    create actor C\n    C->>C: 自转\n')
+
+    expect(proj.participants[0]).toMatchObject({ actorId: 'C', keyword: 'actor', alias: null, created: true })
+  })
+
+  it('隐式引用的参与者不带 created 标记（可选字段缺省，防结构树误标）', () => {
+    const proj = project('sequenceDiagram\n    create participant B\n    A->>B: hi\n')
+
+    expect(proj.participants.find((p) => p.actorId === 'A')).not.toHaveProperty('created')
+    expect(proj.participants.find((p) => p.actorId === 'B')).toHaveProperty('created', true)
+  })
+
+  it('普通声明的参与者不带 created 标记（对照）', () => {
+    const proj = project('sequenceDiagram\n    participant B as Bee\n    A->>B: hi\n')
+
+    expect(proj.participants.find((p) => p.actorId === 'B')).not.toHaveProperty('created')
+  })
+
+  it('create 与后续消息引用归并为同一条参与者（不重复、不串位）', () => {
+    const proj = project('sequenceDiagram\n    create participant B\n    A->>B: hi\n    B-->>A: ok\n')
+
+    expect(proj.participants.map((p) => p.actorId)).toEqual(['B', 'A'])
+    expect(proj.messages).toHaveLength(2)
+  })
+
+  it('destroy / rect / box 不进投影（参与者集合只含真实声明与引用）', () => {
+    const proj = project(
+      `sequenceDiagram
+    participant B
+    A->>B: hi
+    destroy A
+    rect rgb(0, 0, 0)
+    end
+    box 分组
+        participant C
+    end
+`,
+    )
+
+    expect(proj.participants.map((p) => p.actorId)).toEqual(['B', 'A', 'C'])
+    expect(proj.participants.every((p) => p.created !== true)).toBe(true)
+  })
+})

@@ -10,13 +10,14 @@ import { lineAtOffset, type Span } from './span'
  *
  * 覆盖（ADR-0005）：
  * - participant / actor 声明（含 `as` 别名）
+ * - create participant / create actor（参与者生命起点，ADR-0014）
  * - 四种消息箭头：->>（实线箭头）、-->（虚线）、-x（叉头）、--（无头）
  * - autonumber
  * - activate / deactivate（含消息简写 +/-：`A->>+B` 激活 B、`A-->>-B` 停用 B）
  * - note over / left of / right of
  * - 逻辑块：loop / alt-else / opt / par-and / critical / break（含嵌套）
  *
- * 不解析、原样保留（清单外语法不报错，ADR-0008）：create/destroy、rect、box、
+ * 不解析、原样保留（清单外语法不报错，ADR-0008）：destroy、rect、box、
  * 注释、空行、以及一切无法识别的行。
  *
  * span 约定：元素 span 从该行首个非空白字符起、到行尾（不含换行）；
@@ -43,6 +44,8 @@ export interface SeqHeaderData {
 
 export interface ParticipantData {
   kind: 'participant'
+  /** 由 `create` 引入时为 `create` 关键字与其后空白的原文（如 `'create '`）；普通声明为 null（ADR-0014） */
+  createPrefixRaw: string | null
   keyword: 'participant' | 'actor'
   gap: string
   actorId: string
@@ -130,12 +133,14 @@ export type SequenceElementData =
 
 export function renderParticipant(d: ParticipantData, changes: { actorId?: string; alias?: string | null } = {}): string {
   const actorId = changes.actorId ?? d.actorId
+  // create 前缀（`create `）在改写后逐字保留：去掉它会把生命起点降级为普通声明（ADR-0014）
+  const prefix = d.createPrefixRaw ?? ''
   if (changes.alias !== undefined) {
     return changes.alias === null || changes.alias === ''
-      ? `${d.keyword}${d.gap}${actorId}`
-      : `${d.keyword}${d.gap}${actorId} as ${quoteAlias(changes.alias)}`
+      ? `${prefix}${d.keyword}${d.gap}${actorId}`
+      : `${prefix}${d.keyword}${d.gap}${actorId} as ${quoteAlias(changes.alias)}`
   }
-  return d.aliasRaw !== null ? `${d.keyword}${d.gap}${actorId} as ${d.aliasRaw}` : `${d.keyword}${d.gap}${actorId}`
+  return d.aliasRaw !== null ? `${prefix}${d.keyword}${d.gap}${actorId} as ${d.aliasRaw}` : `${prefix}${d.keyword}${d.gap}${actorId}`
 }
 
 /** 别名含空白/逗号时用双引号包起来（mermaid 要求） */
@@ -198,6 +203,11 @@ interface RawEntry {
 }
 
 const PARTICIPANT_RE = /^(participant|actor)([ \t]+)(\S+)([ \t]+as[ \t]+(.+?))?[ \t]*$/i
+/**
+ * 生命起点声明：`create participant B` / `create actor B [as 别名]`（ADR-0014）。
+ * `destroy` 仍不解析（视觉空操作，进模型会让画布与渲染结果不一致）。
+ */
+const CREATE_RE = /^create([ \t]+)(participant|actor)([ \t]+)(\S+)([ \t]+as[ \t]+(.+?))?[ \t]*$/i
 const ACTIVATION_RE = /^(activate|deactivate)([ \t]+)(\S+)[ \t]*$/i
 const AUTONUMBER_RE = /^autonumber([ \t]+.*)?[ \t]*$/i
 const BLOCK_OPEN_RE = /^(loop|alt|opt|par|critical|break)(?:[ \t]+(.*?))?[ \t]*$/i
@@ -287,6 +297,27 @@ function classifyLine(line: string, lineStart: number, lineNo: number, entries: 
     return // 解析不了：原样保留
   }
 
+  const create = CREATE_RE.exec(raw)
+  if (create !== null) {
+    // 重复 create 不在此校验（mermaid 侧会报 actors with the same id），解析器照常产出（工单 01）
+    const actorId = create[4]
+    counters.participant.set(actorId, (counters.participant.get(actorId) ?? 0) + 1)
+    const count = counters.participant.get(actorId) as number
+    entries.push({
+      span,
+      id: `participant:${actorId}` + (count > 1 ? `#${count}` : ''),
+      data: {
+        kind: 'participant',
+        createPrefixRaw: `create${create[1]}`,
+        keyword: create[2].toLowerCase() as 'participant' | 'actor',
+        gap: create[3],
+        actorId,
+        aliasRaw: create[6] ?? null,
+      },
+    })
+    return
+  }
+
   const participant = PARTICIPANT_RE.exec(raw)
   if (participant !== null) {
     const actorId = participant[3]
@@ -297,6 +328,7 @@ function classifyLine(line: string, lineStart: number, lineNo: number, entries: 
       id: `participant:${actorId}` + (count > 1 ? `#${count}` : ''),
       data: {
         kind: 'participant',
+        createPrefixRaw: null,
         keyword: participant[1].toLowerCase() as 'participant' | 'actor',
         gap: participant[2],
         actorId,
@@ -351,7 +383,7 @@ function classifyLine(line: string, lineStart: number, lineNo: number, entries: 
     return
   }
 
-  // 其余（create/destroy、rect、box、注释、无法识别的指令）不解析，verbatim 逐字保留
+  // 其余（destroy、rect、box、注释、无法识别的指令）不解析，verbatim 逐字保留
   void lineNo
 }
 

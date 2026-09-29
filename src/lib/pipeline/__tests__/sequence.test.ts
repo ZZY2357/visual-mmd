@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { applyEdit } from '../pipeline'
 import { reassemble } from '../document'
-import { sequenceParser, renderNote, type NoteData } from '../sequence'
+import { sequenceParser, renderNote, renderParticipant, type NoteData, type ParticipantData } from '../sequence'
 import { SEQUENCE_TEMPLATE } from '../../diagram-registry'
 
 /**
@@ -42,7 +42,7 @@ function expectNoEmptyBranch(source: string): void {
   expect(stack, `块未闭合：\n${source}`).toHaveLength(0)
 }
 
-/** 覆盖 ADR-0005 清单内全部 sequence 语法 + 清单外（create/destroy/rect/box）逐字保留 */
+/** 覆盖 ADR-0005 清单内全部 sequence 语法（含 create，工单 01）+ 清单外（destroy/rect/box）逐字保留 */
 const FULL_COVERAGE = `sequenceDiagram
     %% 一条注释，必须逐字保留
     autonumber 10
@@ -111,7 +111,13 @@ describe('verbatim identity（sequence）', () => {
         系统->>系统: 保存到 localStorage
     end
 `],
-    ['覆盖全部语法的用例（含清单外 create/destroy/rect/box）', FULL_COVERAGE],
+    ['覆盖全部语法的用例（含清单外 destroy/rect/box）', FULL_COVERAGE],
+    ['create 声明（participant/actor，含别名与无别名）', `sequenceDiagram
+    create participant B as Bee
+    create actor C
+    A->>B: hi
+    B->>C: 好
+`],
     ['无尾随换行', 'sequenceDiagram\n    A->>B: 你好'],
     ['CRLF 行尾', 'sequenceDiagram\r\n    A->>B: 你好\r\n    B-->>A: 好\r\n'],
     ['无空格紧凑写法', 'sequenceDiagram\n    A->>B:hi\n    B--xA:yo\n'],
@@ -303,6 +309,103 @@ describe('手术式改写（sequence）：只重写目标元素 span，其余逐
   it('目标元素不存在时返回错误', () => {
     const result = applyEdit(SOURCE, sequenceParser, { type: 'set-message', elementId: 'message:99', text: 'x' })
     expect(result.ok).toBe(false)
+  })
+})
+
+// ---------- create 进模型（工单 01，ADR-0014） ----------
+
+/** 解析出的 participant 元素（断言用） */
+function participantElements(source: string): ParticipantData[] {
+  const parsed = sequenceParser.parse(source)
+  expect(parsed.ok, `样例源码必须可解析：${source}`).toBe(true)
+  if (!parsed.ok) throw parsed.error
+  return parsed.doc.elements
+    .filter((part) => part.element.kind === 'participant')
+    .map((part) => part.element as ParticipantData)
+}
+
+describe('create 声明进模型（工单 01，ADR-0014）', () => {
+  it('create participant / create actor 解析为参与者声明，关键字与别名照常透出', () => {
+    const decls = participantElements(`sequenceDiagram
+    create participant B as Bee
+    create actor C
+`)
+    expect(decls).toEqual([
+      { kind: 'participant', createPrefixRaw: 'create ', keyword: 'participant', gap: ' ', actorId: 'B', aliasRaw: 'Bee' },
+      { kind: 'participant', createPrefixRaw: 'create ', keyword: 'actor', gap: ' ', actorId: 'C', aliasRaw: null },
+    ])
+  })
+
+  it('普通 participant / actor 声明的 createPrefixRaw 为 null（对照）', () => {
+    const decls = participantElements(`sequenceDiagram
+    participant A as 甲
+    actor B
+`)
+    expect(decls.map((d) => [d.actorId, d.createPrefixRaw])).toEqual([
+      ['A', null],
+      ['B', null],
+    ])
+  })
+
+  it('create 与关键字之间的空白逐字保留，renderParticipant 原样回写', () => {
+    const decls = participantElements('sequenceDiagram\n    create   participant B\n')
+    expect(decls[0]?.createPrefixRaw).toBe('create   ')
+    expect(renderParticipant(decls[0] as ParticipantData, {})).toBe('create   participant B')
+  })
+
+  it('verbatim：含 create 的源码解析→重组装逐字相同', () => {
+    const source = `sequenceDiagram
+    %% create 注释
+    create participant B as Bee
+    create actor C
+      create    participant D
+    A->>B: hi
+`
+    const parsed = sequenceParser.parse(source)
+    if (!parsed.ok) throw parsed.error
+    expect(reassemble(parsed.doc)).toBe(source)
+  })
+
+  it('set-participant 别名：create 行改写后仍保留 create 前缀', () => {
+    const source = 'sequenceDiagram\n    create participant B\n    B->>B: hi\n'
+    const result = applyEdit(source, sequenceParser, { type: 'set-participant', actorId: 'B', alias: '乙' })
+    expect(result.ok).toBe(true)
+    if (!result.ok) return
+    expect(result.source).toContain('create participant B as 乙')
+    expect(result.source).toContain('B->>B: hi')
+  })
+
+  it('rename-participant：create 行与全部引用一起改名，create 前缀与别名保留', () => {
+    const source = 'sequenceDiagram\n    create participant B as Bee\n    A->>B: hi\n'
+    const result = applyEdit(source, sequenceParser, { type: 'rename-participant', actorId: 'B', newId: 'Srv' })
+    expect(result.ok).toBe(true)
+    if (!result.ok) return
+    expect(result.source).toContain('create participant Srv as Bee')
+    expect(result.source).toContain('A->>Srv: hi')
+    expect(result.source).not.toMatch(/\bB\b/)
+  })
+
+  it('destroy / rect / box 仍逐字保留、不进解析结构（只解析出 box 内的 participant）', () => {
+    const source = `sequenceDiagram
+    participant A
+    A->>B: hi
+    destroy B
+    rect rgb(0, 0, 0)
+    end
+    box 分组
+        participant C
+    end
+`
+    const parsed = sequenceParser.parse(source)
+    expect(parsed.ok).toBe(true)
+    if (!parsed.ok) return
+    expect(reassemble(parsed.doc)).toBe(source)
+    expect(parsed.doc.elements.map((p) => p.element.kind)).toEqual([
+      'seq-header',
+      'participant',
+      'message',
+      'participant',
+    ])
   })
 })
 
