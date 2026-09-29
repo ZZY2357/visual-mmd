@@ -82,6 +82,45 @@ describe('inlineEditTargetFromEvent（双击目标 → 编辑对象）', () => {
   })
 })
 
+describe('inlineEditTargetFromEvent（工单 05：class / sequence 双击只改显示文本）', () => {
+  const classResolver = (dataId: string): CanvasSelection | null =>
+    dataId === 'Foo' ? { kind: 'node', id: 'Foo' } : dataId === 'relation:1' ? { kind: 'element', elementId: 'relation:1' } : null
+
+  it('class：双击类名文本 → {kind:class}（等价 rename-class）', () => {
+    const g = el('<g data-id="Foo"><text>Foo</text><text>+String name</text></g>')
+    const title = g.querySelectorAll('text')[0]
+    expect(inlineEditTargetFromEvent(title, classResolver, [], 'class')).toEqual({ kind: 'class', name: 'Foo' })
+  })
+
+  it('class：双击成员正文 → null（不做内联编辑，双击节点内另一行会与"选中节点"打架）', () => {
+    const g = el('<g data-id="Foo"><text>Foo</text><text>+String name</text></g>')
+    const member = g.querySelectorAll('text')[1]
+    expect(inlineEditTargetFromEvent(member, classResolver, [], 'class')).toBeNull()
+  })
+
+  it('class：双击关系边（resolver 命中 element）→ null（关系标签不做双击）', () => {
+    const path = el('<path data-id="relation:1"/>')
+    expect(inlineEditTargetFromEvent(path, classResolver, [], 'class')).toBeNull()
+  })
+
+  it('sequence：双击参与者 → {kind:sequence-alias}（改 as 别名，actorId 不变）', () => {
+    const seqResolver = (dataId: string): CanvasSelection | null =>
+      dataId === '甲' ? { kind: 'node', id: '甲' } : dataId === 'message:1' ? { kind: 'element', elementId: 'message:1' } : null
+    const g = el('<g data-id="甲"><text>甲</text></g>')
+    expect(inlineEditTargetFromEvent(g.querySelector('text'), seqResolver, [], 'sequence')).toEqual({
+      kind: 'sequence-alias',
+      actorId: '甲',
+    })
+  })
+
+  it('sequence：双击消息线（resolver 命中 element）→ null（消息文本不做双击）', () => {
+    const seqResolver = (dataId: string): CanvasSelection | null =>
+      dataId === 'message:1' ? { kind: 'element', elementId: 'message:1' } : null
+    const line = el('<line data-id="message:1"/>')
+    expect(inlineEditTargetFromEvent(line, seqResolver, [], 'sequence')).toBeNull()
+  })
+})
+
 describe('inlineEditCommitOf（输入值 → 提交动作）', () => {
   it('flowchart：文本变化 → set-node-text 意图（ nodeId 寻址，文本去首尾空白）', () => {
     expect(
@@ -141,6 +180,26 @@ describe('inlineEditCommitOf（输入值 → 提交动作）', () => {
     })
     expect(inlineEditCommitOf({ kind: 'sequence', actorId: '新参与者' }, 'a:b', '新参与者')).toEqual({
       action: 'invalid',
+    })
+  })
+
+  // 工单 05：双击既有参与者改 `as` 别名（显示文本），actorId 不参与改动
+  it('sequence-alias：文本变化 → set-participant（改 as 别名，actorId 不变）', () => {
+    expect(inlineEditCommitOf({ kind: 'sequence-alias', actorId: '甲' }, ' 用户 ', '')).toEqual({
+      action: 'commit',
+      intent: { type: 'set-participant', actorId: '甲', alias: '用户' },
+    })
+  })
+
+  it('sequence-alias：清空 → unchanged（去掉别名走属性面板，只做改显示文本）', () => {
+    expect(inlineEditCommitOf({ kind: 'sequence-alias', actorId: '甲' }, '   ', '用户')).toEqual({
+      action: 'unchanged',
+    })
+  })
+
+  it('sequence-alias：别名未改动 → unchanged', () => {
+    expect(inlineEditCommitOf({ kind: 'sequence-alias', actorId: '甲' }, '用户', '用户')).toEqual({
+      action: 'unchanged',
     })
   })
 })

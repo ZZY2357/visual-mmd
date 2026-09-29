@@ -6,7 +6,7 @@ import type { ProjectionMindmapNode } from '../projection/mindmap-projection'
 import { selectionFromEventTarget, type CanvasSelection, type DataIdResolver } from '../canvas-selection/data-id'
 
 /**
- * 内联编辑（工单 05/04）：双击节点 / 新建节点后，在画布原位浮出输入框编辑文本。
+ * 内联编辑（工单 05/04/05）：双击节点 / 新建节点后，在画布原位浮出输入框编辑文本。
  *
  * 本模块是纯逻辑，与 DOM/React 解耦：
  * - 双击目标 → 编辑对象（flowchart/class/sequence 用 data-id 精确匹配；mindmap 无
@@ -16,6 +16,11 @@ import { selectionFromEventTarget, type CanvasSelection, type DataIdResolver } f
  * - 节点包围盒（屏幕坐标）→ 相对画布容器的浮层定位（视图变换已反映在
  *   getBoundingClientRect 里，这里是最后一层纯几何换算，便于单测）
  *
+ * 四图种的双击都**只改显示文本**（spec 决策：宁可少做，也不让双击不可预测）：
+ * flowchart / mindmap 改节点文本，class 改类名（rename-class），sequence 改 `as` 别名
+ * （set-participant）。class 的成员正文、class 的关系标签、sequence 的消息文本与 actorId
+ * **不做双击**——前两者在节点内部/线上（编辑路径是"点选 → 右侧表单"），actorId 是语法标识。
+ *
  * 空白右键新建的 class / sequence 元素（工单 04）复用同一输入框：编辑的是**类名** /
  * **参与者 id**（不是 mindmap 的显示文本），落 rename-class / rename-participant。
  */
@@ -23,16 +28,20 @@ export type InlineEditTarget =
   | { kind: 'flowchart'; nodeId: string }
   | { kind: 'mindmap'; elementId: string }
 
-/** 画布内联编辑目标（工单 04 扩展）：在键盘/双击目标（flowchart / mindmap）之上，
- * 增加空白右键新建的 class / sequence —— 这两者的落码分别是 rename-class /
- * rename-participant，与「改显示文本」不同，故与 InlineEditTarget 分开命名，
- * 免得扩大画布键盘（工单 03/06）的契约。 */
+/** 画布内联编辑目标（工单 04/05）：在键盘/双击目标（flowchart / mindmap）之上，
+ * 增加 class / sequence：
+ * - `class`：空白新建后命名、或双击类名 → rename-class（类名即显示文本，两条入口同目标）
+ * - `sequence`：空白新建后命名 → rename-participant（改语法 id，不生成 alias）
+ * - `sequence-alias`：双击既有参与者 → set-participant（改 `as` 显示别名；actorId 不变）
+ * 后两者分开命名：actorId 是语法标识，本票不做双击改它（走属性面板既有字段）。 */
 export type CanvasInlineEditTarget =
   | InlineEditTarget
-  /** class 空白新建：编辑类名（isValidClassName 接受中文） */
+  /** class 空白新建 / 双击类名：编辑类名（isValidClassName 接受中文） */
   | { kind: 'class'; name: string }
   /** sequence 空白新建：编辑参与者 id（不生成 alias） */
   | { kind: 'sequence'; actorId: string }
+  /** sequence 双击既有参与者：编辑 `as` 显示别名（显示文本） */
+  | { kind: 'sequence-alias'; actorId: string }
 
 export type InlineEditCommit =
   | { action: 'commit'; intent: EditIntent }
@@ -72,30 +81,53 @@ function targetFromMindmapText(target: EventTarget | null, nodes: ProjectionMind
   return null
 }
 
+/** class：双击是否落在**类名文本**上。沿 DOM 向上找最近的、可见文本恰等于类名的元素；
+ * 类节点内部的成员正文（另一行文本）与类名不等，故不会进入改名——与 spec 决策
+ * 「双击成员正文不做内联编辑」一致。双击类框本身（类无成员时其文本即类名）仍命中。 */
+function classTitleClicked(target: EventTarget | null, name: string): boolean {
+  if (!(target instanceof Element)) return false
+  let el: Element | null = target
+  while (el !== null) {
+    if ((el.textContent?.trim() ?? '') === name) return true
+    // 已到类节点本身（data-id = 类名）仍不是纯类名文本（说明是成员等）→ 不命中
+    if (el.getAttribute('data-id') === name) return false
+    el = el.parentElement
+  }
+  return false
+}
+
+/** 参与双击寻址的图种（四图种都用 data-id；mindmap 额外回落文本匹配） */
+export type InlineEditDiagramKind = 'flowchart' | 'mindmap' | 'class' | 'sequence'
+
 /**
  * 双击目标 → 编辑对象；两边都匹配不上时返回 null（如点在空白处/边上），
  * 安静地不进入编辑，不崩溃。
  *
- * kind 指明图种（工单 06）：有 resolver 命中时按图种把 node 选择映射为对应编辑
- * 目标（mindmap 的画布选中 id 即 elementId）；仅 mindmap 才回落文本匹配。
+ * kind 指明图种（工单 05 起四图种齐备）：有 resolver 命中时按图种把 node 选择映射为
+ * 对应编辑目标（class → 类名、sequence → 参与者别名）；仅 mindmap 才回落文本匹配。
+ * resolver 命中 `element`（连线）时不进入编辑——class 关系标签 / sequence 消息文本不做双击。
  */
 export function inlineEditTargetFromEvent(
   target: EventTarget | null,
   resolver: DataIdResolver | null,
   mindmapNodes: ProjectionMindmapNode[] = [],
-  kind: 'flowchart' | 'mindmap' = 'flowchart',
-): InlineEditTarget | null {
+  kind: InlineEditDiagramKind = 'flowchart',
+): CanvasInlineEditTarget | null {
   const byId = targetFromDataId(target, resolver)
   if (byId !== null) {
-    return kind === 'mindmap' ? { kind: 'mindmap', elementId: byId.nodeId } : byId
+    if (kind === 'mindmap') return { kind: 'mindmap', elementId: byId.nodeId }
+    // class 只在类名文本上改类名；sequence 改显示别名（不碰 actorId）
+    if (kind === 'class') return classTitleClicked(target, byId.nodeId) ? { kind: 'class', name: byId.nodeId } : null
+    if (kind === 'sequence') return { kind: 'sequence-alias', actorId: byId.nodeId }
+    return byId
   }
   return kind === 'mindmap' ? targetFromMindmapText(target, mindmapNodes) : null
 }
 
 /**
  * 输入值 → 提交动作：去首尾空白后与当前文本相同或为空 → unchanged（不落码）；
- * flowchart 用 set-node-text（nodeId 寻址），mindmap 用 set-node-text（elementId 寻址），
- * class / sequence 分别改类名 / 参与者 id（工单 04 新建后立即命名）。
+ * flowchart / mindmap 用 set-node-text；class 改类名（rename-class）；sequence 空白新建改
+ * 参与者 id（rename-participant）；sequence 双击改显示别名（set-participant，actorId 不变）。
  */
 export function inlineEditCommitOf(target: CanvasInlineEditTarget, text: string, currentText: string): InlineEditCommit {
   const next = text.trim()
@@ -110,6 +142,10 @@ export function inlineEditCommitOf(target: CanvasInlineEditTarget, text: string,
   if (target.kind === 'sequence') {
     if (!isValidParticipantId(next)) return { action: 'invalid' }
     return { action: 'commit', intent: { type: 'rename-participant', actorId: target.actorId, newId: next } }
+  }
+  if (target.kind === 'sequence-alias') {
+    // 只改显示别名（set-participant）；清空视为未改动（去掉别名走属性面板，spec：只做改显示文本）
+    return { action: 'commit', intent: { type: 'set-participant', actorId: target.actorId, alias: next } }
   }
   if (!isValidMindmapNodeText(next)) return { action: 'invalid' }
   return { action: 'commit', intent: { type: 'set-node-text', elementId: target.elementId, text: next } }

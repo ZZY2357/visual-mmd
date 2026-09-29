@@ -10,14 +10,15 @@ import {
   overlayRectInContainer,
   toRect,
   type CanvasInlineEditTarget,
+  type InlineEditDiagramKind,
   type Rect,
 } from './inline-edit'
 
 /**
  * 内联编辑 Hook（工单 05）：管理「正在编辑哪个节点 + 浮层在哪」的状态机。
  *
- * 进入：双击节点（flowchart 走 data-id，mindmap 按文本匹配）或 onNodeCreated
- * （工单 04 占位接线：Tab/Enter 新建节点后立即命名）。
+ * 进入：双击节点（flowchart/class/sequence 走 data-id，mindmap 按文本匹配）或
+ * onNodeCreated（工单 04 占位接线：Tab/Enter 新建节点后立即命名）。
  * 结束：回车/失焦提交（commitIntent 手术式落码，可撤销），Esc 取消。
  *
  * 浮层定位：编辑目标对应的 SVG 元素 getBoundingClientRect 相对画布容器换算
@@ -41,8 +42,8 @@ export interface InlineEditCloseOptions {
 }
 
 /** 编辑目标在投影中的当前文本（预填用；找不到时回落空串）。
- * class/sequence 新建（工单 04）编辑的是语法名（类名 / 参与者 id），不是显示文本。
- * 导出给画布组件：渲染输入框时取最新投影文本（新建元素的文本落码后才可见）。 */
+ * class 编辑类名（语法名即显示文本）；sequence 空白新建编辑参与者 id，双击既有参与者
+ * 编辑 `as` 显示别名（无别名时空串）。导出给画布组件：渲染输入框时取最新投影文本。 */
 export function inlineEditTextOf(projection: AnyProjection | null, target: CanvasInlineEditTarget): string {
   if (projection === null) return ''
   if (projection.type === 'flowchart' && target.kind === 'flowchart') {
@@ -56,6 +57,9 @@ export function inlineEditTextOf(projection: AnyProjection | null, target: Canva
   }
   if (projection.type === 'sequence' && target.kind === 'sequence') {
     return projection.sequence.participants.find((p) => p.actorId === target.actorId)?.actorId ?? target.actorId
+  }
+  if (projection.type === 'sequence' && target.kind === 'sequence-alias') {
+    return projection.sequence.participants.find((p) => p.actorId === target.actorId)?.alias ?? ''
   }
   return ''
 }
@@ -84,11 +88,17 @@ function findMindmapElement(root: Element, elementId: string, text: string): Ele
   return text === '' ? null : findMindmapTextElement(root, text)
 }
 
-/** 在渲染 SVG 中定位编辑目标的元素：flowchart/class/sequence 按 data-id（三者的
+/** 在渲染 SVG 中定位编辑目标的元素：flowchart/class/sequence 按 data-id（四者的
  * data-id 分别是节点 id / 类名 / 参与者 id，见 CanvasPanel 的 resolverOf），
  * mindmap 按 DOM id（回落文本）。 */
 function findTargetElement(root: Element, target: CanvasInlineEditTarget, text: string): Element | null {
-  if (target.kind === 'flowchart' || target.kind === 'class' || target.kind === 'sequence') {
+  if (
+    target.kind === 'flowchart' ||
+    target.kind === 'class' ||
+    target.kind === 'sequence' ||
+    target.kind === 'sequence-alias'
+  ) {
+    // 'sequence' 与 'sequence-alias' 的 data-id 都是参与者 id（actorId 不变，改的是别名）
     const dataId =
       target.kind === 'flowchart' ? target.nodeId : target.kind === 'class' ? target.name : target.actorId
     for (const el of root.querySelectorAll('[data-id]')) {
@@ -101,8 +111,9 @@ function findTargetElement(root: Element, target: CanvasInlineEditTarget, text: 
 
 export interface CanvasInlineEditOptions {
   projection: AnyProjection | null
-  /** 图种提供的 data-id resolver；null = 该图种不做双击寻址（sequence/class 本轮不动，
-   * mindmap 传 () => null 走文本匹配） */
+  /** 图种提供的 data-id resolver；null = 该图种不做双击寻址（mindmap 传 () => null 走文本匹配）。
+   * 四图种都传真实 resolver：class 的 data-id 由渲染后处理反注（工单 09），sequence 参与者
+   * 的 data-id 即 actorId。 */
   resolver: DataIdResolver | null
   /** 最近一次合法渲染的 SVG 字符串：换新即尝试重算浮层定位 */
   svg: string | null
@@ -146,12 +157,15 @@ export function useCanvasInlineEdit({ projection, resolver, svg, containerRef, v
     setEditing((cur) => (cur !== null ? { ...cur, rect } : cur))
   }, [editingTarget, svg, view, projection, containerRef])
 
-  /** 双击进入编辑（挂到画布容器 onDoubleClick）：kind 随图种——mindmap 画布点选
-   * 启用（工单 06）后节点命中走 resolver（DOM id 精确匹配），文本匹配保留为回落 */
+  /** 双击进入编辑（挂到画布容器 onDoubleClick）：kind 随图种（四图种）——
+   * mindmap 画布点选启用后节点命中走 resolver（DOM id 精确匹配），文本匹配保留为回落；
+   * class 命中类名文本 → 改类名；sequence 命中参与者 → 改 `as` 别名（都是"只改显示文本"）。 */
   const onDoubleClick = useCallback(
     (e: React.MouseEvent) => {
+      const type = projection?.type
       const mindmapNodes = projection?.type === 'mindmap' ? projection.mindmap.nodes : []
-      const kind = projection?.type === 'mindmap' ? 'mindmap' : 'flowchart'
+      const kind: InlineEditDiagramKind =
+        type === 'mindmap' ? 'mindmap' : type === 'class' ? 'class' : type === 'sequence' ? 'sequence' : 'flowchart'
       const target = inlineEditTargetFromEvent(e.target, resolver, mindmapNodes, kind)
       if (target === null) return
       e.preventDefault()

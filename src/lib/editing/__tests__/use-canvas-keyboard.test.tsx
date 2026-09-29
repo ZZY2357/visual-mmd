@@ -5,14 +5,18 @@ import { resetEditorHistory, useEditorStore } from '../../../store/editor'
 import { DEFAULT_DIAGRAM_SOURCE } from '../../../lib/storage'
 import { flowchartParser } from '../../pipeline/flowchart'
 import { mindmapParser } from '../../pipeline/mindmap'
+import { classParser } from '../../pipeline/class'
+import { sequenceParser } from '../../pipeline/sequence'
 import { buildFlowchartProjection } from '../../projection/flowchart-projection'
 import { buildMindmapProjection } from '../../projection/mindmap-projection'
+import { buildClassProjection } from '../../projection/class-projection'
+import { buildSequenceProjection } from '../../projection/sequence-projection'
 import type { ClassProjection } from '../../projection/class-projection'
 import type { SequenceProjection } from '../../projection/sequence-projection'
 import type { Selection } from '../../projection/selection'
 import { nodeDataIdResolver } from '../../canvas-selection/data-id'
 import { useCanvasInlineEdit } from '../use-canvas-inline-edit'
-import { useCanvasKeyboard, type CanvasKeyboardProjection } from '../use-canvas-keyboard'
+import { useCanvasKeyboard, type CanvasKeyboardProjection, type EditKeyRequest } from '../use-canvas-keyboard'
 import type { CanvasNavigation } from '../canvas-keyboard'
 
 /**
@@ -56,6 +60,7 @@ function Harness(props: {
   onNodeCreated?: (id: string) => void
   newNodeText?: string
   navigation?: CanvasNavigation
+  onEditKey?: (request: EditKeyRequest) => void
   children?: React.ReactNode
 }) {
   const ref = useRef<HTMLDivElement | null>(null)
@@ -64,6 +69,7 @@ function Harness(props: {
     onNodeCreated: props.onNodeCreated !== undefined ? (target) => props.onNodeCreated?.(target.kind === 'flowchart' ? target.nodeId : target.elementId) : undefined,
     newNodeText: props.newNodeText,
     navigation: props.navigation,
+    onEditKey: props.onEditKey,
   })
   return (
     <div ref={ref} tabIndex={0}>
@@ -476,22 +482,33 @@ describe('useCanvasKeyboard（工单 14 方向键方位导航：mindmap）', () 
   })
 })
 
-// ---------- class / sequence 只享受方向键：编辑键命中也直接 return（不落码、不 preventDefault）----------
+// ---------- class / sequence 编辑键（工单 05 / ADR-0013）：Tab/Enter 落已有表单、Delete 删除 ----------
 
 const CLASS_SAMPLE = `classDiagram
     class Customer
+    class Account
     Customer <|-- Account
 `
 
 const SEQ_SAMPLE = `sequenceDiagram
     participant 使用者
     participant 系统
+    使用者->>系统: hi
 `
 
-const EMPTY_CLASS_PROJECTION: ClassProjection = { classes: [], members: [], relations: [], notes: [], classDefs: [] }
-const EMPTY_SEQ_PROJECTION: SequenceProjection = { autonumber: false, participants: [], messages: [], notes: [], blocks: [] }
+function classProjectionOf(source: string): ClassProjection {
+  const parsed = classParser.parse(source)
+  if (!parsed.ok) throw new Error(`样例源码必须可解析：${parsed.error.message}`)
+  return buildClassProjection(parsed.doc)
+}
 
-describe('useCanvasKeyboard（工单 14：class / sequence 只享受方向键）', () => {
+function sequenceProjectionOf(source: string): SequenceProjection {
+  const parsed = sequenceParser.parse(source)
+  if (!parsed.ok) throw new Error(`样例源码必须可解析：${parsed.error.message}`)
+  return buildSequenceProjection(parsed.doc)
+}
+
+describe('useCanvasKeyboard（工单 05：class / sequence 编辑键，复用已有表单）', () => {
   let host: HTMLDivElement
   let root: ReturnType<typeof createRoot>
 
@@ -507,44 +524,110 @@ describe('useCanvasKeyboard（工单 14：class / sequence 只享受方向键）
     useEditorStore.getState().select(null)
   })
 
-  it('class：Tab / Enter / Delete 不落码、不 preventDefault；方向键仍方位导航', () => {
+  function mountClass(
+    selection: Selection | null,
+    onEditKey?: (r: EditKeyRequest) => void,
+    navigation?: CanvasNavigation,
+  ) {
     resetEditorHistory(CLASS_SAMPLE)
-    useEditorStore.getState().select({ kind: 'class', name: 'Customer' })
-    const { nav, revealed } = fakeNav({ Customer: rectAt(100, 100), Account: rectAt(100, 150) }, 'class')
+    useEditorStore.getState().select(selection)
+    const projection = classProjectionOf(CLASS_SAMPLE)
     act(() => {
-      root.render(<Harness target={{ kind: 'class', projection: EMPTY_CLASS_PROJECTION }} navigation={nav} />)
+      root.render(<Harness target={{ kind: 'class', projection }} onEditKey={onEditKey} navigation={navigation} />)
     })
-    const container = host.firstElementChild as HTMLDivElement
+    return host.firstElementChild as HTMLDivElement
+  }
 
-    for (const key of ['Tab', 'Enter', 'Delete']) {
-      expect(keyOn(container, key)).toBe(false)
-      expect(useEditorStore.getState().source).toBe(CLASS_SAMPLE)
-    }
+  function mountSeq(
+    selection: Selection | null,
+    onEditKey?: (r: EditKeyRequest) => void,
+    navigation?: CanvasNavigation,
+  ) {
+    resetEditorHistory(SEQ_SAMPLE)
+    useEditorStore.getState().select(selection)
+    const projection = sequenceProjectionOf(SEQ_SAMPLE)
+    act(() => {
+      root.render(<Harness target={{ kind: 'sequence', projection }} onEditKey={onEditKey} navigation={navigation} />)
+    })
+    return host.firstElementChild as HTMLDivElement
+  }
 
-    expect(keyOn(container, 'ArrowDown')).toBe(true)
-    expect(useEditorStore.getState().selection).toEqual({ kind: 'class', name: 'Account' })
-    expect(revealed).toEqual(['Account'])
+  it('class：Tab 请求「加成员」、Enter 请求「加关系」；都 preventDefault，源码不变（表单提交才落码）', () => {
+    const requests: EditKeyRequest[] = []
+    const container = mountClass({ kind: 'class', name: 'Customer' }, (r) => requests.push(r))
+
+    expect(keyOn(container, 'Tab')).toBe(true)
+    expect(keyOn(container, 'Enter')).toBe(true)
+
+    expect(requests).toEqual([{ form: 'member' }, { form: 'relation' }])
     expect(useEditorStore.getState().source).toBe(CLASS_SAMPLE)
   })
 
-  it('sequence：Tab / Enter / Delete 不落码、不 preventDefault；方向键仍方位导航', () => {
-    resetEditorHistory(SEQ_SAMPLE)
-    useEditorStore.getState().select({ kind: 'participant', actorId: '使用者' })
-    const { nav, revealed } = fakeNav({ 使用者: rectAt(100, 100), 系统: rectAt(150, 100) }, 'sequence')
-    act(() => {
-      root.render(<Harness target={{ kind: 'sequence', projection: EMPTY_SEQ_PROJECTION }} navigation={nav} />)
-    })
-    const container = host.firstElementChild as HTMLDivElement
+  it('class：Delete 删除选中类（级联删成员/关系/note）并清空选中', () => {
+    const container = mountClass({ kind: 'class', name: 'Customer' })
 
-    for (const key of ['Tab', 'Enter', 'Delete']) {
-      expect(keyOn(container, key)).toBe(false)
-      expect(useEditorStore.getState().source).toBe(SEQ_SAMPLE)
-    }
+    expect(keyOn(container, 'Delete')).toBe(true)
 
-    expect(keyOn(container, 'ArrowRight')).toBe(true)
-    expect(useEditorStore.getState().selection).toEqual({ kind: 'participant', actorId: '系统' })
-    expect(revealed).toEqual(['系统'])
+    const { source, selection } = useEditorStore.getState()
+    expect(source).not.toContain('Customer')
+    expect(source).not.toContain('<|--')
+    expect(source).toContain('class Account')
+    expect(selection).toBeNull()
+  })
+
+  it('class：未选中时不落码、不 preventDefault（Tab 交给浏览器默认行为）', () => {
+    const requests: EditKeyRequest[] = []
+    const container = mountClass(null, (r) => requests.push(r))
+
+    for (const key of ['Tab', 'Enter', 'Delete']) expect(keyOn(container, key)).toBe(false)
+    expect(requests).toEqual([])
+    expect(useEditorStore.getState().source).toBe(CLASS_SAMPLE)
+  })
+
+  it('sequence：Tab 请求「加参与者」、选中参与者后 Enter 请求「加消息」；都 preventDefault', () => {
+    const requests: EditKeyRequest[] = []
+    const container = mountSeq({ kind: 'participant', actorId: '使用者' }, (r) => requests.push(r))
+
+    expect(keyOn(container, 'Tab')).toBe(true)
+    expect(keyOn(container, 'Enter')).toBe(true)
+
+    expect(requests).toEqual([{ form: 'participant' }, { form: 'message' }])
     expect(useEditorStore.getState().source).toBe(SEQ_SAMPLE)
+  })
+
+  it('sequence：未选中参与者时 Enter 无动作（不 preventDefault）；Tab（加参与者）不依赖选中仍生效', () => {
+    const requests: EditKeyRequest[] = []
+    const container = mountSeq(null, (r) => requests.push(r))
+
+    expect(keyOn(container, 'Enter')).toBe(false)
+    expect(keyOn(container, 'Tab')).toBe(true)
+
+    expect(requests).toEqual([{ form: 'participant' }])
+  })
+
+  it('sequence：Delete 删除选中参与者（级联删引用它的消息）并清空选中', () => {
+    const container = mountSeq({ kind: 'participant', actorId: '使用者' })
+
+    expect(keyOn(container, 'Delete')).toBe(true)
+
+    const { source, selection } = useEditorStore.getState()
+    expect(source).not.toContain('使用者')
+    expect(source).not.toContain('hi')
+    expect(selection).toBeNull()
+  })
+
+  it('两图种方向键仍是方位导航（ADR-0011，本票不改其语义）', () => {
+    const classNav = fakeNav({ Customer: rectAt(100, 100), Account: rectAt(100, 150) }, 'class')
+    const classContainer = mountClass({ kind: 'class', name: 'Customer' }, undefined, classNav.nav)
+    expect(keyOn(classContainer, 'ArrowDown')).toBe(true)
+    expect(useEditorStore.getState().selection).toEqual({ kind: 'class', name: 'Account' })
+    expect(classNav.revealed).toEqual(['Account'])
+
+    const seqNav = fakeNav({ 使用者: rectAt(100, 100), 系统: rectAt(150, 100) }, 'sequence')
+    const seqContainer = mountSeq({ kind: 'participant', actorId: '使用者' }, undefined, seqNav.nav)
+    expect(keyOn(seqContainer, 'ArrowRight')).toBe(true)
+    expect(useEditorStore.getState().selection).toEqual({ kind: 'participant', actorId: '系统' })
+    expect(seqNav.revealed).toEqual(['系统'])
   })
 })
 

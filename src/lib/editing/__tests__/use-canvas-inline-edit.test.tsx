@@ -5,8 +5,10 @@ import { resetEditorHistory, useEditorStore } from '../../../store/editor'
 import { DEFAULT_DIAGRAM_SOURCE } from '../../../lib/storage'
 import { flowchartParser } from '../../pipeline/flowchart'
 import { classParser } from '../../pipeline/class'
+import { sequenceParser } from '../../pipeline/sequence'
 import { buildFlowchartProjection } from '../../projection/flowchart-projection'
 import { buildClassProjection } from '../../projection/class-projection'
+import { buildSequenceProjection } from '../../projection/sequence-projection'
 import { nodeDataIdResolver } from '../../canvas-selection/data-id'
 import { annotateNodeDataIds } from '../../canvas-selection/node-data-ids'
 import type { CanvasInlineEditTarget } from '../inline-edit'
@@ -323,5 +325,177 @@ describe('useCanvasInlineEdit（工单 09：class 新建类的定位链路）', 
       api.current!.commit('订单')
     })
     expect(useEditorStore.getState().source).toContain('class 订单')
+  })
+})
+
+/**
+ * 工单 05：双击既有元素的内联编辑接线（class 类名 / sequence 参与者别名）。
+ * 与新建命中共用同一输入框，但双击走 onDoubleClick 的图种分支（class → rename-class，
+ * sequence → set-participant）；成员正文/关系标签/消息文本不进入编辑。
+ */
+
+const CLASS_DBL_SAMPLE = `classDiagram
+    class Foo {
+        +String name
+    }
+`
+const CLASS_DBL_SVG = '<svg><g data-id="Foo"><text>Foo</text><text>+String name</text></g></svg>'
+
+const SEQ_DBL_SAMPLE = `sequenceDiagram
+    participant 甲
+    participant 乙
+    甲->>乙: hi
+`
+const SEQ_DBL_SVG = '<svg><g data-id="甲"><text>甲</text></g><g data-id="乙"><text>乙</text></g><line data-id="message:1"/></svg>'
+
+const CLASS_DBL_PROJECTION = (() => {
+  const parsed = classParser.parse(CLASS_DBL_SAMPLE)
+  if (!parsed.ok) throw new Error(`样例源码必须可解析：${parsed.error.message}`)
+  return { type: 'class' as const, class: buildClassProjection(parsed.doc) }
+})()
+
+const SEQ_DBL_PROJECTION = (() => {
+  const parsed = sequenceParser.parse(SEQ_DBL_SAMPLE)
+  if (!parsed.ok) throw new Error(`样例源码必须可解析：${parsed.error.message}`)
+  return { type: 'sequence' as const, sequence: buildSequenceProjection(parsed.doc) }
+})()
+
+type InlineEditOptions = Parameters<typeof useCanvasInlineEdit>[0]
+
+function DblHarness(props: {
+  projection: InlineEditOptions['projection']
+  resolver: InlineEditOptions['resolver']
+  svg: string
+  onEditing: (editing: unknown) => void
+  apiRef: { current: InlineEditApi | null }
+}) {
+  const ref = useRef<HTMLDivElement | null>(null)
+  const { editing, onDoubleClick, commit, beginEdit } = useCanvasInlineEdit({
+    projection: props.projection,
+    resolver: props.resolver,
+    svg: props.svg,
+    containerRef: ref,
+    view: null,
+  })
+  props.apiRef.current = { commit, cancel: () => {}, beginEdit }
+  useEffect(() => {
+    props.onEditing(editing)
+  }, [editing, props.onEditing])
+  return (
+    <div ref={ref} tabIndex={0} onDoubleClick={onDoubleClick} dangerouslySetInnerHTML={{ __html: props.svg }} />
+  )
+}
+
+describe('useCanvasInlineEdit（工单 05：class / sequence 双击内联编辑）', () => {
+  let host: HTMLDivElement
+  let root: ReturnType<typeof createRoot>
+  let snapshots: unknown[]
+  let api: { current: InlineEditApi | null }
+
+  beforeEach(() => {
+    host = document.createElement('div')
+    document.body.appendChild(host)
+    root = createRoot(host)
+    snapshots = []
+    api = { current: null }
+  })
+  afterEach(() => {
+    act(() => root.unmount())
+    host.remove()
+    resetEditorHistory(DEFAULT_DIAGRAM_SOURCE)
+    useEditorStore.getState().select(null)
+  })
+
+  it('class：双击类名 → 进入改名（{kind:class}），提交落 rename-class', () => {
+    resetEditorHistory(CLASS_DBL_SAMPLE)
+    act(() => {
+      root.render(
+        <DblHarness
+          projection={CLASS_DBL_PROJECTION}
+          resolver={nodeDataIdResolver(['Foo'])}
+          svg={CLASS_DBL_SVG}
+          onEditing={(e) => snapshots.push(e)}
+          apiRef={api}
+        />,
+      )
+    })
+    const container = host.firstElementChild as HTMLDivElement
+
+    act(() => {
+      container.querySelectorAll('text')[0].dispatchEvent(new MouseEvent('dblclick', { bubbles: true }))
+    })
+    expect(snapshots.at(-1)).toMatchObject({ target: { kind: 'class', name: 'Foo' } })
+
+    act(() => api.current!.commit('订单'))
+    expect(useEditorStore.getState().source).toContain('class 订单')
+    expect(snapshots.at(-1)).toBeNull()
+  })
+
+  it('class：双击成员正文 → 不进入内联编辑（行为可预测性）', () => {
+    resetEditorHistory(CLASS_DBL_SAMPLE)
+    act(() => {
+      root.render(
+        <DblHarness
+          projection={CLASS_DBL_PROJECTION}
+          resolver={nodeDataIdResolver(['Foo'])}
+          svg={CLASS_DBL_SVG}
+          onEditing={(e) => snapshots.push(e)}
+          apiRef={api}
+        />,
+      )
+    })
+    const container = host.firstElementChild as HTMLDivElement
+
+    act(() => {
+      container.querySelectorAll('text')[1].dispatchEvent(new MouseEvent('dblclick', { bubbles: true }))
+    })
+    expect(snapshots.at(-1)).toBeNull()
+  })
+
+  it('sequence：双击参与者 → {kind:sequence-alias}，提交落 set-participant（actorId 不变）', () => {
+    resetEditorHistory(SEQ_DBL_SAMPLE)
+    act(() => {
+      root.render(
+        <DblHarness
+          projection={SEQ_DBL_PROJECTION}
+          resolver={nodeDataIdResolver(['甲', '乙'])}
+          svg={SEQ_DBL_SVG}
+          onEditing={(e) => snapshots.push(e)}
+          apiRef={api}
+        />,
+      )
+    })
+    const container = host.firstElementChild as HTMLDivElement
+
+    act(() => {
+      container.querySelector('[data-id="甲"] text')!.dispatchEvent(new MouseEvent('dblclick', { bubbles: true }))
+    })
+    expect(snapshots.at(-1)).toMatchObject({ target: { kind: 'sequence-alias', actorId: '甲' } })
+
+    act(() => api.current!.commit('用户'))
+    const source = useEditorStore.getState().source
+    expect(source).toContain('participant 甲 as 用户') // actorId 仍是 甲，只加别名
+    expect(source).toContain('甲->>乙: hi') // 消息端点不错位
+  })
+
+  it('sequence：双击消息线 → 不进入内联编辑（消息文本走点选 → 右侧表单）', () => {
+    resetEditorHistory(SEQ_DBL_SAMPLE)
+    act(() => {
+      root.render(
+        <DblHarness
+          projection={SEQ_DBL_PROJECTION}
+          resolver={nodeDataIdResolver(['甲', '乙'])}
+          svg={SEQ_DBL_SVG}
+          onEditing={(e) => snapshots.push(e)}
+          apiRef={api}
+        />,
+      )
+    })
+    const container = host.firstElementChild as HTMLDivElement
+
+    act(() => {
+      container.querySelector('line[data-id="message:1"]')!.dispatchEvent(new MouseEvent('dblclick', { bubbles: true }))
+    })
+    expect(snapshots.at(-1)).toBeNull()
   })
 })

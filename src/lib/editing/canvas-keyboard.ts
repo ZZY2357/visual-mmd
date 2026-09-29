@@ -1,6 +1,8 @@
+import type { ClassIntent } from '../pipeline/class'
 import type { FlowchartIntent } from '../pipeline/flowchart'
 import { nodeElementId } from '../pipeline/flowchart'
 import type { MindmapIntent } from '../pipeline/mindmap'
+import type { SequenceIntent } from '../pipeline/sequence'
 import type { ClassProjection } from '../projection/class-projection'
 import type { FlowchartProjection } from '../projection/flowchart-projection'
 import type { MindmapProjection } from '../projection/mindmap-projection'
@@ -18,6 +20,10 @@ import type { Rect } from './inline-edit'
  * dagre / cose-bilkent 布局与书写顺序无关）。纯几何选点在 directional-navigation.ts，
  * DOM 测量在 canvas-measure.ts，接线在 use-canvas-keyboard.ts；本模块只保留键位判定与
  * 编辑动作的纯逻辑。
+ *
+ * 编辑键（工单 05 / ADR-0013）：class / sequence 的 Tab/Enter/Delete 按「就近结构」映射
+ * （class：加成员 / 加关系 / 删除；sequence：加参与者 / 加消息 / 删除），同样只在本模块
+ * 产出动作与意图，表单浮层由 use-canvas-context-menu 复用（不新造浮层）。
  */
 
 /** 参与画布键盘的图种投影（tagged union，keydown 时按图种分支） */
@@ -126,6 +132,94 @@ export function mindmapActionIntents(
     return { intents: [{ type: 'add-child', parentElementId: elementId, text: defaultText }], newElementId }
   }
   return { intents: [{ type: 'add-sibling', elementId, text: defaultText }], newElementId }
+}
+
+// ---------- class / sequence 编辑键（工单 05 / ADR-0013）：就近结构映射 ----------
+
+/** class 编辑键动作：Tab = 加成员、Enter = 加关系、Delete = 删除选中元素 */
+export type ClassKeyAction = 'delete' | 'add-member' | 'add-relation'
+
+/** sequence 编辑键动作：Tab = 加参与者、Enter = 加消息、Delete = 删除选中元素 */
+export type SequenceKeyAction = 'delete' | 'add-participant' | 'add-message'
+
+/**
+ * 键位 → 动作（class）。这是**就近类比**而非严格语义：class 是有向图，没有 flowchart
+ * 的"子/同级"，当前元素附近最近的结构是成员（Tab）与关系（Enter）。带修饰键（Shift-Tab
+ * 等）不处理，交给原有行为。
+ */
+export function keyToClassAction(key: string, mods: { shift?: boolean } = {}): ClassKeyAction | null {
+  if (key === 'Delete' || key === 'Backspace') return 'delete'
+  if (key === 'Tab') return mods.shift === true ? null : 'add-member'
+  if (key === 'Enter') return mods.shift === true ? null : 'add-relation'
+  return null
+}
+
+/**
+ * 键位 → 动作（sequence）：参与者是列、消息是行，最近的"结构"是参与者（Tab）与消息（Enter）。
+ * 带修饰键不处理。方向键语义不受影响（ADR-0011：仍是方位导航）。
+ */
+export function keyToSequenceAction(key: string, mods: { shift?: boolean } = {}): SequenceKeyAction | null {
+  if (key === 'Delete' || key === 'Backspace') return 'delete'
+  if (key === 'Tab') return mods.shift === true ? null : 'add-participant'
+  if (key === 'Enter') return mods.shift === true ? null : 'add-message'
+  return null
+}
+
+/**
+ * 选中元素 → 删除意图（class）：四类可寻址元素各映射到既有 delete-* 意图，
+ * 级联（删类连带成员/关系/note）由管线负责——与属性面板的删除走同一条链路，
+ * 选中元素已不在投影 / 图表级 / 别种选中 → null（不落码、不 preventDefault）。
+ */
+export function classDeleteIntent(projection: ClassProjection, selection: Selection | null): ClassIntent | null {
+  if (selection === null) return null
+  switch (selection.kind) {
+    case 'class':
+      return projection.classes.some((c) => c.name === selection.name)
+        ? { type: 'delete-class', name: selection.name }
+        : null
+    case 'class-member':
+      return projection.members.some((m) => m.elementId === selection.elementId)
+        ? { type: 'delete-member', elementId: selection.elementId }
+        : null
+    case 'class-relation':
+      return projection.relations.some((r) => r.elementId === selection.elementId)
+        ? { type: 'delete-relation', elementId: selection.elementId }
+        : null
+    case 'class-note':
+      return projection.notes.some((n) => n.elementId === selection.elementId)
+        ? { type: 'delete-note', elementId: selection.elementId }
+        : null
+    default:
+      return null
+  }
+}
+
+/** 选中元素 → 删除意图（sequence）：参与者 / 消息 / 注释 / 逻辑块，级联由管线负责。 */
+export function sequenceDeleteIntent(
+  projection: SequenceProjection,
+  selection: Selection | null,
+): SequenceIntent | null {
+  if (selection === null) return null
+  switch (selection.kind) {
+    case 'participant':
+      return projection.participants.some((p) => p.actorId === selection.actorId)
+        ? { type: 'delete-participant', actorId: selection.actorId }
+        : null
+    case 'message':
+      return projection.messages.some((m) => m.elementId === selection.elementId)
+        ? { type: 'delete-message', elementId: selection.elementId }
+        : null
+    case 'note':
+      return projection.notes.some((n) => n.elementId === selection.elementId)
+        ? { type: 'delete-note', elementId: selection.elementId }
+        : null
+    case 'block':
+      return projection.blocks.some((b) => b.elementId === selection.elementId)
+        ? { type: 'delete-block', elementId: selection.elementId }
+        : null
+    default:
+      return null
+  }
 }
 
 // ---------- 方向键（工单 14）：方位导航的键位判定与适配对象 ----------

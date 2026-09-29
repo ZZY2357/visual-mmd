@@ -19,6 +19,7 @@ import {
   MESSAGE_ARROW_OPTIONS,
 } from './sequence-forms'
 import type { CanvasInlineEditTarget } from './inline-edit'
+import type { Selection } from '../projection/selection'
 import {
   contextMenuItems,
   contextMenuTargetFromSelection,
@@ -57,6 +58,9 @@ import { useEditorStore } from '../../store/editor'
  *   class 空白（浮动 note，无需目标类）、class 类节点（`note for X`，锚点为该类声明）。
  *   落码位置：有右键元素时以其声明为锚点（`afterElementId`），空白处不传锚点由管线回退到
  *   文档最后一个元素——顺序即语义，块插在用户右键的那个位置。
+ * - 画布键盘编辑键（工单 05）：class 的 Tab/Enter（加成员/加关系）、sequence 的 Enter
+ *   （加消息）经 openFormForSelection 打开**同一份**添加型表单（无右键菜单，浮层在画布内
+ *   浮出）；锚点/预选取自当前选中。与右键菜单共用 nodeFormForTarget，不新造浮层。
  * - 所有动作复用编辑意图管线（commitIntent，可撤销）；编辑文本/新建节点经
  *   onNodeCreated 进入内联编辑（工单 05 beginEdit）。
  */
@@ -108,6 +112,64 @@ function nextFreeName(base: string, used: Iterable<string>): string {
  * 用于连线菜单「直接改」的字段（关系类型 / 消息箭头）——不新增表单浮层就能切换取值。 */
 function nextInCycle<T>(options: readonly T[], current: T): T {
   return options[(options.indexOf(current) + 1) % options.length]
+}
+
+/**
+ * 菜单目标 + 表单种类 + 投影 → 添加型表单状态（工单 06/04/05）：算出锚点、预选值与位置；
+ * 该组合无意义（目标种类与图种不匹配、投影里找不到该元素）时返回 null。
+ * 右键菜单路径与画布键盘编辑键路径（工单 05）**共用这一个纯函数**，保证两条入口产出同一份表单。
+ */
+function nodeFormForTarget(
+  target: ContextMenuTarget,
+  kind: NodeFormKind,
+  proj: AnyProjection,
+  x: number,
+  y: number,
+): NodeFormState | null {
+  if (kind === 'member' || kind === 'relation') {
+    if (target.kind !== 'class-node' || proj.type !== 'class') return null
+    const cls = proj.class.classes.find((c) => c.name === target.name)
+    if (cls === undefined) return null
+    return { kind, anchorElementId: cls.elementId, className: target.name, x, y }
+  }
+  if (kind === 'message') {
+    if (target.kind !== 'sequence-participant' || proj.type !== 'sequence') return null
+    const p = proj.sequence.participants.find((x2) => x2.actorId === target.actorId)
+    if (p === undefined) return null
+    return { kind, anchorElementId: p.elementId, from: target.actorId, x, y }
+  }
+  if (kind === 'block') {
+    // sequence 独有的添加逻辑块：参与者上右键 → 锚点为该参与者的声明；
+    // 空白处右键 → 无锚点（管线回退到文档最后一个元素）
+    if (proj.type !== 'sequence') return null
+    if (target.kind === 'sequence-participant') {
+      const p = proj.sequence.participants.find((x2) => x2.actorId === target.actorId)
+      if (p === undefined) return null
+      return { kind, anchorElementId: p.elementId, x, y }
+    }
+    return target.kind === 'blank' ? { kind, x, y } : null
+  }
+  // note：class 类节点 = note for X（锚点即该类声明）；class 空白 = 浮动 note；
+  // sequence 空白 = note over/left/right（参与者由表单自行选择）
+  if (proj.type === 'class') {
+    if (target.kind === 'class-node') {
+      const cls = proj.class.classes.find((c) => c.name === target.name)
+      if (cls === undefined) return null
+      return { kind, anchorElementId: cls.elementId, className: target.name, x, y }
+    }
+    return target.kind === 'blank' ? { kind, x, y } : null
+  }
+  if (proj.type === 'sequence') {
+    return target.kind === 'blank' ? { kind, x, y } : null
+  }
+  return null
+}
+
+/** 编辑器选中 → 可打开添加表单的菜单目标形态（仅类与参与者两种；其余选中无该形态） */
+function formTargetOfSelection(selection: Selection): ContextMenuTarget | null {
+  if (selection.kind === 'class') return { kind: 'class-node', name: selection.name }
+  if (selection.kind === 'participant') return { kind: 'sequence-participant', actorId: selection.actorId }
+  return null
 }
 
 export interface CanvasContextMenuOptions {
@@ -327,46 +389,37 @@ export function useCanvasContextMenu(
       const target = menu?.target
       const proj = latest.current.projection
       if (target === undefined || menu === null || proj === null) return
-      if (kind === 'member' || kind === 'relation') {
-        if (target.kind !== 'class-node' || proj.type !== 'class') return
-        const cls = proj.class.classes.find((c) => c.name === target.name)
-        if (cls === undefined) return
-        setNodeForm({ kind, anchorElementId: cls.elementId, className: target.name, x: menu.x, y: menu.y })
-      } else if (kind === 'message') {
-        if (target.kind !== 'sequence-participant' || proj.type !== 'sequence') return
-        const p = proj.sequence.participants.find((x) => x.actorId === target.actorId)
-        if (p === undefined) return
-        setNodeForm({ kind, anchorElementId: p.elementId, from: target.actorId, x: menu.x, y: menu.y })
-      } else if (kind === 'block') {
-        // sequence 独有的添加逻辑块：参与者上右键 → 锚点为该参与者的声明；
-        // 空白处右键 → 无锚点（管线回退到文档最后一个元素）
-        if (proj.type !== 'sequence') return
-        if (target.kind === 'sequence-participant') {
-          const p = proj.sequence.participants.find((x) => x.actorId === target.actorId)
-          if (p === undefined) return
-          setNodeForm({ kind, anchorElementId: p.elementId, x: menu.x, y: menu.y })
-        } else if (target.kind === 'blank') {
-          setNodeForm({ kind, x: menu.x, y: menu.y })
-        } else return
-      } else {
-        // note：class 类节点 = note for X（锚点即该类声明）；class 空白 = 浮动 note；
-        // sequence 空白 = note over/left/right（参与者由表单自行选择）
-        if (proj.type === 'class') {
-          if (target.kind === 'class-node') {
-            const cls = proj.class.classes.find((c) => c.name === target.name)
-            if (cls === undefined) return
-            setNodeForm({ kind, anchorElementId: cls.elementId, className: target.name, x: menu.x, y: menu.y })
-          } else if (target.kind === 'blank') {
-            setNodeForm({ kind, x: menu.x, y: menu.y })
-          } else return
-        } else if (proj.type === 'sequence') {
-          if (target.kind !== 'blank') return
-          setNodeForm({ kind, x: menu.x, y: menu.y })
-        } else return
-      }
+      const form = nodeFormForTarget(target, kind, proj, menu.x, menu.y)
+      if (form === null) return
+      setNodeForm(form)
       setMenu(null)
     },
     [menu],
+  )
+
+  /**
+   * 画布键盘编辑键（工单 05）：对**当前选中**元素打开添加表单（无右键菜单，浮层在画布内浮出）。
+   * Tab/Enter 的「就近结构」在此落成具体表单——class 的加成员/加关系、sequence 的加消息，
+   * 与右键菜单共用 nodeFormForTarget，**不新造浮层**。选中不是类/参与者时安静地不打开。
+   */
+  const openFormForSelection = useCallback(
+    (kind: 'member' | 'relation' | 'message'): void => {
+      const proj = latest.current.projection
+      const { selection } = useEditorStore.getState()
+      if (proj === null || selection === null) return
+      const target = formTargetOfSelection(selection)
+      if (target === null) return
+      const rect = containerRef.current?.getBoundingClientRect()
+      // 键盘没有鼠标位置：浮层落在画布内左上偏中处（宽度留出表单 240px 的余量）
+      const x = rect !== undefined ? Math.max(8, rect.width / 2 - 120) : 8
+      const y = rect !== undefined ? Math.max(8, rect.height / 3) : 8
+      const form = nodeFormForTarget(target, kind, proj, x, y)
+      if (form === null) return
+      setMenu(null)
+      setStyleForm(null)
+      setNodeForm(form)
+    },
+    [containerRef],
   )
 
   const addMember = useCallback(() => openNodeForm('member'), [openNodeForm])
@@ -491,6 +544,7 @@ export function useCanvasContextMenu(
     closeMenu,
     closeStyleForm,
     closeNodeForm,
+    openFormForSelection,
     submitStyleForm,
     addNode,
     addClass,

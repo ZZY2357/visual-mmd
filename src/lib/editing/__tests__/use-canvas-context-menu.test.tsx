@@ -109,6 +109,8 @@ function createdIdOf(target: CanvasInlineEditTarget): string {
       return target.name
     case 'sequence':
       return target.actorId
+    case 'sequence-alias':
+      return target.actorId
   }
 }
 
@@ -143,6 +145,8 @@ interface ContextMenuApi {
   editRelation: () => void
   cycleMessageArrow: () => void
   editMessage: () => void
+  /** 画布键盘编辑键（工单 05）：对当前选中元素打开添加表单 */
+  openFormForSelection: (kind: 'member' | 'relation' | 'message') => void
 }
 
 function Harness(props: {
@@ -184,6 +188,7 @@ function Harness(props: {
     editRelation: ctx.editRelation,
     cycleMessageArrow: ctx.cycleMessageArrow,
     editMessage: ctx.editMessage,
+    openFormForSelection: ctx.openFormForSelection,
   }
   useEffect(() => {
     props.onState({
@@ -904,8 +909,7 @@ describe('useCanvasContextMenu（工单 06 class/sequence 节点菜单）', () =
     expect(useEditorStore.getState().source).toContain('甲->>乙')
   })
 
-  it('菜单「删除类」：级联删除成员与引用该类的 relation、清空选中', () => {
-    const container = mountClass()
+  it('菜单「删除类」：级联删除成员与引用该类的 relation、清空选中', () => {    const container = mountClass()
     contextMenuOn(container, '[data-id="Foo"]')
     snapshots.length = 0
 
@@ -942,6 +946,70 @@ describe('useCanvasContextMenu（工单 06 class/sequence 节点菜单）', () =
 
     useEditorStore.getState().undo()
     expect(useEditorStore.getState().source).toBe(CLASS_SAMPLE)
+  })
+
+  // ---- 画布键盘编辑键（工单 05）：无右键菜单，对当前选中元素打开同一份表单 ----
+
+  it('键盘：选中类后打开成员/关系表单（锚点 = 该类声明，与右键菜单同一份 nodeForm）', () => {
+    mountClass()
+    act(() => useEditorStore.getState().select({ kind: 'class', name: 'Foo' }))
+
+    act(() => api.current!.openFormForSelection('member'))
+    expect(snapshots.at(-1)!.nodeForm).toMatchObject({
+      kind: 'member',
+      className: 'Foo',
+      anchorElementId: 'class:Foo',
+    })
+    expect(snapshots.at(-1)!.menu).toBeNull()
+
+    act(() => api.current!.openFormForSelection('relation'))
+    expect(snapshots.at(-1)!.nodeForm).toMatchObject({
+      kind: 'relation',
+      className: 'Foo',
+      anchorElementId: 'class:Foo',
+    })
+  })
+
+  it('键盘：选中参与者后打开消息表单（起点与锚点 = 该参与者）', () => {
+    mountSequence()
+    act(() => useEditorStore.getState().select({ kind: 'participant', actorId: '甲' }))
+
+    act(() => api.current!.openFormForSelection('message'))
+    expect(snapshots.at(-1)!.nodeForm).toMatchObject({
+      kind: 'message',
+      from: '甲',
+      anchorElementId: 'participant:甲',
+    })
+  })
+
+  it('键盘：选中不是类/参与者（或未选中）时安静地不打开表单', () => {
+    mountSequence()
+    act(() => useEditorStore.getState().select({ kind: 'message', elementId: 'message:1' }))
+    act(() => api.current!.openFormForSelection('message'))
+    expect(snapshots.at(-1)!.nodeForm).toBeNull()
+
+    act(() => useEditorStore.getState().select(null))
+    act(() => api.current!.openFormForSelection('message'))
+    expect(snapshots.at(-1)!.nodeForm).toBeNull()
+  })
+
+  it('键盘：成员表单提交落码带 afterElementId（复用右键菜单同一表单）', async () => {
+    const container = mountClass()
+    act(() => useEditorStore.getState().select({ kind: 'class', name: 'Foo' }))
+    act(() => api.current!.openFormForSelection('member'))
+
+    const spy = spyCommitIntent()
+    await typeInto(inputByLabel(container, '成员声明（如 String name 或 add(id) bool）'), 'String id')
+    await clickButton(container, '添加')
+
+    expect(spy.mock.calls[0]?.[0]).toMatchObject({
+      type: 'add-member',
+      className: 'Foo',
+      vis: '+',
+      text: 'String id',
+      afterElementId: 'class:Foo',
+    })
+    expect(useEditorStore.getState().source).toContain('+String id')
   })
 })
 

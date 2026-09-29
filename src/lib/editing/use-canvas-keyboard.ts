@@ -4,17 +4,22 @@ import type { Selection } from '../projection/selection'
 import { pickDirectionalTarget } from './directional-navigation'
 import type { InlineEditTarget } from './inline-edit'
 import {
+  classDeleteIntent,
   isNavigationKey,
+  keyToClassAction,
   keyToNodeAction,
+  keyToSequenceAction,
   mindmapActionIntents,
   nodeActionIntents,
+  sequenceDeleteIntent,
   type CanvasKeyboardProjection,
   type CanvasNavigation,
   type NodeExtent,
 } from './canvas-keyboard'
 
 /**
- * 画布键盘操作 Hook（工单 04 焦点体系，工单 06 扩展 mindmap，工单 14 方向键方位导航）：
+ * 画布键盘操作 Hook（工单 04 焦点体系，工单 06 扩展 mindmap，工单 14 方向键方位导航，
+ * 工单 05 class/sequence 编辑键）：
  * keydown 挂在画布容器上（而非 window），天然只在画布持有焦点时触发——焦点在代码面板或
  * 任何输入框时事件根本不会到达容器，完全不拦截。容器内若嵌有输入控件（防御性保留），也不触发
  * 画布操作。Del / Tab / Enter 映射为编辑意图，经 commitIntent 手术式落码（可撤销）。
@@ -25,16 +30,34 @@ import {
  * （无选中 / 图表级 / 别种元素 / 已不在投影）回落到投影首个节点；无候选无操作但仍
  * preventDefault（不回绕、不滚动页面）。任何修饰键按住都不导航，但方向键仍 preventDefault
  * （修掉 Alt/Ctrl/Cmd+方向键触发浏览器前进后退、Shift+方向键静默改选中）。
- * 编辑键（Tab/Enter/Delete）**不扩**：只在 flowchart / mindmap 生效，class / sequence
- * 命中也直接 return（不落码、不 preventDefault）——它们只享受方向键。
  *
- * 图种语义（键位相同，落码各按其语法）：
+ * 编辑键（工单 05 / ADR-0013）覆盖四个图种：
  * - flowchart（工单 04）：Tab = 选中 --> 新；Enter = 父 --> 新（无入边退化为连出）
  * - mindmap（工单 06）：Tab = 加子节点；Enter = 加同级（根退化为加子）；落码按缩进层级
+ * - class（工单 05）：Tab = 加成员、Enter = 加关系——两者**落到已有表单浮层**
+ *   （AddMemberInlineForm / AddRelationInlineForm，经 onEditKey 请求），不新造浮层
+ * - sequence（工单 05）：Tab = 加参与者（复用空白菜单的创建 + 内联命名路径）、
+ *   Enter = 加消息（落到已有 AddMessageInlineForm）
+ * - 四图种 Delete = 删除选中元素（class/sequence 的删除经 classDeleteIntent /
+ *   sequenceDeleteIntent 复用既有 delete-* 意图，级联与属性面板一致）
+ *
+ * **可达性代价（ADR-0013 已记录）**：class / sequence 上 Tab 被用作编辑动作并
+ * preventDefault，因此在这两类图的画布上**无法用 Tab 跳出画布**——焦点离开仍可点击或
+ * Escape。无选中（无可编辑锚点）时 Tab/Enter 不 preventDefault，交给浏览器默认行为。
  */
 
 /** 参与画布键盘的图种投影（tagged union，keydown 时按图种分支） */
 export type { CanvasKeyboardProjection }
+
+/**
+ * class / sequence 编辑键（Tab/Enter）的浮层请求（工单 05 / ADR-0013）：
+ * 一律落到已有表单或既有创建路径，不新造浮层；锚点与预选值由右键菜单 hook 从
+ * 当前选中推出（与右键菜单共用同一份 NodeFormState）。
+ */
+export interface EditKeyRequest {
+  /** member / relation（class）、message（sequence）：打开对应添加表单 */
+  form: 'member' | 'relation' | 'message' | 'participant'
+}
 
 /** 容器内焦点落在这类控件上时不触发画布键盘操作（button 不可少：否则按钮上的
  * Enter 会冒泡到容器被当作画布动作，既误改源码又压掉按钮自身的 Enter→click，工单 12） */
@@ -50,15 +73,17 @@ export interface CanvasKeyboardOptions {
   newNodeText?: string
   /** 方向键方位导航的适配对象（工单 14）；未接线时方向键只 preventDefault、不移动选中 */
   navigation?: CanvasNavigation
+  /** class / sequence 编辑键（Tab/Enter）的浮层请求（工单 05）：落到已有表单/创建路径 */
+  onEditKey?: (request: EditKeyRequest) => void
 }
 
 export function useCanvasKeyboard(
   target: CanvasKeyboardProjection | null,
-  { containerRef, onNodeCreated, newNodeText = '新节点', navigation }: CanvasKeyboardOptions,
+  { containerRef, onNodeCreated, newNodeText = '新节点', navigation, onEditKey }: CanvasKeyboardOptions,
 ): void {
   // 事件回调里读最新值：ref 兜住
-  const latest = useRef({ onNodeCreated, newNodeText, navigation })
-  latest.current = { onNodeCreated, newNodeText, navigation }
+  const latest = useRef({ onNodeCreated, newNodeText, navigation, onEditKey })
+  latest.current = { onNodeCreated, newNodeText, navigation, onEditKey }
 
   useEffect(() => {
     const container = containerRef.current
@@ -112,10 +137,54 @@ export function useCanvasKeyboard(
       // ② 非方向键：带修饰键不处理（交给原有行为）
       if (e.ctrlKey || e.metaKey || e.altKey) return
 
+      // ③ class（工单 05 / ADR-0013）：Tab = 加成员、Enter = 加关系（落到已有表单浮层）、
+      //    Delete = 删除选中元素。无选中（无可编辑锚点）时不处理、不 preventDefault。
+      if (target.kind === 'class') {
+        const classAction = keyToClassAction(e.key, { shift: e.shiftKey })
+        if (classAction === null) return
+        if (classAction === 'delete') {
+          const intent = classDeleteIntent(target.projection, selection)
+          if (intent === null) return
+          e.preventDefault()
+          if (commitIntent(intent)) select(null)
+          return
+        }
+        if (selection === null || selection.kind !== 'class') return
+        if (!target.projection.classes.some((c) => c.name === selection.name)) return
+        e.preventDefault() // 已确定要处理：压掉 Tab 焦点切换 / 页面滚动等默认行为
+        latest.current.onEditKey?.({ form: classAction === 'add-member' ? 'member' : 'relation' })
+        return
+      }
+
+      // ④ sequence（工单 05 / ADR-0013）：Tab = 加参与者（既有创建路径）、
+      //    Enter = 加消息（落到已有表单浮层）、Delete = 删除选中元素。
+      if (target.kind === 'sequence') {
+        const seqAction = keyToSequenceAction(e.key, { shift: e.shiftKey })
+        if (seqAction === null) return
+        if (seqAction === 'delete') {
+          const intent = sequenceDeleteIntent(target.projection, selection)
+          if (intent === null) return
+          e.preventDefault()
+          if (commitIntent(intent)) select(null)
+          return
+        }
+        if (seqAction === 'add-participant') {
+          // 参与者是列、没有锚点：直接走空白菜单的创建路径（默认名 + 内联命名）
+          e.preventDefault()
+          latest.current.onEditKey?.({ form: 'participant' })
+          return
+        }
+        // 加消息需要选中一个参与者作为起点与锚点
+        if (selection === null || selection.kind !== 'participant') return
+        if (!target.projection.participants.some((p) => p.actorId === selection.actorId)) return
+        e.preventDefault()
+        latest.current.onEditKey?.({ form: 'message' })
+        return
+      }
+
+      // ⑤ flowchart / mindmap（工单 04/06）：Tab 加子/同级、Delete 删除，落码后进入内联命名
       const action = keyToNodeAction(e.key, { shift: e.shiftKey })
       if (action === null) return
-      // ③ class / sequence 只享受方向键：编辑键命中也直接 return（不落码、不 preventDefault）
-      if (target.kind !== 'flowchart' && target.kind !== 'mindmap') return
 
       // 落码成功后：选中 + 进入内联命名的目标（两类图种各按其选中种类）
       let newTarget: InlineEditTarget | null = null

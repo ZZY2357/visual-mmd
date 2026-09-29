@@ -17,6 +17,7 @@ import type { Selection } from '../lib/projection/selection'
 import type { SequenceProjection } from '../lib/projection/sequence-projection'
 import { useCanvasSelection } from '../lib/canvas-selection/use-canvas-selection'
 import { useCanvasKeyboard } from '../lib/editing/use-canvas-keyboard'
+import type { EditKeyRequest } from '../lib/editing/use-canvas-keyboard'
 import type { CanvasKeyboardProjection, CanvasNavigation, NodeExtent } from '../lib/editing/canvas-keyboard'
 import { measureNodeExtents } from '../lib/editing/canvas-measure'
 import { useCanvasInlineEdit, inlineEditTextOf } from '../lib/editing/use-canvas-inline-edit'
@@ -45,8 +46,9 @@ import { useEditorStore } from '../store/editor'
  * 中心为锚点，按方向键所指的 45° 锥取最近节点；落点未完全可见时自动平移视图（瞬时无补间）。
  * 本组件把测量 / 选中映射 / 自动平移打包成 CanvasNavigation 适配对象交给 useCanvasKeyboard。
  *
- * 内联编辑（工单 05）：双击节点（flowchart + mindmap）原位浮出输入框，回车/失焦
- * 提交、Esc 取消；Tab/Enter 新建节点后经 onNodeCreated 自动进入同一输入框。
+ * 内联编辑（工单 05）：双击节点（flowchart/mindmap 改文本、class 改类名、sequence 改 `as`
+ * 别名）原位浮出输入框，回车/失焦提交、Esc 取消；Tab/Enter 新建节点后经 onNodeCreated
+ * 自动进入同一输入框。class 的成员正文、关系标签与 sequence 的消息文本/actorId 不做双击。
  *
  * 右键菜单（工单 07/04/06）：单一菜单随右键目标变化（空白/节点/连线/mindmap 节点/
  * class 节点/sequence 参与者），挂在画布容器上阻止浏览器默认菜单，代码面板不受影响；
@@ -428,13 +430,12 @@ export function CanvasPanel({ preview, projection }: CanvasPanelProps) {
   // 切换图表自然重置，无需持久化。revealRect：方向键导航的自动平移入口（工单 14）
   const { containerRef, view, fit, revealRect, onPointerDown, onPointerMove, onPointerUp } = useCanvasView(svg)
 
-  // 内联编辑（工单 05）：双击 flowchart/mindmap 节点原位浮出输入框
+  // 内联编辑（工单 05，工单 05 批内扩到 class/sequence）：双击节点原位浮出输入框。
+  // 四图种都用 resolver 精确寻址（class 的 data-id 由渲染后处理反注，sequence 参与者
+  // data-id 即 actorId）；mindmap 无 data-id 时 hook 内回落文本匹配。
   const { editing, onDoubleClick, beginEdit, commit, cancel } = useCanvasInlineEdit({
     projection,
-    resolver:
-      projection !== null && (projection.type === 'flowchart' || projection.type === 'mindmap')
-        ? resolverOf(projection)
-        : null,
+    resolver: projection !== null ? resolverOf(projection) : null,
     svg,
     containerRef,
     view,
@@ -486,10 +487,23 @@ export function CanvasPanel({ preview, projection }: CanvasPanelProps) {
     }
   }, [projection, svg, revealRect])
 
-  // 键盘焦点体系（工单 04，工单 06 扩展 mindmap，工单 14 方向键覆盖四图种）：容器 tabindex=0，
-  // 点击画布即持有焦点；keydown 挂在容器上，Tab/Enter/Del 仅在画布聚焦时拦截，焦点在代码面板/
-  // 输入框时完全不干扰。flowchart 与 mindmap 各有编辑键语义（Tab 加子 / Enter 加同级 / Del 删除）；
-  // class / sequence 只享受方向键（编辑键命中也直接 return，不落码）。
+  // 右键菜单（工单 07）：菜单/连线模式/添加样式表单三个状态托管在 hook 中，
+  // 编辑文本与新建节点的内联命名同样走 beginEdit。
+  // 画布键盘的编辑键（工单 05）也复用这里的表单浮层状态：先声明 ctx，再接线键盘 hook。
+  const ctx = useCanvasContextMenu({
+    projection,
+    resolver: projection !== null ? resolverOf(projection) : null,
+    containerRef,
+    onNodeCreated: beginEdit,
+    newNodeText: t('app:propertyPanel.mindmapNewNode'),
+  })
+
+  // 键盘焦点体系（工单 04，工单 06 扩展 mindmap，工单 14 方向键覆盖四图种，
+  // 工单 05 class/sequence 编辑键）：容器 tabindex=0，点击画布即持有焦点；keydown 挂在
+  // 容器上，Tab/Enter/Del 仅在画布聚焦时拦截，焦点在代码面板/输入框时完全不干扰。
+  // flowchart 与 mindmap：Tab 加子 / Enter 加同级 / Del 删除；class 与 sequence：
+  // Tab/Enter 打开**已有添加表单**（成员/关系、参与者/消息），Del 删除选中元素——
+  // 这条路径复用 ctx.openFormForSelection / ctx.addParticipant，不新造浮层。
   useCanvasKeyboard(keyboardProjectionOf(projection), {
     containerRef,
     // 工单 05/06 接线：新建节点落码后立即进入内联命名
@@ -497,16 +511,11 @@ export function CanvasPanel({ preview, projection }: CanvasPanelProps) {
     newNodeText: t('app:propertyPanel.mindmapNewNode'),
     // 工单 14：方向键方位导航 + 自动平移
     navigation,
-  })
-
-  // 右键菜单（工单 07）：菜单/连线模式/添加样式表单三个状态托管在 hook 中，
-  // 编辑文本与新建节点的内联命名同样走 beginEdit
-  const ctx = useCanvasContextMenu({
-    projection,
-    resolver: projection !== null ? resolverOf(projection) : null,
-    containerRef,
-    onNodeCreated: beginEdit,
-    newNodeText: t('app:propertyPanel.mindmapNewNode'),
+    // 工单 05：class/sequence 的 Tab/Enter 落到已有表单或既有创建路径
+    onEditKey: (request: EditKeyRequest) => {
+      if (request.form === 'participant') ctx.addParticipant()
+      else ctx.openFormForSelection(request.form)
+    },
   })
   const classDefNames = projection?.type === 'flowchart' ? projection.flowchart.classDefs.map((c) => c.name) : []
 
