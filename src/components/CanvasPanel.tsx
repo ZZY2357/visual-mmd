@@ -2,11 +2,11 @@ import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import { Alert, Box, Button, ColorInput, Group, Stack, Text, TextInput, Title, UnstyledButton } from '@mantine/core'
 import { useTranslation } from 'react-i18next'
 import type { MermaidPreview } from '../lib/use-mermaid-preview'
-import { flowchartDataIdResolver, toEditorSelection } from '../lib/canvas-selection/flowchart-adapter'
+import { flowchartDataIdResolver } from '../lib/canvas-selection/flowchart-adapter'
 import { mindmapDataIdResolver, mindmapDomIdOf } from '../lib/canvas-selection/mindmap-adapter'
 import type { CanvasSelection, DataIdResolver } from '../lib/canvas-selection/data-id'
 import { elementDataIdResolver, nodeDataIdResolver } from '../lib/canvas-selection/data-id'
-import { edgeSelectionOf } from '../lib/canvas-selection/edge-adapter'
+import { canvasIdOf, fromCanvasId } from '../lib/canvas-selection/selection-codec'
 import {
   annotateClassRelationIdentities,
   annotateSequenceIdentities,
@@ -86,51 +86,13 @@ function resolverOf(projection: AnyProjection): DataIdResolver {
   return (dataId) => nodes(dataId) ?? edges(dataId)
 }
 
-/** 图种无关的画布选中 → 编辑器选中 */
-function canvasToEditorSelection(projection: AnyProjection, canvasSelection: CanvasSelection): Selection | null {
-  if (projection.type === 'flowchart') return toEditorSelection(canvasSelection)
-  if (projection.type === 'mindmap') {
-    // mindmap 画布选中只可能是节点（无连线）；canvas id 即 elementId（mindmap-node:N）
-    return canvasSelection.kind === 'node' ? { kind: 'mindmap-node', elementId: canvasSelection.id } : null
-  }
-  // 位置序连线（工单 02）：elementId 直接落成 class-relation / message / note / block
-  if (canvasSelection.kind === 'element') return edgeSelectionOf(projection.type, canvasSelection.elementId)
-  if (canvasSelection.kind === 'node') {
-    return projection.type === 'sequence'
-      ? { kind: 'participant', actorId: canvasSelection.id }
-      : { kind: 'class', name: canvasSelection.id }
-  }
-  return null
-}
-
-/** 当前编辑器选中对应的 data-id（高亮用） */
-function selectedDataIdOf(selection: Selection): string | null {
-  switch (selection.kind) {
-    case 'node':
-      return selection.nodeId
-    case 'participant':
-      return selection.actorId
-    case 'class':
-      return selection.name
-    // 位置序连线（工单 02）：elementId 即渲染后标注的 data-id。class 的成员/注释
-    // 本票未纳入寻址，画布上没有对应 data-id，返回后安静地不高亮（既有行为不变）。
-    case 'class-relation':
-    case 'message':
-    case 'note':
-    case 'block':
-      return selection.elementId
-    case 'mindmap-node':
-      // mindmap 无 data-id：高亮按节点 DOM id（node_{N-1}）匹配（highlight 已支持）
-      return mindmapDomIdOf(selection.elementId)
-    default:
-      return null
-  }
-}
+// 选中映射（工单 03）：画布选中 ↔ 编辑器选中 ↔ data-id 的互逆映射收敛在
+// canvas-selection/selection-codec.ts（fromCanvasId / canvasIdOf），本组件只转调。
 
 /** 各图种全部节点的 data-id 列表（**投影顺序**，工单 14 §3 表格）：方位导航的候选与
  * 「无选中回落首节点」共用同一口径。flowchart = nodes[].nodeId；class = classes[].name；
  * sequence = participants[].actorId；mindmap = nodes[].elementId 经 mindmapDomIdOf
- * （node_{N-1}，与高亮 / selectedDataIdOf 同形态）。 */
+ * （node_{N-1}，与高亮 / canvasIdOf 同形态）。 */
 function nodeDataIdsOf(projection: AnyProjection): string[] {
   if (projection.type === 'flowchart') return projection.flowchart.nodes.map((n) => n.nodeId)
   if (projection.type === 'class') return projection.class.classes.map((c) => c.name)
@@ -443,7 +405,7 @@ export function CanvasPanel({ preview, projection }: CanvasPanelProps) {
   })
 
   // 方向键方位导航的适配对象（工单 14）：DOM 测量 + 选中映射 + 自动平移，全部复用现成能力：
-  // measureNodeExtents（可视范围并集）、selectedDataIdOf / resolverOf / canvasToEditorSelection
+  // measureNodeExtents（可视范围并集）、canvasIdOf / resolverOf / fromCanvasId
   // （选中 ↔ data-id）、useCanvasView 的 revealRect（自动平移）。measureNodeExtents 不做缓存
   // （模板规模 2–13 节点，工单接受每次现测）。
   const navigation = useMemo<CanvasNavigation | undefined>(() => {
@@ -452,7 +414,7 @@ export function CanvasPanel({ preview, projection }: CanvasPanelProps) {
     const resolver = resolverOf(projection)
     const toSelection = (dataId: string): Selection | null => {
       const canvasSelection = resolver(dataId)
-      return canvasSelection === null ? null : canvasToEditorSelection(projection, canvasSelection)
+      return canvasSelection === null ? null : fromCanvasId(projection.type, canvasSelection)
     }
     return {
       // 按投影顺序过滤出命中的节点（容器缺失 / 节点未渲染 → 不参与导航）
@@ -470,7 +432,7 @@ export function CanvasPanel({ preview, projection }: CanvasPanelProps) {
       // 选中已不在投影中（源码被外部改动等）也算无锚点 → 回落首节点
       dataIdOf: (selection) => {
         if (selection === null) return null
-        const dataId = selectedDataIdOf(selection)
+        const dataId = canvasIdOf(selection)
         return dataId !== null && ids.includes(dataId) ? dataId : null
       },
       toSelection,
@@ -563,12 +525,12 @@ export function CanvasPanel({ preview, projection }: CanvasPanelProps) {
     svg,
     containerRef,
     resolver: canvasResolver,
-    selectedDataId: selection !== null ? selectedDataIdOf(selection) : null,
+    selectedDataId: selection !== null ? canvasIdOf(selection) : null,
     annotateEdges,
     hitTestEdge,
     onSelect: (canvasSelection) => {
       if (projection !== null) {
-        const editorSelection = canvasToEditorSelection(projection, canvasSelection)
+        const editorSelection = fromCanvasId(projection.type, canvasSelection)
         if (editorSelection !== null) select(editorSelection)
       }
     },

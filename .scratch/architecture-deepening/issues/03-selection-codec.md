@@ -1,6 +1,6 @@
 # 03 · 选中的互逆映射收敛成一处 codec
 
-Status: needs-triage
+Status: resolved
 Blocked by: 01
 Type: task
 
@@ -96,3 +96,40 @@ export function menuTargetOfCanvas(diagramType: DiagramTypeId, canvas: CanvasSel
 是有意的（画布本来就只可寻址一部分 kind），硬改会扭曲类型。改用「显式可寻址表 +
 遍历全部 16 个 kind 的测试」——新增 kind 时测试逼你回答「它可寻址吗」，
 漏答是测试失败而不是线上静默。
+
+## 实施记录（2026-09-29，分支 `ticket-03-selection-codec`）
+
+按分步 1–5 完成，无偏差：
+
+- 新建 `src/lib/canvas-selection/selection-codec.ts`：`canvasIdOf` / `fromCanvasId` /
+  `selectionOfMenuTarget` / `menuTargetOfCanvas` 四个纯函数。`canvasIdOf` 与
+  `fromCanvasId` 行为逐字照搬 CanvasPanel 原实现（flowchart 的 `toEditorSelection`
+  分支按风险项保留在 `fromCanvasId` 内部）；`selectionOfMenuTarget` 的 blank 分支
+  返回 null（保留「空白菜单不 select」语义）；`menuTargetOfCanvas` 逐字照搬
+  `contextMenuTargetFromSelection`。
+- `CanvasPanel.tsx`：删除 `canvasToEditorSelection` / `selectedDataIdOf` 函数体，
+  5 处调用点改转调 codec（navigation.toSelection 的组合随之收敛）。
+- `context-menu.ts`：`contextMenuTargetFromSelection` 改为 `menuTargetOfCanvas` 转调
+  （保留导出名，`use-canvas-context-menu` 消费端零改动）。
+- `use-canvas-context-menu.ts`：`selectTarget` 的 9 分支 if-else 删除，改转调
+  `selectionOfMenuTarget`（blank → 不 select）。
+- 新增 `src/lib/canvas-selection/__tests__/selection-codec.test.ts`（10 用例）：
+  核心「全 kind 可寻址表」`ADDRESSABLE`（16 kind × 4 图种逐格钉住：flowchart=node，
+  sequence=participant/message/note/block，class=class/class-relation，
+  mindmap=mindmap-node）+ 往返测试（`fromCanvasId` 经 `sameSelection` 回原选中）、
+  `canvasIdOf` 16 kind 正解、菜单目标两对互逆 + 与 `fromCanvasId` 同解测试。
+
+验收核对：
+
+1. `grep -c 'canvasToEditorSelection\|selectedDataIdOf' src/components/CanvasPanel.tsx`
+   → **0**（函数体已删，注释引用同步更新）。
+2. 往返测试覆盖全部 16 个 kind（`ALL_KINDS` 清单 × 4 图种，可寻址 8 格断言
+   sameSelection 回原、其余断言不回 / null）。
+3. 全量测试绿：**58 文件 / 842 用例全部通过**（基线 57 文件 832 用例 + 本票新增
+   1 文件 10 用例）；`scenario-a-class-relation.test.tsx`、`context-menu.test.ts`、
+   `use-canvas-context-menu.test.tsx` 零改动全绿。
+4. 附带指标：CanvasPanel 内 `projection.type ===` 图种分支 23 → 20（下降，未新增）；
+   `npm run typecheck` 通过。
+
+Decision 遵守：`resolve*Selection` 四份未动（归 04）；`projection/selection.ts` 的
+`selectionKey` 未动。
