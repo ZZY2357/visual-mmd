@@ -1,5 +1,6 @@
 import type { DiagramTypeId } from '../diagram-registry'
 import type { CanvasSelection } from '../canvas-selection/data-id'
+import { edgeSelectionOf } from '../canvas-selection/edge-adapter'
 
 /**
  * 右键菜单（工单 07/04/06）：单一菜单随右键目标变化。
@@ -12,8 +13,8 @@ import type { CanvasSelection } from '../canvas-selection/data-id'
  * sequence 添加参与者、mindmap 添加根节点；空图与错误态（空 classDiagram）同样适用。
  * 节点菜单四种图种齐备（工单 06）：class 节点选中 id 即类名、sequence 节点选中 id 即
  * 参与者 actorId，各给最小可用集（class = 加成员/加关系/删除类；sequence = 加消息/删除参与者）。
- * 右键目标无法映射为菜单目标（如 sequence/class 的连线，本轮未定义）时返回 null：
- * 安静地不弹菜单，不崩溃。
+ * 连线目标（工单 02）：flowchart 走 mermaid data-id，class / sequence 走位置序身份
+ * （`edgeSelectionOf` 收窄）；无法映射为菜单目标时返回 null：安静地不弹菜单，不崩溃。
  */
 
 export type ContextMenuTarget =
@@ -26,6 +27,12 @@ export type ContextMenuTarget =
   | { kind: 'class-node'; name: string }
   /** sequence 参与者：选中 id 即 actorId */
   | { kind: 'sequence-participant'; actorId: string }
+  /** class 关系边（工单 02 位置序寻址）：elementId 即投影 elementId（`relation:N`） */
+  | { kind: 'class-relation'; elementId: string }
+  /** sequence 消息 / 注释 / 块（工单 02 位置序寻址）：elementId 为 `message:N` / `note:N` / `block:N` */
+  | { kind: 'sequence-message'; elementId: string }
+  | { kind: 'sequence-note'; elementId: string }
+  | { kind: 'sequence-block'; elementId: string }
 
 export type ContextMenuItemId =
   | 'add-node'
@@ -49,8 +56,8 @@ export type ContextMenuItemId =
 
 /**
  * 画布选中 → 菜单目标：节点/连线按图种改写 kind（四种图种的节点都有菜单）；
- * 连线仅 flowchart 有定义（sequence/class 的连线本轮未定义 → null）。
- * 空白处一律返回 blank（图种随目标携带，决定菜单项）。
+ * 连线 flowchart 走 mermaid data-id，class / sequence 走**位置序身份**（工单 02，
+ * 经 edgeSelectionOf 收窄到本图种可寻址的种类）；空白处一律返回 blank（图种随目标携带）。
  */
 export function contextMenuTargetFromSelection(
   selection: CanvasSelection | null,
@@ -62,6 +69,23 @@ export function contextMenuTargetFromSelection(
     if (diagramType === 'mindmap') return { kind: 'mindmap-node', elementId: selection.id }
     if (diagramType === 'class') return { kind: 'class-node', name: selection.id }
     return { kind: 'sequence-participant', actorId: selection.id }
+  }
+  if (selection.kind === 'element') {
+    // 复用「身份 → 编辑器选中」的收窄逻辑，保证路由与选中永远认同一批种类
+    const editorSelection = edgeSelectionOf(diagramType, selection.elementId)
+    if (editorSelection === null) return null
+    switch (editorSelection.kind) {
+      case 'class-relation':
+        return { kind: 'class-relation', elementId: editorSelection.elementId }
+      case 'message':
+        return { kind: 'sequence-message', elementId: editorSelection.elementId }
+      case 'note':
+        return { kind: 'sequence-note', elementId: editorSelection.elementId }
+      case 'block':
+        return { kind: 'sequence-block', elementId: editorSelection.elementId }
+      default:
+        return null
+    }
   }
   return diagramType === 'flowchart'
     ? { kind: 'flowchart-edge', from: selection.from, to: selection.to, occurrence: selection.occurrence }
@@ -91,6 +115,8 @@ function blankMenuItems(diagramType: DiagramTypeId): ContextMenuItemId[] {
  * - mindmap 节点：添加子节点 / 编辑文本 / 删除
  * - class 节点：添加成员 / 添加关系 / 删除类（级联删成员与相关关系）
  * - sequence 参与者：添加消息 / 删除参与者（级联删引用它的语句）
+ * - class 关系边 / sequence 连线：**本票（工单 02）只打通寻址**，菜单项为空 →
+ *   右键安静不弹（工单 03 在此挂上「只放删除」起步的编辑动作）
  */
 export function contextMenuItems(target: ContextMenuTarget): ContextMenuItemId[] {
   switch (target.kind) {
@@ -106,5 +132,11 @@ export function contextMenuItems(target: ContextMenuTarget): ContextMenuItemId[]
       return ['add-member', 'add-relation', 'delete-class']
     case 'sequence-participant':
       return ['add-message', 'delete-participant']
+    // 工单 03 的落点：连线菜单项（起步「删除」，收尾补编辑类动作）
+    case 'class-relation':
+    case 'sequence-message':
+    case 'sequence-note':
+    case 'sequence-block':
+      return []
   }
 }

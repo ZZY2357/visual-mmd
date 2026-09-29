@@ -5,8 +5,16 @@ import type { MermaidPreview } from '../lib/use-mermaid-preview'
 import { flowchartDataIdResolver, toEditorSelection } from '../lib/canvas-selection/flowchart-adapter'
 import { mindmapDataIdResolver, mindmapDomIdOf } from '../lib/canvas-selection/mindmap-adapter'
 import type { CanvasSelection, DataIdResolver } from '../lib/canvas-selection/data-id'
-import { nodeDataIdResolver } from '../lib/canvas-selection/data-id'
+import { elementDataIdResolver, nodeDataIdResolver } from '../lib/canvas-selection/data-id'
+import { edgeSelectionOf } from '../lib/canvas-selection/edge-adapter'
+import {
+  annotateClassRelationIdentities,
+  annotateSequenceIdentities,
+  hitTestEdgeIdentity,
+  relationShapesOf,
+} from '../lib/canvas-selection/edge-locate'
 import type { Selection } from '../lib/projection/selection'
+import type { SequenceProjection } from '../lib/projection/sequence-projection'
 import { useCanvasSelection } from '../lib/canvas-selection/use-canvas-selection'
 import { useCanvasKeyboard } from '../lib/editing/use-canvas-keyboard'
 import type { CanvasKeyboardProjection, CanvasNavigation, NodeExtent } from '../lib/editing/canvas-keyboard'
@@ -55,12 +63,24 @@ interface CanvasPanelProps {
  * 与 class 类的 data-id 即其 id（class 的 data-id 由 node-data-ids 的渲染后处理从
  * `{svgId}-classId-{类名}-{n}` 反注而来，工单 09；无法匹配时不选中）。
  * mindmap（工单 06）：mermaid 不发 data-id，但节点 g 的 DOM id 为 node_N（源码节点序），
- * 经 mindmapDataIdResolver 映射回投影节点。 */
+ * 经 mindmapDataIdResolver 映射回投影节点。
+ * 连线（工单 02）：class 的关系边与 sequence 的消息/注释/块按**位置序**寻址（ADR-0012），
+ * data-id 为投影 elementId（`relation:1` / `message:2` …），由 edge-locate 的渲染后处理标注。 */
 function resolverOf(projection: AnyProjection): DataIdResolver {
   if (projection.type === 'flowchart') return flowchartDataIdResolver(projection.flowchart)
-  if (projection.type === 'sequence') return nodeDataIdResolver(projection.sequence.participants.map((p) => p.actorId))
+  if (projection.type === 'sequence') {
+    const nodes = nodeDataIdResolver(projection.sequence.participants.map((p) => p.actorId))
+    const edges = elementDataIdResolver([
+      ...projection.sequence.messages.map((m) => m.elementId),
+      ...projection.sequence.notes.map((n) => n.elementId),
+      ...projection.sequence.blocks.map((b) => b.elementId),
+    ])
+    return (dataId) => nodes(dataId) ?? edges(dataId)
+  }
   if (projection.type === 'mindmap') return mindmapDataIdResolver(projection.mindmap)
-  return nodeDataIdResolver(projection.class.classes.map((c) => c.name))
+  const nodes = nodeDataIdResolver(projection.class.classes.map((c) => c.name))
+  const edges = elementDataIdResolver(projection.class.relations.map((r) => r.elementId))
+  return (dataId) => nodes(dataId) ?? edges(dataId)
 }
 
 /** 图种无关的画布选中 → 编辑器选中 */
@@ -70,6 +90,8 @@ function canvasToEditorSelection(projection: AnyProjection, canvasSelection: Can
     // mindmap 画布选中只可能是节点（无连线）；canvas id 即 elementId（mindmap-node:N）
     return canvasSelection.kind === 'node' ? { kind: 'mindmap-node', elementId: canvasSelection.id } : null
   }
+  // 位置序连线（工单 02）：elementId 直接落成 class-relation / message / note / block
+  if (canvasSelection.kind === 'element') return edgeSelectionOf(projection.type, canvasSelection.elementId)
   if (canvasSelection.kind === 'node') {
     return projection.type === 'sequence'
       ? { kind: 'participant', actorId: canvasSelection.id }
@@ -87,6 +109,13 @@ function selectedDataIdOf(selection: Selection): string | null {
       return selection.actorId
     case 'class':
       return selection.name
+    // 位置序连线（工单 02）：elementId 即渲染后标注的 data-id。class 的成员/注释
+    // 本票未纳入寻址，画布上没有对应 data-id，返回后安静地不高亮（既有行为不变）。
+    case 'class-relation':
+    case 'message':
+    case 'note':
+    case 'block':
+      return selection.elementId
     case 'mindmap-node':
       // mindmap 无 data-id：高亮按节点 DOM id（node_{N-1}）匹配（highlight 已支持）
       return mindmapDomIdOf(selection.elementId)
@@ -118,6 +147,16 @@ function keyboardProjectionOf(projection: AnyProjection | null): CanvasKeyboardP
   if (projection.type === 'mindmap') return { kind: 'mindmap', projection: projection.mindmap }
   if (projection.type === 'class') return { kind: 'class', projection: projection.class }
   return { kind: 'sequence', projection: projection.sequence }
+}
+
+/** sequence 位置序标注的条数（工单 02）：块只数 block-open——`else`/`and` 是分支行，
+ * 画布上不构成独立元素（其 elementId 是 `else:N`，不是位置序身份）。 */
+function sequenceEdgeCounts(projection: SequenceProjection): { messages: number; notes: number; blocks: number } {
+  return {
+    messages: projection.messages.length,
+    notes: projection.notes.length,
+    blocks: projection.blocks.filter((b) => b.keyword !== 'else' && b.keyword !== 'and').length,
+  }
 }
 
 /** 内联编辑浮层输入框（工单 05/02）：预填当前显示文本，回车/失焦提交、Esc 取消。
@@ -496,11 +535,34 @@ export function CanvasPanel({ preview, projection }: CanvasPanelProps) {
     if (matches) beginEdit(pendingInlineEdit.target)
   }, [pendingInlineEdit, projection, beginEdit])
 
+  // 连线位置序寻址（工单 02，ADR-0012）：渲染后把身份写进连线的 data-id——
+  // class 的关系边（含标签/基数，故 shapes 由投影的 label/基数算出）、
+  // sequence 的消息 / 注释 / 块（条数由投影给出，条数不符的种类整体不标）。
+  // flowchart 的边仍走 mermaid data-id（ADR-0007），mindmap 无连线 → 不标注。
+  const canvasResolver = projection !== null ? resolverOf(projection) : null
+  const hasOrdinalEdges = projection !== null && (projection.type === 'class' || projection.type === 'sequence')
+  const annotateEdges =
+    projection !== null && projection.type === 'class'
+      ? (root: ParentNode) => annotateClassRelationIdentities(root, relationShapesOf(projection.class.relations))
+      : projection !== null && projection.type === 'sequence'
+        ? (root: ParentNode) => annotateSequenceIdentities(root, sequenceEdgeCounts(projection.sequence))
+        : undefined
+  // 兜底命中：data-id 没命中时按屏幕坐标沿真实路径采样（只对位置序连线开的图种启用）
+  const hitTestEdge =
+    canvasResolver === null || !hasOrdinalEdges
+      ? undefined
+      : (root: ParentNode, clientX: number, clientY: number): CanvasSelection | null => {
+          const elementId = hitTestEdgeIdentity(root, clientX, clientY)
+          return elementId === null ? null : canvasResolver(elementId)
+        }
+
   const { containerRef: selectionRef, onClick } = useCanvasSelection({
     svg,
     containerRef,
-    resolver: projection !== null ? resolverOf(projection) : null,
+    resolver: canvasResolver,
     selectedDataId: selection !== null ? selectedDataIdOf(selection) : null,
+    annotateEdges,
+    hitTestEdge,
     onSelect: (canvasSelection) => {
       if (projection !== null) {
         const editorSelection = canvasToEditorSelection(projection, canvasSelection)

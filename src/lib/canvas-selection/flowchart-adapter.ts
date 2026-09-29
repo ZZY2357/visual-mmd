@@ -21,12 +21,15 @@ export function flowchartDataIdResolver(projection: FlowchartProjection): DataId
   return (dataId) => nodes(dataId) ?? edges(dataId)
 }
 
-/** 通用选中描述 → 编辑器 store 的 Selection */
-export function toEditorSelection(selection: CanvasSelection): Selection {
+/** 通用选中描述 → 编辑器 store 的 Selection；flowchart 不会产出位置序连线
+ * （`kind: 'element'`，工单 02）——真收到了返回 null，安静地不选中。 */
+export function toEditorSelection(selection: CanvasSelection): Selection | null {
   switch (selection.kind) {
     case 'node':
       return { kind: 'node', nodeId: selection.id }
     case 'edge':
       return { kind: 'edge', from: selection.from, to: selection.to, occurrence: selection.occurrence }
+    case 'element':
+      return null
   }
 }

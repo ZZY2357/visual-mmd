@@ -52,10 +52,37 @@ describe('contextMenuTargetFromSelection（工单 07/04/06 菜单目标解析）
     })
   })
 
-  it('sequence/class 的连线本轮未定义 → null', () => {
+  it('sequence/class 的 flowchart 形态边（旧 kind:edge）→ null（不回归）', () => {
     const edge = { kind: 'edge' as const, from: 'A', to: 'B', occurrence: 1 }
     expect(contextMenuTargetFromSelection(edge, 'sequence')).toBeNull()
     expect(contextMenuTargetFromSelection(edge, 'class')).toBeNull()
+  })
+
+  it('class 关系边（工单 02 位置序身份）→ class-relation', () => {
+    expect(
+      contextMenuTargetFromSelection({ kind: 'element', elementId: 'relation:2' }, 'class'),
+    ).toEqual({ kind: 'class-relation', elementId: 'relation:2' })
+  })
+
+  it('sequence 连线（工单 02 位置序身份）→ message / note / block 各自的目标', () => {
+    expect(contextMenuTargetFromSelection({ kind: 'element', elementId: 'message:3' }, 'sequence')).toEqual({
+      kind: 'sequence-message',
+      elementId: 'message:3',
+    })
+    expect(contextMenuTargetFromSelection({ kind: 'element', elementId: 'note:1' }, 'sequence')).toEqual({
+      kind: 'sequence-note',
+      elementId: 'note:1',
+    })
+    expect(contextMenuTargetFromSelection({ kind: 'element', elementId: 'block:1' }, 'sequence')).toEqual({
+      kind: 'sequence-block',
+      elementId: 'block:1',
+    })
+  })
+
+  it('位置序身份按图种收窄：class 不认消息，sequence 不认关系 → null', () => {
+    expect(contextMenuTargetFromSelection({ kind: 'element', elementId: 'message:1' }, 'class')).toBeNull()
+    expect(contextMenuTargetFromSelection({ kind: 'element', elementId: 'relation:1' }, 'sequence')).toBeNull()
+    expect(contextMenuTargetFromSelection({ kind: 'element', elementId: 'i1' }, 'sequence')).toBeNull()
   })
 })
 
@@ -118,5 +145,12 @@ describe('contextMenuItems（工单 07/04/06 菜单项）', () => {
       'add-message',
       'delete-participant',
     ])
+  })
+
+  it('连线目标本轮（工单 02）还没有菜单项：安静不弹，等工单 03 填', () => {
+    expect(contextMenuItems({ kind: 'class-relation', elementId: 'relation:1' })).toEqual([])
+    expect(contextMenuItems({ kind: 'sequence-message', elementId: 'message:1' })).toEqual([])
+    expect(contextMenuItems({ kind: 'sequence-note', elementId: 'note:1' })).toEqual([])
+    expect(contextMenuItems({ kind: 'sequence-block', elementId: 'block:1' })).toEqual([])
   })
 })

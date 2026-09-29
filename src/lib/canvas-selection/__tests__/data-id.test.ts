@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import {
   edgeDataIdResolver,
+  elementDataIdResolver,
   nodeDataIdResolver,
   selectionFromEventTarget,
   type DataIdResolver,
@@ -80,6 +81,22 @@ describe('edgeDataIdResolver（mermaid 边 data-id 的尽力而为匹配）', ()
   it('不存在的边返回 null', () => {
     expect(resolver('L_A_C_0')).toBeNull()
     expect(resolver('A_B')).toBeNull()
+  })
+})
+
+describe('elementDataIdResolver（工单 02：位置序连线的 data-id 匹配）', () => {
+  const resolver = elementDataIdResolver(['relation:1', 'relation:2', 'message:1'])
+
+  it('data-id 精确等于投影已知的 elementId 时命中', () => {
+    expect(resolver('relation:2')).toEqual({ kind: 'element', elementId: 'relation:2' })
+    expect(resolver('message:1')).toEqual({ kind: 'element', elementId: 'message:1' })
+  })
+
+  it('投影里没有的 id 一律 null（mermaid 自己的 data-id 不会误造选中）', () => {
+    expect(resolver('relation:3')).toBeNull()
+    expect(resolver('id_A_B_1')).toBeNull()
+    expect(resolver('i1')).toBeNull()
+    expect(resolver('A')).toBeNull()
   })
 })
 

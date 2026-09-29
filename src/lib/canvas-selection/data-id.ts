@@ -26,7 +26,17 @@ export interface CanvasEdgeSelection {
   occurrence: number
 }
 
-export type CanvasSelection = CanvasNodeSelection | CanvasEdgeSelection
+/**
+ * 位置序寻址的连线/块级元素（工单 02，ADR-0012）：`id` 即投影 elementId
+ * （`relation:1` / `message:2` / `note:1` / `block:1`）。
+ * 与 mindmap 的 `node` 变体同思路——画布身份就是编辑器 elementId，无需转换表。
+ */
+export interface CanvasElementSelection {
+  kind: 'element'
+  elementId: string
+}
+
+export type CanvasSelection = CanvasNodeSelection | CanvasEdgeSelection | CanvasElementSelection
 
 /** data-id 值 → 选中描述；返回 null 表示该 data-id 无法匹配 */
 export type DataIdResolver = (dataId: string) => CanvasSelection | null
@@ -39,6 +49,16 @@ export type DataIdResolver = (dataId: string) => CanvasSelection | null
 export function nodeDataIdResolver(ids: Iterable<string>): DataIdResolver {
   const known = new Set(ids)
   return (dataId) => (known.has(dataId) ? { kind: 'node', id: dataId } : null)
+}
+
+/**
+ * 连接/块级元素 resolver（工单 02）：data-id 精确等于投影里已知的 elementId 时命中。
+ * 与 `nodeDataIdResolver` 同构——**只认投影已知的元素**，因此凭空出现的 data-id
+ * （mermaid 自己的 `id_A_B_1` / `i1` / `L_A_B_0`）一律返回 null，不会误造选中。
+ */
+export function elementDataIdResolver(elementIds: Iterable<string>): DataIdResolver {
+  const known = new Set(elementIds)
+  return (dataId) => (known.has(dataId) ? { kind: 'element', elementId: dataId } : null)
 }
 
 /**
