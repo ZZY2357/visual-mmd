@@ -32,7 +32,7 @@ const CLASS_RELATION_PATH = `.edgePaths > path:not([${HIT_MARK}])`
 /** class 标签 / 基数容器：直接子元素按「每条关系一个 label 组（若有），紧随其 terminals 组（若有）」排列 */
 const CLASS_LABEL_CHILDREN = 'g.edgeLabels > *'
 
-/** sequence 消息线：普通消息是 line，自消息是 path（实测 class 名同为 messageLine0/1） */
+/** sequence 消息：普通消息是 line，自消息是 path（实测 class 名同为 messageLine0/1） */
 const SEQUENCE_MESSAGE =
   'line[class~="messageLine0"], line[class~="messageLine1"], path[class~="messageLine0"], path[class~="messageLine1"]'
 
@@ -165,7 +165,7 @@ function annotateHostAnchors(hosts: readonly Element[], kind: EdgeIdentityKind, 
   })
 }
 
-/** sequence：标注消息线 / 注释 / 块（各自按投影顺序编号，条数不符的种类整体放弃） */
+/** sequence：标注消息 / 注释 / 块（各自按投影顺序编号，条数不符的种类整体放弃） */
 export function annotateSequenceIdentities(
   root: ParentNode,
   counts: { messages: number; notes: number; blocks: number },
@@ -175,7 +175,7 @@ export function annotateSequenceIdentities(
   annotateHostAnchors(hostGroupsOf(Array.from(root.querySelectorAll(SEQUENCE_BLOCK_LINE))), 'block', counts.blocks)
 }
 
-/** 屏幕命中容差（CSS px）：sequence 消息线 only 1.5px 描边，给一点余量但不足以吃到空白 */
+/** 屏幕命中容差（CSS px）：sequence 消息 only 1.5px 描边，给一点余量但不足以吃到空白 */
 export const EDGE_HIT_TOLERANCE = 4
 
 /** 屏幕坐标到元素路径的最短距离；无几何 API（未渲染 / 非几何元素）时返回 null */

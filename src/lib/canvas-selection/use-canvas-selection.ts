@@ -72,7 +72,7 @@ export function useCanvasSelection({
       return
     }
     // 兜底：data-id 没命中时按屏幕坐标沿真实路径采样找连线（工单 02）。
-    // 序列消息线只有 1.5px 描边，靠浏览器精确命中过于苛刻；容差小到不会吃到空白。
+    // 序列消息只有 1.5px 描边，靠浏览器精确命中过于苛刻；容差小到不会吃到空白。
     const root = containerRef.current
     if (root === null || hitTestEdge === undefined) return
     const hit = hitTestEdge(root, e.clientX, e.clientY)

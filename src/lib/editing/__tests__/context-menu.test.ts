@@ -180,7 +180,7 @@ describe('contextMenuItems（工单 07/04/06 菜单项）', () => {
     }
   })
 
-  it('连线目标（工单 03）：class 关系边与 sequence 消息线各有编辑 + 删除动作', () => {
+  it('连线目标（工单 03）：class 关系边与 sequence 消息各有编辑 + 删除动作', () => {
     expect(contextMenuItems({ kind: 'class-relation', elementId: 'relation:1' })).toEqual([
       'cycle-relation-kind',
       'edit-relation',

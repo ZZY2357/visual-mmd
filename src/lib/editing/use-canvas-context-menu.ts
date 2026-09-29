@@ -47,7 +47,7 @@ import { useEditorStore } from '../../store/editor'
  *   浮出表单（Add*member/relation/message*InlineForm），提交才落码（锚点为右键节点的声明，
  *   新元素插到它之后）；删除类/删除参与者直接经 delete-class / delete-participant 落码
  *   （级联删成员/关系/引用该参与者的语句由管线负责）。
- * - 连线菜单（工单 03）：class 关系边与 sequence 消息线各给「编辑 + 删除」——能循环的
+ * - 连线菜单（工单 03）：class 关系边与 sequence 消息各给「编辑 + 删除」——能循环的
  *   **直接改**（set-relation 的 kind / set-message 的 arrow，菜单不关可连着点）；其余是
  *   「在属性面板中编辑」——菜单项自己选中该连线并关闭菜单（工单 05 定案 D5），字段在右侧
  *   RelationForm / MessageForm 改（沿用 flowchart 的 edit-label 既定链路）；
@@ -476,7 +476,7 @@ export function useCanvasContextMenu(
     closeMenu()
   }, [menu, selectTarget, closeMenu])
 
-  /** sequence 消息线：循环切换箭头（set-message 的 arrow，直接改，不弹表单）。菜单保持打开。 */
+  /** sequence 消息：循环切换箭头（set-message 的 arrow，直接改，不弹表单）。菜单保持打开。 */
   const cycleMessageArrow = useCallback((): void => {
     const target = menu?.target
     const proj = latest.current.projection

@@ -208,7 +208,7 @@ describe('class 关系边标注（工单 02）', () => {
 describe('sequence 连线/注释/块标注（工单 02）', () => {
   const counts = { messages: 3, notes: 2, blocks: 1 }
 
-  it('消息线（line/path 的 messageLine0/1）按文档序标 message:N', () => {
+  it('消息（line/path 的 messageLine0/1）按文档序标 message:N', () => {
     const host = buildSequenceSvg()
     annotateSequenceIdentities(host, counts)
     expect(

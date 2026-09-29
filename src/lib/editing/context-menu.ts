@@ -63,7 +63,7 @@ export type ContextMenuItemId =
   | 'apply-style'
   | 'add-child'
   | 'delete'
-  // 连线菜单（工单 03）：class 关系边与 sequence 消息线各「编辑 + 删除」；
+  // 连线菜单（工单 03）：class 关系边与 sequence 消息各「编辑 + 删除」；
   // 注释 / 逻辑块只补删除（见 contextMenuItems 的说明）。
   // 编辑项的语义（工单 05 定案 D5）= 选中该连线 + 关闭菜单，字段在右侧属性面板里改。
   | 'cycle-relation-kind'
@@ -139,7 +139,7 @@ function blankMenuItems(diagramType: DiagramTypeId): ContextMenuItemId[] {
  * - sequence 参与者：添加消息 / 添加逻辑块（以该参与者为落点）/ 删除参与者（级联删引用它的语句）
  * - class 关系边（工单 03/05）：切换关系类型（循环，直接改 kind）/ 在属性面板中编辑
  *   （选中该关系并关闭菜单，基数与标签由右侧 RelationForm 承接）/ 删除
- * - sequence 消息线（工单 03/05）：切换箭头（循环，直接改 arrow）/ 在属性面板中编辑
+ * - sequence 消息（工单 03/05）：切换箭头（循环，直接改 arrow）/ 在属性面板中编辑
  *   （选中该消息并关闭菜单，激活与文本由右侧 MessageForm 承接）/ 删除
  * - sequence 注释 / 逻辑块（工单 03）：**只放删除**——本票把这两类目标顺带接上（删除意图
  *   早已存在，接线成本≈0），但不再为它们补编辑动作（不扩大改造面；字段仍可在右侧表单改）

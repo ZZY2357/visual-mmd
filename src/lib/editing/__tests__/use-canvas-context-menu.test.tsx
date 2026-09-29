@@ -29,7 +29,7 @@ import type { LinkModeState } from '../link-mode'
  * 画布右键菜单 Hook（工单 07/04/06/03）：右键弹出随目标变化的菜单并联动选中；
  * 添加节点走编辑意图管线并回调内联命名；连线模式两步落码连线、Esc 取消；
  * 添加样式表单提交才落码；class/sequence 节点菜单的添加型表单提交才落码（工单 06）；
- * class 关系边与 sequence 消息线的菜单（工单 03）：循环切换类型/箭头直接落码，
+ * class 关系边与 sequence 消息的菜单（工单 03）：循环切换类型/箭头直接落码，
  * 删除经 delete-relation / delete-message / delete-note / delete-block 落码；
  * 编辑类菜单项（工单 05 定案 D5）= 选中该连线 + 关闭菜单，字段在右侧属性面板改；
  * 添加入口补全（工单 04）：sequence 空白加注释/逻辑块、sequence 参与者加逻辑块、
@@ -1165,7 +1165,7 @@ describe('useCanvasContextMenu（工单 03 连线菜单）', () => {
     expect(spy).not.toHaveBeenCalled()
   })
 
-  it('右键 sequence 消息线：菜单为切换箭头/编辑激活文本/删除并联动选中', () => {
+  it('右键 sequence 消息：菜单为切换箭头/编辑激活文本/删除并联动选中', () => {
     const container = mountSequenceEdge()
 
     expect(contextMenuOn(container, 'line[data-id="message:1"]')).toBe(true)

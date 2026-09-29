@@ -113,7 +113,7 @@ describe('inlineEditTargetFromEvent（工单 05：class / sequence 双击只改�
     })
   })
 
-  it('sequence：双击消息线（resolver 命中 element）→ null（消息文本不做双击）', () => {
+  it('sequence：双击消息（resolver 命中 element）→ null（消息文本不做双击）', () => {
     const seqResolver = (dataId: string): CanvasSelection | null =>
       dataId === 'message:1' ? { kind: 'element', elementId: 'message:1' } : null
     const line = el('<line data-id="message:1"/>')

@@ -478,7 +478,7 @@ describe('useCanvasInlineEdit（工单 05：class / sequence 双击内联编辑�
     expect(source).toContain('甲->>乙: hi') // 消息端点不错位
   })
 
-  it('sequence：双击消息线 → 不进入内联编辑（消息文本走点选 → 右侧表单）', () => {
+  it('sequence：双击消息 → 不进入内联编辑（消息文本走点选 → 右侧表单）', () => {
     resetEditorHistory(SEQ_DBL_SAMPLE)
     act(() => {
       root.render(
