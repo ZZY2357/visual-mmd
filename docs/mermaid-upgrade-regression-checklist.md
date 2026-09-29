@@ -56,3 +56,38 @@
   （第 2 条平行边 counter = 2 而非 1），实现已兼容，格式再变需同步调整。
 - 若未来 mermaid 改用 shadow DOM / iframe 渲染，事件委托与
   `dangerouslySetInnerHTML` 注入路径（`useMermaidPreview`）都需重新评估。
+
+## 2026-09-29 追加：连线身份不再依赖 data-id（ADR-0012）
+
+实测证明 class / sequence 的连线 data-id **会随中位插入重排**，因此本仓对连线改用**位置序**身份，
+不再消费 mermaid 的连线 data-id。以下事实仅作背景参考，**不再是实现依赖**，但升级时仍需复核
+（若某版 mermaid 开始提供稳定连线 id，可回看 ADR-0012 是否值得重新评估）。
+
+| 渲染产物 | data-id 值（v12 实测） | 稳定性 |
+| --- | --- | --- |
+| class 关系边 `<path>` | `id_{源}_{目标}_{N}`（`N` 全局自增） | **中位插入后后缀重排** |
+| class 关系边 `<path>` 的 `id` 属性 | `{svgId}-{data-id}` | 同左 |
+| class 关系标签内层 `<g>` | 与同边 edgePaths **共享同一 id** | 同左 |
+| class 基数 `"1"`/`"*"`（`span.edgeLabel`） | **无任何 data-id** | — |
+| sequence 消息线 `<line>` | 纯序号 `iN` | **插入点之后全部重排** |
+| sequence note `<g>` / loop 块 `<g>` | 纯序号 `iN`（与消息共用计数器） | 同左 |
+| sequence 参与者生命线 / 实例 | 参与者名 | **稳定**（ADR-0007 对节点仍成立） |
+
+新增回归项：
+
+1. **连线可点选**（工单 02 后）：class 关系边与 sequence 消息线点击可选中；
+   **必须在"中位插入一条新连线"之后复测**——这是最易碎的场景。
+2. **连线命中路径**：沿真实路径采样（`getTotalLength` + `getPointAtLength` + `getScreenCTM`）
+   能命中连线元素；**确认 `getBoundingClientRect().中心` 仍不可用**（class 斜线 bbox 退化）。
+3. **`create` / `destroy` / `rect` / `box` / `namespace` 渲染结构**：
+   - `create participant B` → 生命线仅从 create 点开始；
+   - `destroy B` → **仍不画十字标记**（若某版开始渲染，可回看 ADR-0014 是否值得重新评估）；
+   - `rect` / `box` / `namespace` 产物**仍无 data-id**、且**不构成 DOM 包含**
+     （`namespace` 的 `childDataIds` 应为空）。
+4. **错误态**：
+   - `destroy` 之后存在消息线 → 仍报
+     `...does not have an associated destroying message after its declaration`（含 `undefined` 疑似 bug）；
+   - `create` 同名两次 → 仍报 `It is not possible to have actors with the same id...`；
+   - `destroy` 一个不存在的参与者 → 仍**静默忽略**。
+5. **工单 14 的可视范围口径不受影响**：`rect`/`box`/`namespace` 矩形仍无 data-id，
+   故仍不进方位导航的候选集合。
