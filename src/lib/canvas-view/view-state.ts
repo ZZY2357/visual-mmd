@@ -1,6 +1,7 @@
 /**
  * 画布视图换算（工单 03）：缩放/平移只是查看手段（CONTEXT「视图」），
- * 不影响渲染内容与导出产物。本模块只做纯数学换算，DOM 应用在 use-canvas-view。
+ * 不影响渲染内容与导出产物。本模块只做纯数学换算与纯命中判定，
+ * DOM 应用（transform 写入、指针捕获）在 use-canvas-view。
  *
  * 坐标约定：SVG 内容以 transform: translate(tx, ty) scale(scale) 呈现在容器中，
  * 容器坐标 = tx + scale × 内容坐标。
@@ -56,4 +57,23 @@ export function zoomAtPoint(view: ViewState, nextScale: number, px: number, py: 
     tx: px - (px - view.tx) * k,
     ty: py - (py - view.ty) * k,
   }
+}
+
+/**
+ * 交互控件选择器（与画布键盘的焦点排除表同类）：指针按下落在这些控件上时，
+ * 事件属于控件自身的链路（按钮的点击、输入框的文本选择……），不是画布手势。
+ */
+const INTERACTIVE_TARGET_SELECTOR =
+  'button, a[href], input, textarea, select, [contenteditable="true"], [contenteditable=""]'
+
+/**
+ * 指针按下的目标是否算「画布背景」（即允许启动背景拖拽平移）：
+ * - SVG 内容（节点/连线/标签）：不算背景，指针事件留给选中链路；
+ * - 交互控件（按钮/输入框/链接/可编辑区）及其后代：不算背景 ——
+ *   背景拖拽会对容器 setPointerCapture，把派生的 click 劫持到容器，
+ *   控件自身的 onClick 永不触发（工单 12：常驻的「适应窗口」按钮就是这样失效的）。
+ */
+export function isBackgroundDragTarget(target: Element): boolean {
+  if (target.closest('svg') !== null) return false
+  return target.closest(INTERACTIVE_TARGET_SELECTOR) === null
 }

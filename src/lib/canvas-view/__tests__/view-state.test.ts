@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { MAX_SCALE, MIN_SCALE, clampScale, fitView, zoomAtPoint } from '../view-state'
+import { MAX_SCALE, MIN_SCALE, clampScale, fitView, isBackgroundDragTarget, zoomAtPoint } from '../view-state'
 import { svgIntrinsicSize } from '../use-canvas-view'
 
 describe('clampScale', () => {
@@ -80,5 +80,41 @@ describe('svgIntrinsicSize', () => {
   it('无从读取尺寸时返回 null', () => {
     expect(parse('<svg></svg>')).toBeNull()
     expect(parse('<svg viewBox="0 0 0 10"></svg>')).toBeNull()
+  })
+})
+
+describe('isBackgroundDragTarget（工单 12：背景拖拽的命中判定）', () => {
+  const parse = (html: string) => {
+    const host = document.createElement('div')
+    host.innerHTML = html
+    return host.firstElementChild as Element
+  }
+
+  it('普通背景元素算背景：可以启动拖拽平移', () => {
+    expect(isBackgroundDragTarget(parse('<div class="canvas-bg"></div>'))).toBe(true)
+  })
+
+  it('button 及其嵌套子元素（真实点击落在内层 span）不算背景', () => {
+    const button = parse('<button><span>适应窗口</span></button>')
+    expect(isBackgroundDragTarget(button)).toBe(false)
+    expect(isBackgroundDragTarget(button.querySelector('span') as Element)).toBe(false)
+  })
+
+  it('其余交互控件（input / a[href] / contenteditable）不算背景', () => {
+    expect(isBackgroundDragTarget(parse('<input type="text">'))).toBe(false)
+    expect(isBackgroundDragTarget(parse('<a href="#x">链接</a>'))).toBe(false)
+    expect(isBackgroundDragTarget(parse('<div contenteditable="true"></div>'))).toBe(false)
+    expect(isBackgroundDragTarget(parse('<div contenteditable=""></div>'))).toBe(false)
+  })
+
+  it('无 href 的 a 不是交互控件：仍算背景（与键盘排除表口径一致）', () => {
+    expect(isBackgroundDragTarget(parse('<a>锚点</a>'))).toBe(true)
+  })
+
+  it('svg 及其后代（节点/连线/标签）不算背景：指针事件留给选中链路', () => {
+    const svg = parse('<svg width="100" height="100"><g><rect /><text>节点</text></g></svg>')
+    expect(isBackgroundDragTarget(svg)).toBe(false)
+    expect(isBackgroundDragTarget(svg.querySelector('g') as Element)).toBe(false)
+    expect(isBackgroundDragTarget(svg.querySelector('text') as Element)).toBe(false)
   })
 })

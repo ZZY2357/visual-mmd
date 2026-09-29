@@ -123,6 +123,22 @@ describe('useCanvasKeyboard（工单 04 画布焦点体系）', () => {
     expect(useEditorStore.getState().source).toBe(SAMPLE)
   })
 
+  it('焦点在容器内（背景拖拽区）的按钮上：完全不拦截，Enter 不落码（工单 12）', () => {
+    const container = mountWithSelection()
+    // 常驻的「适应窗口」按钮：真实点击 / 键盘 Enter 的事件起点落在内层 span 上
+    const button = document.createElement('button')
+    const span = document.createElement('span')
+    span.textContent = '适应窗口'
+    button.appendChild(span)
+    container.appendChild(button)
+    button.focus()
+    expect(document.activeElement).toBe(button)
+
+    expect(keyOn(span, 'Enter')).toBe(false)
+    expect(useEditorStore.getState().source).toBe(SAMPLE)
+    expect(useEditorStore.getState().source).not.toContain('新节点')
+  })
+
   it('焦点在容器外（代码面板等）：事件不经过容器监听，不拦截不落码', () => {
     mountWithSelection()
     const outside = document.createElement('div')

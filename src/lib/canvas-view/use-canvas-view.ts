@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
-import { fitView, zoomAtPoint, type ViewState } from './view-state'
+import { fitView, isBackgroundDragTarget, zoomAtPoint, type ViewState } from './view-state'
 
 /**
  * 画布视图 Hook（工单 03）：
@@ -87,10 +87,12 @@ export function useCanvasView(svg: string | null) {
   }, [])
 
   const onPointerDown = (e: React.PointerEvent) => {
-    // 仅背景（非 SVG 元素）拖拽平移；元素上的指针事件留给选中链路
+    // 仅背景（非 SVG 元素、非交互控件）拖拽平移；元素上的指针事件留给选中链路，
+    // 控件（如常驻的「适应窗口」按钮）上的留给其自身点击——否则 setPointerCapture
+    // 会把派生的 click 劫持到容器，onClick 永不触发（工单 12）
     const container = containerRef.current
     if (container === null || viewRef.current === null) return
-    if ((e.target as Element).closest('svg') !== null) return
+    if (!isBackgroundDragTarget(e.target as Element)) return
     dragRef.current = { pointerId: e.pointerId, lastX: e.clientX, lastY: e.clientY }
     container.setPointerCapture(e.pointerId)
   }

@@ -27,9 +27,10 @@ import {
 /** 参与画布键盘的图种投影（tagged union，keydown 时按图种分支） */
 export type { CanvasKeyboardProjection }
 
-/** 容器内焦点落在这类控件上时不触发画布键盘操作 */
+/** 容器内焦点落在这类控件上时不触发画布键盘操作（button 不可少：否则按钮上的
+ * Enter 会冒泡到容器被当作画布动作，既误改源码又压掉按钮自身的 Enter→click，工单 12） */
 const FOCUS_EXCLUDE_SELECTOR =
-  '.cm-editor, input, textarea, select, [contenteditable="true"], [contenteditable=""]'
+  '.cm-editor, button, input, textarea, select, [contenteditable="true"], [contenteditable=""]'
 
 export interface CanvasKeyboardOptions {
   /** 画布容器（tabindex=0、点击后持有焦点的元素）；keydown 监听就挂在其上 */
