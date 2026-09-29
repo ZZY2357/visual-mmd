@@ -16,6 +16,11 @@ import { edgeSelectionOf } from '../canvas-selection/edge-adapter'
  * 连线目标（工单 02 打通寻址 / 工单 03 挂上动作）：flowchart 走 mermaid data-id，
  * class / sequence 走位置序身份（`edgeSelectionOf` 收窄）；无法映射为菜单目标时返回 null：
  * 安静地不弹菜单，不崩溃。
+ *
+ * 添加入口补全（工单 04）：`add-note` / `add-block` 落进菜单——sequence 空白给「注释 + 逻辑块」、
+ * sequence 参与者给「逻辑块」（以该参与者为落点）、class 空白给「浮动注释」、class 类节点给
+ * `note for X`。至此 `CONTEXT.md:78` 的「右键菜单是元素添加的唯一入口」才真正成立
+ * （原先 sequence 的 note/block、class 的 note 只能手写源码）。结构树仍是纯选中器，不引入第二套添加心智。
  */
 
 export type ContextMenuTarget =
@@ -48,6 +53,10 @@ export type ContextMenuItemId =
   | 'delete-class'
   | 'add-message'
   | 'delete-participant'
+  // 添加入口补全（工单 04）：sequence 的注释与逻辑块、class 的注释。
+  // 与既有添加项同构：取值仍是 pipeline 早已存在的 add-note / add-block 意图，本票只接线。
+  | 'add-note'
+  | 'add-block'
   | 'link-from-here'
   | 'edit-text'
   | 'edit-label'
@@ -103,15 +112,16 @@ export function contextMenuTargetFromSelection(
     : null
 }
 
-/** 空白菜单项按图种：flowchart 维持既有四项，其余图种各一个「添加到空图」的入口 */
+/** 空白菜单项按图种：flowchart 维持既有四项，其余图种各一个「添加到空图」的入口。
+ * 工单 04 起 class / sequence 各补一个添加注释的入口，sequence 另有添加逻辑块。 */
 function blankMenuItems(diagramType: DiagramTypeId): ContextMenuItemId[] {
   switch (diagramType) {
     case 'flowchart':
       return ['add-node', 'link-mode', 'add-style', 'add-subgraph']
     case 'class':
-      return ['add-class']
+      return ['add-class', 'add-note']
     case 'sequence':
-      return ['add-participant']
+      return ['add-participant', 'add-note', 'add-block']
     case 'mindmap':
       return ['add-root']
   }
@@ -119,13 +129,13 @@ function blankMenuItems(diagramType: DiagramTypeId): ContextMenuItemId[] {
 
 /**
  * 菜单目标 → 菜单项列表（顺序即展示顺序）：
- * - 空白：按图种（flowchart 添加节点 / 连线模式 / 添加样式 / 添加子图；
- *   class 添加类；sequence 添加参与者；mindmap 添加根节点）
+ * - 空白：按图种（flowchart 添加节点 / 连线模式 / 添加样式 / 添加子图；class 添加类 + 添加注释；
+ *   sequence 添加参与者 + 添加注释 + 添加逻辑块；mindmap 添加根节点）
  * - flowchart 节点：从这里连线 / 编辑文本 / 应用样式 / 删除
  * - flowchart 连线：编辑标签 / 删除
  * - mindmap 节点：添加子节点 / 编辑文本 / 删除
- * - class 节点：添加成员 / 添加关系 / 删除类（级联删成员与相关关系）
- * - sequence 参与者：添加消息 / 删除参与者（级联删引用它的语句）
+ * - class 节点：添加成员 / 添加关系 / 添加注释（`note for X`）/ 删除类（级联删成员与相关关系）
+ * - sequence 参与者：添加消息 / 添加逻辑块（以该参与者为落点）/ 删除参与者（级联删引用它的语句）
  * - class 关系边（工单 03）：切换关系类型（循环，直接改 kind）/ 编辑基数与标签（关闭菜单，
  *   由右侧 RelationForm 承接）/ 删除
  * - sequence 消息线（工单 03）：切换箭头（循环，直接改 arrow）/ 编辑激活与文本（关闭菜单，
@@ -135,6 +145,8 @@ function blankMenuItems(diagramType: DiagramTypeId): ContextMenuItemId[] {
  *
  * 编辑类动作遵守 spec 决策「不新增表单浮层」：能循环的直接改（关系类型 / 箭头），
  * 其余沿用 flowchart 的既定链路（右键已联动选中 → 关掉菜单后右侧表单可编）。
+ * 添加类动作（工单 04）：空白与节点上的 add-note / add-block 在菜单位置浮出添加型小表单
+ * （复用 `Add*InlineForm` 形态），提交才落码。
  */
 export function contextMenuItems(target: ContextMenuTarget): ContextMenuItemId[] {
   switch (target.kind) {
@@ -147,9 +159,9 @@ export function contextMenuItems(target: ContextMenuTarget): ContextMenuItemId[]
     case 'mindmap-node':
       return ['add-child', 'edit-text', 'delete']
     case 'class-node':
-      return ['add-member', 'add-relation', 'delete-class']
+      return ['add-member', 'add-relation', 'add-note', 'delete-class']
     case 'sequence-participant':
-      return ['add-message', 'delete-participant']
+      return ['add-message', 'add-block', 'delete-participant']
     case 'class-relation':
       return ['cycle-relation-kind', 'edit-relation', 'delete-relation']
     case 'sequence-message':

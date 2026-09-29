@@ -8,6 +8,7 @@ import {
   RELATION_KIND_OPTIONS,
   VISIBILITY_OPTIONS,
   addMemberIntent,
+  addNoteIntent,
   addRelationIntent,
   deleteClassIntent,
   deleteMemberIntent,
@@ -239,7 +240,51 @@ export function ClassNoteForm({ note }: { note: ProjectionNote }) {
   )
 }
 
-// ---------- 添加元素（右键菜单的浮层小表单，工单 06） ----------
+// ---------- 添加元素（右键菜单的浮层小表单，工单 06 / 工单 04） ----------
+
+/** 添加 note（工单 04 从 git 历史取回后按右键菜单需求调整）。
+ * 目标类可选：类节点右键预选该类 → `note for X`；空白处右键缺省 = 无目标类 → 浮动 note。 */
+export function AddClassNoteInlineForm({
+  classes,
+  initialClassName,
+  afterElementId,
+  onDone,
+}: {
+  classes: ProjectionClass[]
+  /** 预选 note 目标类（右键的那个类）；缺省为空串 = 浮动 note */
+  initialClassName?: string
+  /** 落码锚点（类声明的 elementId）：新 note 插到它之后；空白处右键不传 */
+  afterElementId?: string
+  onDone: () => void
+}) {
+  const t = useTranslation().t
+  const commitIntent = useCommit()
+  const [target, setTarget] = useState<string>(initialClassName ?? '')
+  const [text, setText] = useState('')
+  return (
+    <Stack gap="sm">
+      <Select
+        label={t('app:propertyPanel.addNoteTarget')}
+        data={[
+          { value: '', label: t('app:propertyPanel.floatingNote') },
+          ...classes.map((c) => ({ value: c.name, label: c.name })),
+        ]}
+        value={target}
+        onChange={(v) => setTarget(v ?? '')}
+        allowDeselect={false}
+      />
+      <TextInput label={t('app:propertyPanel.noteText')} value={text} onChange={(e) => setText(e.currentTarget.value)} />
+      <Button
+        onClick={() => {
+          const intent = addNoteIntent({ className: target !== '' ? target : null, text })
+          if (intent !== null && commitIntent({ ...intent, afterElementId })) onDone()
+        }}
+      >
+        {t('app:propertyPanel.add')}
+      </Button>
+    </Stack>
+  )
+}
 
 export function AddMemberInlineForm({
   classes,

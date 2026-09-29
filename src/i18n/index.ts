@@ -43,6 +43,9 @@ export const zhDict = {
         'delete-class': '删除类（含成员与关系）',
         'add-message': '添加消息',
         'delete-participant': '删除参与者',
+        // 添加入口补全（工单 04）：sequence 的注释与逻辑块、class 的注释
+        'add-note': '添加注释',
+        'add-block': '添加逻辑块',
         // 连线菜单（工单 03）：class 关系边 / sequence 消息线；注释与块只补删除
         'cycle-relation-kind': '切换关系类型',
         'edit-relation': '编辑基数与标签',
@@ -212,6 +215,14 @@ export const zhDict = {
       // 死代码表单专属的 label（节点 ID/显示文本/连线标签/子图标题/参与者 ID/actor 样式）已删除
       addEdgeFrom: '起点节点',
       addEdgeTo: '终点节点',
+      // 工单 04：重建的添加型表单（AddNoteInlineForm / AddBlockInlineForm /
+      // AddClassNoteInlineForm）专属 label。不复用工单 06 删掉的旧 key 名
+      // （noteActorA / noteActorB / blockKeyword / noteTarget）——旧名已从字典移除，
+      // 复用会让「这个 key 到底是谁在用」在 git 历史里失去区分度，故一律加 add 前缀重命名。
+      addNoteActorA: '参与者 A',
+      addNoteActorB: '参与者 B（over 时可选）',
+      addBlockKeyword: '块类型',
+      addNoteTarget: 'note 目标（留空为浮动 note）',
       // ---- sequence（工单 06） ----
       participants: '参与者',
       messages: '消息',

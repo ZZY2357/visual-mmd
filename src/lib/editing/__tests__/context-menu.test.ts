@@ -6,6 +6,10 @@ import { contextMenuItems, contextMenuTargetFromSelection } from '../context-men
  * 空白处四种图种都有添加动作（工单 04）；节点菜单四种图种齐备（工单 06 补齐
  * class/sequence 的节点）；位置序连线（工单 03 补齐 class/sequence）也齐备，
  * 而 flowchart 形态的 kind:edge 在 class/sequence 仍返回 null（不回归）。
+ *
+ * 本批工单 04 追加：`add-note` / `add-block` 两类添加动作落进菜单（sequence 空白的注释与
+ * 逻辑块、sequence 参与者的逻辑块、class 空白与类节点的注释）——补全
+ * `CONTEXT.md` 的「右键菜单是元素添加的唯一入口」。
  */
 
 describe('contextMenuTargetFromSelection（工单 07/04/06 菜单目标解析）', () => {
@@ -99,12 +103,16 @@ describe('contextMenuItems（工单 07/04/06 菜单项）', () => {
     ])
   })
 
-  it('class 空白处：添加类', () => {
-    expect(contextMenuItems({ kind: 'blank', diagramType: 'class' })).toEqual(['add-class'])
+  it('class 空白处：添加类 / 添加注释（工单 04 补注入口）', () => {
+    expect(contextMenuItems({ kind: 'blank', diagramType: 'class' })).toEqual(['add-class', 'add-note'])
   })
 
-  it('sequence 空白处：添加参与者', () => {
-    expect(contextMenuItems({ kind: 'blank', diagramType: 'sequence' })).toEqual(['add-participant'])
+  it('sequence 空白处：添加参与者 / 添加注释 / 添加逻辑块（工单 04 补注入口）', () => {
+    expect(contextMenuItems({ kind: 'blank', diagramType: 'sequence' })).toEqual([
+      'add-participant',
+      'add-note',
+      'add-block',
+    ])
   })
 
   it('mindmap 空白处：添加根节点', () => {
@@ -135,19 +143,41 @@ describe('contextMenuItems（工单 07/04/06 菜单项）', () => {
     ])
   })
 
-  it('class 节点：添加成员 / 添加关系 / 删除类（工单 06）', () => {
+  it('class 节点：添加成员 / 添加关系 / 添加注释 / 删除类（工单 06，工单 04 补注释）', () => {
     expect(contextMenuItems({ kind: 'class-node', name: 'Foo' })).toEqual([
       'add-member',
       'add-relation',
+      'add-note',
       'delete-class',
     ])
   })
 
-  it('sequence 参与者：添加消息 / 删除参与者（工单 06）', () => {
+  it('sequence 参与者：添加消息 / 添加逻辑块 / 删除参与者（工单 06，工单 04 补块）', () => {
     expect(contextMenuItems({ kind: 'sequence-participant', actorId: 'Alice' })).toEqual([
       'add-message',
+      'add-block',
       'delete-participant',
     ])
+  })
+
+  // 工单 04：两个新菜单项只在它们各自的合法目标上出现——mindmap / flowchart 与
+  // 已存在的连线目标都不该多出添加动作（「菜单内容随目标变化」要真的随目标变）
+  it('add-note / add-block 不出现在无此动作的目标上（工单 04）', () => {
+    const withoutAdditions = [
+      contextMenuItems({ kind: 'blank', diagramType: 'flowchart' }),
+      contextMenuItems({ kind: 'blank', diagramType: 'mindmap' }),
+      contextMenuItems({ kind: 'flowchart-node', nodeId: 'A' }),
+      contextMenuItems({ kind: 'flowchart-edge', from: 'A', to: 'B', occurrence: 1 }),
+      contextMenuItems({ kind: 'mindmap-node', elementId: 'mindmap-node:1' }),
+      contextMenuItems({ kind: 'class-relation', elementId: 'relation:1' }),
+      contextMenuItems({ kind: 'sequence-message', elementId: 'message:1' }),
+      contextMenuItems({ kind: 'sequence-note', elementId: 'note:1' }),
+      contextMenuItems({ kind: 'sequence-block', elementId: 'block:1' }),
+    ]
+    for (const items of withoutAdditions) {
+      expect(items).not.toContain('add-note')
+      expect(items).not.toContain('add-block')
+    }
   })
 
   it('连线目标（工单 03）：class 关系边与 sequence 消息线各有编辑 + 删除动作', () => {

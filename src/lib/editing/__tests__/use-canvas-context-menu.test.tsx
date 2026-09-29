@@ -4,7 +4,7 @@ import { MantineProvider } from '@mantine/core'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { resetEditorHistory, useEditorStore } from '../../../store/editor'
 import { DEFAULT_DIAGRAM_SOURCE } from '../../../lib/storage'
-import { initI18n } from '../../../i18n'
+import { initI18n, zhDict } from '../../../i18n'
 import { flowchartParser } from '../../pipeline/flowchart'
 import { mindmapParser } from '../../pipeline/mindmap'
 import { classParser } from '../../pipeline/class'
@@ -18,18 +18,21 @@ import { mindmapDataIdResolver } from '../../canvas-selection/mindmap-adapter'
 import { nodeDataIdResolver, elementDataIdResolver } from '../../canvas-selection/data-id'
 import type { AnyProjection } from '../../diagram-registry'
 import { useCanvasContextMenu, type NodeFormState } from '../use-canvas-context-menu'
-import { AddMemberInlineForm, AddRelationInlineForm } from '../../../components/class-forms'
-import { AddMessageInlineForm } from '../../../components/sequence-forms'
+import { AddMemberInlineForm, AddRelationInlineForm, AddClassNoteInlineForm } from '../../../components/class-forms'
+import { AddMessageInlineForm, AddNoteInlineForm, AddBlockInlineForm } from '../../../components/sequence-forms'
+import { BLOCK_KEYWORD_OPTIONS } from '../sequence-forms'
 import type { CanvasInlineEditTarget } from '../inline-edit'
 import type { ContextMenuTarget } from '../context-menu'
 import type { LinkModeState } from '../link-mode'
 
 /**
- * 画布右键菜单 Hook（工单 07/04/06）：右键弹出随目标变化的菜单并联动选中；
+ * 画布右键菜单 Hook（工单 07/04/06/03）：右键弹出随目标变化的菜单并联动选中；
  * 添加节点走编辑意图管线并回调内联命名；连线模式两步落码连线、Esc 取消；
  * 添加样式表单提交才落码；class/sequence 节点菜单的添加型表单提交才落码（工单 06）；
  * class 关系边与 sequence 消息线的菜单（工单 03）：循环切换类型/箭头直接落码，
- * 删除经 delete-relation / delete-message / delete-note / delete-block 落码。
+ * 删除经 delete-relation / delete-message / delete-note / delete-block 落码；
+ * 添加入口补全（工单 04）：sequence 空白加注释/逻辑块、sequence 参与者加逻辑块、
+ * class 空白加浮动注释、class 类节点加 `note for X`，全部提交才落码。
  */
 
 initI18n()
@@ -125,6 +128,8 @@ interface ContextMenuApi {
   addMember: () => void
   addRelation: () => void
   addMessage: () => void
+  addNote: () => void
+  addBlock: () => void
   enterLinkMode: (from?: string) => void
   addSubgraph: () => void
   applyStyle: (name: string) => void
@@ -164,6 +169,8 @@ function Harness(props: {
     addMember: ctx.addMember,
     addRelation: ctx.addRelation,
     addMessage: ctx.addMessage,
+    addNote: ctx.addNote,
+    addBlock: ctx.addBlock,
     enterLinkMode: ctx.enterLinkMode,
     addSubgraph: ctx.addSubgraph,
     applyStyle: ctx.applyStyle,
@@ -215,6 +222,30 @@ function Harness(props: {
           <AddMessageInlineForm
             participants={props.projection.sequence.participants}
             initialFrom={ctx.nodeForm.from}
+            afterElementId={ctx.nodeForm.anchorElementId}
+            onDone={ctx.closeNodeForm}
+          />
+        </MantineProvider>
+      )}
+      {ctx.nodeForm !== null && props.projection.type === 'sequence' && ctx.nodeForm.kind === 'note' && (
+        <MantineProvider>
+          <AddNoteInlineForm
+            participants={props.projection.sequence.participants}
+            afterElementId={ctx.nodeForm.anchorElementId}
+            onDone={ctx.closeNodeForm}
+          />
+        </MantineProvider>
+      )}
+      {ctx.nodeForm !== null && props.projection.type === 'sequence' && ctx.nodeForm.kind === 'block' && (
+        <MantineProvider>
+          <AddBlockInlineForm afterElementId={ctx.nodeForm.anchorElementId} onDone={ctx.closeNodeForm} />
+        </MantineProvider>
+      )}
+      {ctx.nodeForm !== null && props.projection.type === 'class' && ctx.nodeForm.kind === 'note' && (
+        <MantineProvider>
+          <AddClassNoteInlineForm
+            classes={props.projection.class.classes}
+            initialClassName={ctx.nodeForm.className}
             afterElementId={ctx.nodeForm.anchorElementId}
             onDone={ctx.closeNodeForm}
           />
@@ -550,13 +581,13 @@ describe('useCanvasContextMenu（工单 04 空白处按图种建元素）', () =
   const CLASS_SVG_STUB = '<svg><g data-id="已有类">已有类</g></svg>'
   const SEQUENCE_SVG_STUB = '<svg><g data-id="甲">甲</g></svg>'
 
-  it('class 空白右键（空图错误态）：菜单为「添加类」，落码后选中并回调内联命名类名', () => {
+  it('class 空白右键（空图错误态）：菜单为「添加类 / 添加注释」，落码后选中并回调内联命名类名', () => {
     const container = mount(classProjectionOf(CLASS_HEADER_ONLY), CLASS_HEADER_ONLY)
 
     expect(blankContextMenu(container)).toBe(true)
     const last = snapshots.at(-1)!
     expect(last.menu?.target).toEqual({ kind: 'blank', diagramType: 'class' })
-    expect(last.menu?.items).toEqual(['add-class'])
+    expect(last.menu?.items).toEqual(['add-class', 'add-note'])
 
     const spy = spyCommitIntent()
     act(() => api.current!.addClass())
@@ -587,11 +618,11 @@ describe('useCanvasContextMenu（工单 04 空白处按图种建元素）', () =
     expect(created).toEqual(['新类2'])
   })
 
-  it('sequence 空白右键（空图）：菜单为「添加参与者」，落码不带 alias 并回调内联命名 id', () => {
+  it('sequence 空白右键（空图）：菜单为「添加参与者 / 添加注释 / 添加逻辑块」，落码不带 alias 并回调内联命名 id', () => {
     const container = mount(sequenceProjectionOf(SEQUENCE_HEADER_ONLY), SEQUENCE_HEADER_ONLY)
 
     expect(blankContextMenu(container)).toBe(true)
-    expect(snapshots.at(-1)!.menu?.items).toEqual(['add-participant'])
+    expect(snapshots.at(-1)!.menu?.items).toEqual(['add-participant', 'add-note', 'add-block'])
 
     const spy = spyCommitIntent()
     act(() => api.current!.addParticipant())
@@ -685,6 +716,26 @@ async function clickButton(host: HTMLElement, text: string): Promise<void> {
   await act(async () => button.click())
 }
 
+/** 打开 Select 下拉，返回选项文案（Mantine 的选项渲染到 portal，按 role=option 取） */
+async function optionTexts(host: HTMLElement, labelText: string): Promise<string[]> {
+  const input = inputByLabel(host, labelText)
+  await act(async () => {
+    input.click()
+  })
+  return Array.from(document.querySelectorAll('[role="option"]')).map((o) => o.textContent?.trim() ?? '')
+}
+
+/** 打开 Select 下拉并点选文案匹配的选项 */
+async function selectOption(host: HTMLElement, labelText: string, optionText: string): Promise<void> {
+  const texts = await optionTexts(host, labelText)
+  const index = texts.indexOf(optionText)
+  if (index === -1) throw new Error(`未找到选项：${optionText}（现有：${texts.join(' | ')}）`)
+  const options = Array.from(document.querySelectorAll('[role="option"]'))
+  await act(async () => {
+    ;(options[index] as HTMLElement).click()
+  })
+}
+
 describe('useCanvasContextMenu（工单 06 class/sequence 节点菜单）', () => {
   let host: HTMLDivElement
   let root: ReturnType<typeof createRoot>
@@ -763,25 +814,25 @@ describe('useCanvasContextMenu（工单 06 class/sequence 节点菜单）', () =
     return vi.spyOn(useEditorStore.getState(), 'commitIntent')
   }
 
-  it('右键 class 节点：菜单为添加成员/添加关系/删除类并联动选中', () => {
+  it('右键 class 节点：菜单为添加成员/添加关系/添加注释/删除类并联动选中', () => {
     const container = mountClass()
 
     expect(contextMenuOn(container, '[data-id="Foo"]')).toBe(true)
 
     const last = snapshots.at(-1)!
     expect(last.menu?.target).toEqual({ kind: 'class-node', name: 'Foo' })
-    expect(last.menu?.items).toEqual(['add-member', 'add-relation', 'delete-class'])
+    expect(last.menu?.items).toEqual(['add-member', 'add-relation', 'add-note', 'delete-class'])
     expect(useEditorStore.getState().selection).toEqual({ kind: 'class', name: 'Foo' })
   })
 
-  it('右键 sequence 参与者：菜单为添加消息/删除参与者并联动选中', () => {
+  it('右键 sequence 参与者：菜单为添加消息/添加逻辑块/删除参与者并联动选中', () => {
     const container = mountSequence()
 
     expect(contextMenuOn(container, '[data-id="甲"]')).toBe(true)
 
     const last = snapshots.at(-1)!
     expect(last.menu?.target).toEqual({ kind: 'sequence-participant', actorId: '甲' })
-    expect(last.menu?.items).toEqual(['add-message', 'delete-participant'])
+    expect(last.menu?.items).toEqual(['add-message', 'add-block', 'delete-participant'])
     expect(useEditorStore.getState().selection).toEqual({ kind: 'participant', actorId: '甲' })
   })
 
@@ -1122,5 +1173,334 @@ describe('useCanvasContextMenu（工单 03 连线菜单）', () => {
     expect(source).not.toContain('alt')
     expect(source).not.toContain('自语')
     expect(source).toContain('note over 甲: 备注')
+  })
+})
+
+describe('useCanvasContextMenu（工单 04 添加入口补全）', () => {
+  let host: HTMLDivElement
+  let root: ReturnType<typeof createRoot>
+  let snapshots: MenuSnapshot[]
+  let api: { current: ContextMenuApi | null }
+  let created: string[]
+
+  const SEQ_SAMPLE = `sequenceDiagram
+    participant 甲
+    participant 乙
+    甲->>乙: hi
+`
+  const CLASS_SAMPLE = `classDiagram
+    class Foo
+    class Bar
+`
+  const CLASS_SVG = '<svg><g data-id="Foo">Foo</g><g data-id="Bar">Bar</g></svg>'
+
+  /** 投影 → 与 CanvasPanel 同约定的 SVG 桩（节点 + 位置序连线都带 data-id） */
+  function seqSvgOf(projection: AnyProjection): string {
+    if (projection.type !== 'sequence') throw new Error('只用于 sequence')
+    const parts = [
+      ...projection.sequence.participants.map((p) => `<g data-id="${p.actorId}"></g>`),
+      ...projection.sequence.messages.map((m) => `<line data-id="${m.elementId}"></line>`),
+      ...projection.sequence.notes.map((n) => `<g data-id="${n.elementId}"></g>`),
+      ...projection.sequence.blocks.map((b) => `<g data-id="${b.elementId}"></g>`),
+    ]
+    return `<svg>${parts.join('')}</svg>`
+  }
+
+  beforeEach(() => {
+    host = document.createElement('div')
+    document.body.appendChild(host)
+    root = createRoot(host)
+    snapshots = []
+    api = { current: null }
+    created = []
+  })
+  afterEach(() => {
+    act(() => root.unmount())
+    host.remove()
+    vi.restoreAllMocks()
+    resetEditorHistory(DEFAULT_DIAGRAM_SOURCE)
+    useEditorStore.getState().select(null)
+  })
+
+  function mount(projection: AnyProjection, source: string, svg: string): HTMLDivElement {
+    resetEditorHistory(source)
+    act(() => {
+      root.render(
+        <Harness
+          projection={projection}
+          svg={svg}
+          onState={(s) => snapshots.push(s)}
+          apiRef={api}
+          onNodeCreated={(t) => created.push(createdIdOf(t))}
+        />,
+      )
+    })
+    return host.firstElementChild as HTMLDivElement
+  }
+
+  /** 按当前 store 源码重新渲染（真实 app 每次编辑后重投影；场景 B 逐步走通要用） */
+  function rerenderFromStore(svg: string): HTMLDivElement {
+    act(() => {
+      root.render(
+        <Harness
+          projection={sequenceProjectionOf(useEditorStore.getState().source)}
+          svg={svg}
+          onState={(s) => snapshots.push(s)}
+          apiRef={api}
+          onNodeCreated={(t) => created.push(createdIdOf(t))}
+        />,
+      )
+    })
+    return host.firstElementChild as HTMLDivElement
+  }
+
+  function mountSequence(): HTMLDivElement {
+    return mount(sequenceProjectionOf(SEQ_SAMPLE), SEQ_SAMPLE, seqSvgOf(sequenceProjectionOf(SEQ_SAMPLE)))
+  }
+
+  function contextMenuOn(container: Element, selector: string): boolean {
+    let prevented = false
+    act(() => {
+      const event = new MouseEvent('contextmenu', { bubbles: true, cancelable: true })
+      container.querySelector(selector)!.dispatchEvent(event)
+      prevented = event.defaultPrevented
+    })
+    return prevented
+  }
+
+  /** 右键画布空白（SVG 无 data-id 的包裹元素） */
+  function blankContextMenu(container: HTMLDivElement): boolean {
+    return contextMenuOn(container, 'div')
+  }
+
+  function spyCommitIntent() {
+    return vi.spyOn(useEditorStore.getState(), 'commitIntent')
+  }
+
+  /** 提交的意图（断言意图字段与 afterElementId）；未提交时为 undefined */
+  function intentAt(spy: ReturnType<typeof spyCommitIntent>, n: number): Record<string, unknown> | undefined {
+    return spy.mock.calls[n]?.[0] as unknown as Record<string, unknown> | undefined
+  }
+
+  it('sequence 空白右键：菜单含「添加参与者 / 添加注释 / 添加逻辑块」，不改变选中', () => {
+    const container = mountSequence()
+
+    const selectionBefore = useEditorStore.getState().selection
+    expect(blankContextMenu(container)).toBe(true)
+
+    const last = snapshots.at(-1)!
+    expect(last.menu?.target).toEqual({ kind: 'blank', diagramType: 'sequence' })
+    expect(last.menu?.items).toEqual(['add-participant', 'add-note', 'add-block'])
+    // 空白目标没有可联动的选中（selectTarget 对 blank 无分支）
+    expect(useEditorStore.getState().selection).toBe(selectionBefore)
+  })
+
+  it('sequence 空白「添加注释」：浮出表单（无锚点）→ 提交落码 note over', async () => {
+    const container = mountSequence()
+    blankContextMenu(container)
+
+    const spy = spyCommitIntent()
+    act(() => api.current!.addNote())
+
+    // 打开表单并收起菜单：空白右键没有锚点元素
+    const form = snapshots.at(-1)!.nodeForm
+    expect(form).toMatchObject({ kind: 'note' })
+    expect(form?.anchorElementId).toBeUndefined()
+    expect(snapshots.at(-1)!.menu).toBeNull()
+
+    await typeInto(inputByLabel(container, '注释文本'), '备注')
+    await clickButton(container, '添加')
+
+    const intent = intentAt(spy, 0)
+    expect(intent).toMatchObject({ type: 'add-note', pos: 'over', actors: ['甲', '乙'], text: '备注' })
+    expect(intent?.afterElementId).toBeUndefined() // 无锚点 → 管线回退到文档最后一个元素
+    expect(useEditorStore.getState().source).toContain('Note over 甲,乙: 备注')
+  })
+
+  it('sequence 空白「添加逻辑块」：六种关键字都在选项里，提交落码 open + end', async () => {
+    const container = mountSequence()
+    blankContextMenu(container)
+
+    act(() => api.current!.addBlock())
+    expect(snapshots.at(-1)!.nodeForm).toMatchObject({ kind: 'block' })
+    expect(snapshots.at(-1)!.nodeForm?.anchorElementId).toBeUndefined()
+
+    // 六种块关键字都可选（选项文案来自 app:blockKeywords）
+    const labels = await optionTexts(container, '块类型')
+    expect(labels).toEqual(BLOCK_KEYWORD_OPTIONS.map((k) => zhDict.app.blockKeywords[k]))
+
+    const spy = spyCommitIntent()
+    await selectOption(container, '块类型', zhDict.app.blockKeywords.alt)
+    await typeInto(inputByLabel(container, '块标题（可选）'), '条件')
+    await clickButton(container, '添加')
+
+    const intent = intentAt(spy, 0)
+    expect(intent).toMatchObject({ type: 'add-block', keyword: 'alt', label: '条件' })
+    expect(intent?.afterElementId).toBeUndefined()
+    const source = useEditorStore.getState().source
+    expect(source).toContain('alt 条件')
+    expect(source).toContain('end')
+  })
+
+  it('sequence 参与者「添加逻辑块」：锚点是右键的那个参与者（顺序即语义）', async () => {
+    const container = mountSequence()
+    expect(contextMenuOn(container, '[data-id="甲"]')).toBe(true)
+    expect(snapshots.at(-1)!.menu?.items).toEqual(['add-message', 'add-block', 'delete-participant'])
+    expect(useEditorStore.getState().selection).toEqual({ kind: 'participant', actorId: '甲' })
+
+    const spy = spyCommitIntent()
+    act(() => api.current!.addBlock())
+
+    const form = snapshots.at(-1)!.nodeForm
+    expect(form).toMatchObject({ kind: 'block', anchorElementId: 'participant:甲' })
+
+    await typeInto(inputByLabel(container, '块标题（可选）'), '重试')
+    await clickButton(container, '添加')
+
+    expect(intentAt(spy, 0)).toMatchObject({
+      type: 'add-block',
+      keyword: 'loop',
+      label: '重试',
+      afterElementId: 'participant:甲',
+    })
+    // 块落在「participant 甲」声明之后（用户右键的那个位置），而不是文档末尾
+    expect(useEditorStore.getState().source).toContain('participant 甲\n    loop 重试\n    end\n')
+  })
+
+  it('class 空白「添加注释」：浮动 note（className 缺省、无锚点）', async () => {
+    const container = mount(classProjectionOf(CLASS_SAMPLE), CLASS_SAMPLE, CLASS_SVG)
+    expect(blankContextMenu(container)).toBe(true)
+    expect(snapshots.at(-1)!.menu?.items).toEqual(['add-class', 'add-note'])
+
+    const spy = spyCommitIntent()
+    act(() => api.current!.addNote())
+
+    const form = snapshots.at(-1)!.nodeForm
+    expect(form).toMatchObject({ kind: 'note' })
+    // 空白右键不预选任何类 → 浮动 note
+    expect(form?.className).toBeUndefined()
+    expect(form?.anchorElementId).toBeUndefined()
+
+    await typeInto(inputByLabel(container, '注释文本'), '整体说明')
+    await clickButton(container, '添加')
+
+    const intent = intentAt(spy, 0)
+    expect(intent).toMatchObject({ type: 'add-note', className: null, text: '整体说明' })
+    expect(intent?.afterElementId).toBeUndefined()
+    expect(useEditorStore.getState().source).toContain('note "整体说明"')
+  })
+
+  it('class 类节点「添加注释」：note for X，锚点为该类声明', async () => {
+    const container = mount(classProjectionOf(CLASS_SAMPLE), CLASS_SAMPLE, CLASS_SVG)
+    expect(contextMenuOn(container, '[data-id="Foo"]')).toBe(true)
+    expect(snapshots.at(-1)!.menu?.items).toEqual(['add-member', 'add-relation', 'add-note', 'delete-class'])
+
+    const spy = spyCommitIntent()
+    act(() => api.current!.addNote())
+
+    const form = snapshots.at(-1)!.nodeForm
+    expect(form).toMatchObject({ kind: 'note', className: 'Foo', anchorElementId: 'class:Foo' })
+
+    await typeInto(inputByLabel(container, '注释文本'), 'Foo 的说明')
+    await clickButton(container, '添加')
+
+    expect(intentAt(spy, 0)).toMatchObject({
+      type: 'add-note',
+      className: 'Foo',
+      text: 'Foo 的说明',
+      afterElementId: 'class:Foo',
+    })
+    expect(useEditorStore.getState().source).toContain('note for Foo "Foo 的说明"')
+  })
+
+  it('添加注释 / 添加块都走 commitIntent（可撤销，撤销后源码回原样）', async () => {
+    const container = mountSequence()
+    blankContextMenu(container)
+    act(() => api.current!.addBlock())
+    await clickButton(container, '添加')
+
+    expect(useEditorStore.getState().canUndo).toBe(true)
+    useEditorStore.getState().undo()
+    expect(useEditorStore.getState().source).toBe(SEQ_SAMPLE)
+  })
+
+  /**
+   * 端到端场景 B 的**单测等价覆盖**（本轮未做真机端到端——用户指示跳过真机验收）：
+   * 加参与者 → 互发三条消息 → 包一个 alt 块并写条件 → 右键一条消息改箭头并删掉它。
+   * 逐步断言各自 intent 与 afterElementId；每步后按 store 源码重投影（与真实 app 的重渲染同构）。
+   */
+  it('端到端场景 B（单测等价覆盖）：加参与者 → 三条消息 → alt 块 → 改箭头 → 删消息', async () => {
+    resetEditorHistory('sequenceDiagram\n')
+    rerenderFromStore('<svg></svg>')
+    let container = host.firstElementChild as HTMLDivElement
+
+    // ① 加参与者 ×2（空白右键 → 添加参与者）；每步后按 store 源码重投影
+    act(() => api.current!.addParticipant())
+    rerenderFromStore('<svg></svg>')
+    act(() => api.current!.addParticipant())
+    expect(useEditorStore.getState().source).toContain('participant 新参与者')
+    expect(useEditorStore.getState().source).toContain('participant 新参与者2')
+
+    // ② 互发三条消息（右键参与者 → 添加消息 → 提交）
+    for (let i = 0; i < 3; i++) {
+      rerenderFromStore(seqSvgOf(sequenceProjectionOf(useEditorStore.getState().source)))
+      container = host.firstElementChild as HTMLDivElement
+      // 先装 spy 再打开表单：表单在渲染时从 store 取 commitIntent，装晚了它拿到的还是原函数
+      const spy = spyCommitIntent()
+      contextMenuOn(container, '[data-id="新参与者"]')
+      act(() => api.current!.addMessage())
+      await clickButton(container, '添加')
+      expect(intentAt(spy, 0)).toMatchObject({
+        type: 'add-message',
+        from: '新参与者',
+        to: '新参与者2',
+        afterElementId: 'participant:新参与者',
+      })
+      vi.restoreAllMocks()
+    }
+    const withMessages = useEditorStore.getState().source
+    expect(withMessages.match(/->>/g)).toHaveLength(3)
+
+    // ③ 包一个 alt 块并写条件（右键参与者 → 添加逻辑块 → 选 alt、填条件）
+    rerenderFromStore(seqSvgOf(sequenceProjectionOf(withMessages)))
+    container = host.firstElementChild as HTMLDivElement
+    const blockSpy = spyCommitIntent()
+    contextMenuOn(container, '[data-id="新参与者"]')
+    act(() => api.current!.addBlock())
+    await selectOption(container, '块类型', zhDict.app.blockKeywords.alt)
+    await typeInto(inputByLabel(container, '块标题（可选）'), '条件成立')
+    await clickButton(container, '添加')
+    expect(intentAt(blockSpy, 0)).toMatchObject({
+      type: 'add-block',
+      keyword: 'alt',
+      label: '条件成立',
+      afterElementId: 'participant:新参与者',
+    })
+    vi.restoreAllMocks()
+    expect(useEditorStore.getState().source).toContain('alt 条件成立')
+
+    // ④ 右键一条消息 → 改箭头
+    const beforeEdit = useEditorStore.getState().source
+    rerenderFromStore(seqSvgOf(sequenceProjectionOf(beforeEdit)))
+    container = host.firstElementChild as HTMLDivElement
+    expect(contextMenuOn(container, 'line[data-id="message:1"]')).toBe(true)
+    const arrowSpy = spyCommitIntent()
+    act(() => api.current!.cycleMessageArrow())
+    expect(intentAt(arrowSpy, 0)).toMatchObject({ type: 'set-message', elementId: 'message:1', arrow: '-->' })
+    vi.restoreAllMocks()
+    expect(useEditorStore.getState().source).not.toBe(beforeEdit)
+
+    // ⑤ 右键同一条消息 → 删掉它
+    const beforeDelete = useEditorStore.getState().source
+    rerenderFromStore(seqSvgOf(sequenceProjectionOf(beforeDelete)))
+    container = host.firstElementChild as HTMLDivElement
+    contextMenuOn(container, 'line[data-id="message:1"]')
+    act(() => api.current!.deleteTarget())
+    const after = useEditorStore.getState().source
+    expect(after.match(/->>|-->/g)).toHaveLength(2)
+    expect(useEditorStore.getState().selection).toBeNull()
+
+    // 全程可撤销（每次编辑一次快照）
+    expect(useEditorStore.getState().canUndo).toBe(true)
   })
 })

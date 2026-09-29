@@ -24,8 +24,8 @@ import type { InlineEditCloseOptions } from '../lib/editing/use-canvas-inline-ed
 import type { Rect } from '../lib/editing/inline-edit'
 import { useCanvasContextMenu } from '../lib/editing/use-canvas-context-menu'
 import type { ContextMenuItemId } from '../lib/editing/context-menu'
-import { AddMemberInlineForm, AddRelationInlineForm } from './class-forms'
-import { AddMessageInlineForm } from './sequence-forms'
+import { AddMemberInlineForm, AddRelationInlineForm, AddClassNoteInlineForm } from './class-forms'
+import { AddMessageInlineForm, AddNoteInlineForm, AddBlockInlineForm } from './sequence-forms'
 import { useCanvasView } from '../lib/canvas-view/use-canvas-view'
 import type { AnyProjection } from '../lib/diagram-registry'
 import { useEditorStore } from '../store/editor'
@@ -51,7 +51,7 @@ import { useEditorStore } from '../store/editor'
  * 右键菜单（工单 07/04/06）：单一菜单随右键目标变化（空白/节点/连线/mindmap 节点/
  * class 节点/sequence 参与者），挂在画布容器上阻止浏览器默认菜单，代码面板不受影响；
  * 连线模式光标十字，依次单击起点终点创建连线；「添加样式」与 class/sequence 的
- * 「添加成员/关系/消息」在菜单位置浮出小表单，提交才落码。
+ * 「添加成员/关系/消息/注释/逻辑块」在菜单位置浮出小表单，提交才落码。
  */
 
 interface CanvasPanelProps {
@@ -522,6 +522,8 @@ export function CanvasPanel({ preview, projection }: CanvasPanelProps) {
     else if (id === 'add-member') ctx.addMember()
     else if (id === 'add-relation') ctx.addRelation()
     else if (id === 'add-message') ctx.addMessage()
+    else if (id === 'add-note') ctx.addNote()
+    else if (id === 'add-block') ctx.addBlock()
     else if (
       id === 'delete-class' ||
       id === 'delete-participant' ||
@@ -697,7 +699,7 @@ export function CanvasPanel({ preview, projection }: CanvasPanelProps) {
             onClose={ctx.closeStyleForm}
           />
         )}
-        {/* class/sequence 节点菜单的添加型表单（工单 06）：成员 / 关系 / 消息 */}
+        {/* class/sequence 的添加型表单浮层（工单 06 成员/关系/消息；工单 04 补注释/逻辑块） */}
         {ctx.nodeForm !== null && projection !== null && (
           <NodeFormPopup x={ctx.nodeForm.x} y={ctx.nodeForm.y} onClose={ctx.closeNodeForm}>
             {ctx.nodeForm.kind === 'member' && projection.type === 'class' && (
@@ -720,6 +722,24 @@ export function CanvasPanel({ preview, projection }: CanvasPanelProps) {
               <AddMessageInlineForm
                 participants={projection.sequence.participants}
                 initialFrom={ctx.nodeForm.from}
+                afterElementId={ctx.nodeForm.anchorElementId}
+                onDone={ctx.closeNodeForm}
+              />
+            )}
+            {ctx.nodeForm.kind === 'note' && projection.type === 'sequence' && (
+              <AddNoteInlineForm
+                participants={projection.sequence.participants}
+                afterElementId={ctx.nodeForm.anchorElementId}
+                onDone={ctx.closeNodeForm}
+              />
+            )}
+            {ctx.nodeForm.kind === 'block' && projection.type === 'sequence' && (
+              <AddBlockInlineForm afterElementId={ctx.nodeForm.anchorElementId} onDone={ctx.closeNodeForm} />
+            )}
+            {ctx.nodeForm.kind === 'note' && projection.type === 'class' && (
+              <AddClassNoteInlineForm
+                classes={projection.class.classes}
+                initialClassName={ctx.nodeForm.className}
                 afterElementId={ctx.nodeForm.anchorElementId}
                 onDone={ctx.closeNodeForm}
               />

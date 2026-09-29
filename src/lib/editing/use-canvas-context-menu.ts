@@ -52,6 +52,11 @@ import { useEditorStore } from '../../store/editor'
  *   删除走 delete-relation / delete-message。sequence 注释与逻辑块**顺带接上删除**
  *   （delete-note / delete-block 意图早已存在，接线成本≈0），不为其新造编辑动作。
  *   本票不新建任何表单浮层（spec 决策：画布上应是「这元素能做什么」而非又一个表单）。
+ * - 添加入口补全（工单 04）：add-note / add-block 在菜单位置浮出添加型小表单——
+ *   sequence 空白（注释 / 逻辑块）、sequence 参与者（逻辑块，锚点为该参与者的声明）、
+ *   class 空白（浮动 note，无需目标类）、class 类节点（`note for X`，锚点为该类声明）。
+ *   落码位置：有右键元素时以其声明为锚点（`afterElementId`），空白处不传锚点由管线回退到
+ *   文档最后一个元素——顺序即语义，块插在用户右键的那个位置。
  * - 所有动作复用编辑意图管线（commitIntent，可撤销）；编辑文本/新建节点经
  *   onNodeCreated 进入内联编辑（工单 05 beginEdit）。
  */
@@ -69,14 +74,16 @@ export interface StyleFormState {
   y: number
 }
 
-/** class/sequence 节点菜单的表单浮层种类（工单 06）：复用属性面板的添加型小表单 */
-export type NodeFormKind = 'member' | 'relation' | 'message'
+/** 菜单上浮出的添加型小表单种类（工单 06 三项 + 工单 04 补三项）：
+ * 'note' 同时服务 sequence（注释）与 class（浮动 / note for X），由投影图种决定渲染哪个表单。 */
+export type NodeFormKind = 'member' | 'relation' | 'message' | 'note' | 'block'
 
 export interface NodeFormState {
   kind: NodeFormKind
-  /** 落码锚点：类声明 / 参与者声明的 elementId（新元素插到它之后） */
-  anchorElementId: string
-  /** class 类表单：预选类名（右键的那个类） */
+  /** 落码锚点：右键元素的声明 elementId（新元素插到它之后）。
+   * 缺省 = 空白处右键，由各管线回退到文档最后一个元素。 */
+  anchorElementId?: string
+  /** class 表单：预选类名（右键的那个类）；class 的 note 表单用它预选 `note for` 目标 */
   className?: string
   /** sequence 消息表单：预选起点参与者（右键的那个参与者） */
   from?: string
@@ -308,8 +315,13 @@ export function useCanvasContextMenu(
     [menu, closeMenu],
   )
 
-  /** class/sequence 节点菜单：在菜单位置浮出添加型表单（工单 06）。
-   * 锚点为右键节点的声明元素（类/参与者），新元素插到它之后；表单提交才落码。 */
+  /** 添加型表单浮层（工单 06/04）：在菜单位置浮出小表单，表单提交才落码。
+   * 锚点与预选值取自右键目标：
+   * - member / relation：class 类节点 → 锚点 = 该类声明，预选类名；
+   * - message：sequence 参与者 → 锚点 = 该参与者声明，预选起点；
+   * - block（工单 04）：sequence 空白（无锚点，回退文档末尾）或参与者（锚点 = 该参与者声明）；
+   * - note（工单 04）：class 类节点（锚点 = 该类声明 + 预选 `note for` 目标）/ class 空白
+   *   （无锚点、无目标类 = 浮动 note）/ sequence 空白（无锚点）。 */
   const openNodeForm = useCallback(
     (kind: NodeFormKind): void => {
       const target = menu?.target
@@ -320,11 +332,37 @@ export function useCanvasContextMenu(
         const cls = proj.class.classes.find((c) => c.name === target.name)
         if (cls === undefined) return
         setNodeForm({ kind, anchorElementId: cls.elementId, className: target.name, x: menu.x, y: menu.y })
-      } else {
+      } else if (kind === 'message') {
         if (target.kind !== 'sequence-participant' || proj.type !== 'sequence') return
         const p = proj.sequence.participants.find((x) => x.actorId === target.actorId)
         if (p === undefined) return
         setNodeForm({ kind, anchorElementId: p.elementId, from: target.actorId, x: menu.x, y: menu.y })
+      } else if (kind === 'block') {
+        // sequence 独有的添加逻辑块：参与者上右键 → 锚点为该参与者的声明；
+        // 空白处右键 → 无锚点（管线回退到文档最后一个元素）
+        if (proj.type !== 'sequence') return
+        if (target.kind === 'sequence-participant') {
+          const p = proj.sequence.participants.find((x) => x.actorId === target.actorId)
+          if (p === undefined) return
+          setNodeForm({ kind, anchorElementId: p.elementId, x: menu.x, y: menu.y })
+        } else if (target.kind === 'blank') {
+          setNodeForm({ kind, x: menu.x, y: menu.y })
+        } else return
+      } else {
+        // note：class 类节点 = note for X（锚点即该类声明）；class 空白 = 浮动 note；
+        // sequence 空白 = note over/left/right（参与者由表单自行选择）
+        if (proj.type === 'class') {
+          if (target.kind === 'class-node') {
+            const cls = proj.class.classes.find((c) => c.name === target.name)
+            if (cls === undefined) return
+            setNodeForm({ kind, anchorElementId: cls.elementId, className: target.name, x: menu.x, y: menu.y })
+          } else if (target.kind === 'blank') {
+            setNodeForm({ kind, x: menu.x, y: menu.y })
+          } else return
+        } else if (proj.type === 'sequence') {
+          if (target.kind !== 'blank') return
+          setNodeForm({ kind, x: menu.x, y: menu.y })
+        } else return
       }
       setMenu(null)
     },
@@ -334,6 +372,8 @@ export function useCanvasContextMenu(
   const addMember = useCallback(() => openNodeForm('member'), [openNodeForm])
   const addRelation = useCallback(() => openNodeForm('relation'), [openNodeForm])
   const addMessage = useCallback(() => openNodeForm('message'), [openNodeForm])
+  const addNote = useCallback(() => openNodeForm('note'), [openNodeForm])
+  const addBlock = useCallback(() => openNodeForm('block'), [openNodeForm])
 
   /** 删除右键目标（节点/连线/mindmap 节点/类/参与者/位置序连线与块级元素） */
   const deleteTarget = useCallback((): void => {
@@ -459,6 +499,8 @@ export function useCanvasContextMenu(
     addMember,
     addRelation,
     addMessage,
+    addNote,
+    addBlock,
     enterLinkMode,
     addSubgraph,
     applyStyle,

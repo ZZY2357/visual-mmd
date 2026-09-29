@@ -3,9 +3,12 @@ import { Button, Group, Select, Stack, Switch, Text, TextInput } from '@mantine/
 import { useTranslation } from 'react-i18next'
 import type { BlockKeyword, MessageAct, MessageArrow, NotePos } from '../lib/pipeline/sequence'
 import {
+  BLOCK_KEYWORD_OPTIONS,
   MESSAGE_ARROW_OPTIONS,
   NOTE_POS_OPTIONS,
+  addBlockIntent,
   addMessageIntent,
+  addNoteIntent,
   deleteBlockIntent,
   deleteElseIntent,
   deleteMessageIntent,
@@ -311,7 +314,95 @@ function ElseForm({ branch }: { branch: ProjectionElse }) {
   )
 }
 
-// ---------- 添加元素（右键菜单的浮层小表单，工单 06） ----------
+// ---------- 添加元素（右键菜单的浮层小表单，工单 06 / 工单 04） ----------
+
+/** 添加注释（工单 04 从 git 历史取回后按右键菜单需求调整）。
+ * 表单自己选参与者：空白处右键没有可预选的参与者，`note over` 才需要第二个。 */
+export function AddNoteInlineForm({
+  participants,
+  afterElementId,
+  onDone,
+}: {
+  participants: ProjectionParticipant[]
+  /** 落码锚点（空白处右键不传 → 管线回退到文档最后一个元素） */
+  afterElementId?: string
+  onDone: () => void
+}) {
+  const t = useTranslation().t
+  const commitIntent = useCommit()
+  const [pos, setPos] = useState<NotePos>('over')
+  const [actorA, setActorA] = useState<string | null>(participants[0]?.actorId ?? null)
+  const [actorB, setActorB] = useState<string | null>(participants[1]?.actorId ?? participants[0]?.actorId ?? null)
+  const [text, setText] = useState('')
+  const options = participants.map((p) => ({ value: p.actorId, label: p.alias ?? p.actorId }))
+  return (
+    <Stack gap="sm">
+      <Select
+        label={t('app:propertyPanel.notePosition')}
+        data={NOTE_POS_OPTIONS.map((p) => ({ value: p, label: t(`app:notePos.${p}`) }))}
+        value={pos}
+        onChange={(v) => v !== null && setPos(v as NotePos)}
+        allowDeselect={false}
+      />
+      <Group grow>
+        <Select
+          label={t('app:propertyPanel.addNoteActorA')}
+          data={options}
+          value={actorA}
+          onChange={setActorA}
+          allowDeselect={false}
+        />
+        {pos === 'over' && (
+          <Select
+            label={t('app:propertyPanel.addNoteActorB')}
+            data={options}
+            value={actorB}
+            onChange={setActorB}
+            allowDeselect={false}
+          />
+        )}
+      </Group>
+      <TextInput label={t('app:propertyPanel.noteText')} value={text} onChange={(e) => setText(e.currentTarget.value)} />
+      <Button
+        onClick={() => {
+          if (actorA === null || (pos === 'over' && actorB === null)) return
+          const intent = addNoteIntent({ pos, actorA, actorB: actorB ?? '', text: text.trim() })
+          if (intent !== null && commitIntent({ ...intent, afterElementId })) onDone()
+        }}
+      >
+        {t('app:propertyPanel.add')}
+      </Button>
+    </Stack>
+  )
+}
+
+/** 添加逻辑块（工单 04 从 git 历史取回后按右键菜单需求调整）：
+ * 关键字六选一 + 可选标题；`afterElementId` 决定块插在哪（顺序即语义）。 */
+export function AddBlockInlineForm({ afterElementId, onDone }: { afterElementId?: string; onDone: () => void }) {
+  const t = useTranslation().t
+  const commitIntent = useCommit()
+  const [keyword, setKeyword] = useState<BlockKeyword>('loop')
+  const [label, setLabel] = useState('')
+  return (
+    <Stack gap="sm">
+      <Select
+        label={t('app:propertyPanel.addBlockKeyword')}
+        data={BLOCK_KEYWORD_OPTIONS.map((k) => ({ value: k, label: blockKeywordLabel(t, k) }))}
+        value={keyword}
+        onChange={(v) => v !== null && setKeyword(v as BlockKeyword)}
+        allowDeselect={false}
+      />
+      <TextInput label={t('app:propertyPanel.blockLabel')} value={label} onChange={(e) => setLabel(e.currentTarget.value)} />
+      <Button
+        onClick={() => {
+          if (commitIntent({ ...addBlockIntent({ keyword, label: label.trim() }), afterElementId })) onDone()
+        }}
+      >
+        {t('app:propertyPanel.add')}
+      </Button>
+    </Stack>
+  )
+}
 
 export function AddMessageInlineForm({
   participants,
