@@ -1,6 +1,7 @@
 import { assembleDocument, getElementById, type SourceDocument } from './document'
 import type { DiagramParser, EditIntent, ParseResult, SourceParseError } from './parser'
 import { frontmatterEnd } from './frontmatter'
+import { classDefElementId, classElementId, namespaceElementId } from './element-id'
 import type { Span } from './span'
 import {
   parseClassDefLine,
@@ -438,7 +439,7 @@ function classifyLine(line: string, lineStart: number, lineNo: number, entries: 
   if (decl !== null) {
     counters.class.set(decl.name, (counters.class.get(decl.name) ?? 0) + 1)
     const count = counters.class.get(decl.name) as number
-    entries.push({ span, id: `class:${decl.name}` + (count > 1 ? `#${count}` : ''), data: decl })
+    entries.push({ span, id: classElementId(decl.name, count), data: decl })
     return
   }
 
@@ -446,7 +447,7 @@ function classifyLine(line: string, lineStart: number, lineNo: number, entries: 
   if (ns !== null) {
     counters.namespace.set(ns.name, (counters.namespace.get(ns.name) ?? 0) + 1)
     const count = counters.namespace.get(ns.name) as number
-    entries.push({ span, id: `namespace:${ns.name}` + (count > 1 ? `#${count}` : ''), data: ns })
+    entries.push({ span, id: namespaceElementId(ns.name, count), data: ns })
     return
   }
 
@@ -472,7 +473,7 @@ function classifyLine(line: string, lineStart: number, lineNo: number, entries: 
     if (data !== null) {
       counters.classDef.set(data.name, (counters.classDef.get(data.name) ?? 0) + 1)
       const count = counters.classDef.get(data.name) as number
-      entries.push({ span, id: `classdef:${data.name}` + (count > 1 ? `#${count}` : ''), data })
+      entries.push({ span, id: classDefElementId(data.name, count), data })
     }
     return
   }

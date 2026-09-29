@@ -1,6 +1,7 @@
 import { assembleDocument, getElementById, type SourceDocument } from './document'
 import type { DiagramParser, EditIntent, ParseResult, SourceParseError } from './parser'
 import { frontmatterEnd } from './frontmatter'
+import { mindmapNodeElementId } from './element-id'
 import type { Span } from './span'
 
 /**
@@ -288,7 +289,7 @@ export class MindmapParser implements DiagramParser {
               nodeCount++
               entries.push({
                 span: { start: cursor, end: cursor + line.length + eol.length },
-                id: `mindmap-node:${nodeCount}`,
+                id: mindmapNodeElementId(nodeCount),
                 data: {
                   kind: 'mindmap-node',
                   indent,

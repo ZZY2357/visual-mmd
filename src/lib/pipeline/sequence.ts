@@ -1,6 +1,7 @@
 import { assembleDocument, getElementById, type AnyElement, type ElementPart, type SourceDocument } from './document'
 import type { DiagramParser, EditIntent, ParseResult, SourceParseError } from './parser'
 import { frontmatterEnd } from './frontmatter'
+import { participantElementId, withOccurrence } from './element-id'
 import { lineAtOffset, type Span } from './span'
 
 /**
@@ -365,7 +366,7 @@ function classifyLine(line: string, lineStart: number, lineNo: number, entries: 
     const tokens = raw.slice('autonumber'.length).trim().split(/[ \t]+/).filter((t) => t !== '')
     entries.push({
       span,
-      id: counters.autonumber > 1 ? `autonumber#${counters.autonumber}` : 'autonumber',
+      id: withOccurrence('autonumber', counters.autonumber),
       data: { kind: 'autonumber', raw, start: tokens[0] ?? null, step: tokens[1] ?? null },
     })
     return
@@ -400,7 +401,7 @@ function classifyLine(line: string, lineStart: number, lineNo: number, entries: 
     const count = counters.participant.get(actorId) as number
     entries.push({
       span,
-      id: `participant:${actorId}` + (count > 1 ? `#${count}` : ''),
+      id: participantElementId(actorId, count),
       data: {
         kind: 'participant',
         createPrefixRaw: `create${create[1]}`,
@@ -420,7 +421,7 @@ function classifyLine(line: string, lineStart: number, lineNo: number, entries: 
     const count = counters.participant.get(actorId) as number
     entries.push({
       span,
-      id: `participant:${actorId}` + (count > 1 ? `#${count}` : ''),
+      id: participantElementId(actorId, count),
       data: {
         kind: 'participant',
         createPrefixRaw: null,
@@ -718,7 +719,7 @@ export class SequenceParser implements DiagramParser {
     doc: SourceDocument,
     intent: Extract<SequenceIntent, { type: 'set-participant' }>,
   ): Map<string, string> | null {
-    const part = getElementById(doc, `participant:${intent.actorId}`)
+    const part = getElementById(doc, participantElementId(intent.actorId))
     if (part === undefined || part.element.kind !== 'participant') return null
     const changes: { alias?: string | null } = {}
     if (intent.alias !== undefined) changes.alias = intent.alias
@@ -731,7 +732,7 @@ export class SequenceParser implements DiagramParser {
     intent: Extract<SequenceIntent, { type: 'rename-participant' }>,
   ): Map<string, string> | null {
     if (!isValidParticipantId(intent.newId)) return null
-    const decl = getElementById(doc, `participant:${intent.actorId}`)
+    const decl = getElementById(doc, participantElementId(intent.actorId))
     if (decl === undefined || decl.element.kind !== 'participant') return null
     const rewrites = new Map<string, string>([
       [decl.id, renderParticipant(decl.element as ParticipantData, { actorId: intent.newId })],
@@ -781,7 +782,7 @@ export class SequenceParser implements DiagramParser {
     doc: SourceDocument,
     intent: Extract<SequenceIntent, { type: 'delete-participant' }>,
   ): Map<string, string> | null {
-    const decl = getElementById(doc, `participant:${intent.actorId}`)
+    const decl = getElementById(doc, participantElementId(intent.actorId))
     if (decl === undefined || decl.element.kind !== 'participant') return null
     const deleted = new Set<string>([decl.id])
     for (const part of doc.elements) {
@@ -812,7 +813,7 @@ export class SequenceParser implements DiagramParser {
     doc: SourceDocument,
     intent: Extract<SequenceIntent, { type: 'toggle-activation' }>,
   ): Map<string, string> | null {
-    const decl = getElementById(doc, `participant:${intent.actorId}`)
+    const decl = getElementById(doc, participantElementId(intent.actorId))
     if (decl === undefined || decl.element.kind !== 'participant') return null
     const active = this.isActive(doc, intent.actorId)
     const referencing = doc.elements.filter((part) => this.referencesActor(part, intent.actorId))

@@ -1,3 +1,4 @@
+import { parseMindmapNodeElementId } from '../pipeline/element-id'
 import type { MindmapProjection } from '../projection/mindmap-projection'
 import type { CanvasSelection, DataIdResolver } from './data-id'
 
@@ -36,6 +37,6 @@ export function mindmapDataIdResolver(projection: MindmapProjection): DataIdReso
  * 不是 mindmap 节点 elementId 时返回 null（高亮与内联编辑定位共用；使用方需按
  * id 或 id 后缀回查——mermaid v12 的节点 id 带 svgId 前缀） */
 export function mindmapDomIdOf(elementId: string): string | null {
-  const m = /^mindmap-node:(\d+)$/.exec(elementId)
-  return m !== null ? `node_${Number(m[1]) - 1}` : null
+  const ordinal = parseMindmapNodeElementId(elementId)
+  return ordinal !== null ? `node_${ordinal - 1}` : null
 }

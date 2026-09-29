@@ -1,4 +1,5 @@
 import type { SourceDocument } from '../pipeline/document'
+import { splitOccurrence } from '../pipeline/element-id'
 import {
   type ClassDefData,
   type ClassStatementData,
@@ -82,12 +83,12 @@ export function buildFlowchartProjection(doc: SourceDocument): FlowchartProjecti
       }
     } else if (data.kind === 'link') {
       const link = data as LinkOccData
-      // element id 已编码 occurrence（linkElementId），这里从 id 恢复序号
-      const m = /#(\d+)$/.exec(part.id)
+      // element id 已编码 occurrence（linkElementId），这里用同一份协议解回序号
+      const { occurrence } = splitOccurrence(part.id)
       edges.push({
         from: link.fromNodeId,
         to: link.toNodeId,
-        occurrence: m !== null ? Number(m[1]) : 1,
+        occurrence,
         label: link.spec.label,
         spec: link.spec,
       })

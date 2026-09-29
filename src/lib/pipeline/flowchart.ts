@@ -1,7 +1,12 @@
 import { assembleDocument, getElementById, type AnyElement, type SourceDocument } from './document'
 import type { DiagramParser, EditIntent, ParseResult, SourceParseError } from './parser'
 import { frontmatterEnd } from './frontmatter'
+import { classDefElementId, linkElementId, nodeElementId } from './element-id'
 import { lineAtOffset, type Span } from './span'
+
+// 元素 ID 协议收敛在 element-id.ts；既有消费端（editing/canvas-keyboard）从此处取，
+// 不另抄一份形态。
+export { linkElementId, nodeElementId }
 
 /**
  * flowchart 完整解析器（工单 03，语法范围以 ADR-0005 清单为准）：
@@ -732,12 +737,6 @@ export function parseClassLine(line: string, start: number): ClassStatementData 
   }
 }
 
-export const linkElementId = (from: string, to: string, occurrence: number): string =>
-  occurrence <= 1 ? `link:${from}:${to}` : `link:${from}:${to}#${occurrence}`
-
-export const nodeElementId = (nodeId: string, occurrence: number): string =>
-  occurrence <= 1 ? `node:${nodeId}` : `node:${nodeId}#${occurrence}`
-
 // ---------- 编辑意图（工单 04 表单所需的最小完备集合） ----------
 
 export type FlowchartIntent =
@@ -943,7 +942,7 @@ export class FlowchartParser implements DiagramParser {
       if (data !== null) {
         const count = (classDefCounts.get(data.name) ?? 0) + 1
         classDefCounts.set(data.name, count)
-        const id = `classdef:${data.name}` + (count > 1 ? `#${count}` : '')
+        const id = classDefElementId(data.name, count)
         entries.push({ span: { start: lineStart + firstChar, end: lineStart + line.length }, id, data })
         return
       }

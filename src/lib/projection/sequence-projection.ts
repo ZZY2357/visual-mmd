@@ -1,4 +1,5 @@
 import type { SourceDocument } from '../pipeline/document'
+import { participantElementId } from '../pipeline/element-id'
 import {
   type ActivationData,
   type AutonumberData,
@@ -184,11 +185,14 @@ export function buildSequenceProjection(doc: SourceDocument): SequenceProjection
     const decl = declared.get(actorId)
     const active = activeDelta.get(actorId) ?? false
     if (decl !== undefined) return { ...decl, active }
+    // 隐式参与者没有声明行，文档里不存在这个元素：elementId 由投影按协议合成，
+    // 仅供表单/结构树寻址（编辑意图落地时会因找不到该元素而无操作）。合成与声明
+    // 走同一个 codec，协议不再有第二份写法。
     return {
       actorId,
       alias: null,
       keyword: 'participant',
-      elementId: `participant:${actorId}`,
+      elementId: participantElementId(actorId),
       active,
     }
   })

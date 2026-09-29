@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest'
+import { parseParticipantElementId } from '../../pipeline/element-id'
 import { sequenceParser } from '../../pipeline/sequence'
 import { buildSequenceProjection, resolveSequenceSelection } from '../sequence-projection'
 
@@ -197,6 +198,55 @@ describe('buildSequenceProjection：参与者按 actorId 合并（工单 10）',
     expect(proj.blocks.map((b) => [b.elementId, b.keyword, b.depth])).toEqual([
       ['block:1', 'alt', 1],
       ['else:1', 'else', 1],
+    ])
+  })
+})
+
+// ---------- 隐式参与者的 elementId（工单 01） ----------
+
+/**
+ * 隐式参与者（只在消息 / note / activate 里出现、没有声明行）的 elementId 是**投影合成的**：
+ * 它在文档里并不存在，是投影按协议造出来给表单与结构树寻址用的（ADR-0010 相关的有意行为）。
+ * 工单 01 把它改为调用元素 ID codec，形态必须逐字不变——这里钉住。
+ */
+describe('隐式参与者的 elementId 由 codec 合成，形态与声明一致（工单 01）', () => {
+  const parse = (source: string) => {
+    const parsed = sequenceParser.parse(source)
+    if (!parsed.ok) throw new Error(`样例源码必须可解析：${parsed.error.message}`)
+    return parsed.doc
+  }
+
+  it('从未声明的参与者：合成 `participant:<actorId>`（不带 occurrence 后缀）', () => {
+    const proj = project('sequenceDiagram\n    A->>B: hi\n')
+
+    expect(proj.participants.map((p) => p.elementId)).toEqual(['participant:A', 'participant:B'])
+    // 合成出来的 id 能被 codec 解回原 actorId，occurrence 为 1
+    expect(parseParticipantElementId('participant:A')).toEqual({ actorId: 'A', occurrence: 1 })
+  })
+
+  it('该 id 在文档里确实不存在（没有声明行）——合成是有意行为，不是漏解析', () => {
+    const doc = parse('sequenceDiagram\n    A->>B: hi\n')
+
+    expect(doc.elements.some((e) => e.id === 'participant:A')).toBe(false)
+    expect(doc.elements.some((e) => e.id === 'participant:B')).toBe(false)
+  })
+
+  it('有声明时用声明行的 id（重名的第二次声明带 `#2`，不被合成覆盖）', () => {
+    const proj = project('sequenceDiagram\n    participant A\n    participant A\n    A->>B: hi\n')
+
+    expect(proj.participants.map((p) => [p.actorId, p.elementId])).toEqual([
+      ['A', 'participant:A#2'],
+      ['B', 'participant:B'],
+    ])
+    expect(parseParticipantElementId('participant:A#2')).toEqual({ actorId: 'A', occurrence: 2 })
+  })
+
+  it('隐式参与者在声明之前出现时，两者仍合并为一个（elementId 取声明行）', () => {
+    const proj = project('sequenceDiagram\n    A->>B: hi\n    participant B as Bee\n')
+
+    expect(proj.participants.map((p) => [p.actorId, p.elementId])).toEqual([
+      ['A', 'participant:A'],
+      ['B', 'participant:B'],
     ])
   })
 })
