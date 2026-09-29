@@ -153,9 +153,12 @@ Comments 写明。
 | 01 | 未闭合 `rect`/`box` 不再让整图解析失败 | **resolved**（`aa8c7b4`） | — |
 | 02 | namespace 改名在重名时跟随选中 | **resolved**（`91ebfec`） | — |
 | 03 | note / block 的位置序身份可被点选命中 | **resolved**（`9907446`） | — |
-| 04 | 清理 CONTEXT.md 禁用词（本批新造 15 处） | 进行中 | — |
+| 04 | 清理 CONTEXT.md 禁用词（本批新造 15 处） | **resolved**（`773ff88`） | — |
 | 05 | 工单 03「编辑类」菜单项的实际落码 | **resolved**（`f7a48c4`） | — |
-| 06 | `beginEditLabel` 是同款空壳（05 的连带项） | ready-for-agent | 04（共用 i18n / 菜单文件） |
+| 06 | `beginEditLabel` 是同款空壳（05 的连带项） | **resolved**（`514f60d`） | 04（共用 i18n / 菜单文件） |
+
+**本批 6 票已全部 resolved。** `grep -rn 消息线 src/` = 0（`CONTEXT.md` 的 `_Avoid_` 规则条目保留）；
+`grep -rn 编辑标签 src/` = 0。全量：56 文件 / 824 用例绿。
 
 三张 `needs-triage` 已于 2026-09-29 全部定案：D1 取 (甲)（证据见工单 01）、
 D3 取「身份下移到几何元素、同宿主共享一个 id」（证据见工单 03）、
