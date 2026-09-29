@@ -122,6 +122,7 @@ function hasEffectiveConfigChildren(lines: string[], configIdx: number): boolean
 
 /**
  * 读取源码里的主题**原始字符串**；无 frontmatter / 无 config / 无 theme 键时返回 null。
+ * 只识别 `config.theme`，顶层 `theme:` 视为无效文本（既不回显也不清除，工单 08 口径）。
  * 不做白名单过滤：手写的非法值（如 `solarized`）也如实回显（mermaid 会静默忽略它）。
  */
 export function readTheme(source: string): string | null {

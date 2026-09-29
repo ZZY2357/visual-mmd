@@ -167,6 +167,60 @@ describe('applySetTheme：清除主题（「跟随 Mermaid 默认」）', () => 
   })
 })
 
+/**
+ * 工单 08 口径（用户 2026-09-29 裁定）：frontmatter **顶层** `theme:` 行视为无效文本。
+ * 依据：mermaid 12 的 extractFrontMatter 只从 YAML 里取 `title` / `displayMode` / `config`
+ * 三个键（node_modules/mermaid/dist/mermaid.esm.mjs），顶层 `theme:` 被静默丢弃；
+ * 合法写法只有 `config.theme`。因此编辑器不识别、也不清除它 —— 它属于「未被编辑触碰的
+ * 文本」，受 ADR-0004/0008 的逐字保留承诺保护，也不额外给「无效写法」UI 告警。
+ * 浏览器实测与证据见 .scratch/editor-polish/issues/08-theme-toplevel-key-not-cleared.md。
+ */
+describe('顶层 `theme:` 视为无效文本（工单 08 口径）', () => {
+  const TOPLEVEL = `---\ntheme: forest\n---\n${FLOWCHART_SRC}`
+  const BOTH = `---\ntheme: forest\nconfig:\n  theme: dark\n---\n${FLOWCHART_SRC}`
+
+  it('只有顶层 theme:（无 config）→ readTheme 返回 null，选择器照旧显示「跟随」', () => {
+    expect(readTheme(TOPLEVEL)).toBe(null)
+    expect(readTheme(`---\ntheme: dark\nfontFamily: monospace\n---\n${FLOWCHART_SRC}`)).toBe(null)
+  })
+
+  it('选「跟随」（theme = null）→ 顶层 theme 行逐字保留，源码恒等不变', () => {
+    expect(applySetTheme(TOPLEVEL, null)).toBe(TOPLEVEL)
+    // 含多余空格/缩进的顶层行同样逐字保留
+    expect(applySetTheme(`---\ntheme:  forest  \n---\n${FLOWCHART_SRC}`, null)).toBe(
+      `---\ntheme:  forest  \n---\n${FLOWCHART_SRC}`,
+    )
+  })
+
+  it('设置主题 → 落码到 config.theme，顶层 theme 行仍逐字保留', () => {
+    // 只有顶层行：在其后追加 config 块（既有行一字不动）
+    expect(applySetTheme(TOPLEVEL, 'dark')).toBe(
+      `---\ntheme: forest\nconfig:\n  theme: dark\n---\n${FLOWCHART_SRC}`,
+    )
+    // 已有 config.theme：只改写 config 下那一行
+    expect(applySetTheme(BOTH, 'neutral')).toBe(
+      `---\ntheme: forest\nconfig:\n  theme: neutral\n---\n${FLOWCHART_SRC}`,
+    )
+  })
+
+  it('顶层与 config.theme 并存 → readTheme 取 config.theme（顶层被忽略）', () => {
+    expect(readTheme(BOTH)).toBe('dark')
+    expect(readTheme(applySetTheme(TOPLEVEL, 'dark'))).toBe('dark')
+  })
+
+  it('顶层与 config.theme 并存 → 清除只删 config.theme（连带悬空 config 行），顶层行逐字保留', () => {
+    // config 下只剩 theme：config 行随 theme 行一起删，frontmatter 因顶层行仍有效而保留
+    expect(applySetTheme(BOTH, null)).toBe(`---\ntheme: forest\n---\n${FLOWCHART_SRC}`)
+    // config 下还有其它子项：只删 config.theme
+    expect(
+      applySetTheme(
+        `---\ntheme: forest\nconfig:\n  theme: dark\n  fontFamily: monospace\n---\n${FLOWCHART_SRC}`,
+        null,
+      ),
+    ).toBe(`---\ntheme: forest\nconfig:\n  fontFamily: monospace\n---\n${FLOWCHART_SRC}`)
+  })
+})
+
 describe('frontmatter 被各图种解析器 verbatim 保留', () => {
   const FM = `---\nconfig:\n  theme: dark\n  fontFamily: monospace\n---\n`
   const SEQ_SRC = FM + `sequenceDiagram\n    A->>B: 你好\n`
