@@ -114,6 +114,8 @@ interface Api {
   addClass: () => void
   addMember: () => void
   addRelation: () => void
+  /** 工单 05：连线菜单的编辑类菜单项（「在属性面板中编辑」） */
+  editRelation: () => void
 }
 
 function Harness(props: {
@@ -147,6 +149,7 @@ function Harness(props: {
     addClass: ctx.addClass,
     addMember: ctx.addMember,
     addRelation: ctx.addRelation,
+    editRelation: ctx.editRelation,
   }
   useEffect(() => {
     props.onState({ nodeForm: ctx.nodeForm, menuOpen: ctx.menu !== null })
@@ -422,5 +425,26 @@ describe('验收场景 A（单测等价覆盖）', () => {
     clickOn(container, 'path[data-id="relation:3"]')
     expect(useEditorStore.getState().selection).toEqual({ kind: 'class-relation', elementId: 'relation:3' })
     expect(container.textContent).toContain('B → C')
+  })
+
+  it('右键关系边 → 「在属性面板中编辑」：菜单关闭、选中停在该关系、右侧出现它的表单（工单 05）', () => {
+    const source = 'classDiagram\n    class Foo\n    class Bar\n    Foo "1" --> "*" Bar : owns\n'
+    resetEditorHistory(source)
+    const container = rerender()
+
+    contextMenuOn(container, 'path[data-id="relation:1"]')
+    expect(snapshots.at(-1)!.menuOpen).toBe(true)
+    expect(useEditorStore.getState().selection).toEqual({ kind: 'class-relation', elementId: 'relation:1' })
+
+    // 菜单项自身的语义 = 选中该连线 + 关闭菜单（D5）；字段编辑由右侧表单承接
+    act(() => useEditorStore.getState().select(null))
+    act(() => api.current!.editRelation())
+
+    expect(snapshots.at(-1)!.menuOpen).toBe(false)
+    expect(useEditorStore.getState().selection).toEqual({ kind: 'class-relation', elementId: 'relation:1' })
+    // 属性面板得到的是这条关系：表头 + 基数 / 标签字段都在
+    expect(container.textContent).toContain('Foo → Bar')
+    expect(container.textContent).toContain(zhDict.app.propertyPanel.cardFrom)
+    expect(container.textContent).toContain(zhDict.app.propertyPanel.relationLabel)
   })
 })

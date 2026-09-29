@@ -48,8 +48,9 @@ import { useEditorStore } from '../../store/editor'
  *   新元素插到它之后）；删除类/删除参与者直接经 delete-class / delete-participant 落码
  *   （级联删成员/关系/引用该参与者的语句由管线负责）。
  * - 连线菜单（工单 03）：class 关系边与 sequence 消息线各给「编辑 + 删除」——能循环的
- *   **直接改**（set-relation 的 kind / set-message 的 arrow，菜单不关可连着点），其余沿用
- *   flowchart 既定链路（右键已联动选中 → 关掉菜单后右侧 RelationForm / MessageForm 可编）；
+ *   **直接改**（set-relation 的 kind / set-message 的 arrow，菜单不关可连着点）；其余是
+ *   「在属性面板中编辑」——菜单项自己选中该连线并关闭菜单（工单 05 定案 D5），字段在右侧
+ *   RelationForm / MessageForm 改（沿用 flowchart 的 edit-label 既定链路）；
  *   删除走 delete-relation / delete-message。sequence 注释与逻辑块**顺带接上删除**
  *   （delete-note / delete-block 意图早已存在，接线成本≈0），不为其新造编辑动作。
  *   本票不新建任何表单浮层（spec 决策：画布上应是「这元素能做什么」而非又一个表单）。
@@ -460,10 +461,20 @@ export function useCanvasContextMenu(
       .commitIntent(setRelationIntent(target.elementId, { kind: nextInCycle(RELATION_KIND_OPTIONS, relation.kind) }))
   }, [menu])
 
-  /** class 关系边：编辑基数/标签（右键已联动选中该边 → 关掉菜单即可在右侧 RelationForm 编辑） */
-  const editRelation = useCallback((): void => {
+  /**
+   * 编辑类菜单项的语义（工单 05 定案 D5）：**选中该连线 + 关闭菜单**，字段编辑在右侧
+   * 属性面板完成（ADR-0001 表单驱动编辑 + CONTEXT.md：属性面板是选中元素属性表单的入口）。
+   *
+   * 改动前 `editRelation` / `editMessage` 的函数体只有 `closeMenu()`——菜单项自身是个空动作，
+   * 选中靠右键时的联动隐式成立（U1 的 Middle Man 气味，也是「点了没反应」错觉的来源）。
+   * 现在选中由菜单项自己确认：属性面板拿到哪条连线不依赖「右键顺带选中过」这一隐式前提。
+   * 两个菜单项 id 各自存在是因为目标种类不同（见 `contextMenuItems`），语义则共用这一份。
+   */
+  const selectMenuTargetAndClose = useCallback((): void => {
+    const target = menu?.target
+    if (target !== undefined) selectTarget(target)
     closeMenu()
-  }, [closeMenu])
+  }, [menu, selectTarget, closeMenu])
 
   /** sequence 消息线：循环切换箭头（set-message 的 arrow，直接改，不弹表单）。菜单保持打开。 */
   const cycleMessageArrow = useCallback((): void => {
@@ -476,11 +487,6 @@ export function useCanvasContextMenu(
       .getState()
       .commitIntent(setMessageIntent(target.elementId, { arrow: nextInCycle(MESSAGE_ARROW_OPTIONS, message.arrow) }))
   }, [menu])
-
-  /** sequence 消息线：编辑激活/文本（右键已联动选中 → 关掉菜单即可在右侧 MessageForm 编辑） */
-  const editMessage = useCallback((): void => {
-    closeMenu()
-  }, [closeMenu])
 
   /** mindmap 添加子节点：落码后选中新节点并进入内联命名 */
   const addChildToMindmap = useCallback((): void => {
@@ -564,8 +570,9 @@ export function useCanvasContextMenu(
     beginEditLabel,
     openStyleForm,
     cycleRelationKind,
-    editRelation,
+    // D5：两个编辑类菜单项共用「选中该连线 + 关闭菜单」这一个语义（id 不同是因为目标种类不同）
+    editRelation: selectMenuTargetAndClose,
     cycleMessageArrow,
-    editMessage,
+    editMessage: selectMenuTargetAndClose,
   }
 }

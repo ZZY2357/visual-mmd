@@ -64,7 +64,8 @@ export type ContextMenuItemId =
   | 'add-child'
   | 'delete'
   // 连线菜单（工单 03）：class 关系边与 sequence 消息线各「编辑 + 删除」；
-  // 注释 / 逻辑块只补删除（见 contextMenuItems 的说明）
+  // 注释 / 逻辑块只补删除（见 contextMenuItems 的说明）。
+  // 编辑项的语义（工单 05 定案 D5）= 选中该连线 + 关闭菜单，字段在右侧属性面板里改。
   | 'cycle-relation-kind'
   | 'edit-relation'
   | 'delete-relation'
@@ -136,15 +137,16 @@ function blankMenuItems(diagramType: DiagramTypeId): ContextMenuItemId[] {
  * - mindmap 节点：添加子节点 / 编辑文本 / 删除
  * - class 节点：添加成员 / 添加关系 / 添加注释（`note for X`）/ 删除类（级联删成员与相关关系）
  * - sequence 参与者：添加消息 / 添加逻辑块（以该参与者为落点）/ 删除参与者（级联删引用它的语句）
- * - class 关系边（工单 03）：切换关系类型（循环，直接改 kind）/ 编辑基数与标签（关闭菜单，
- *   由右侧 RelationForm 承接）/ 删除
- * - sequence 消息线（工单 03）：切换箭头（循环，直接改 arrow）/ 编辑激活与文本（关闭菜单，
- *   由右侧 MessageForm 承接）/ 删除
+ * - class 关系边（工单 03/05）：切换关系类型（循环，直接改 kind）/ 在属性面板中编辑
+ *   （选中该关系并关闭菜单，基数与标签由右侧 RelationForm 承接）/ 删除
+ * - sequence 消息线（工单 03/05）：切换箭头（循环，直接改 arrow）/ 在属性面板中编辑
+ *   （选中该消息并关闭菜单，激活与文本由右侧 MessageForm 承接）/ 删除
  * - sequence 注释 / 逻辑块（工单 03）：**只放删除**——本票把这两类目标顺带接上（删除意图
  *   早已存在，接线成本≈0），但不再为它们补编辑动作（不扩大改造面；字段仍可在右侧表单改）
  *
  * 编辑类动作遵守 spec 决策「不新增表单浮层」：能循环的直接改（关系类型 / 箭头），
- * 其余沿用 flowchart 的既定链路（右键已联动选中 → 关掉菜单后右侧表单可编）。
+ * 其余是明确的「编辑属性」入口（工单 05 定案 D5）——菜单项自己选中该连线并关闭菜单，
+ * 随后右侧表单可编（ADR-0001：表单驱动编辑，不引入第二个编辑入口）。
  * 添加类动作（工单 04）：空白与节点上的 add-note / add-block 在菜单位置浮出添加型小表单
  * （复用 `Add*InlineForm` 形态），提交才落码。
  */

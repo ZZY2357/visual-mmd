@@ -31,6 +31,7 @@ import type { LinkModeState } from '../link-mode'
  * 添加样式表单提交才落码；class/sequence 节点菜单的添加型表单提交才落码（工单 06）；
  * class 关系边与 sequence 消息线的菜单（工单 03）：循环切换类型/箭头直接落码，
  * 删除经 delete-relation / delete-message / delete-note / delete-block 落码；
+ * 编辑类菜单项（工单 05 定案 D5）= 选中该连线 + 关闭菜单，字段在右侧属性面板改；
  * 添加入口补全（工单 04）：sequence 空白加注释/逻辑块、sequence 参与者加逻辑块、
  * class 空白加浮动注释、class 类节点加 `note for X`，全部提交才落码。
  */
@@ -1146,15 +1147,22 @@ describe('useCanvasContextMenu（工单 03 连线菜单）', () => {
     expect(useEditorStore.getState().source).toBe(CLASS_EDGE_SAMPLE)
   })
 
-  it('菜单「编辑基数/标签」：关闭菜单但保持选中（右侧 RelationForm 承接，沿用 flowchart 链路）', () => {
+  it('菜单「在属性面板中编辑」（关系）：菜单项自己选中该关系并关闭菜单，自身不落码', () => {
     const container = mountClassEdge()
     contextMenuOn(container, 'path[data-id="relation:1"]')
     snapshots.length = 0
 
+    // D5 定案：菜单项 = 选中该连线 + 关闭菜单，字段编辑在右侧 RelationForm 完成。
+    // 选中必须由菜单项自己确认（改动前函数体只有 closeMenu()，选中依赖右键时的隐式联动），
+    // 故这里先把选中清掉，验证点完菜单项后选中一定落回该关系。
+    act(() => useEditorStore.getState().select(null))
+    const spy = spyCommitIntent()
     act(() => api.current!.editRelation())
 
     expect(snapshots.at(-1)!.menu).toBeNull()
     expect(useEditorStore.getState().selection).toEqual({ kind: 'class-relation', elementId: 'relation:1' })
+    // 编辑类菜单项不是落码动作：改源码归右侧表单（set-relation 由 cycleRelationKind 与表单各自触发）
+    expect(spy).not.toHaveBeenCalled()
   })
 
   it('右键 sequence 消息线：菜单为切换箭头/编辑激活文本/删除并联动选中', () => {
@@ -1197,15 +1205,19 @@ describe('useCanvasContextMenu（工单 03 连线菜单）', () => {
     expect(useEditorStore.getState().source).toBe(SEQ_EDGE_SAMPLE)
   })
 
-  it('菜单「编辑激活/文本」：关闭菜单但保持选中（右侧 MessageForm 承接）', () => {
+  it('菜单「在属性面板中编辑」（消息）：菜单项自己选中该消息并关闭菜单，自身不落码', () => {
     const container = mountSequenceEdge()
     contextMenuOn(container, 'line[data-id="message:1"]')
     snapshots.length = 0
 
+    act(() => useEditorStore.getState().select(null))
+    const spy = spyCommitIntent()
     act(() => api.current!.editMessage())
 
     expect(snapshots.at(-1)!.menu).toBeNull()
     expect(useEditorStore.getState().selection).toEqual({ kind: 'message', elementId: 'message:1' })
+    // 与关系同理：编辑类菜单项只负责「选中 + 关菜单」，激活/文本在右侧 MessageForm 改
+    expect(spy).not.toHaveBeenCalled()
   })
 
   it('右键 sequence 注释：菜单只放删除（工单 03 边界裁定），删除只去掉该注释', () => {

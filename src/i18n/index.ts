@@ -48,10 +48,12 @@ export const zhDict = {
         'add-block': '添加逻辑块',
         // 连线菜单（工单 03）：class 关系边 / sequence 消息线；注释与块只补删除
         'cycle-relation-kind': '切换关系类型',
-        'edit-relation': '编辑基数与标签',
+        // 工单 05 定案 D5：菜单项 = 选中该连线 + 关闭菜单，字段编辑在右侧属性面板完成。
+        // 文案如实描述行为（原先的「编辑基数与标签」/「编辑激活与文本」暗示点了就能改）
+        'edit-relation': '在属性面板中编辑',
         'delete-relation': '删除关系',
         'cycle-message-arrow': '切换箭头',
-        'edit-message': '编辑激活与文本',
+        'edit-message': '在属性面板中编辑',
         'delete-message': '删除消息',
         'delete-note': '删除注释',
         'delete-block': '删除逻辑块',
