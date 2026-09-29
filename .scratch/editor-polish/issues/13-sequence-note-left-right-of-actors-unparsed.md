@@ -1,6 +1,6 @@
 # 13 `Note left of X` / `Note right of X` 的参与者解析不出来：级联删除漏删该 note，被删参与者又被 mermaid 隐式复现
 
-Status: needs-triage
+Status: resolved
 
 来源：修复波（08–12）浏览器复验时的**题外发现**（非本批清单条目）。与工单 10/11 同属
 sequence 侧缺陷，但根因独立：`parseNoteLine` 解析不出 `left of` / `right of` 的参与者。
