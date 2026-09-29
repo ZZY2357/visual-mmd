@@ -2,11 +2,45 @@ import { describe, expect, it } from 'vitest'
 import { applyEdit } from '../pipeline'
 import { reassemble } from '../document'
 import { sequenceParser } from '../sequence'
+import { SEQUENCE_TEMPLATE } from '../../diagram-registry'
 
 /**
  * sequence 解析器测试（工单 06，ADR-0004/0008）：
  * verbatim identity / 手术式改写，金样合法性见 sequence-golden.test.ts。
  */
+
+/**
+ * 结构性不变量（工单 11）：产物里不得存在"空分支"的块。
+ * mermaid 对空块（loop/alt/... 与 end 之间没有语句）解析通过、但渲染期会抛出
+ * 成批 `attribute …: Expected length, "NaN"` console error，故这里在结构层面拦住。
+ * 实现：open 起一个块；else/and 结束当前分支并起下一个；end 收块；
+ * 每个分支必须至少含一条语句（嵌套块本身算外层分支的一条语句）。
+ */
+function expectNoEmptyBranch(source: string): void {
+  const parsed = sequenceParser.parse(source)
+  expect(parsed.ok, `产物无法解析：${source}`).toBe(true)
+  if (!parsed.ok) return
+  const stack: number[] = []
+  for (const part of parsed.doc.elements) {
+    const kind = part.element.kind
+    if (kind === 'block-open') {
+      if (stack.length > 0) stack[stack.length - 1]++
+      stack.push(0)
+    } else if (kind === 'block-else') {
+      if (stack.length > 0) {
+        expect(stack[stack.length - 1], `else 分支为空：\n${source}`).toBeGreaterThan(0)
+        stack[stack.length - 1] = 0
+      }
+    } else if (kind === 'block-end') {
+      if (stack.length > 0) {
+        expect(stack.pop(), `块体为空：\n${source}`).toBeGreaterThan(0)
+      }
+    } else if (stack.length > 0) {
+      stack[stack.length - 1]++
+    }
+  }
+  expect(stack, `块未闭合：\n${source}`).toHaveLength(0)
+}
 
 /** 覆盖 ADR-0005 清单内全部 sequence 语法 + 清单外（create/destroy/rect/box）逐字保留 */
 const FULL_COVERAGE = `sequenceDiagram
@@ -242,14 +276,17 @@ describe('手术式改写（sequence）：只重写目标元素 span，其余逐
     expect(result.source).toContain('Note over A,B: 一句注释')
   })
 
-  it('delete-participant：声明与全部引用删除', () => {
+  it('delete-participant：声明与全部引用删除，被删空的 loop 一并移除（工单 11）', () => {
     const result = applyEdit(SOURCE, sequenceParser, { type: 'delete-participant', actorId: 'B' })
     expect(result.ok).toBe(true)
     if (!result.ok) return
     expect(result.source).not.toContain('participant B')
     expect(result.source).not.toContain('A->>B')
     expect(result.source).toContain('participant A as 甲')
-    expect(result.source).toContain('loop 心跳')
+    // loop 心跳 的块体只有 A->>B: ping（引用 B）→ 级联删空后整块移除，不留空块
+    expect(result.source).not.toContain('loop 心跳')
+    expect(result.source).not.toMatch(/^[ \t]*end[ \t]*$/m)
+    expectNoEmptyBranch(result.source)
   })
 
   it('toggle-activation：追加 activate / deactivate 行', () => {
@@ -266,5 +303,246 @@ describe('手术式改写（sequence）：只重写目标元素 span，其余逐
   it('目标元素不存在时返回错误', () => {
     const result = applyEdit(SOURCE, sequenceParser, { type: 'set-message', elementId: 'message:99', text: 'x' })
     expect(result.ok).toBe(false)
+  })
+})
+
+// ---------- 级联删除后的空块清理（工单 11） ----------
+
+/** 非空白行（去掉纯缩进的残留行后）——便于精确描述产物结构 */
+function nonBlankLines(source: string): string[] {
+  return source.split('\n').filter((line) => line.trim() !== '')
+}
+
+describe('级联删除参与者后清理空块（工单 11）', () => {
+  it('最小复现（默认模板）：loop 内只有待删参与者的消息 → loop 整块消失、end 不留', () => {
+    const result = applyEdit(SEQUENCE_TEMPLATE, sequenceParser, { type: 'delete-participant', actorId: '系统' })
+    expect(result.ok).toBe(true)
+    if (!result.ok) return
+    expect(result.source).not.toContain('系统')
+    expect(result.source).not.toContain('loop')
+    expect(result.source).not.toMatch(/^[ \t]*end[ \t]*$/m)
+    // 只剩与被删参与者无关的三行；被删行只留下行内缩进的空白（手术式改写不改 verbatim）
+    expect(nonBlankLines(result.source)).toEqual(['sequenceDiagram', '    autonumber', '    actor 使用者'])
+    expectNoEmptyBranch(result.source)
+  })
+
+  it('alt：else 分支被删空 → 摘掉该 else 行，块与其它分支逐字保留', () => {
+    const source = `sequenceDiagram
+    actor A
+    participant B
+    participant C
+    alt 条件一
+        A->>B: hi
+    else 条件二
+        A->>C: ho
+    end
+    Note over B,C: 收尾
+`
+    const result = applyEdit(source, sequenceParser, { type: 'delete-participant', actorId: 'C' })
+    expect(result.ok).toBe(true)
+    if (!result.ok) return
+    // 条件二（含唯一的 A->>C: ho）被删空 → else 行摘掉；条件一 与 end 原样保留
+    expect(nonBlankLines(result.source)).toEqual([
+      'sequenceDiagram',
+      '    actor A',
+      '    participant B',
+      '    alt 条件一',
+      '        A->>B: hi',
+      '    end',
+    ])
+    expect(result.source).not.toContain('else')
+    expect(result.source).not.toContain('条件二')
+    expectNoEmptyBranch(result.source)
+  })
+
+  it('alt：所有分支都被删空 → 整块消失（含 end）', () => {
+    const source = `sequenceDiagram
+    actor A
+    participant B
+    alt 条件一
+        A->>B: hi
+    else 条件二
+        B->>A: ho
+    end
+`
+    const result = applyEdit(source, sequenceParser, { type: 'delete-participant', actorId: 'B' })
+    expect(result.ok).toBe(true)
+    if (!result.ok) return
+    expect(nonBlankLines(result.source)).toEqual(['sequenceDiagram', '    actor A'])
+    expect(result.source).not.toContain('alt')
+    expect(result.source).not.toContain('else')
+    expect(result.source).not.toMatch(/^[ \t]*end[ \t]*$/m)
+    expectNoEmptyBranch(result.source)
+  })
+
+  it('alt：首个分支被删空、else 分支仍有语句 → 摘掉分界 else 行，不留空分支', () => {
+    const source = `sequenceDiagram
+    actor A
+    participant B as Bee
+    participant C as Cee
+    alt 条件一
+        A->>B: hi
+    else 条件二
+        A->>C: ho
+    end
+`
+    const result = applyEdit(source, sequenceParser, { type: 'delete-participant', actorId: 'B' })
+    expect(result.ok).toBe(true)
+    if (!result.ok) return
+    expect(nonBlankLines(result.source)).toEqual([
+      'sequenceDiagram',
+      '    actor A',
+      '    participant C as Cee',
+      '    alt 条件一',
+      '        A->>C: ho',
+      '    end',
+    ])
+    expect(result.source).not.toContain('else')
+    expectNoEmptyBranch(result.source)
+  })
+
+  it('par/and：首个分支被删空、and 分支仍有语句 → 摘掉 and 分界行', () => {
+    const source = `sequenceDiagram
+    actor A
+    participant B
+    par 任务一
+        A->>B: ping
+    and 任务二
+        A->>A: pong
+    end
+`
+    const result = applyEdit(source, sequenceParser, { type: 'delete-participant', actorId: 'B' })
+    expect(result.ok).toBe(true)
+    if (!result.ok) return
+    expect(nonBlankLines(result.source)).toEqual([
+      'sequenceDiagram',
+      '    actor A',
+      '    par 任务一',
+      '        A->>A: pong',
+      '    end',
+    ])
+    expect(result.source).not.toContain('and')
+    expectNoEmptyBranch(result.source)
+  })
+
+  it('嵌套块：内层被删空先删内层，外层仍有语句则保留', () => {
+    const source = `sequenceDiagram
+    actor A
+    participant B
+    loop 外层
+        alt 内层
+            A->>B: ping
+        end
+        A->>A: 自转
+    end
+`
+    const result = applyEdit(source, sequenceParser, { type: 'delete-participant', actorId: 'B' })
+    expect(result.ok).toBe(true)
+    if (!result.ok) return
+    expect(nonBlankLines(result.source)).toEqual([
+      'sequenceDiagram',
+      '    actor A',
+      '    loop 外层',
+      '        A->>A: 自转',
+      '    end',
+    ])
+    expect(result.source).not.toContain('alt')
+    expect(result.source).not.toContain('ping')
+    expectNoEmptyBranch(result.source)
+  })
+
+  it('嵌套块：内层删空导致外层也变空 → 内外一起移除', () => {
+    const source = `sequenceDiagram
+    actor A
+    participant B
+    loop 外层
+        alt 内层
+            A->>B: ping
+        end
+    end
+`
+    const result = applyEdit(source, sequenceParser, { type: 'delete-participant', actorId: 'B' })
+    expect(result.ok).toBe(true)
+    if (!result.ok) return
+    expect(nonBlankLines(result.source)).toEqual(['sequenceDiagram', '    actor A'])
+    expect(result.source).not.toContain('loop')
+    expect(result.source).not.toContain('alt')
+    expect(result.source).not.toContain('end')
+    expectNoEmptyBranch(result.source)
+  })
+
+  it('不该删：两个块都不含待删参与者 → 块体与 end 逐字不变', () => {
+    const source = `sequenceDiagram
+    actor A
+    participant B
+    participant C
+    loop 心跳
+        A->>C: pong
+    end
+    alt 条件
+        A->>C: hi
+    else 别的
+        C->>C: ho
+    end
+    A->>B: 无关消息
+`
+    const result = applyEdit(source, sequenceParser, { type: 'delete-participant', actorId: 'B' })
+    expect(result.ok).toBe(true)
+    if (!result.ok) return
+    // 只有声明行与无关消息行被删（各自留下行内缩进的空白），两个块逐字未动
+    const expected = source.replace('    participant B\n', '    \n').replace('    A->>B: 无关消息\n', '    \n')
+    expect(result.source).toBe(expected)
+  })
+
+  it('不该删：块内仍有其它参与者的语句 → 块与 end 保留，仅被删空的分支摘掉分界行', () => {
+    const source = `sequenceDiagram
+    actor A
+    participant B
+    participant C
+    loop 心跳
+        A->>B: ping
+        A->>C: pong
+    end
+    alt 条件
+        A->>C: hi
+    else 别的
+        B->>C: ho
+    end
+`
+    const result = applyEdit(source, sequenceParser, { type: 'delete-participant', actorId: 'B' })
+    expect(result.ok).toBe(true)
+    if (!result.ok) return
+    // loop 仍有 A->>C: pong → 整块保留（含 end）；只有被删的 A->>B: ping 行剩下一行缩进
+    expect(result.source).toContain('    loop 心跳\n        \n        A->>C: pong\n    end\n')
+    expect(nonBlankLines(result.source)).toEqual([
+      'sequenceDiagram',
+      '    actor A',
+      '    participant C',
+      '    loop 心跳',
+      '        A->>C: pong',
+      '    end',
+      '    alt 条件',
+      '        A->>C: hi',
+      '    end',
+    ])
+    expect(result.source).not.toContain('else')
+    expectNoEmptyBranch(result.source)
+  })
+
+  it('原本就空的块不被触碰（只清理本次删除造成的空）', () => {
+    const source = `sequenceDiagram
+    actor A
+    participant B
+    loop 空块
+    end
+    A->>B: hi
+`
+    const result = applyEdit(source, sequenceParser, { type: 'delete-participant', actorId: 'B' })
+    expect(result.ok).toBe(true)
+    if (!result.ok) return
+    // 该 loop 在删除前就是空的，不属于"本次删空"，逐字保留（此处不能用 expectNoEmptyBranch）
+    expect(result.source).toContain('    loop 空块\n    end\n')
+    expect(result.source).not.toContain('participant B')
+    expect(result.source).not.toContain('A->>B: hi')
   })
 })

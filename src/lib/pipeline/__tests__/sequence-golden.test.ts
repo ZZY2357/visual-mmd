@@ -128,4 +128,23 @@ describe('金样合法性（sequence）', () => {
     expect(step2.source).toContain('participant 服务端')
     await expect(mermaid.parse(step2.source)).resolves.toBeTruthy()
   })
+
+  it('delete-participant 级联删空的 loop 被移除后 parse 通过（工单 11）', async () => {
+    const result = applyEdit(SEQUENCE_TEMPLATE, sequenceParser, { type: 'delete-participant', actorId: '系统' })
+    expect(result.ok).toBe(true)
+    if (!result.ok) return
+    expect(result.source).not.toContain('loop')
+    expect(result.source).not.toMatch(/^[ \t]*end[ \t]*$/m)
+    await expect(mermaid.parse(result.source)).resolves.toBeTruthy()
+  })
+
+  /**
+   * 对照（工单 11）：空 loop 本身语法合法、mermaid.parse 会通过，畸形点在"空块"结构，
+   * 渲染期才产出成批 `attribute …: Expected length, "NaN"` console error。
+   * happy-dom 下 mermaid.render 不可用（`svg element not in render tree`），
+   * 故"不产生 NaN 属性"由 sequence.test.ts 的 expectNoEmptyBranch 结构断言保证。
+   */
+  it('对照：空 loop 源文本本身也能 parse 通过（故金样合法性不足以拦住该缺陷）', async () => {
+    await expect(mermaid.parse('sequenceDiagram\n    actor A\n    loop 每次编辑\n    end\n')).resolves.toBeTruthy()
+  })
 })

@@ -1,4 +1,4 @@
-import { assembleDocument, getElementById, type AnyElement, type SourceDocument } from './document'
+import { assembleDocument, getElementById, type AnyElement, type ElementPart, type SourceDocument } from './document'
 import type { DiagramParser, EditIntent, ParseResult, SourceParseError } from './parser'
 import { frontmatterEnd } from './frontmatter'
 import { lineAtOffset, type Span } from './span'
@@ -360,6 +360,14 @@ interface Counters {
   participant: Map<string, number>
 }
 
+/** 逻辑块的解析结构（工单 11 清理空块用）：open 行、属于该块的 else/and 行、匹配的 end 行 */
+interface BlockShape {
+  open: ElementPart
+  end: ElementPart
+  /** 该块的 else/and 边界行（按文档顺序；不含嵌套块的 else/and） */
+  elseLines: ElementPart[]
+}
+
 // ---------- 解析器 ----------
 
 export class SequenceParser implements DiagramParser {
@@ -578,18 +586,22 @@ export class SequenceParser implements DiagramParser {
     return false
   }
 
-  /** 删除参与者：声明与全部引用它的消息 / note / activate 行删除 */
+  /**
+   * 删除参与者：声明与全部引用它的消息 / note / activate 行删除；
+   * 被级联删空的 loop / alt 等块一并清理（工单 11，见 pruneEmptyBlocks）。
+   */
   private resolveDeleteParticipant(
     doc: SourceDocument,
     intent: Extract<SequenceIntent, { type: 'delete-participant' }>,
   ): Map<string, string> | null {
     const decl = getElementById(doc, `participant:${intent.actorId}`)
     if (decl === undefined || decl.element.kind !== 'participant') return null
-    const rewrites = new Map<string, string>([[decl.id, '']])
+    const deleted = new Set<string>([decl.id])
     for (const part of doc.elements) {
-      if (this.referencesActor(part, intent.actorId)) rewrites.set(part.id, '')
+      if (this.referencesActor(part, intent.actorId)) deleted.add(part.id)
     }
-    return rewrites
+    this.pruneEmptyBlocks(doc, deleted)
+    return new Map([...deleted].map((id) => [id, '']))
   }
 
   /** 计算参与者当前净激活状态（+ / activate 计为开，- / deactivate 计为关） */
@@ -769,6 +781,84 @@ export class SequenceParser implements DiagramParser {
       }
     }
     return null
+  }
+
+  /** 按文档顺序配对出全部块结构（open / 本块 else 行 / 匹配 end）；嵌套块的 else 不串到外层 */
+  private blockShapes(doc: SourceDocument): BlockShape[] {
+    const shapes: BlockShape[] = []
+    const stack: BlockShape[] = []
+    for (const part of doc.elements) {
+      if (part.element.kind === 'block-open') {
+        stack.push({ open: part, end: part, elseLines: [] })
+      } else if (part.element.kind === 'block-else') {
+        stack[stack.length - 1]?.elseLines.push(part)
+      } else if (part.element.kind === 'block-end') {
+        const shape = stack.pop()
+        if (shape !== undefined) {
+          shape.end = part
+          shapes.push(shape)
+        }
+      }
+    }
+    return shapes
+  }
+
+  /** 区间 (start, end) 内是否存在"未被删除"的元素（即该分支仍有语句） */
+  private hasLiveElement(doc: SourceDocument, start: number, end: number, deleted: ReadonlySet<string>): boolean {
+    return doc.elements.some((part) => part.span.start >= start && part.span.end <= end && !deleted.has(part.id))
+  }
+
+  /** 区间 (start, end) 内是否存在"本次被删除"的元素（用于区分原本就空与本次删空） */
+  private hasDeletedElement(doc: SourceDocument, start: number, end: number, deleted: ReadonlySet<string>): boolean {
+    return doc.elements.some((part) => part.span.start >= start && part.span.end <= end && deleted.has(part.id))
+  }
+
+  /**
+   * 级联删除后清理空块（工单 11）：
+   * - 某分支的语句被本次删除删空 → 摘掉该分支的分界行（首个分支摘终止它的 else，其余摘起头它的 else）；
+   * - 所有分支都空 → 整块移除（open + 全部 else + end）；
+   * - 迭代到不动点：内层块先被移除，外层块才可能随之变空。
+   *
+   * 只清理"本次删除造成的空"：原本就空的块 / 分支不碰（verbatim 底线）。
+   * 空块会让 mermaid 渲染期产出成批 `attribute …: Expected length, "NaN"` console error。
+   */
+  private pruneEmptyBlocks(doc: SourceDocument, deleted: Set<string>): void {
+    const shapes = this.blockShapes(doc)
+    let changed = true
+    while (changed) {
+      changed = false
+      for (const shape of shapes) {
+        if (deleted.has(shape.open.id)) continue
+        // 分支边界：open → 仍存活的 else/and 行 → end；相邻两界之间即一个分支
+        const bounds: ElementPart[] = [shape.open, ...shape.elseLines.filter((p) => !deleted.has(p.id)), shape.end]
+        const branches = bounds.slice(0, -1).map((start, i) => {
+          const end = bounds[i + 1]
+          return {
+            start,
+            end,
+            empty: !this.hasLiveElement(doc, start.span.end, end.span.start, deleted),
+            touched: this.hasDeletedElement(doc, start.span.end, end.span.start, deleted),
+          }
+        })
+        const emptied = branches.filter((b) => b.empty && b.touched)
+        if (emptied.length === 0) continue
+        if (branches.every((b) => b.empty)) {
+          deleted.add(shape.open.id)
+          for (const line of shape.elseLines) deleted.add(line.id)
+          deleted.add(shape.end.id)
+          changed = true
+          continue
+        }
+        for (const branch of emptied) {
+          // 首个分支由 open 起头（不可删），摘终止它的 else；其余分支摘起头它的 else
+          const boundary = branch.start === shape.open ? branch.end : branch.start
+          if (boundary.element.kind === 'block-else' && !deleted.has(boundary.id)) {
+            deleted.add(boundary.id)
+            changed = true
+          }
+        }
+      }
+    }
   }
 
   private resolveSetBlockLabel(
