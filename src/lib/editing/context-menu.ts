@@ -133,7 +133,7 @@ function blankMenuItems(diagramType: DiagramTypeId): ContextMenuItemId[] {
  * - 空白：按图种（flowchart 添加节点 / 连线模式 / 添加样式 / 添加子图；class 添加类 + 添加注释；
  *   sequence 添加参与者 + 添加注释 + 添加逻辑块；mindmap 添加根节点）
  * - flowchart 节点：从这里连线 / 编辑文本 / 应用样式 / 删除
- * - flowchart 连线：编辑标签 / 删除
+ * - flowchart 连线：在属性面板中编辑（工单 06：与 class 关系 / sequence 消息同语义）/ 删除
  * - mindmap 节点：添加子节点 / 编辑文本 / 删除
  * - class 节点：添加成员 / 添加关系 / 添加注释（`note for X`）/ 删除类（级联删成员与相关关系）
  * - sequence 参与者：添加消息 / 添加逻辑块（以该参与者为落点）/ 删除参与者（级联删引用它的语句）

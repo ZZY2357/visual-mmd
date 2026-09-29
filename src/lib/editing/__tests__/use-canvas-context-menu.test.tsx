@@ -139,6 +139,8 @@ interface ContextMenuApi {
   deleteTarget: () => void
   addChildToMindmap: () => void
   beginEditText: () => void
+  /** flowchart 连线菜单的编辑类菜单项（工单 06：与 editRelation / editMessage 同语义） */
+  beginEditLabel: () => void
   submitStyleForm: (name: string, color: string) => boolean
   openStyleForm: () => void
   closeStyleForm: () => void
@@ -182,6 +184,7 @@ function Harness(props: {
     deleteTarget: ctx.deleteTarget,
     addChildToMindmap: ctx.addChildToMindmap,
     beginEditText: ctx.beginEditText,
+    beginEditLabel: ctx.beginEditLabel,
     submitStyleForm: ctx.submitStyleForm,
     openStyleForm: ctx.openStyleForm,
     closeStyleForm: ctx.closeStyleForm,
@@ -325,7 +328,7 @@ describe('useCanvasContextMenu（工单 07 右键菜单）', () => {
     expect(useEditorStore.getState().selection).toEqual({ kind: 'node', nodeId: 'A' })
   })
 
-  it('右键连线：菜单为编辑标签/删除', () => {
+  it('右键连线：菜单为「在属性面板中编辑」/删除', () => {
     const container = mountFlow()
 
     expect(contextMenuOn(container, 'path[data-id="L_A_B_0"]')).toBe(true)
@@ -420,6 +423,23 @@ describe('useCanvasContextMenu（工单 07 右键菜单）', () => {
 
     // 未右键具体目标时无动作
     expect(created).toEqual([])
+  })
+
+  it('菜单「在属性面板中编辑」（flowchart 连线）：菜单项自己选中该连线并关闭菜单，自身不落码（工单 06）', () => {
+    const container = mountFlow()
+    contextMenuOn(container, 'path[data-id="L_A_B_0"]')
+    snapshots.length = 0
+
+    // 与 class 关系 / sequence 消息同款：选中必须由菜单项自己确认，
+    // 故先清掉右键时的联动选中，验证点完菜单项后选中一定落回该连线。
+    act(() => useEditorStore.getState().select(null))
+    const spy = vi.spyOn(useEditorStore.getState(), 'commitIntent')
+    act(() => api.current!.beginEditLabel())
+
+    expect(snapshots.at(-1)!.menu).toBeNull()
+    expect(useEditorStore.getState().selection).toEqual({ kind: 'edge', from: 'A', to: 'B', occurrence: 1 })
+    // 编辑类菜单项不是落码动作：改标签 / 线型归右侧 EdgeForm（set-edge 由表单触发）
+    expect(spy).not.toHaveBeenCalled()
   })
 
   it('添加样式表单：提交才落码，名称非法拒绝', () => {

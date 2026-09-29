@@ -59,7 +59,9 @@ export const zhDict = {
         'delete-block': '删除逻辑块',
         'link-from-here': '从这里连线',
         'edit-text': '编辑文本',
-        'edit-label': '编辑标签',
+        // 工单 06：flowchart 连线与上面两条措辞统一（原先那句暗示点了就能改，实际只关菜单；
+        // 改后如实说明点完去哪儿改）。
+        'edit-label': '在属性面板中编辑',
         'apply-style': '应用样式',
         applyStyleEmpty: '暂无样式',
         'add-child': '添加子节点',

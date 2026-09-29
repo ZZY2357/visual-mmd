@@ -50,7 +50,8 @@ import { useEditorStore } from '../../store/editor'
  * - 连线菜单（工单 03）：class 关系边与 sequence 消息各给「编辑 + 删除」——能循环的
  *   **直接改**（set-relation 的 kind / set-message 的 arrow，菜单不关可连着点）；其余是
  *   「在属性面板中编辑」——菜单项自己选中该连线并关闭菜单（工单 05 定案 D5），字段在右侧
- *   RelationForm / MessageForm 改（沿用 flowchart 的 edit-label 既定链路）；
+ *   RelationForm / MessageForm 改；flowchart 连线的 edit-label 由工单 06 一并统一到该语义
+ *   （字段在右侧 EdgeForm 改）；
  *   删除走 delete-relation / delete-message。sequence 注释与逻辑块**顺带接上删除**
  *   （delete-note / delete-block 意图早已存在，接线成本≈0），不为其新造编辑动作。
  *   本票不新建任何表单浮层（spec 决策：画布上应是「这元素能做什么」而非又一个表单）。
@@ -200,7 +201,7 @@ export function useCanvasContextMenu(
   const closeStyleForm = useCallback(() => setStyleForm(null), [])
   const closeNodeForm = useCallback(() => setNodeForm(null), [])
 
-  /** 右键目标 → 编辑器选中（属性面板联动，编辑标签与连线字段编辑依赖该选中） */
+  /** 右键目标 → 编辑器选中（属性面板联动：连线的字段编辑依赖该选中） */
   const selectTarget = useCallback((target: ContextMenuTarget): void => {
     const { select } = useEditorStore.getState()
     if (target.kind === 'flowchart-node') select({ kind: 'node', nodeId: target.nodeId })
@@ -462,13 +463,15 @@ export function useCanvasContextMenu(
   }, [menu])
 
   /**
-   * 编辑类菜单项的语义（工单 05 定案 D5）：**选中该连线 + 关闭菜单**，字段编辑在右侧
-   * 属性面板完成（ADR-0001 表单驱动编辑 + CONTEXT.md：属性面板是选中元素属性表单的入口）。
+   * 编辑类菜单项的语义（工单 05 定案 D5，工单 06 补上 flowchart 连线）：**选中该连线 + 关闭菜单**，
+   * 字段编辑在右侧属性面板完成（ADR-0001 表单驱动编辑 + CONTEXT.md：属性面板是选中元素属性
+   * 表单的入口）。
    *
-   * 改动前 `editRelation` / `editMessage` 的函数体只有 `closeMenu()`——菜单项自身是个空动作，
-   * 选中靠右键时的联动隐式成立（U1 的 Middle Man 气味，也是「点了没反应」错觉的来源）。
-   * 现在选中由菜单项自己确认：属性面板拿到哪条连线不依赖「右键顺带选中过」这一隐式前提。
-   * 两个菜单项 id 各自存在是因为目标种类不同（见 `contextMenuItems`），语义则共用这一份。
+   * 改动前 `editRelation` / `editMessage` / `beginEditLabel` 的函数体都只有 `closeMenu()`
+   * ——菜单项自身是个空动作，选中靠右键时的联动隐式成立（U1 的 Middle Man 气味，也是
+   * 「点了没反应」错觉的来源）。现在选中由菜单项自己确认：属性面板拿到哪条连线不依赖
+   * 「右键顺带选中过」这一隐式前提。三个菜单项 id 各自存在是因为目标种类不同
+   * （见 `contextMenuItems`），语义则共用这一份。
    */
   const selectMenuTargetAndClose = useCallback((): void => {
     const target = menu?.target
@@ -516,11 +519,6 @@ export function useCanvasContextMenu(
     closeMenu()
   }, [menu, closeMenu])
 
-  /** 编辑标签（连线菜单项）：右键时已选中该连线，关闭菜单即可在 EdgeForm 编辑 */
-  const beginEditLabel = useCallback((): void => {
-    closeMenu()
-  }, [closeMenu])
-
   /** 打开「添加样式」小表单（在菜单位置浮出，提交才落码） */
   const openStyleForm = useCallback((): void => {
     if (menu === null) return
@@ -567,10 +565,11 @@ export function useCanvasContextMenu(
     deleteTarget,
     addChildToMindmap,
     beginEditText,
-    beginEditLabel,
     openStyleForm,
     cycleRelationKind,
-    // D5：两个编辑类菜单项共用「选中该连线 + 关闭菜单」这一个语义（id 不同是因为目标种类不同）
+    // D5（工单 05，工单 06 补 flowchart 连线）：三个编辑类菜单项共用「选中该连线 + 关闭菜单」
+    // 这一个语义（id 不同是因为目标种类不同：flowchart 连线 / class 关系 / sequence 消息）
+    beginEditLabel: selectMenuTargetAndClose,
     editRelation: selectMenuTargetAndClose,
     cycleMessageArrow,
     editMessage: selectMenuTargetAndClose,

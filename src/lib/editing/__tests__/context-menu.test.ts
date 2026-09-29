@@ -128,7 +128,7 @@ describe('contextMenuItems（工单 07/04/06 菜单项）', () => {
     ])
   })
 
-  it('flowchart 连线：编辑标签 / 删除', () => {
+  it('flowchart 连线：在属性面板中编辑 / 删除', () => {
     expect(contextMenuItems({ kind: 'flowchart-edge', from: 'A', to: 'B', occurrence: 1 })).toEqual([
       'edit-label',
       'delete',
