@@ -24,6 +24,7 @@ import { useCanvasInlineEdit, inlineEditTextOf } from '../lib/editing/use-canvas
 import type { InlineEditCloseOptions } from '../lib/editing/use-canvas-inline-edit'
 import type { Rect } from '../lib/editing/inline-edit'
 import { useCanvasContextMenu } from '../lib/editing/use-canvas-context-menu'
+import { MENU_ACTIONS } from '../lib/editing/menu-actions'
 import type { ContextMenuItemId } from '../lib/editing/context-menu'
 import { AddMemberInlineForm, AddRelationInlineForm, AddClassNoteInlineForm } from './class-forms'
 import { AddMessageInlineForm, AddNoteInlineForm, AddBlockInlineForm } from './sequence-forms'
@@ -519,40 +520,11 @@ export function CanvasPanel({ preview, projection }: CanvasPanelProps) {
   })
   const classDefNames = projection?.type === 'flowchart' ? projection.flowchart.classDefs.map((c) => c.name) : []
 
-  // 菜单项 → 动作分发（标签 / 基数 / 文本：菜单项本身负责选中该连线，右侧表单承接编辑）
+  // 菜单项 → 动作分发（标签 / 基数 / 文本：菜单项本身负责选中该连线，右侧表单承接编辑）。
+  // 动作表在 src/lib/editing/menu-actions.ts（工单 05）：Record<ContextMenuItemId, MenuAction>
+  // 在类型层保证穷尽——漏一项是编译错误，而不是这里的静默无反应。
   const onMenuItem = (id: ContextMenuItemId): void => {
-    if (id === 'add-node') ctx.addNode()
-    else if (id === 'link-mode') ctx.enterLinkMode()
-    else if (id === 'add-style') ctx.openStyleForm()
-    else if (id === 'add-subgraph') ctx.addSubgraph()
-    else if (id === 'add-class') ctx.addClass()
-    else if (id === 'add-participant') ctx.addParticipant()
-    else if (id === 'add-root') ctx.addMindmapRoot()
-    else if (id === 'add-member') ctx.addMember()
-    else if (id === 'add-relation') ctx.addRelation()
-    else if (id === 'add-message') ctx.addMessage()
-    else if (id === 'add-note') ctx.addNote()
-    else if (id === 'add-block') ctx.addBlock()
-    else if (
-      id === 'delete-class' ||
-      id === 'delete-participant' ||
-      id === 'delete-relation' ||
-      id === 'delete-message' ||
-      id === 'delete-note' ||
-      id === 'delete-block'
-    )
-      ctx.deleteTarget()
-    else if (id === 'link-from-here') {
-      const target = ctx.menu?.target
-      if (target !== undefined && target.kind === 'flowchart-node') ctx.enterLinkMode(target.nodeId)
-    } else if (id === 'edit-text') ctx.beginEditText()
-    else if (id === 'edit-label') ctx.beginEditLabel()
-    else if (id === 'delete') ctx.deleteTarget()
-    else if (id === 'add-child') ctx.addChildToMindmap()
-    else if (id === 'cycle-relation-kind') ctx.cycleRelationKind()
-    else if (id === 'edit-relation') ctx.editRelation()
-    else if (id === 'cycle-message-arrow') ctx.cycleMessageArrow()
-    else if (id === 'edit-message') ctx.editMessage()
+    MENU_ACTIONS[id](ctx, ctx.menu?.target)
   }
 
   // 结构树键盘（工单 06）添加节点后的内联命名请求：画布侧消费（gotoLine 同款 nonce 模式）
