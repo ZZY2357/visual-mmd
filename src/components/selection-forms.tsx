@@ -1,3 +1,4 @@
+import { Select } from '@mantine/core'
 import { Text } from '@mantine/core'
 import { useTranslation } from 'react-i18next'
 import type { Selection } from '../lib/projection/selection'
@@ -11,6 +12,7 @@ import { type ClassProjection } from '../lib/projection/class-projection'
 import { type MindmapProjection } from '../lib/projection/mindmap-projection'
 import { type StateProjection } from '../lib/projection/state-projection'
 import { type ErProjection } from '../lib/projection/er-projection'
+import { type GitgraphProjection } from '../lib/projection/gitgraph-projection'
 import { DIRECTIONS } from '../lib/pipeline/flowchart'
 import { setDirectionIntent } from '../lib/editing/flowchart-forms'
 import { setClassDirectionIntent } from '../lib/editing/class-forms'
@@ -22,6 +24,13 @@ import { ClassForm, ClassNoteForm, MemberForm, NamespaceForm, RelationForm } fro
 import { MindmapNodeForm } from './mindmap-forms'
 import { StateForm, StateNoteForm, StateTransitionForm } from './state-forms'
 import { ErAttributeForm, ErEntityForm, ErRelationForm } from './er-forms'
+import {
+  GitgraphBranchForm,
+  GitgraphCherryPickForm,
+  GitgraphCommitForm,
+  GitgraphMergeForm,
+} from './gitgraph-forms'
+import { GITGRAPH_DIRECTIONS, type GitgraphIntent } from '../lib/pipeline/gitgraph'
 
 /**
  * 选中元素的属性表单，按投影图种分发（工单 04-bundle 自 PropertyPanel 迁出）：
@@ -318,6 +327,60 @@ function ErSelectionForm({
   }
 }
 
+
+function GitgraphSelectionForm({
+  projection,
+  selection,
+}: {
+  projection: GitgraphProjection
+  selection: Selection | null
+}) {
+  const { t } = useTranslation()
+  const commitIntent = useEditorStore((s) => s.commitIntent)
+  if (selection === null) {
+    return (
+      <Text size="sm" c="dimmed" px="xs">
+        {t('app:propertyPanel.nothingSelected')}
+      </Text>
+    )
+  }
+  switch (selection.kind) {
+    case 'diagram':
+      // gitGraph 的方向在表头 token 上（gitGraph LR:）：没有「不设置」之外的独立语句；
+      // 缺省即 mermaid 默认 LR（表头可写回方向 token，无「跟随」哨兵的必要——默认就是 LR）
+      return (
+        <Select
+          label={t('app:propertyPanel.direction')}
+          data={GITGRAPH_DIRECTIONS.map((d) => ({ value: d, label: d }))}
+          value={projection.direction ?? 'LR'}
+          onChange={(value) => {
+            if (value === null) return
+            commitIntent({ type: 'set-direction', direction: value } satisfies GitgraphIntent)
+          }}
+          allowDeselect={false}
+        />
+      )
+    case 'gitgraph-commit': {
+      const commit = projection.commits.find((c) => c.elementId === selection.elementId)
+      return commit !== undefined ? <GitgraphCommitForm commit={commit} /> : null
+    }
+    case 'gitgraph-branch': {
+      const branch = projection.branches.find((b) => b.name === selection.name)
+      return branch !== undefined ? <GitgraphBranchForm branch={branch} /> : null
+    }
+    case 'gitgraph-merge': {
+      const merge = projection.merges.find((m) => m.elementId === selection.elementId)
+      return merge !== undefined ? <GitgraphMergeForm merge={merge} /> : null
+    }
+    case 'gitgraph-cherry-pick': {
+      const pick = projection.cherryPicks.find((p) => p.elementId === selection.elementId)
+      return pick !== undefined ? <GitgraphCherryPickForm pick={pick} /> : null
+    }
+    default:
+      return null
+  }
+}
+
 export function ProjectionSelectionForm({ projection, selection }: { projection: AnyProjection; selection: Selection | null }) {
   if (projection.type === 'flowchart') {
     return <FlowchartSelectionForm projection={projection.flowchart} selection={selection} />
@@ -333,6 +396,9 @@ export function ProjectionSelectionForm({ projection, selection }: { projection:
   }
   if (projection.type === 'er') {
     return <ErSelectionForm projection={projection.er} selection={selection} />
+  }
+  if (projection.type === 'gitgraph') {
+    return <GitgraphSelectionForm projection={projection.gitgraph} selection={selection} />
   }
   return <ClassSelectionForm projection={projection.class} selection={selection} />
 }

@@ -48,6 +48,8 @@ export type ContextMenuTarget =
   | { kind: 'er-entity'; name: string }
   | { kind: 'er-relation'; elementId: string }
   | { kind: 'er-attribute'; elementId: string }
+// gitGraph（more-diagrams 工单 04）：画布 DOM 无 data-id（实测降级），无元素级菜单目标；
+// 空白菜单提供添加入口（语句序即拓扑，追加 = 文档末尾落码）
 
 export type ContextMenuItemId =
   | 'add-node'
@@ -95,6 +97,10 @@ export type ContextMenuItemId =
   | 'cycle-er-line'
   | 'edit-er-relation'
   | 'edit-er-attribute'
+  // gitGraph（more-diagrams 工单 04）：空白 = 加提交 / 加分支（branch 创建并 checkout）。
+  // 提交/分支的编辑动作不做画布菜单（无 data-id 可命中），由结构树选中 + 属性表单承接。
+  | 'add-commit'
+  | 'add-branch'
 
 /**
  * 画布选中 → 菜单目标（工单 03 起为 `canvas-selection/selection-codec.ts` 的
@@ -125,6 +131,8 @@ function blankMenuItems(diagramType: DiagramTypeId): ContextMenuItemId[] {
       return ['add-state', 'link-mode']
     case 'er':
       return ['add-entity']
+    case 'gitgraph':
+      return ['add-commit', 'add-branch']
     // DiagramTypeId 是开放类型（more-diagrams 工单 01）：未接入画布能力包的图种
     // 没有空白右键入口（unsupported 态下画布右键整体停用，不会走到这里）
     default:

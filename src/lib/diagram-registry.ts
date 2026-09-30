@@ -6,6 +6,7 @@ import { classParser } from './pipeline/class'
 import { mindmapParser } from './pipeline/mindmap'
 import { stateParser } from './pipeline/state'
 import { erParser } from './pipeline/er'
+import { gitgraphParser } from './pipeline/gitgraph'
 import { frontmatterEnd } from './pipeline/frontmatter'
 import { buildFlowchartProjection, type FlowchartProjection } from './projection/flowchart-projection'
 import { buildSequenceProjection, type SequenceProjection } from './projection/sequence-projection'
@@ -13,12 +14,14 @@ import { buildClassProjection, type ClassProjection } from './projection/class-p
 import { buildMindmapProjection, type MindmapProjection } from './projection/mindmap-projection'
 import { buildStateProjection, type StateProjection } from './projection/state-projection'
 import { buildErProjection, type ErProjection } from './projection/er-projection'
+import { buildGitgraphProjection, type GitgraphProjection } from './projection/gitgraph-projection'
 import { flowchartCanvasCapabilities } from './canvas-selection/flowchart-adapter'
 import { sequenceCanvasCapabilities } from './canvas-selection/sequence-adapter'
 import { classCanvasCapabilities } from './canvas-selection/class-adapter'
 import { mindmapCanvasCapabilities } from './canvas-selection/mindmap-adapter'
 import { stateCanvasCapabilities } from './canvas-selection/state-adapter'
 import { erCanvasCapabilities } from './canvas-selection/er-adapter'
+import { gitgraphCanvasCapabilities } from './canvas-selection/gitgraph-adapter'
 import type { CanvasCapabilities } from './canvas-selection/capabilities'
 import { treePartitions, type TreePartitions } from './structure-tree/partitions'
 import { DEFAULT_DIAGRAM_SOURCE } from './storage'
@@ -46,6 +49,7 @@ export interface ProjectionTypes {
   mindmap: MindmapProjection
   state: StateProjection
   er: ErProjection
+  gitgraph: GitgraphProjection
 }
 
 /** 已注册图种的 id 集合（字面量联合，随 ProjectionTypes 增长） */
@@ -156,7 +160,6 @@ export const STATE_TEMPLATE = `stateDiagram-v2
     end note
 `
 
-
 /** er 起步模板（more-diagrams 工单 03）：两个实体（其一属性块带 PK 与注释）、
  * 一条 identifying 关系带标签、一条 non-identifying 关系 */
 export const ER_TEMPLATE = `erDiagram
@@ -171,6 +174,18 @@ export const ER_TEMPLATE = `erDiagram
 
     CAR ||--|{ DRIVER : "drives"
     DRIVER }|..|{ CAR : "insured by"
+`
+
+/** gitGraph 起步模板（more-diagrams 工单 04）：main 两个提交、一个分支带两个提交、
+ * merge 回 main（带 tag 的提交） */
+export const GITGRAPH_TEMPLATE = `gitGraph
+    commit id: "init"
+    commit id: "docs"
+    branch feature
+    commit
+    commit
+    checkout main
+    merge feature tag: "v1.0"
 `
 
 /**
@@ -233,6 +248,16 @@ export const DIAGRAM_TYPE_LIST: DiagramTypeRegistration[] = [
     buildProjection: (doc) => ({ type: 'er', er: buildErProjection(doc) }),
     tree: treePartitions.er,
     canvas: erCanvasCapabilities,
+  },
+  {
+    id: 'gitgraph',
+    parser: gitgraphParser,
+    template: GITGRAPH_TEMPLATE,
+    // 方向写在声明后（`gitGraph LR:`）；`\b` 让关键字不被 `gitGraphX` 误认
+    detect: (source) => /^gitGraph\b/i.test(firstStatementLine(source)),
+    buildProjection: (doc) => ({ type: 'gitgraph', gitgraph: buildGitgraphProjection(doc) }),
+    tree: treePartitions.gitgraph,
+    canvas: gitgraphCanvasCapabilities,
   },
 ]
 

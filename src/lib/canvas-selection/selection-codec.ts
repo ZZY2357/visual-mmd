@@ -94,6 +94,10 @@ export function fromCanvasId(diagramType: DiagramTypeId, canvas: CanvasSelection
     if (canvas.kind === 'element') return edgeSelectionOf(diagramType, canvas.elementId)
     return canvas.kind === 'node' ? { kind: 'er-entity', name: canvas.id } : null
   }
+  if (diagramType === 'gitgraph') {
+    // gitGraph（more-diagrams 工单 04）：画布 DOM 无 data-id（实测降级），画布选中不产生
+    return null
+  }
   if (canvas.kind === 'element') return edgeSelectionOf(diagramType, canvas.elementId)
   if (canvas.kind === 'node') {
     return diagramType === 'sequence'
@@ -164,6 +168,7 @@ export function menuTargetOfCanvas(
       return { kind: 'state-node', id: canvas.id }
     }
     if (diagramType === 'er') return { kind: 'er-entity', name: canvas.id }
+    if (diagramType === 'gitgraph') return null // 无 data-id（实测降级），画布节点不可命中
     return { kind: 'sequence-participant', actorId: canvas.id }
   }
   if (canvas.kind === 'element') {

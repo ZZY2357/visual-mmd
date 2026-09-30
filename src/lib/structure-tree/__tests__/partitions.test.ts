@@ -138,6 +138,7 @@ describe('结构树分区描述（工单 06）', () => {
       mindmap: 'mindmap\n  root((圆))',
       state: 'stateDiagram-v2\n[*] --> s1',
       er: 'erDiagram\nCAR ||--o{ DRIVER : uses',
+      gitgraph: 'gitGraph\n    commit id: "a"\n    branch dev\n    commit',
     }
     for (const id of Object.keys(DIAGRAM_TYPES) as (keyof typeof DIAGRAM_TYPES)[]) {
       const registration = DIAGRAM_TYPES[id]

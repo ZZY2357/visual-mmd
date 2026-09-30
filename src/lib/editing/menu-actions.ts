@@ -10,6 +10,7 @@ import { nextNodeId, mindmapActionIntents, applyPlan, type MindmapActionPlan, ty
 import { nextFreeName } from '../pipeline/element-id'
 import { isValidStateId } from '../pipeline/state'
 import { isValidErName } from '../pipeline/er'
+import { isValidGitgraphBranchName } from '../pipeline/gitgraph'
 import { setRelationIntent, RELATION_KIND_OPTIONS } from './class-forms'
 import {
   setMessageIntent,
@@ -132,6 +133,11 @@ export function createElement(ctx: MenuActionContext, target: ContextMenuTarget 
         intents: [{ type: 'add-entity', name }],
         newElementTarget: { selection: { kind: 'er-entity', name }, inlineEdit: { kind: 'er', name } },
       }
+    }
+    if (proj.type === 'gitgraph') {
+      // gitGraph（more-diagrams 工单 04）：添加入口是独立的 add-commit / add-branch 动作
+      // （语句序即拓扑，无「创建 + 内联命名」形态），不走 createElement
+      return null
     }
     // mindmap：节点目标 = 挂为其子节点；空白 / 无目标 = 建根（空文档）或挂到根节点下
     const text = ctx.newNodeText
@@ -288,6 +294,27 @@ export const MENU_ACTIONS: Record<Exclude<ContextMenuItemId, 'apply-style'>, Men
   'add-block': openFormOf('block'),
   // er（more-diagrams 工单 03）：add-entity 走 createElement 的 er 分支（空白入口）
   'add-entity': createElement,
+  // gitGraph（more-diagrams 工单 04）：空白 = 追加提交 / 新建分支（创建并 checkout）。
+  // 语句序即拓扑：追加落码在文档末尾（insertAfter 回退），新元素按位置序/名选中。
+  // 分支名自动避重（'branch' 前缀），改名不做（牵动 checkout 语义，工单明确），
+  // 故不进内联编辑——选中即可在属性表单看 order。
+  'add-commit': (ctx) => {
+    const proj = ctx.projection
+    if (proj === null || proj.type !== 'gitgraph') return
+    const elementId = `commit:${proj.gitgraph.commits.length + 1}`
+    if (!ctx.commitIntent({ type: 'add-commit' })) return
+    ctx.select({ kind: 'gitgraph-commit', elementId })
+    ctx.close()
+  },
+  'add-branch': (ctx) => {
+    const proj = ctx.projection
+    if (proj === null || proj.type !== 'gitgraph') return
+    const name = nextFreeName('dev', proj.gitgraph.branches.map((b) => b.name))
+    if (!isValidGitgraphBranchName(name)) return
+    if (!ctx.commitIntent({ type: 'add-branch', name })) return
+    ctx.select({ kind: 'gitgraph-branch', name })
+    ctx.close()
+  },
   'add-attribute': openFormOf('er-attribute'),
   'edit-er-alias': beginEditText,
   'cycle-er-line': cycleErLine,

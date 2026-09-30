@@ -16,6 +16,11 @@ describe('金样合法性：默认图表模板能被 mermaid 渲染', () => {
     await expect(mermaid.parse(STATE_TEMPLATE)).resolves.toBeTruthy()
   })
 
+  it('gitGraph 起步模板 parse 通过（more-diagrams 工单 04）', async () => {
+    const { GITGRAPH_TEMPLATE } = await import('../diagram-registry')
+    await expect(mermaid.parse(GITGRAPH_TEMPLATE)).resolves.toBeTruthy()
+  })
+
   it('sequence 源码 parse 通过', async () => {
     const src = `sequenceDiagram
     Alice->>Bob: 你好
@@ -26,5 +31,32 @@ describe('金样合法性：默认图表模板能被 mermaid 渲染', () => {
 
   it('非法源码 parse 抛错', async () => {
     await expect(mermaid.parse('flowchart TD\n    A --> {\n')).rejects.toThrow()
+  })
+
+  it('gitGraph 端到端编辑场景（工单 04）落在合法 mermaid 源码上', async () => {
+    const { GITGRAPH_TEMPLATE } = await import('../diagram-registry')
+    const { gitgraphParser } = await import('../pipeline/gitgraph')
+    const { reassemble } = await import('../pipeline/document')
+    const parse = (src: string) => {
+      const r = gitgraphParser.parse(src)
+      if (!r.ok) throw new Error(`解析失败：${r.error.message}`)
+      return r.doc
+    }
+    const apply = (doc: ReturnType<typeof parse>, intent: Parameters<typeof gitgraphParser.resolveRewrites>[1]) => {
+      const rewrites = gitgraphParser.resolveRewrites(doc, intent)
+      if (rewrites === null) throw new Error(`意图被拒绝：${intent.type}`)
+      return parse(reassemble(doc, rewrites))
+    }
+
+    let doc = parse(GITGRAPH_TEMPLATE)
+    doc = apply(doc, { type: 'add-commit', id: 'extra' }) // 加提交
+    doc = apply(doc, { type: 'add-branch', name: 'dev' }) // 加分支（创建并 checkout）
+    doc = apply(doc, { type: 'add-commit', id: 'dev-1' }) // 分支上加提交
+    doc = apply(doc, { type: 'add-checkout', branch: 'main' }) // 切回 main
+    doc = apply(doc, { type: 'add-merge', branch: 'dev' }) // merge 回 main
+    doc = apply(doc, { type: 'set-commit-params', elementId: 'commit:1', changes: { tag: 'v2' } }) // 加 tag
+    doc = apply(doc, { type: 'delete-commit', elementId: 'commit:2' }) // 删提交
+
+    await expect(mermaid.parse(doc.source)).resolves.toBeTruthy()
   })
 })

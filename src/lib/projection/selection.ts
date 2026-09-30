@@ -37,6 +37,12 @@ export type Selection =
   | { kind: 'er-entity'; name: string }
   | { kind: 'er-attribute'; elementId: string }
   | { kind: 'er-relation'; elementId: string }
+  // gitGraph（more-diagrams 工单 04）：语句序即拓扑，元素身份 = 位置序（分支按名）。
+  // 画布 DOM 无 data-id（实测降级），选中只来自结构树 / 表单 / 键盘。
+  | { kind: 'gitgraph-commit'; elementId: string }
+  | { kind: 'gitgraph-branch'; name: string }
+  | { kind: 'gitgraph-merge'; elementId: string }
+  | { kind: 'gitgraph-cherry-pick'; elementId: string }
 
 export const DIAGRAM_SELECTION: Selection = { kind: 'diagram' }
 
@@ -86,6 +92,14 @@ export function selectionKey(sel: Selection): string {
       return `er-attribute:${sel.elementId}`
     case 'er-relation':
       return `er-relation:${sel.elementId}`
+    case 'gitgraph-commit':
+      return `gitgraph-commit:${sel.elementId}`
+    case 'gitgraph-branch':
+      return `gitgraph-branch:${sel.name}`
+    case 'gitgraph-merge':
+      return `gitgraph-merge:${sel.elementId}`
+    case 'gitgraph-cherry-pick':
+      return `gitgraph-cherry-pick:${sel.elementId}`
   }
 }
 
