@@ -1,4 +1,5 @@
 import type { ClassIntent } from '../pipeline/class'
+import type { ErIntent } from '../pipeline/er'
 import type { FlowchartIntent } from '../pipeline/flowchart'
 import { nodeElementId } from '../pipeline/flowchart'
 import { mindmapNodeElementId, nextFreeName } from '../pipeline/element-id'
@@ -7,6 +8,7 @@ import type { EditIntent } from '../pipeline/parser'
 import type { SequenceIntent } from '../pipeline/sequence'
 import type { StateIntent } from '../pipeline/state'
 import type { ClassProjection } from '../projection/class-projection'
+import type { ErProjection } from '../projection/er-projection'
 import type { FlowchartProjection } from '../projection/flowchart-projection'
 import type { MindmapProjection } from '../projection/mindmap-projection'
 import type { SequenceProjection } from '../projection/sequence-projection'
@@ -41,6 +43,7 @@ export type CanvasKeyboardProjection =
   | { kind: 'class'; projection: ClassProjection }
   | { kind: 'sequence'; projection: SequenceProjection }
   | { kind: 'state'; projection: StateProjection }
+  | { kind: 'er'; projection: ErProjection }
 
 export type NodeKeyAction = 'delete' | 'add-child' | 'add-sibling'
 
@@ -151,14 +154,15 @@ export function mindmapActionIntents(
 
 /** 编辑键请求打开的添加表单种类：member / relation / message 落到已有表单浮层
  * （锚点/预选由右键菜单 hook 从选中推出），participant 走既有创建路径（内联命名） */
-export type KeyFormKind = 'member' | 'relation' | 'message' | 'participant' | 'transition'
+export type KeyFormKind = 'member' | 'relation' | 'message' | 'participant' | 'transition' | 'er-relation'
 
 /** 键事件的语义 plan：执行器（applyPlan）按字段决定提交 / 选中 / 内联编辑 / 表单 */
 export interface KeyPlan {
   /** 依次经管线落码的编辑意图序列（表单类 plan 为空——提交才落码） */
   intents: EditIntent[]
-  /** 全部意图落码成功后：选中新元素并进入内联编辑（删除类 plan 无此字段） */
-  newElementTarget?: { selection: Selection; inlineEdit: CanvasInlineEditTarget }
+  /** 全部意图落码成功后：选中新元素，且（若有）进入内联编辑（删除类 plan 无此字段；
+   * 属性类新元素不做内联编辑（er 属性无双击/内联，工单 03），inlineEdit 可省略） */
+  newElementTarget?: { selection: Selection; inlineEdit?: CanvasInlineEditTarget }
   /** 编辑键要求打开的添加表单（class/sequence 的 Tab/Enter 落到已有表单，不直接落码） */
   form?: KeyFormKind
   /** 落码成功后清空选中（class/sequence 的删除，与右键菜单/属性面板删除一致；
@@ -209,7 +213,7 @@ export function applyPlan(plan: KeyPlan, exec: PlanExecutor): boolean {
   }
   if (plan.newElementTarget !== undefined) {
     exec.select(plan.newElementTarget.selection)
-    exec.beginInlineEdit?.(plan.newElementTarget.inlineEdit)
+    if (plan.newElementTarget.inlineEdit !== undefined) exec.beginInlineEdit?.(plan.newElementTarget.inlineEdit)
   } else if (plan.clearSelection === true) {
     exec.select(null)
   }
@@ -371,6 +375,62 @@ export function stateKeyPlan(projection: StateProjection, input: KeyInput): KeyP
     newElementTarget: {
       selection: { kind: 'state', id },
       inlineEdit: { kind: 'state', id },
+    },
+  }
+}
+
+// ---------- er 编辑键（more-diagrams 工单 03 / ADR-0013）：就近结构映射 ----------
+
+/**
+ * 选中元素 → 删除意图（er）：实体（级联删属性块与触及关系，由管线负责）、属性、
+ * 关系三类各映射到既有 delete-* 意图；已不在投影 / null / 别种选中 → null。
+ */
+export function erDeleteIntent(projection: ErProjection, selection: Selection | null): ErIntent | null {
+  if (selection === null) return null
+  switch (selection.kind) {
+    case 'er-entity':
+      return projection.entities.some((e) => e.name === selection.name)
+        ? { type: 'delete-entity', name: selection.name }
+        : null
+    case 'er-attribute':
+      return projection.attributes.some((a) => a.elementId === selection.elementId)
+        ? { type: 'delete-attribute', elementId: selection.elementId }
+        : null
+    case 'er-relation':
+      return projection.relations.some((r) => r.elementId === selection.elementId)
+        ? { type: 'delete-relation', elementId: selection.elementId }
+        : null
+    default:
+      return null
+  }
+}
+
+/**
+ * 键 → plan（er，more-diagrams 工单 03 / ADR-0013 就近类比）：
+ * - Delete = 删除选中元素（查 erDeleteIntent 唯一映射）
+ * - Tab = 给该实体加属性（落码 + 选中；属性不做内联编辑——工单 03 明确，属性的双击
+ *   与内联命名都不做，字段在右侧表单改）
+ * - Enter = 从该实体拉一条关系（落到已有 AddErRelationInlineForm 表单浮层，不新造）
+ */
+export function erKeyPlan(projection: ErProjection, input: KeyInput): KeyPlan | null {
+  if (input.key === 'Delete' || input.key === 'Backspace') {
+    const intent = erDeleteIntent(projection, input.selection)
+    return intent === null ? null : { intents: [intent], clearSelection: true }
+  }
+  if (input.key !== 'Tab' && input.key !== 'Enter') return null
+  if (input.mods?.shift === true) return null
+  const selection = input.selection
+  if (selection === null || selection.kind !== 'er-entity') return null
+  const entity = projection.entities.find((e) => e.name === selection.name)
+  if (entity === undefined) return null
+  if (input.key === 'Enter') return { intents: [], form: 'er-relation' }
+  const attrName = nextFreeName('field', entity.attributes.map((a) => a.name))
+  return {
+    intents: [
+      { type: 'add-attribute', entity: entity.name, attrType: 'string', name: attrName },
+    ],
+    newElementTarget: {
+      selection: { kind: 'er-attribute', elementId: `attr:${entity.nextAttrOrdinal}` },
     },
   }
 }

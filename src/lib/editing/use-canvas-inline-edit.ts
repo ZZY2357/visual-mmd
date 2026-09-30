@@ -65,6 +65,10 @@ export function inlineEditTextOf(projection: AnyProjection | null, target: Canva
     // state 双击编辑的是描述段：无描述状态预填空串（输入即新增描述）
     return projection.state.states.find((s) => s.id === target.id)?.desc ?? ''
   }
+  if (projection.type === 'er' && target.kind === 'er') {
+    // er 双击编辑的是别名：无别名实体预填空串（输入即新增别名）
+    return projection.er.entities.find((e) => e.name === target.name)?.alias ?? ''
+  }
   return ''
 }
 
@@ -114,6 +118,13 @@ function findTargetElement(root: Element, target: CanvasInlineEditTarget, text: 
     // state 的 data-id 即状态 id（渲染后处理从 DOM id 反注，more-diagrams 工单 02）
     for (const el of root.querySelectorAll('[data-id]')) {
       if (el.getAttribute('data-id') === target.id) return el
+    }
+    return null
+  }
+  if (target.kind === 'er') {
+    // er 的 data-id 即实体名（渲染后处理从 DOM id `entity-{名}-{n}` 反注，工单 03）
+    for (const el of root.querySelectorAll('[data-id]')) {
+      if (el.getAttribute('data-id') === target.name) return el
     }
     return null
   }
@@ -184,7 +195,9 @@ export function useCanvasInlineEdit({ projection, resolver, svg, containerRef, v
               ? 'sequence'
               : type === 'state'
                 ? 'state'
-                : 'flowchart'
+                : type === 'er'
+                  ? 'er'
+                  : 'flowchart'
       const target = inlineEditTargetFromEvent(e.target, resolver, mindmapNodes, kind)
       if (target === null) return
       e.preventDefault()

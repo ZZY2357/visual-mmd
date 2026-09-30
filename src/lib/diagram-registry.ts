@@ -5,17 +5,20 @@ import { sequenceParser } from './pipeline/sequence'
 import { classParser } from './pipeline/class'
 import { mindmapParser } from './pipeline/mindmap'
 import { stateParser } from './pipeline/state'
+import { erParser } from './pipeline/er'
 import { frontmatterEnd } from './pipeline/frontmatter'
 import { buildFlowchartProjection, type FlowchartProjection } from './projection/flowchart-projection'
 import { buildSequenceProjection, type SequenceProjection } from './projection/sequence-projection'
 import { buildClassProjection, type ClassProjection } from './projection/class-projection'
 import { buildMindmapProjection, type MindmapProjection } from './projection/mindmap-projection'
 import { buildStateProjection, type StateProjection } from './projection/state-projection'
+import { buildErProjection, type ErProjection } from './projection/er-projection'
 import { flowchartCanvasCapabilities } from './canvas-selection/flowchart-adapter'
 import { sequenceCanvasCapabilities } from './canvas-selection/sequence-adapter'
 import { classCanvasCapabilities } from './canvas-selection/class-adapter'
 import { mindmapCanvasCapabilities } from './canvas-selection/mindmap-adapter'
 import { stateCanvasCapabilities } from './canvas-selection/state-adapter'
+import { erCanvasCapabilities } from './canvas-selection/er-adapter'
 import type { CanvasCapabilities } from './canvas-selection/capabilities'
 import { treePartitions, type TreePartitions } from './structure-tree/partitions'
 import { DEFAULT_DIAGRAM_SOURCE } from './storage'
@@ -42,6 +45,7 @@ export interface ProjectionTypes {
   class: ClassProjection
   mindmap: MindmapProjection
   state: StateProjection
+  er: ErProjection
 }
 
 /** 已注册图种的 id 集合（字面量联合，随 ProjectionTypes 增长） */
@@ -152,6 +156,23 @@ export const STATE_TEMPLATE = `stateDiagram-v2
     end note
 `
 
+
+/** er 起步模板（more-diagrams 工单 03）：两个实体（其一属性块带 PK 与注释）、
+ * 一条 identifying 关系带标签、一条 non-identifying 关系 */
+export const ER_TEMPLATE = `erDiagram
+    direction LR
+
+    CAR {
+        string make PK "制造商"
+        string model "型号"
+        int? year
+    }
+    DRIVER
+
+    CAR ||--|{ DRIVER : "drives"
+    DRIVER }|..|{ CAR : "insured by"
+`
+
 /**
  * 注册表：数组是唯一权威（more-diagrams 工单 01），DIAGRAM_TYPES 由它推导。
  * detectDiagramType 按数组顺序显式遍历——不再维护手写的 if 分发链，
@@ -203,6 +224,15 @@ export const DIAGRAM_TYPE_LIST: DiagramTypeRegistration[] = [
     buildProjection: (doc) => ({ type: 'state', state: buildStateProjection(doc) }),
     tree: treePartitions.state,
     canvas: stateCanvasCapabilities,
+  },
+  {
+    id: 'er',
+    parser: erParser,
+    template: ER_TEMPLATE,
+    detect: (source) => /^erDiagram\b/i.test(firstStatementLine(source)),
+    buildProjection: (doc) => ({ type: 'er', er: buildErProjection(doc) }),
+    tree: treePartitions.er,
+    canvas: erCanvasCapabilities,
   },
 ]
 

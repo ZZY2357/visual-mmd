@@ -43,6 +43,11 @@ export type ContextMenuTarget =
   // 转移边 elementId 即投影 elementId（`transition:N`，位置序身份）
   | { kind: 'state-node'; id: string; composite?: boolean }
   | { kind: 'state-transition'; elementId: string }
+  // er（more-diagrams 工单 03）：实体节点选中 id 即实体名；关系边 / 属性 elementId
+  // 即投影 elementId（`relation:N` / `attr:N`）
+  | { kind: 'er-entity'; name: string }
+  | { kind: 'er-relation'; elementId: string }
+  | { kind: 'er-attribute'; elementId: string }
 
 export type ContextMenuItemId =
   | 'add-node'
@@ -82,6 +87,14 @@ export type ContextMenuItemId =
   | 'add-state'
   | 'add-state-into'
   | 'edit-state-desc'
+  // er（more-diagrams 工单 03）：编辑类动作遵守工单 05 定案 D5——线型可循环直接改，
+  // 基数与标签（枚举选择）在右侧属性面板改（选中该连线并关闭菜单）。
+  | 'add-entity'
+  | 'add-attribute'
+  | 'edit-er-alias'
+  | 'cycle-er-line'
+  | 'edit-er-relation'
+  | 'edit-er-attribute'
 
 /**
  * 画布选中 → 菜单目标（工单 03 起为 `canvas-selection/selection-codec.ts` 的
@@ -110,6 +123,8 @@ function blankMenuItems(diagramType: DiagramTypeId): ContextMenuItemId[] {
       return ['add-root']
     case 'state':
       return ['add-state', 'link-mode']
+    case 'er':
+      return ['add-entity']
     // DiagramTypeId 是开放类型（more-diagrams 工单 01）：未接入画布能力包的图种
     // 没有空白右键入口（unsupported 态下画布右键整体停用，不会走到这里）
     default:
@@ -168,5 +183,14 @@ export function contextMenuItems(target: ContextMenuTarget): ContextMenuItemId[]
         : ['edit-state-desc', 'link-from-here', 'delete']
     case 'state-transition':
       return ['edit-label', 'delete']
+    // er（more-diagrams 工单 03）：实体 = 添加属性 / 连线模式（预选起点）/ 改别名 / 删除；
+    // 关系 = 切换线型（循环直接改）/ 在属性面板中编辑（基数与标签，枚举选择）/ 删除；
+    // 属性 = 在属性面板中编辑 / 删除
+    case 'er-entity':
+      return ['add-attribute', 'link-from-here', 'edit-er-alias', 'delete']
+    case 'er-relation':
+      return ['cycle-er-line', 'edit-er-relation', 'delete']
+    case 'er-attribute':
+      return ['edit-er-attribute', 'delete']
   }
 }

@@ -97,6 +97,19 @@ function nodeFormForTarget(
     if (state === undefined) return null
     return { kind, anchorElementId: state.tailElementId ?? undefined, from: target.id, x, y }
   }
+  if (kind === 'er-attribute' || kind === 'er-relation') {
+    // er 属性 / 关系表单（more-diagrams 工单 03）：实体节点右键 → 锚点为该实体的
+    // 属性锚点（块内最后一个属性 ?? 声明行），关系表单预选起点该实体
+    if (target.kind !== 'er-entity' || proj.type !== 'er') return null
+    const entity = proj.er.entities.find((e) => e.name === target.name)
+    if (entity === undefined) return null
+    const base = {
+      anchorElementId: entity.attrAnchorElementId ?? entity.tailElementId ?? undefined,
+      x,
+      y,
+    }
+    return kind === 'er-attribute' ? { kind, ...base, entity: target.name } : { kind, ...base, from: target.name }
+  }
   if (kind === 'block') {
     // sequence 独有的添加逻辑块：参与者上右键 → 锚点为该参与者的声明；
     // 空白处右键 → 无锚点（管线回退到文档最后一个元素）
@@ -124,11 +137,12 @@ function nodeFormForTarget(
   return null
 }
 
-/** 编辑器选中 → 可打开添加表单的菜单目标形态（类 / 参与者 / 状态三种；其余选中无该形态） */
+/** 编辑器选中 → 可打开添加表单的菜单目标形态（类 / 参与者 / 状态 / 实体四种；其余选中无该形态） */
 function formTargetOfSelection(selection: Selection): ContextMenuTarget | null {
   if (selection.kind === 'class') return { kind: 'class-node', name: selection.name }
   if (selection.kind === 'participant') return { kind: 'sequence-participant', actorId: selection.actorId }
   if (selection.kind === 'state') return { kind: 'state-node', id: selection.id }
+  if (selection.kind === 'er-entity') return { kind: 'er-entity', name: selection.name }
   return null
 }
 
@@ -214,13 +228,19 @@ export function useCanvasContextMenu(
       )
       setOpen(t.state.open)
       if (t.completedLink !== null) {
-        // 两步完成：落码一条连线并选中它（state 图种落 add-transition，其余落 flowchart add-edge）
+        // 两步完成：落码一条连线并选中它（state 落 add-transition、er 落 add-relation，
+        // 其余落 flowchart add-edge）
         const { commitIntent, select } = useEditorStore.getState()
         const { from, to } = t.completedLink
         const proj = latest.current.projection
         if (proj !== null && proj.type === 'state') {
           if (commitIntent({ type: 'add-transition', from, to })) {
             select({ kind: 'state-transition', elementId: `transition:${proj.state.transitions.length + 1}` })
+          }
+        } else if (proj !== null && proj.type === 'er') {
+          // er 关系默认 identifying `||--|{`（验收场景的基数），落码后按位置序选中
+          if (commitIntent({ type: 'add-relation', from, to, cardLeft: '||', line: '--', cardRight: '|{' })) {
+            select({ kind: 'er-relation', elementId: `relation:${proj.er.relations.length + 1}` })
           }
         } else if (commitIntent({ type: 'add-edge', from, to, lineStyle: 'solid', head: 'arrow' })) {
           select({ kind: 'edge', from, to, occurrence: 1 })
@@ -297,7 +317,7 @@ export function useCanvasContextMenu(
    * 与右键菜单共用 nodeFormForTarget，**不新造浮层**。选中不是类/参与者时安静地不打开。
    */
   const openFormForSelection = useCallback(
-    (kind: 'member' | 'relation' | 'message' | 'transition'): void => {
+    (kind: 'member' | 'relation' | 'message' | 'transition' | 'er-relation'): void => {
       const proj = latest.current.projection
       const { selection } = useEditorStore.getState()
       if (proj === null || selection === null) return

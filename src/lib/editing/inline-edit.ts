@@ -3,6 +3,7 @@ import { isValidMindmapNodeText } from '../pipeline/mindmap'
 import { isValidClassName } from '../pipeline/class'
 import { isValidParticipantId } from '../pipeline/sequence'
 import { isValidStateId } from '../pipeline/state'
+import { isValidErName } from '../pipeline/er'
 import type { ProjectionMindmapNode } from '../projection/mindmap-projection'
 import { selectionFromEventTarget, type CanvasSelection, type DataIdResolver } from '../canvas-selection/data-id'
 
@@ -46,6 +47,9 @@ export type CanvasInlineEditTarget =
   /** state（more-diagrams 工单 02）：双击 / 键盘新建后编辑状态描述（`id : desc` 的 desc 段，
    * set-state-desc 意图；id 是语法标识，不在此改） */
   | { kind: 'state'; id: string }
+  /** er（more-diagrams 工单 03）：双击实体改别名（set-alias 意图；实体名是语法标识，
+   * 不在此改。属性不做双击——工单 03 明确） */
+  | { kind: 'er'; name: string }
 
 export type InlineEditCommit =
   | { action: 'commit'; intent: EditIntent }
@@ -101,7 +105,7 @@ function classTitleClicked(target: EventTarget | null, name: string): boolean {
 }
 
 /** 参与双击寻址的图种（各图种都用 data-id；mindmap 额外回落文本匹配） */
-export type InlineEditDiagramKind = 'flowchart' | 'mindmap' | 'class' | 'sequence' | 'state'
+export type InlineEditDiagramKind = 'flowchart' | 'mindmap' | 'class' | 'sequence' | 'state' | 'er'
 
 /**
  * 双击目标 → 编辑对象；两边都匹配不上时返回 null（如点在空白处/边上），
@@ -125,6 +129,8 @@ export function inlineEditTargetFromEvent(
     if (kind === 'sequence') return { kind: 'sequence-alias', actorId: byId.nodeId }
     // state：双击状态节点 = 编辑描述（set-state-desc；无描述状态输入即新增描述行）
     if (kind === 'state') return isValidStateId(byId.nodeId) ? { kind: 'state', id: byId.nodeId } : null
+    // er：双击实体 = 编辑别名（set-alias；实体名是语法标识，不在此改）
+    if (kind === 'er') return isValidErName(byId.nodeId) ? { kind: 'er', name: byId.nodeId } : null
     return byId
   }
   return kind === 'mindmap' ? targetFromMindmapText(target, mindmapNodes) : null
@@ -157,6 +163,11 @@ export function inlineEditCommitOf(target: CanvasInlineEditTarget, text: string,
     if (!isValidStateId(target.id)) return { action: 'invalid' }
     // 空白/未改动已被顶部守卫短路（unchanged）；到这里的非空改动 = set-state-desc
     return { action: 'commit', intent: { type: 'set-state-desc', id: target.id, desc: next } }
+  }
+  if (target.kind === 'er') {
+    if (!isValidErName(target.name)) return { action: 'invalid' }
+    // 空白/未改动已被顶部守卫短路（unchanged）；到这里的非空改动 = set-alias
+    return { action: 'commit', intent: { type: 'set-alias', name: target.name, alias: next } }
   }
   if (!isValidMindmapNodeText(next)) return { action: 'invalid' }
   return { action: 'commit', intent: { type: 'set-node-text', elementId: target.elementId, text: next } }
