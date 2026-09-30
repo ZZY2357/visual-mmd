@@ -21,11 +21,12 @@
  * 本模块只覆盖连线与块级元素。
  */
 
-/** 位置序身份的种类：投影里各自独立编号的连线/块级元素（transition = state 转移，工单 02） */
-export type EdgeIdentityKind = 'relation' | 'message' | 'note' | 'block' | 'transition'
+/** 位置序身份的种类：投影里各自独立编号的连线/块级元素（transition = state 转移，工单 02；
+ * edge = block 边，more-diagrams 工单 09） */
+export type EdgeIdentityKind = 'relation' | 'message' | 'note' | 'block' | 'transition' | 'edge'
 
 /** 位置序身份形态 `<kind>:<1 基序号>`；与 pipeline elementId 逐字一致 */
-const EDGE_IDENTITY_RE = /^(relation|message|note|block|transition):([1-9][0-9]*)$/
+const EDGE_IDENTITY_RE = /^(relation|message|note|block|transition|edge):([1-9][0-9]*)$/
 
 /**
  * 是否为位置序身份（`relation:1` / `message:2` / `note:1` / `block:1` / `transition:1`）。

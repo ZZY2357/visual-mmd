@@ -43,6 +43,7 @@ export interface StyleFormState {
  * er 工单 03 补属性 / 关系）：'note' 同时服务 sequence（注释）与 class（浮动 / note for X），
  * 由投影图种决定渲染哪个表单。 */
 // requirement（more-diagrams 工单 07）：'requirement-relation' = 从选中节点拉一条关系
+// block（more-diagrams 工单 09）：'block-edge' = 从选中块节点拉一条边
 export type NodeFormKind =
   | 'member'
   | 'relation'
@@ -57,6 +58,8 @@ export type NodeFormKind =
   | 'requirement-node'
   | 'requirement-element'
   | 'requirement-relation'
+  // block（more-diagrams 工单 09）：从块节点拉一条边
+  | 'block-edge'
 
 export interface NodeFormState {
   kind: NodeFormKind

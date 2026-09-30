@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import {
+  BLOCK_TEMPLATE,
   CLASS_TEMPLATE,
   DIAGRAM_TYPES,
   KANBAN_TEMPLATE,
@@ -12,12 +13,13 @@ import { capabilitiesOf } from '../capabilities'
 import { classDataIdResolver } from '../class-adapter'
 import { sequenceDataIdResolver } from '../sequence-adapter'
 import { kanbanDataIdResolver } from '../kanban-adapter'
+import { blockDataIdResolver } from '../block-adapter'
 import type { Selection } from '../../projection/selection'
 
 /**
  * 画布能力包查表测试（工单 04）：图种 × 能力，断言无 undefined 遗漏；
  * 尤其是可选成员 edgeAnnotator——无位置序连线的图种（含 kanban）必须没有。
- * 另含 class / sequence / kanban adapter 的 resolver 对照行为。
+ * 另含 class / sequence / kanban / block adapter 的 resolver 对照行为。
  */
 
 ;(globalThis as Record<string, unknown>).IS_REACT_ACT_ENVIRONMENT = true
@@ -28,6 +30,7 @@ const SOURCES = {
   class: CLASS_TEMPLATE,
   mindmap: MINDMAP_TEMPLATE,
   kanban: KANBAN_TEMPLATE,
+  block: BLOCK_TEMPLATE,
 } as const
 
 function projectionOf(type: keyof typeof SOURCES): AnyProjection {
@@ -37,9 +40,9 @@ function projectionOf(type: keyof typeof SOURCES): AnyProjection {
   return registration.buildProjection(parsed.doc)
 }
 
-const TYPES = ['flowchart', 'sequence', 'class', 'mindmap', 'kanban'] as const
+const TYPES = ['flowchart', 'sequence', 'class', 'mindmap', 'kanban', 'block'] as const
 
-describe('capabilitiesOf：5 图种 × 8 能力查表（工单 04 + architecture-deepening-2 工单 03）', () => {
+describe('capabilitiesOf：6 图种 × 8 能力查表（工单 04 + architecture-deepening-2 工单 03 + 工单 09）', () => {
   for (const type of TYPES) {
     it(`${type}：八项能力齐备（edgeAnnotator 按图种有无位置序连线）`, () => {
       const projection = projectionOf(type)
@@ -60,7 +63,7 @@ describe('capabilitiesOf：5 图种 × 8 能力查表（工单 04 + architecture
       expect(typeof caps.resolveSelection).toBe('function')
       expect(typeof caps.deleteIntent).toBe('function')
 
-      const hasOrdinalEdges = type === 'class' || type === 'sequence'
+      const hasOrdinalEdges = type === 'class' || type === 'sequence' || type === 'block'
       if (hasOrdinalEdges) {
         expect(typeof caps.edgeAnnotator).toBe('function')
         expect(typeof caps.edgeAnnotator?.(projection)).toBe('function')
@@ -142,6 +145,18 @@ describe('class/sequence adapter resolver 对照（与原 CanvasPanel.resolverOf
     expect(resolve(column.id)).toEqual({ kind: 'node', id: column.elementId })
     const card = projection.kanban.cards[0]
     expect(resolve(card.id)).toEqual({ kind: 'node', id: card.elementId })
+    expect(resolve('__nope__')).toBeNull()
+  })
+
+  it('block（more-diagrams 工单 09）：块 id → 节点/嵌套块选中（带前缀），边 elementId → 位置序选中，未知 → null', () => {
+    const projection = projectionOf('block') as Extract<AnyProjection, { type: 'block' }>
+    const resolve = blockDataIdResolver(projection.block)
+    const node = projection.block.nodes[0]
+    expect(resolve(node.id)).toEqual({ kind: 'node', id: `block-node:${node.id}` })
+    const group = projection.block.groups[0]
+    expect(resolve(group.id)).toEqual({ kind: 'node', id: `block-group:${group.id}` })
+    const edge = projection.block.edges[0]
+    expect(resolve(edge.elementId)).toEqual({ kind: 'element', elementId: edge.elementId })
     expect(resolve('__nope__')).toBeNull()
   })
 })

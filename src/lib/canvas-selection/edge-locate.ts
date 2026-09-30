@@ -212,6 +212,27 @@ export function annotateRequirementRelationIdentities(root: ParentNode, expected
   annotatePositionalEdgeGroups(root, 'relation', expected)
 }
 
+/**
+ * block 边（more-diagrams 工单 09）：block 不走 unified 的 dagre 布局器，边 path 由
+ * blockDiagram chunk 的 `insertEdges` 直接 append 到渲染器自己的包裹组 `g.block` 下
+ * （`chunk-Z7XXMR3K:943` 统一写 `data-id = edge.id`，但 block 的 edge.id 带渲染 id 前缀
+ * `mmd-preview-N-{count}-{start}-{end}`，不能直接当身份用）。故与 er / state / requirement
+ * 同构地按**位置序**反注——锚点集合是 `g.block` 内 `path[data-edge="true"]` 的文档序
+ * （block 按源码顺序逐条 insertEdge），第 k 条 = `edge:(k+1)`；条数与投影不符时
+ * 整体放弃（绝不误标）。
+ */
+export function annotateBlockEdgeIdentities(root: ParentNode, expected: number): void {
+  if (expected <= 0) return
+  for (const wrapper of root.querySelectorAll('g.block')) {
+    const anchors = Array.from(wrapper.querySelectorAll('path[data-edge="true"]'))
+    if (anchors.length !== expected) continue
+    anchors.forEach((path, ordinal) => {
+      const elementId = edgeElementIdOf('edge', ordinal)
+      if (elementId !== null) path.setAttribute('data-id', elementId)
+    })
+  }
+}
+
 /** 屏幕命中容差（CSS px）：sequence 消息 only 1.5px 描边，给一点余量但不足以吃到空白 */
 export const EDGE_HIT_TOLERANCE = 4
 

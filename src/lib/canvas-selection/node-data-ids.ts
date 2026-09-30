@@ -109,6 +109,34 @@ function annotateRequirementDataIds(root: ParentNode): void {
   }
 }
 
+/**
+ * mermaid v12 block 图（more-diagrams 工单 09）：渲染器把所有节点/嵌套块装进
+ * **自己的包裹组** `<g class="block">`（blockDiagram chunk 的 draw：
+ * `svg.insert("g").attr("class", "block")`），节点经统一渲染器的形状处理器落
+ * `<g class="node">`，DOM id 是 `${svgId}-${块id}`（`getNodeFromBlock` 的
+ * `domId = db.getDiagramId() ? \`${diagramId}-${vertex.id}\` : vertex.id`，
+ * 形状处理器 `attr("id", node.domId ?? node.id)`）——与 kanban 的 `${svgId}-${节点id}`
+ * 同形，走前缀剥离。作用域严格限定在 `g.block` 内，不进 `nodeIdOfDomId` 通用循环
+ * （kanban 已用「孤立 g.node 不反注」钉住收口约定）。
+ * space 不渲染（`insertBlockPositioned` 对 type space 跳过），无对应 DOM；匿名嵌套块
+ * （无 `block:gid` 显式 id）由 mermaid 生成随机 id，反注出的身份不在投影里，resolver
+ * 安静拒绝（降级为不可寻址）。
+ */
+function annotateBlockDataIds(root: ParentNode): void {
+  const svgId = root.querySelector('svg')?.getAttribute('id') ?? ''
+  if (svgId === '') return
+  const prefix = `${svgId}-`
+  for (const wrapper of root.querySelectorAll('g.block')) {
+    for (const g of wrapper.querySelectorAll('g.node')) {
+      if (g.getAttribute('data-id') !== null) continue
+      const domId = g.getAttribute('id')
+      if (domId === null || !domId.startsWith(prefix)) continue
+      const nodeId = domId.slice(prefix.length)
+      if (nodeId !== '') g.setAttribute('data-id', nodeId)
+    }
+  }
+}
+
 export function annotateNodeDataIds(root: ParentNode): void {
   for (const g of root.querySelectorAll('g.node')) {
     if (g.getAttribute('data-id') !== null) continue
@@ -120,4 +148,5 @@ export function annotateNodeDataIds(root: ParentNode): void {
   }
   annotateKanbanDataIds(root)
   annotateRequirementDataIds(root)
+  annotateBlockDataIds(root)
 }

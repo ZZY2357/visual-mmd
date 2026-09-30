@@ -63,6 +63,11 @@ export type ContextMenuTarget =
   | { kind: 'requirement-node'; name: string }
   | { kind: 'requirement-element'; name: string }
   | { kind: 'requirement-relation'; elementId: string }
+// block（more-diagrams 工单 09）：节点选中 id 即语法 id；嵌套块 id 即 gid；
+// 边 elementId 即投影 elementId（`edge:N`，位置序身份）
+  | { kind: 'block-node'; id: string }
+  | { kind: 'block-group'; id: string }
+  | { kind: 'block-edge'; elementId: string }
 
 export type ContextMenuItemId =
   | 'add-node'
@@ -134,6 +139,11 @@ export type ContextMenuItemId =
   | 'edit-requirement-field'
   | 'cycle-requirement-kind'
   | 'invert-requirement-relation'
+  // block（more-diagrams 工单 09）：空白 = 加块节点 / 加嵌套块（创建 + 内联命名）；
+  // 节点 = 改标签（内联编辑）/ 删除；嵌套块 = 加块节点（落进组内）/ 删除；
+  // 边 = 在属性面板中编辑（选中 + 关菜单）/ 删除
+  | 'add-block-node'
+  | 'add-block-group'
 
 /**
  * 画布选中 → 菜单目标（工单 03 起为 `canvas-selection/selection-codec.ts` 的
@@ -174,6 +184,9 @@ function blankMenuItems(diagramType: DiagramTypeId): ContextMenuItemId[] {
       // requirement 的空白入口（工单 07 定案）：加 requirement（type 在添加表单的枚举里选）与加 element。
       // 拉关系不做空白入口——关系两端都是节点，从节点菜单「从这里连线」进入更省一步
       return ['add-requirement', 'add-requirement-element']
+    case 'block':
+      // block 的空白入口（more-diagrams 工单 09）：加块节点（创建 + 内联命名）与加嵌套块
+      return ['add-block-node', 'add-block-group']
     // DiagramTypeId 是开放类型（more-diagrams 工单 01）：未接入画布能力包的图种
     // 没有空白右键入口（unsupported 态下画布右键整体停用，不会走到这里）
     default:
@@ -260,5 +273,13 @@ export function contextMenuItems(target: ContextMenuTarget): ContextMenuItemId[]
       return ['edit-requirement-field', 'link-from-here', 'delete']
     case 'requirement-relation':
       return ['cycle-requirement-kind', 'invert-requirement-relation', 'delete']
+    // block（more-diagrams 工单 09）：节点 = 改标签（内联编辑）/ 删除；
+    // 嵌套块 = 加块节点（落进组内）/ 删除；边 = 在属性面板中编辑 / 删除
+    case 'block-node':
+      return ['edit-text', 'delete']
+    case 'block-group':
+      return ['add-block-node', 'delete']
+    case 'block-edge':
+      return ['edit-label', 'delete']
   }
 }

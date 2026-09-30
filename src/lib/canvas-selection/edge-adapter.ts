@@ -34,5 +34,9 @@ export function edgeSelectionOf(diagramType: DiagramTypeId, elementId: string): 
     // requirement 关系同理共用 `relation:N`（more-diagrams 工单 07）
     return parsed.kind === 'relation' ? { kind: 'requirement-relation', elementId } : null
   }
+  if (diagramType === 'block') {
+    // block 边走专属的 `edge:N` 位置序身份（more-diagrams 工单 09）
+    return parsed.kind === 'edge' ? { kind: 'block-edge', elementId } : null
+  }
   return null
 }

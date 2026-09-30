@@ -193,6 +193,7 @@ describe('结构树分区描述（工单 06）', () => {
       kanban: 'kanban\n  Todo[待办]\n    t1[写代码]',
       requirement:
         'requirementDiagram\n    functionalRequirement login {\n        id: "REQ-1"\n        text: "登录"\n        risk: Medium\n        verifymethod: Test\n    }\n\n    element loginUI {\n        type: "界面"\n    }\n\n    loginUI - satisfies -> login',
+      block: 'block-beta\n    columns 3\n    a["输入"]\n    b{"校验"}\n    a --> b',
     }
     for (const id of Object.keys(DIAGRAM_TYPES) as (keyof typeof DIAGRAM_TYPES)[]) {
       const registration = DIAGRAM_TYPES[id]

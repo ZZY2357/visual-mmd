@@ -153,6 +153,11 @@ describe('MENU_ACTIONS 穷尽性（工单 05 → 工单 01）', () => {
       { kind: 'requirement-node', name: 'login' },
       { kind: 'requirement-element', name: 'ui' },
       { kind: 'requirement-relation', elementId: 'relation:0' },
+      // block（more-diagrams 工单 09）：空白添加入口 + 节点 / 嵌套块 / 边
+      { kind: 'blank', diagramType: 'block' },
+      { kind: 'block-node', id: 'a' },
+      { kind: 'block-group', id: 'g1' },
+      { kind: 'block-edge', elementId: 'edge:1' },
     ]
     const reachableIds = new Set(allTargets.flatMap((target) => contextMenuItems(target)))
     // apply-style 不经 onMenuItem 分发（CanvasPanel 渲染成子菜单开关，点样式名直接调

@@ -46,6 +46,8 @@ import {
   TimelineSectionForm,
 } from './timeline-forms'
 import { KanbanCardForm, KanbanColumnForm } from './kanban-forms'
+import { BlockDiagramForm, BlockEdgeForm, BlockGroupForm, BlockNodeForm } from './block-forms'
+import { type BlockProjection } from '../lib/projection/block-projection'
 
 /**
  * 选中元素的属性表单，按投影图种分发（工单 04-bundle 自 PropertyPanel 迁出）：
@@ -515,6 +517,45 @@ function RequirementSelectionForm({
   }
 }
 
+/**
+ * block 属性表单（more-diagrams 工单 09）：图表级 title/columns + 节点 / 嵌套块 /
+ * 边三类元素。space 不进投影选中面（布局空位，无表单）。
+ */
+function BlockSelectionForm({
+  projection,
+  selection,
+}: {
+  projection: BlockProjection
+  selection: Selection | null
+}) {
+  const { t } = useTranslation()
+  if (selection === null) {
+    return (
+      <Text size="sm" c="dimmed" px="xs">
+        {t('app:propertyPanel.nothingSelected')}
+      </Text>
+    )
+  }
+  switch (selection.kind) {
+    case 'diagram':
+      return <BlockDiagramForm title={projection.title} columns={projection.columns} />
+    case 'block-node': {
+      const node = projection.nodes.find((n) => n.id === selection.id)
+      return node !== undefined ? <BlockNodeForm node={node} /> : null
+    }
+    case 'block-group': {
+      const group = projection.groups.find((g) => g.id === selection.id)
+      return group !== undefined ? <BlockGroupForm group={group} /> : null
+    }
+    case 'block-edge': {
+      const edge = projection.edges.find((e) => e.elementId === selection.elementId)
+      return edge !== undefined ? <BlockEdgeForm edge={edge} /> : null
+    }
+    default:
+      return null
+  }
+}
+
 export function ProjectionSelectionForm({ projection, selection }: { projection: AnyProjection; selection: Selection | null }) {
   if (projection.type === 'flowchart') {
     return <FlowchartSelectionForm projection={projection.flowchart} selection={selection} />
@@ -542,6 +583,9 @@ export function ProjectionSelectionForm({ projection, selection }: { projection:
   }
   if (projection.type === 'requirement') {
     return <RequirementSelectionForm projection={projection.requirement} selection={selection} />
+  }
+  if (projection.type === 'block') {
+    return <BlockSelectionForm projection={projection.block} selection={selection} />
   }
   return <ClassSelectionForm projection={projection.class} selection={selection} />
 }

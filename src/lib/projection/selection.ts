@@ -56,6 +56,12 @@ export type Selection =
   | { kind: 'requirement'; name: string }
   | { kind: 'requirement-element'; name: string }
   | { kind: 'requirement-relation'; elementId: string }
+  // block(-beta)（more-diagrams 工单 09）：块节点与嵌套块是**名字即身份**（`block-node:<id>` /
+  // `block-group:<gid>`，嵌套块是分组）；边走位置序身份（`edge:N`）。space 是布局空位，
+  // 不构成选中种类。
+  | { kind: 'block-node'; id: string }
+  | { kind: 'block-group'; id: string }
+  | { kind: 'block-edge'; elementId: string }
 
 export const DIAGRAM_SELECTION: Selection = { kind: 'diagram' }
 
@@ -129,6 +135,12 @@ export function selectionKey(sel: Selection): string {
       return `requirement-element:${sel.name}`
     case 'requirement-relation':
       return `requirement-relation:${sel.elementId}`
+    case 'block-node':
+      return `block-node:${sel.id}`
+    case 'block-group':
+      return `block-group:${sel.id}`
+    case 'block-edge':
+      return `block-edge:${sel.elementId}`
   }
 }
 

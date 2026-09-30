@@ -168,6 +168,33 @@ export function parseKanbanCardElementId(elementId: string): { id: string; occur
   return parsed === null ? null : { id: parsed.key, occurrence: parsed.occurrence }
 }
 
+// ---------- block（more-diagrams 工单 09） ----------
+
+/**
+ * block 图的块节点声明（`block-node:a1` / 同名重复 `block-node:a1#2`）与
+ * 嵌套块声明（`block-group:gid` / `…#2`）。前缀带图种名：裸 `block:` 已是 sequence
+ * 逻辑块的位置序身份（`edge-identity.ts` 的 'block' kind），不能复用。
+ * 边（`edge:N`）、space（`space:N`）、columns（`columns:N`）是位置序字面量（ADR-0012），
+ * 不在此编码。
+ */
+export function blockNodeElementId(id: string, occurrence = 1): string {
+  return keyed('block-node', id, occurrence)
+}
+
+export function parseBlockNodeElementId(id: string): { id: string; occurrence: number } | null {
+  const parsed = parseKeyed('block-node', id)
+  return parsed === null ? null : { id: parsed.key, occurrence: parsed.occurrence }
+}
+
+export function blockGroupElementId(gid: string, occurrence = 1): string {
+  return keyed('block-group', gid, occurrence)
+}
+
+export function parseBlockGroupElementId(id: string): { id: string; occurrence: number } | null {
+  const parsed = parseKeyed('block-group', id)
+  return parsed === null ? null : { id: parsed.key, occurrence: parsed.occurrence }
+}
+
 // ---------- requirement（more-diagrams 工单 07） ----------
 
 /**

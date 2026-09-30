@@ -47,8 +47,7 @@ describe('detectDiagramType：无法识别 → unsupported（null），绝不默
     ['冷门图种 venn-beta', 'venn-beta\n    A o B\n'],
     ['纯文本', '这不是 Mermaid 源码\n'],
     ['空源码', ''],
-    ['裸 block', 'block\n    A\n'],
-    ['block-beta', 'block-beta\n    A\n'],
+    // block / block-beta 已注册（more-diagrams 工单 09），移入下方「返回 block」的用例
     ['裸 packet', 'packet\n    0-7: "x"\n'],
     ['packet-beta', 'packet-beta\n    0-7: "x"\n'],
     ['xychart-beta', 'xychart-beta\n    line [1, 2]\n'],
@@ -57,9 +56,17 @@ describe('detectDiagramType：无法识别 → unsupported（null），绝不默
   })
 
   it('flowchart 的 detect 不认领双关键字变体（原缺陷回归锁）', () => {
-    for (const source of ['block-beta\n', 'packet-beta\n', 'venn-beta\n', 'block\n']) {
+    for (const source of ['packet-beta\n', 'venn-beta\n']) {
       expect(DIAGRAM_TYPES.flowchart.detect(source)).toBe(false)
     }
+  })
+
+  it('block(-beta) 识别（more-diagrams 工单 09）：两个关键字都认领，不越界误判', () => {
+    expect(detectDiagramType('block-beta\n    A\n')?.id).toBe('block')
+    expect(detectDiagramType('block\n    A\n')?.id).toBe('block')
+    // `\b` 防越界：嵌套块声明行 / 更长的词不被误吞
+    expect(DIAGRAM_TYPES.block.detect('blockchain\n    A\n')).toBe(false)
+    expect(DIAGRAM_TYPES.block.detect('block:gid\n    A\nend\n')).toBe(false)
   })
 
   it('双关键字 detect 例（后续图种工单的写法约定）：-beta 可选且不越界误判', () => {
