@@ -67,6 +67,11 @@ export type ContextMenuTarget =
 // 空白菜单提供添加入口（任务/section 的编辑由结构树选中 + 属性表单承接）
 // pie（more-diagrams 工单 10）：画布 DOM 无 data-id（实测降级，见 pie-adapter），无元素级
 // 菜单目标；空白菜单提供添加入口（扇区的编辑由结构树选中 + 属性表单承接）
+// block（more-diagrams 工单 09）：节点选中 id 即语法 id；嵌套块 id 即 gid；
+// 边 elementId 即投影 elementId（`edge:N`，位置序身份）
+  | { kind: 'block-node'; id: string }
+  | { kind: 'block-group'; id: string }
+  | { kind: 'block-edge'; elementId: string }
 
 export type ContextMenuItemId =
   | 'add-node'
@@ -145,6 +150,11 @@ export type ContextMenuItemId =
   // pie（more-diagrams 工单 10）：空白 = 加扇区（数值落 1，可在右侧表单改）。
   // 扇区的编辑不做元素级画布菜单（无 data-id 可命中），由结构树选中 + 属性表单承接。
   | 'add-pie-sector'
+  // block（more-diagrams 工单 09）：空白 = 加块节点 / 加嵌套块（创建 + 内联命名）；
+  // 节点 = 改标签（内联编辑）/ 删除；嵌套块 = 加块节点（落进组内）/ 删除；
+  // 边 = 在属性面板中编辑（选中 + 关菜单）/ 删除
+  | 'add-block-node'
+  | 'add-block-group'
 
 /**
  * 画布选中 → 菜单目标（工单 03 起为 `canvas-selection/selection-codec.ts` 的
@@ -191,6 +201,9 @@ function blankMenuItems(diagramType: DiagramTypeId): ContextMenuItemId[] {
     case 'pie':
       // pie 的空白入口（工单 10 定案）：加扇区（数值落 1，标签避重，右侧表单可改）
       return ['add-pie-sector']
+    case 'block':
+      // block 的空白入口（more-diagrams 工单 09）：加块节点（创建 + 内联命名）与加嵌套块
+      return ['add-block-node', 'add-block-group']
     // DiagramTypeId 是开放类型（more-diagrams 工单 01）：未接入画布能力包的图种
     // 没有空白右键入口（unsupported 态下画布右键整体停用，不会走到这里）
     default:
@@ -277,5 +290,13 @@ export function contextMenuItems(target: ContextMenuTarget): ContextMenuItemId[]
       return ['edit-requirement-field', 'link-from-here', 'delete']
     case 'requirement-relation':
       return ['cycle-requirement-kind', 'invert-requirement-relation', 'delete']
+    // block（more-diagrams 工单 09）：节点 = 改标签（内联编辑）/ 删除；
+    // 嵌套块 = 加块节点（落进组内）/ 删除；边 = 在属性面板中编辑 / 删除
+    case 'block-node':
+      return ['edit-text', 'delete']
+    case 'block-group':
+      return ['add-block-node', 'delete']
+    case 'block-edge':
+      return ['edit-label', 'delete']
   }
 }

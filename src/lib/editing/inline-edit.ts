@@ -8,6 +8,8 @@ import { isValidKanbanText } from '../pipeline/kanban'
 import { parseKanbanCardElementId, parseKanbanColumnElementId } from '../pipeline/element-id'
 import { isValidRequirementFieldValue } from '../pipeline/requirement'
 import { parseRequirementBlockElementId } from '../pipeline/element-id'
+import { isValidBlockLabel } from '../pipeline/block'
+import { parseBlockNodeElementId } from '../pipeline/element-id'
 import type { ProjectionMindmapNode } from '../projection/mindmap-projection'
 import { selectionFromEventTarget, type CanvasSelection, type DataIdResolver } from '../canvas-selection/data-id'
 
@@ -62,6 +64,9 @@ export type CanvasInlineEditTarget =
    * （set-requirement-field 意图；名字是语法标识，不在此改。element 无双击编辑——
    * 工单 07 明确：element 的 type/docref 是元数据，展示与编辑都在右侧表单） */
   | { kind: 'requirement'; name: string }
+  /** block（more-diagrams 工单 09）：双击块节点改标签（set-node-label 意图；id 是语法
+   * 标识，不在此改。嵌套块无双击——组没有标签，宽度/列数在右侧属性表单改） */
+  | { kind: 'block-node'; id: string }
 
 export type InlineEditCommit =
   | { action: 'commit'; intent: EditIntent }
@@ -126,6 +131,7 @@ export type InlineEditDiagramKind =
   | 'er'
   | 'kanban'
   | 'requirement'
+  | 'block'
 
 /**
  * 双击目标 → 编辑对象；两边都匹配不上时返回 null（如点在空白处/边上），
@@ -163,6 +169,12 @@ export function inlineEditTargetFromEvent(
     if (kind === 'requirement') {
       const requirement = parseRequirementBlockElementId(byId.nodeId)
       return requirement !== null ? { kind: 'requirement', name: requirement.name } : null
+    }
+    // block（more-diagrams 工单 09）：resolver 返回 elementId（`block-node:<id>` /
+    // `block-group:<gid>`）；只有块节点可双击（改标签），嵌套块双击安静忽略
+    if (kind === 'block') {
+      const node = parseBlockNodeElementId(byId.nodeId)
+      return node !== null ? { kind: 'block-node', id: node.id } : null
     }
     return byId
   }
@@ -218,6 +230,12 @@ export function inlineEditCommitOf(target: CanvasInlineEditTarget, text: string,
       action: 'commit',
       intent: { type: 'set-requirement-field', requirement: target.name, field: 'text', value: next },
     }
+  }
+  if (target.kind === 'block-node') {
+    // block（more-diagrams 工单 09）：非空改动 = set-node-label（标签含引号/方括号/换行
+    // 非法；清空 = 去掉标签变裸形状，走属性表单而非双击——顶部守卫已按 unchanged 关闭）
+    if (!isValidBlockLabel(next)) return { action: 'invalid' }
+    return { action: 'commit', intent: { type: 'set-node-label', id: target.id, label: next } }
   }
   if (!isValidMindmapNodeText(next)) return { action: 'invalid' }
   return { action: 'commit', intent: { type: 'set-node-text', elementId: target.elementId, text: next } }

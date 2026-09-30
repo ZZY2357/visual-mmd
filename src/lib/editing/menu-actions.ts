@@ -16,6 +16,7 @@ import { isValidTimelineSectionName, type TimelineIntent } from '../pipeline/tim
 import { isValidJourneySectionName, isValidJourneyTaskName, type JourneyIntent } from '../pipeline/journey'
 import { isValidPieLabel, type PieIntent } from '../pipeline/pie'
 import { isValidKanbanId } from '../pipeline/kanban'
+import { isValidBlockId } from '../pipeline/block'
 import { setRelationIntent, RELATION_KIND_OPTIONS } from './class-forms'
 import {
   setMessageIntent,
@@ -179,6 +180,27 @@ export function createElement(ctx: MenuActionContext, target: ContextMenuTarget 
       // （不做内联编辑——画布无 data-id，工单降级定案），不走 createElement
       return null
     }
+    if (proj.type === 'block') {
+      // block（more-diagrams 工单 09）：空白 = 新建顶层块节点 + 内联编辑标签；
+      // 嵌套块上 = 新建块节点落进该组（锚点 = 组声明行）。id 全局避重（节点与
+      // 嵌套块共享 id 名空间——mermaid 的 blockDatabase 是一张 Map）。
+      const used = [...proj.block.nodes.map((n) => n.id), ...proj.block.groups.map((g) => g.id)]
+      const id = nextFreeName('b', used)
+      if (!isValidBlockId(id)) return null
+      const parentGroupId =
+        target !== undefined && target.kind === 'block-group' ? target.id : null
+      const anchor =
+        target !== undefined && target.kind === 'block-group'
+          ? (proj.block.groups.find((g) => g.id === target.id)?.elementId ?? undefined)
+          : undefined
+      return {
+        intents: [{ type: 'add-node', id, shape: 'square', label: id, parentGroupId, afterElementId: anchor }],
+        newElementTarget: {
+          selection: { kind: 'block-node', id },
+          inlineEdit: { kind: 'block-node', id },
+        },
+      }
+    }
     // mindmap：节点目标 = 挂为其子节点；空白 / 无目标 = 建根（空文档）或挂到根节点下
     const text = ctx.newNodeText
     let mindPlan: MindmapActionPlan | null
@@ -273,6 +295,8 @@ function beginEditText(ctx: MenuActionContext, target: ContextMenuTarget | undef
   // kanban（more-diagrams 工单 06）：列 = 改标题、卡片 = 改描述（都是内联编辑显示文本）
   else if (target.kind === 'kanban-column') ctx.beginInlineEdit({ kind: 'kanban-column', elementId: target.elementId })
   else if (target.kind === 'kanban-card') ctx.beginInlineEdit({ kind: 'kanban-card', elementId: target.elementId })
+  // block（more-diagrams 工单 09）：块节点改标签（内联编辑，set-node-label 落码）
+  else if (target.kind === 'block-node') ctx.beginInlineEdit({ kind: 'block-node', id: target.id })
   ctx.close()
 }
 
@@ -482,6 +506,21 @@ function addPieSector(ctx: MenuActionContext): void {
   if (applyPlan(plan, { commitIntent: ctx.commitIntent, select: ctx.select })) ctx.close()
 }
 
+/** block 空白加嵌套块（more-diagrams 工单 09）：落 `block:gid` + `end` 两行，
+ * 选中新组（组无标签，不做内联命名——宽度/列数在右侧属性表单改）。id 全局避重。 */
+function addBlockGroup(ctx: MenuActionContext): void {
+  const proj = ctx.projection
+  if (proj === null || proj.type !== 'block') return
+  const used = [...proj.block.nodes.map((n) => n.id), ...proj.block.groups.map((g) => g.id)]
+  const id = nextFreeName('g', used)
+  if (!isValidBlockId(id)) return
+  const plan: KeyPlan = {
+    intents: [{ type: 'add-group', id }],
+    newElementTarget: { selection: { kind: 'block-group', id } },
+  }
+  if (applyPlan(plan, { commitIntent: ctx.commitIntent, select: ctx.select })) ctx.close()
+}
+
 export const MENU_ACTIONS: Record<Exclude<ContextMenuItemId, 'apply-style'>, MenuAction> = {
   // 「创建 + 选中 + 内联命名」五个入口共用 createElement（工单 01 收敛）
   'add-node': createElement,
@@ -542,6 +581,10 @@ export const MENU_ACTIONS: Record<Exclude<ContextMenuItemId, 'apply-style'>, Men
   'edit-requirement-field': selectMenuTargetAndClose,
   'cycle-requirement-kind': cycleRequirementKind,
   'invert-requirement-relation': invertRequirementRelation,
+  // block（more-diagrams 工单 09）：add-block-node 走 createElement 的 block 分支
+  // （空白 = 顶层节点 / 嵌套块上 = 落进组内）；add-block-group = 落 `block:gid` + `end` 两行
+  'add-block-node': createElement,
+  'add-block-group': addBlockGroup,
   // state（more-diagrams 工单 02）：add-state 走 createElement 的 state 分支（空白入口）
   'add-state-into': addStateIntoComposite,
   // kanban（more-diagrams 工单 06）：add-column 走 createElement 的 kanban 分支（空白入口）；

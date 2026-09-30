@@ -12,6 +12,7 @@ import { kanbanParser } from './pipeline/kanban'
 import { requirementParser } from './pipeline/requirement'
 import { journeyParser } from './pipeline/journey'
 import { pieParser } from './pipeline/pie'
+import { blockParser } from './pipeline/block'
 import { frontmatterEnd } from './pipeline/frontmatter'
 import { buildFlowchartProjection, type FlowchartProjection } from './projection/flowchart-projection'
 import { buildSequenceProjection, type SequenceProjection } from './projection/sequence-projection'
@@ -28,6 +29,7 @@ import {
 } from './projection/requirement-projection'
 import { buildJourneyProjection, type JourneyProjection } from './projection/journey-projection'
 import { buildPieProjection, type PieProjection } from './projection/pie-projection'
+import { buildBlockProjection, type BlockProjection } from './projection/block-projection'
 import { flowchartCanvasCapabilities } from './canvas-selection/flowchart-adapter'
 import { sequenceCanvasCapabilities } from './canvas-selection/sequence-adapter'
 import { classCanvasCapabilities } from './canvas-selection/class-adapter'
@@ -40,6 +42,7 @@ import { kanbanCanvasCapabilities } from './canvas-selection/kanban-adapter'
 import { requirementCanvasCapabilities } from './canvas-selection/requirement-adapter'
 import { journeyCanvasCapabilities } from './canvas-selection/journey-adapter'
 import { pieCanvasCapabilities } from './canvas-selection/pie-adapter'
+import { blockCanvasCapabilities } from './canvas-selection/block-adapter'
 import type { CanvasCapabilities } from './canvas-selection/capabilities'
 import { treePartitions, type TreePartitions } from './structure-tree/partitions'
 import { DEFAULT_DIAGRAM_SOURCE } from './storage'
@@ -73,6 +76,7 @@ export interface ProjectionTypes {
   requirement: RequirementProjection
   journey: JourneyProjection
   pie: PieProjection
+  block: BlockProjection
 }
 
 /** 已注册图种的 id 集合（字面量联合，随 ProjectionTypes 增长） */
@@ -286,6 +290,29 @@ export const PIE_TEMPLATE = `pie showData
 `
 
 /**
+ * block 起步模板（more-diagrams 工单 09）：`columns 3`、三个不同形状块（方形 / 菱形 /
+ * 圆角 + 圆柱）、一条带标签箭头、一个嵌套块、一个 space。块图无自动布局——
+ * 网格位置完全由书写顺序 + columns 决定，space 即显式空位。
+ */
+export const BLOCK_TEMPLATE = `block-beta
+    columns 3
+
+    a["输入"]
+    space
+    b{"校验"}
+    c["输出"]
+
+    block:group1
+        columns 2
+        d("缓存")
+        e[("数据库")]
+    end
+
+    a --> b
+    b -- "通过" --> c
+`
+
+/**
  * 注册表：数组是唯一权威（more-diagrams 工单 01），DIAGRAM_TYPES 由它推导。
  * detectDiagramType 按数组顺序显式遍历——不再维护手写的 if 分发链，
  * 新图种挂一条即可参与识别，无法识别时不再默认 flowchart（见下）。
@@ -403,6 +430,18 @@ export const DIAGRAM_TYPE_LIST: DiagramTypeRegistration[] = [
     buildProjection: (doc) => ({ type: 'pie', pie: buildPieProjection(doc) }),
     tree: treePartitions.pie,
     canvas: pieCanvasCapabilities,
+  },
+  {
+    id: 'block',
+    parser: blockParser,
+    template: BLOCK_TEMPLATE,
+    // 老用户源码更常见 block-beta；12.0.0 起文档统一 block——两个关键字都认（工单决策）。
+    // 声明行必须是裸关键字（行尾只允许空白，与 BlockParser.HEADER_RE 同口径）——
+    // `block:gid`（嵌套块声明）不是合法表头，不被认领；`blockX` 也不被误吞
+    detect: (source) => /^block(-beta)?[ \t\r]*$/i.test(firstStatementLine(source)),
+    buildProjection: (doc) => ({ type: 'block', block: buildBlockProjection(doc) }),
+    tree: treePartitions.block,
+    canvas: blockCanvasCapabilities,
   },
 ]
 

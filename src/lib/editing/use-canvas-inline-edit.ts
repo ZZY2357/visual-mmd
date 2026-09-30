@@ -81,6 +81,10 @@ export function inlineEditTextOf(projection: AnyProjection | null, target: Canva
     //（输入即新增字段行；清空字段 = 删字段行，走右侧属性表单）
     return projection.requirement.requirements.find((r) => r.name === target.name)?.text ?? ''
   }
+  if (projection.type === 'block' && target.kind === 'block-node') {
+    // block 双击编辑的是标签（more-diagrams 工单 09）：无标签节点预填语法 id
+    return projection.block.nodes.find((n) => n.id === target.id)?.label ?? target.id
+  }
   return ''
 }
 
@@ -161,6 +165,13 @@ function findTargetElement(root: Element, target: CanvasInlineEditTarget, text: 
     }
     return null
   }
+  if (target.kind === 'block-node') {
+    // block 的 data-id 即语法 id（渲染后处理从 `g.block` 内的 DOM id 反注，工单 09）
+    for (const el of root.querySelectorAll('[data-id]')) {
+      if (el.getAttribute('data-id') === target.id) return el
+    }
+    return null
+  }
   return findMindmapElement(root, target.elementId, text)
 }
 
@@ -234,7 +245,9 @@ export function useCanvasInlineEdit({ projection, resolver, svg, containerRef, v
                     ? 'requirement'
                     : type === 'kanban'
                       ? 'kanban'
-                      : 'flowchart'
+                      : type === 'block'
+                        ? 'block'
+                        : 'flowchart'
       const target = inlineEditTargetFromEvent(e.target, resolver, mindmapNodes, kind)
       if (target === null) return
       e.preventDefault()

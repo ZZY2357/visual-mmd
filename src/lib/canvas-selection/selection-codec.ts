@@ -10,6 +10,11 @@ import {
   parseRequirementBlockElementId,
   parseRequirementElemBlockElementId,
 } from '../pipeline/element-id'
+import { blockSelectionOf } from './block-adapter'
+import {
+  parseBlockGroupElementId,
+  parseBlockNodeElementId,
+} from '../pipeline/element-id'
 import type { ContextMenuTarget } from '../editing/context-menu'
 
 /**
@@ -87,6 +92,13 @@ export function canvasIdOf(selection: Selection): string | null {
       return selection.name
     case 'requirement-relation':
       return selection.elementId
+    // block（more-diagrams 工单 09）：节点/嵌套块 data-id 即语法 id（渲染后从
+    // `g.block` 内的 DOM id 反注）；边走位置序身份 `edge:N`
+    case 'block-node':
+    case 'block-group':
+      return selection.id
+    case 'block-edge':
+      return selection.elementId
     default:
       return null
   }
@@ -135,6 +147,11 @@ export function fromCanvasId(diagramType: DiagramTypeId, canvas: CanvasSelection
     // requirement（more-diagrams 工单 07）：节点 data-id 即**投影 elementId**
     // （`requirement:<名>` / `requirement-element:<名>`，由 resolver 反注），关系走位置序
     return requirementSelectionOf(canvas)
+  }
+  if (diagramType === 'block') {
+    // block（more-diagrams 工单 09）：节点 data-id 即语法 id，resolver 反注成
+    // `block-node:<id>` / `block-group:<gid>`，按前缀解回；边走位置序（edgeSelectionOf 收窄）
+    return blockSelectionOf(canvas)
   }
   if (canvas.kind === 'element') return edgeSelectionOf(diagramType, canvas.elementId)
   if (canvas.kind === 'node') {
@@ -195,6 +212,13 @@ export function selectionOfMenuTarget(target: ContextMenuTarget): Selection | nu
       return { kind: 'requirement-element', name: target.name }
     case 'requirement-relation':
       return { kind: 'requirement-relation', elementId: target.elementId }
+    // block（more-diagrams 工单 09）：节点 / 嵌套块 / 边菜单目标一一对应各自 Selection kind
+    case 'block-node':
+      return { kind: 'block-node', id: target.id }
+    case 'block-group':
+      return { kind: 'block-group', id: target.id }
+    case 'block-edge':
+      return { kind: 'block-edge', elementId: target.elementId }
     case 'blank':
       return null
   }
@@ -240,6 +264,14 @@ export function menuTargetOfCanvas(
       const element = parseRequirementElemBlockElementId(canvas.id)
       return element !== null ? { kind: 'requirement-element', name: element.name } : null
     }
+    // block（more-diagrams 工单 09）：node.id = 投影 elementId（`block-node:<id>` /
+    // `block-group:<gid>`），按前缀解回两类节点；都解不开 → null（安静地不弹菜单）
+    if (diagramType === 'block') {
+      const node = parseBlockNodeElementId(canvas.id)
+      if (node !== null) return { kind: 'block-node', id: node.id }
+      const group = parseBlockGroupElementId(canvas.id)
+      return group !== null ? { kind: 'block-group', id: group.id } : null
+    }
     return { kind: 'sequence-participant', actorId: canvas.id }
   }
   if (canvas.kind === 'element') {
@@ -261,6 +293,8 @@ export function menuTargetOfCanvas(
         return { kind: 'er-relation', elementId: editorSelection.elementId }
       case 'requirement-relation':
         return { kind: 'requirement-relation', elementId: editorSelection.elementId }
+      case 'block-edge':
+        return { kind: 'block-edge', elementId: editorSelection.elementId }
       default:
         return null
     }

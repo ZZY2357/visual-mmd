@@ -128,6 +128,15 @@ function nodeFormForTarget(
     if (block === undefined) return null
     return { kind, anchorElementId: block.tailElementId, from: target.name, x, y }
   }
+  if (kind === 'block-edge') {
+    // block 边表单（more-diagrams 工单 09）：块节点 Enter 键 → 锚点为该节点声明行，
+    // 预选起点该节点；终点由表单选择
+    if (proj.type !== 'block') return null
+    if (target.kind !== 'block-node') return null
+    const node = proj.block.nodes.find((n) => n.id === target.id)
+    if (node === undefined) return null
+    return { kind, anchorElementId: node.elementId ?? undefined, from: target.id, x, y }
+  }
   if (kind === 'block') {
     // sequence 独有的添加逻辑块：参与者上右键 → 锚点为该参与者的声明；
     // 空白处右键 → 无锚点（管线回退到文档最后一个元素）
@@ -164,6 +173,8 @@ function formTargetOfSelection(selection: Selection): ContextMenuTarget | null {
   if (selection.kind === 'er-entity') return { kind: 'er-entity', name: selection.name }
   if (selection.kind === 'requirement') return { kind: 'requirement-node', name: selection.name }
   if (selection.kind === 'requirement-element') return { kind: 'requirement-element', name: selection.name }
+  // block（more-diagrams 工单 09）：块节点 → 边表单（Enter 键）的锚点与预选起点
+  if (selection.kind === 'block-node') return { kind: 'block-node', id: selection.id }
   return null
 }
 
@@ -338,7 +349,16 @@ export function useCanvasContextMenu(
    * 与右键菜单共用 nodeFormForTarget，**不新造浮层**。选中不是类/参与者时安静地不打开。
    */
   const openFormForSelection = useCallback(
-    (kind: 'member' | 'relation' | 'message' | 'transition' | 'er-relation' | 'requirement-relation'): void => {
+    (
+      kind:
+        | 'member'
+        | 'relation'
+        | 'message'
+        | 'transition'
+        | 'er-relation'
+        | 'requirement-relation'
+        | 'block-edge',
+    ): void => {
       const proj = latest.current.projection
       const { selection } = useEditorStore.getState()
       if (proj === null || selection === null) return

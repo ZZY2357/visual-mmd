@@ -19,6 +19,7 @@ import { stateDataIdResolver } from '../../canvas-selection/state-adapter'
 import { erDataIdResolver } from '../../canvas-selection/er-adapter'
 import { kanbanDataIdResolver } from '../../canvas-selection/kanban-adapter'
 import { requirementDataIdResolver } from '../../canvas-selection/requirement-adapter'
+import { blockDataIdResolver } from '../../canvas-selection/block-adapter'
 import { nodeDataIdResolver, elementDataIdResolver } from '../../canvas-selection/data-id'
 import type { AnyProjection } from '../../diagram-registry'
 import { useCanvasContextMenu, type NodeFormState } from '../use-canvas-context-menu'
@@ -109,6 +110,7 @@ function resolverOf(projection: AnyProjection) {
   if (projection.type === 'journey') return () => null
   // pie：无 data-id 寻址（more-diagrams 工单 10），resolver 永不命中
   if (projection.type === 'pie') return () => null
+  if (projection.type === 'block') return blockDataIdResolver(projection.block)
   const nodes = nodeDataIdResolver(projection.class.classes.map((c) => c.name))
   const edges = elementDataIdResolver(projection.class.relations.map((r) => r.elementId))
   return (dataId: string) => nodes(dataId) ?? edges(dataId)
@@ -136,6 +138,8 @@ function createdIdOf(target: CanvasInlineEditTarget): string {
       return target.elementId
     case 'requirement':
       return target.name
+    case 'block-node':
+      return target.id
   }
 }
 
