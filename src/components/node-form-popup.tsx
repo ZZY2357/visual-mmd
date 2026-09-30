@@ -12,6 +12,7 @@ import {
   AddRequirementRelationInlineForm,
 } from './requirement-forms'
 import { AddBlockEdgeInlineForm } from './block-forms'
+import { AddSankeyLinkInlineForm } from './sankey-forms'
 
 /**
  * class/sequence 节点菜单的表单浮层（工单 06/04；工单 04-canvas-bundle 自 CanvasPanel 迁出）：
@@ -120,6 +121,14 @@ export function NodeFormPopup(props: { state: NodeFormState; projection: AnyProj
             nodeIds={projection.block.nodes.map((n) => n.id)}
             groupIds={projection.block.groups.map((g) => g.id)}
             initialFrom={state.from}
+            afterElementId={state.anchorElementId}
+            onDone={props.onClose}
+          />
+        )}
+        {state.kind === 'sankey-link' && projection.type === 'sankey' && (
+          <AddSankeyLinkInlineForm
+            nodeNames={projection.sankey.nodes.map((n) => n.name)}
+            initialSource={state.from}
             afterElementId={state.anchorElementId}
             onDone={props.onClose}
           />

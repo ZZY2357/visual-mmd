@@ -69,6 +69,10 @@ export type Selection =
   | { kind: 'block-node'; id: string }
   | { kind: 'block-group'; id: string }
   | { kind: 'block-edge'; elementId: string }
+  // sankey-beta（more-diagrams 工单 13）：节点**不落码**（链路行 source/target 去重派生），
+  // 名字即身份；链路走位置序身份（`link:N`）。画布 DOM 经位置序反注可寻址。
+  | { kind: 'sankey-node'; name: string }
+  | { kind: 'sankey-link'; elementId: string }
 
 export const DIAGRAM_SELECTION: Selection = { kind: 'diagram' }
 
@@ -154,6 +158,10 @@ export function selectionKey(sel: Selection): string {
       return `block-group:${sel.id}`
     case 'block-edge':
       return `block-edge:${sel.elementId}`
+    case 'sankey-node':
+      return `sankey-node:${sel.name}`
+    case 'sankey-link':
+      return `sankey-link:${sel.elementId}`
   }
 }
 

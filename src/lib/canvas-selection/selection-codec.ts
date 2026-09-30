@@ -99,6 +99,12 @@ export function canvasIdOf(selection: Selection): string | null {
       return selection.id
     case 'block-edge':
       return selection.elementId
+    // sankey（more-diagrams 工单 13）：节点 data-id 即名字（渲染后从 `g.nodes` 内按
+    // 位置序反注）；链路走位置序身份 `link:N`（渲染后从 `g.links` 内按位置序反注）
+    case 'sankey-node':
+      return selection.name
+    case 'sankey-link':
+      return selection.elementId
     default:
       return null
   }
@@ -152,6 +158,13 @@ export function fromCanvasId(diagramType: DiagramTypeId, canvas: CanvasSelection
     // block（more-diagrams 工单 09）：节点 data-id 即语法 id，resolver 反注成
     // `block-node:<id>` / `block-group:<gid>`，按前缀解回；边走位置序（edgeSelectionOf 收窄）
     return blockSelectionOf(canvas)
+  }
+  if (diagramType === 'sankey') {
+    // sankey（more-diagrams 工单 13）：节点 data-id 即名字（位置序反注），名字即身份；
+    // 链路走位置序（edgeSelectionOf 收窄）
+    if (canvas.kind === 'node') return { kind: 'sankey-node', name: canvas.id }
+    if (canvas.kind === 'element') return edgeSelectionOf(diagramType, canvas.elementId)
+    return null
   }
   if (canvas.kind === 'element') return edgeSelectionOf(diagramType, canvas.elementId)
   if (canvas.kind === 'node') {
@@ -219,6 +232,11 @@ export function selectionOfMenuTarget(target: ContextMenuTarget): Selection | nu
       return { kind: 'block-group', id: target.id }
     case 'block-edge':
       return { kind: 'block-edge', elementId: target.elementId }
+    // sankey（more-diagrams 工单 13）：节点 / 链路菜单目标一一对应各自 Selection kind
+    case 'sankey-node':
+      return { kind: 'sankey-node', name: target.name }
+    case 'sankey-link':
+      return { kind: 'sankey-link', elementId: target.elementId }
     case 'blank':
       return null
   }
@@ -272,6 +290,8 @@ export function menuTargetOfCanvas(
       const group = parseBlockGroupElementId(canvas.id)
       return group !== null ? { kind: 'block-group', id: group.id } : null
     }
+    // sankey（more-diagrams 工单 13）：node.id = 节点名（位置序反注），名字即身份
+    if (diagramType === 'sankey') return { kind: 'sankey-node', name: canvas.id }
     return { kind: 'sequence-participant', actorId: canvas.id }
   }
   if (canvas.kind === 'element') {
@@ -295,6 +315,8 @@ export function menuTargetOfCanvas(
         return { kind: 'requirement-relation', elementId: editorSelection.elementId }
       case 'block-edge':
         return { kind: 'block-edge', elementId: editorSelection.elementId }
+      case 'sankey-link':
+        return { kind: 'sankey-link', elementId: editorSelection.elementId }
       default:
         return null
     }

@@ -44,6 +44,7 @@ export interface StyleFormState {
  * 由投影图种决定渲染哪个表单。 */
 // requirement（more-diagrams 工单 07）：'requirement-relation' = 从选中节点拉一条关系
 // block（more-diagrams 工单 09）：'block-edge' = 从选中块节点拉一条边
+// sankey（more-diagrams 工单 13）：'sankey-link' = 加链路（source 预填同源，空白/链路上均可）
 export type NodeFormKind =
   | 'member'
   | 'relation'
@@ -60,6 +61,8 @@ export type NodeFormKind =
   | 'requirement-relation'
   // block（more-diagrams 工单 09）：从块节点拉一条边
   | 'block-edge'
+  // sankey（more-diagrams 工单 13）：加链路（三列表单）
+  | 'sankey-link'
 
 export interface NodeFormState {
   kind: NodeFormKind

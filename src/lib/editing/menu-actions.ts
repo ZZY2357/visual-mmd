@@ -180,6 +180,11 @@ export function createElement(ctx: MenuActionContext, target: ContextMenuTarget 
       // （不做内联编辑——画布无 data-id，工单降级定案），不走 createElement
       return null
     }
+    if (proj.type === 'sankey') {
+      // sankey（more-diagrams 工单 13）：添加入口是独立的 add-sankey-link 动作
+      // （三列表单浮出，提交才落码；链路才有落码语法，无「创建节点」形态），不走 createElement
+      return null
+    }
     if (proj.type === 'block') {
       // block（more-diagrams 工单 09）：空白 = 新建顶层块节点 + 内联编辑标签；
       // 嵌套块上 = 新建块节点落进该组（锚点 = 组声明行）。id 全局避重（节点与
@@ -585,6 +590,10 @@ export const MENU_ACTIONS: Record<Exclude<ContextMenuItemId, 'apply-style'>, Men
   // （空白 = 顶层节点 / 嵌套块上 = 落进组内）；add-block-group = 落 `block:gid` + `end` 两行
   'add-block-node': createElement,
   'add-block-group': addBlockGroup,
+  // sankey（more-diagrams 工单 13）：空白 = 加链路（三列表单浮出，提交才落码）；
+  // 节点 = 重命名（选中 + 关菜单，在右侧属性表单改）
+  'add-sankey-link': openFormOf('sankey-link'),
+  'edit-sankey-name': selectMenuTargetAndClose,
   // state（more-diagrams 工单 02）：add-state 走 createElement 的 state 分支（空白入口）
   'add-state-into': addStateIntoComposite,
   // kanban（more-diagrams 工单 06）：add-column 走 createElement 的 kanban 分支（空白入口）；
