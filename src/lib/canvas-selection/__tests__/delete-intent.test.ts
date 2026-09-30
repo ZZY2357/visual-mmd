@@ -3,6 +3,7 @@ import {
   CLASS_TEMPLATE,
   MINDMAP_TEMPLATE,
   SEQUENCE_TEMPLATE,
+  TIMELINE_TEMPLATE,
   type AnyProjection,
 } from '../../diagram-registry'
 import type { EditIntent } from '../../pipeline/parser'
@@ -10,16 +11,19 @@ import { classParser } from '../../pipeline/class'
 import { flowchartParser } from '../../pipeline/flowchart'
 import { mindmapParser } from '../../pipeline/mindmap'
 import { sequenceParser } from '../../pipeline/sequence'
+import { timelineParser } from '../../pipeline/timeline'
 import { buildClassProjection } from '../../projection/class-projection'
 import { buildFlowchartProjection } from '../../projection/flowchart-projection'
 import { buildMindmapProjection } from '../../projection/mindmap-projection'
 import { buildSequenceProjection } from '../../projection/sequence-projection'
+import { buildTimelineProjection } from '../../projection/timeline-projection'
 import type { Selection } from '../../projection/selection'
 import {
   classDeleteIntent,
   mindmapActionIntents,
   nodeActionIntents,
   sequenceDeleteIntent,
+  timelineDeleteIntent,
 } from '../../editing/canvas-keyboard'
 import {
   deleteClassDefIntent,
@@ -87,6 +91,11 @@ function mindProjection(): Extract<AnyProjection, { type: 'mindmap' }> {
   const parsed = mindmapParser.parse(MINDMAP_TEMPLATE)
   if (!parsed.ok) throw new Error(parsed.error.message)
   return { type: 'mindmap', mindmap: buildMindmapProjection(parsed.doc) }
+}
+function timelineProjection(): Extract<AnyProjection, { type: 'timeline' }> {
+  const parsed = timelineParser.parse(TIMELINE_TEMPLATE)
+  if (!parsed.ok) throw new Error(parsed.error.message)
+  return { type: 'timeline', timeline: buildTimelineProjection(parsed.doc) }
 }
 
 /** 每个图种的一组「selection → 属性面板删除按钮会提交的意图」用例 */
@@ -201,11 +210,33 @@ function mindmapCases(p: ReturnType<typeof mindProjection>): DeleteCase[] {
   ]
 }
 
+function timelineCases(p: ReturnType<typeof timelineProjection>): DeleteCase[] {
+  const period = p.timeline.periods[0]
+  const event = p.timeline.events[0]
+  return [
+    {
+      name: 'timeline-period',
+      selection: { kind: 'timeline-period', elementId: period.elementId },
+      panelIntent: timelineDeleteIntent(p.timeline, { kind: 'timeline-period', elementId: period.elementId })!,
+      menuTarget: { kind: 'timeline-period', elementId: period.elementId },
+      menuItemId: 'delete',
+    },
+    {
+      name: 'timeline-event',
+      selection: { kind: 'timeline-event', elementId: event.elementId },
+      panelIntent: timelineDeleteIntent(p.timeline, { kind: 'timeline-event', elementId: event.elementId })!,
+      menuTarget: { kind: 'timeline-event', elementId: event.elementId },
+      menuItemId: 'delete',
+    },
+  ]
+}
+
 const SUITES = [
   { type: 'flowchart' as const, projection: flowProjection, cases: flowchartCases },
   { type: 'class' as const, projection: classProjection, cases: classCases },
   { type: 'sequence' as const, projection: seqProjection, cases: sequenceCases },
   { type: 'mindmap' as const, projection: mindProjection, cases: mindmapCases },
+  { type: 'timeline' as const, projection: timelineProjection, cases: timelineCases },
 ]
 
 describe('deleteIntent 等价性：三个删除入口对同一 selection 产出同一意图（工单 03）', () => {
@@ -240,6 +271,8 @@ describe('deleteIntent 等价性：三个删除入口对同一 selection 产出�
                 return classDeleteIntent(projection.class, sel)
               case 'sequence':
                 return sequenceDeleteIntent(projection.sequence, sel)
+              case 'timeline':
+                return timelineDeleteIntent(projection.timeline, sel)
             }
           })()
           // 键盘按选中种类设门（flowchart/mindmap 只删节点）；门内的种类必须与能力包等价
@@ -247,7 +280,8 @@ describe('deleteIntent 等价性：三个删除入口对同一 selection 产出�
             (suite.type === 'flowchart' && sel.kind === 'node') ||
             (suite.type === 'mindmap' && sel.kind === 'mindmap-node') ||
             suite.type === 'class' ||
-            suite.type === 'sequence'
+            suite.type === 'sequence' ||
+            suite.type === 'timeline'
           if (!keyboardHandles) {
             expect(viaKeyboard).toBeNull() // 门外：键盘安静地不产出意图（零变化护栏）
             return
@@ -300,6 +334,7 @@ describe('deleteIntent 等价性：三个删除入口对同一 selection 产出�
           class: { kind: 'class', name: '__不存在__' },
           sequence: { kind: 'participant', actorId: '__不存在__' },
           mindmap: { kind: 'mindmap-node', elementId: 'mindmap-node:999' },
+          timeline: { kind: 'timeline-period', elementId: 'period:999' },
         }
         expect(caps.deleteIntent(projection, gone[suite.type])).toBeNull()
 

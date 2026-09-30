@@ -10,6 +10,7 @@ import { nextNodeId, mindmapActionIntents, applyPlan, type MindmapActionPlan, ty
 import { nextFreeName } from '../pipeline/element-id'
 import { isValidStateId } from '../pipeline/state'
 import { isValidErName } from '../pipeline/er'
+import { isValidTimelineSectionName, type TimelineIntent } from '../pipeline/timeline'
 import { setRelationIntent, RELATION_KIND_OPTIONS } from './class-forms'
 import {
   setMessageIntent,
@@ -132,6 +133,10 @@ export function createElement(ctx: MenuActionContext, target: ContextMenuTarget 
         intents: [{ type: 'add-entity', name }],
         newElementTarget: { selection: { kind: 'er-entity', name }, inlineEdit: { kind: 'er', name } },
       }
+    }
+    if (proj.type === 'timeline') {
+      // timeline 的创建动作（加时期 / 加分组 / 加事件）由专用动作实现，不经 createElement
+      return null
     }
     // mindmap：节点目标 = 挂为其子节点；空白 / 无目标 = 建根（空文档）或挂到根节点下
     const text = ctx.newNodeText
@@ -262,6 +267,56 @@ function openFormOf(kind: NodeFormKind): MenuAction {
   return (ctx) => ctx.openForm(kind)
 }
 
+// ---------- timeline（more-diagrams 工单 05） ----------
+
+/**
+ * 空白处加时期（timeline）：落一行时期 + 选中新时期（不做内联编辑——事件/时期无 inline-edit，
+ * 文本在右侧属性表单改）。新时期的 elementId 按 `period:N` 位置序预测（追加在文档末尾 =
+ * 时期总数 + 1）。
+ */
+function addTimelinePeriod(ctx: MenuActionContext): void {
+  const proj = ctx.projection
+  if (proj === null || proj.type !== 'timeline') return
+  const text = nextFreeName('新阶段', proj.timeline.periods.map((p) => p.text))
+  const plan: KeyPlan = {
+    intents: [{ type: 'add-period', text } satisfies TimelineIntent],
+    newElementTarget: {
+      selection: { kind: 'timeline-period', elementId: `period:${proj.timeline.nextPeriodOrdinal}` },
+    },
+  }
+  if (applyPlan(plan, { commitIntent: ctx.commitIntent, select: ctx.select })) ctx.close()
+}
+
+/** 空白处加分组 section（timeline）：落一行 `section 名称` + 选中新分组 */
+function addTimelineSection(ctx: MenuActionContext): void {
+  const proj = ctx.projection
+  if (proj === null || proj.type !== 'timeline') return
+  if (!isValidTimelineSectionName('新分组')) return
+  const plan: KeyPlan = {
+    intents: [{ type: 'add-section', name: '新分组' } satisfies TimelineIntent],
+    newElementTarget: {
+      selection: { kind: 'timeline-section', elementId: `section:${proj.timeline.sections.length + 1}` },
+    },
+  }
+  if (applyPlan(plan, { commitIntent: ctx.commitIntent, select: ctx.select })) ctx.close()
+}
+
+/** 时期上加事件（timeline）：落续行 `: 文本` + 选中新事件（不做内联编辑） */
+function addTimelineEvent(ctx: MenuActionContext, target: ContextMenuTarget | undefined): void {
+  const proj = ctx.projection
+  if (target === undefined || target.kind !== 'timeline-period' || proj === null || proj.type !== 'timeline') return
+  const period = proj.timeline.periods.find((p) => p.elementId === target.elementId)
+  if (period === undefined) return
+  const text = nextFreeName('新事件', period.events.map((e) => e.text))
+  const plan: KeyPlan = {
+    intents: [{ type: 'add-event', periodElementId: period.elementId, text } satisfies TimelineIntent],
+    newElementTarget: {
+      selection: { kind: 'timeline-event', elementId: `event:${period.nextEventOrdinal}` },
+    },
+  }
+  if (applyPlan(plan, { commitIntent: ctx.commitIntent, select: ctx.select })) ctx.close()
+}
+
 export const MENU_ACTIONS: Record<Exclude<ContextMenuItemId, 'apply-style'>, MenuAction> = {
   // 「创建 + 选中 + 内联命名」五个入口共用 createElement（工单 01 收敛）
   'add-node': createElement,
@@ -311,4 +366,10 @@ export const MENU_ACTIONS: Record<Exclude<ContextMenuItemId, 'apply-style'>, Men
   'edit-message': selectMenuTargetAndClose,
   'cycle-relation-kind': cycleRelationKind,
   'cycle-message-arrow': cycleMessageArrow,
+  // timeline（more-diagrams 工单 05）：空白加时期 / 加分组；时期加事件；改文本走属性表单
+  'add-period': addTimelinePeriod,
+  'add-section': addTimelineSection,
+  'add-event': addTimelineEvent,
+  'edit-period-text': selectMenuTargetAndClose,
+  'edit-event-text': selectMenuTargetAndClose,
 }

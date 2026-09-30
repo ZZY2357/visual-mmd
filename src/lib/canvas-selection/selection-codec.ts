@@ -138,6 +138,10 @@ export function selectionOfMenuTarget(target: ContextMenuTarget): Selection | nu
       return { kind: 'er-relation', elementId: target.elementId }
     case 'er-attribute':
       return { kind: 'er-attribute', elementId: target.elementId }
+    case 'timeline-period':
+      return { kind: 'timeline-period', elementId: target.elementId }
+    case 'timeline-event':
+      return { kind: 'timeline-event', elementId: target.elementId }
     case 'blank':
       return null
   }

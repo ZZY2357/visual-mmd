@@ -9,6 +9,8 @@ import { buildFlowchartProjection } from '../../projection/flowchart-projection'
 import { buildMindmapProjection } from '../../projection/mindmap-projection'
 import { buildClassProjection } from '../../projection/class-projection'
 import { buildSequenceProjection } from '../../projection/sequence-projection'
+import { timelineParser } from '../../pipeline/timeline'
+import { buildTimelineProjection } from '../../projection/timeline-projection'
 import type { AnyProjection } from '../../diagram-registry'
 import type { EditIntent } from '../../pipeline/parser'
 import type { Selection } from '../../projection/selection'
@@ -62,6 +64,18 @@ function seqProjectionOf(source: string): AnyProjection {
   if (!parsed.ok) throw new Error(parsed.error.message)
   return { type: 'sequence' as const, sequence: buildSequenceProjection(parsed.doc) }
 }
+function timelineProjectionOf(source: string): AnyProjection {
+  const parsed = timelineParser.parse(source)
+  if (!parsed.ok) throw new Error(parsed.error.message)
+  return { type: 'timeline' as const, timeline: buildTimelineProjection(parsed.doc) }
+}
+
+const TIMELINE = `timeline
+    section 第一阶段
+        需求 : 调研 : 评审
+        设计
+            : 原型
+`
 
 /** 语境替身：记录 commitIntent / select / beginInlineEdit / close 的调用 */
 function fakeCtx(overrides: Partial<MenuActionContext> = {}): MenuActionContext & {
@@ -125,6 +139,9 @@ describe('MENU_ACTIONS 穷尽性（工单 05 → 工单 01）', () => {
       { kind: 'er-entity', name: 'E1' },
       { kind: 'er-relation', elementId: 'relation:1' },
       { kind: 'er-attribute', elementId: 'attr:1' },
+      { kind: 'blank', diagramType: 'timeline' },
+      { kind: 'timeline-period', elementId: 'period:1' },
+      { kind: 'timeline-event', elementId: 'event:1' },
     ]
     const reachableIds = new Set(allTargets.flatMap((target) => contextMenuItems(target)))
     // apply-style 不经 onMenuItem 分发（CanvasPanel 渲染成子菜单开关，点样式名直接调
@@ -403,5 +420,65 @@ describe('编辑类与添加表单类菜单项（分发语义）', () => {
     const edgeCtx = fakeCtx()
     MENU_ACTIONS['link-from-here'](edgeCtx, { kind: 'flowchart-edge', from: 'A', to: 'B', occurrence: 1 })
     expect(edgeCtx.enterLinkMode).not.toHaveBeenCalled()
+  })
+})
+
+describe('timeline 菜单动作（more-diagrams 工单 05）', () => {
+  it('add-period（空白）：落 add-period 意图、选中新时期的预测 elementId、关菜单', () => {
+    const ctx = fakeCtx({ projection: timelineProjectionOf(TIMELINE) })
+
+    MENU_ACTIONS['add-period'](ctx, { kind: 'blank', diagramType: 'timeline' })
+
+    expect(ctx.intents[0]).toMatchObject({ type: 'add-period' })
+    // 样例有 2 个时期 → 新时期预测为 period:3
+    expect(ctx.selections).toEqual([{ kind: 'timeline-period', elementId: 'period:3' }])
+    expect(ctx.closed).toBe(1)
+  })
+
+  it('add-section（空白）：落 add-section 意图、选中新分组的预测 elementId', () => {
+    const ctx = fakeCtx({ projection: timelineProjectionOf(TIMELINE) })
+
+    MENU_ACTIONS['add-section'](ctx, { kind: 'blank', diagramType: 'timeline' })
+
+    expect(ctx.intents[0]).toMatchObject({ type: 'add-section', name: '新分组' })
+    expect(ctx.selections).toEqual([{ kind: 'timeline-section', elementId: 'section:2' }])
+    expect(ctx.closed).toBe(1)
+  })
+
+  it('add-event（时期目标）：落 add-event 意图到该时期、选中新事件的预测 elementId', () => {
+    const ctx = fakeCtx({ projection: timelineProjectionOf(TIMELINE) })
+
+    MENU_ACTIONS['add-event'](ctx, { kind: 'timeline-period', elementId: 'period:2' })
+
+    expect(ctx.intents[0]).toMatchObject({ type: 'add-event', periodElementId: 'period:2' })
+    // period:2 之后事件总数 = 3（period:1 的 2 个 + period:2 的 1 个）→ 新事件 event:4
+    expect(ctx.selections).toEqual([{ kind: 'timeline-event', elementId: 'event:4' }])
+    expect(ctx.closed).toBe(1)
+  })
+
+  it('edit-period-text / edit-event-text：选中目标 + 关菜单，自身不落码（文本在属性表单改）', () => {
+    const periodCtx = fakeCtx()
+    MENU_ACTIONS['edit-period-text'](periodCtx, { kind: 'timeline-period', elementId: 'period:1' })
+    expect(periodCtx.intents).toEqual([])
+    expect(periodCtx.selections).toEqual([{ kind: 'timeline-period', elementId: 'period:1' }])
+    expect(periodCtx.closed).toBe(1)
+
+    const eventCtx = fakeCtx()
+    MENU_ACTIONS['edit-event-text'](eventCtx, { kind: 'timeline-event', elementId: 'event:2' })
+    expect(eventCtx.intents).toEqual([])
+    expect(eventCtx.selections).toEqual([{ kind: 'timeline-event', elementId: 'event:2' }])
+    expect(eventCtx.closed).toBe(1)
+  })
+
+  it('目标不是 timeline 时期 / 投影未就绪时安静地不执行', () => {
+    const wrongTarget = fakeCtx({ projection: timelineProjectionOf(TIMELINE) })
+    MENU_ACTIONS['add-event'](wrongTarget, { kind: 'timeline-event', elementId: 'event:1' })
+    expect(wrongTarget.intents).toEqual([])
+    expect(wrongTarget.closed).toBe(0)
+
+    const noProj = fakeCtx({ projection: null })
+    MENU_ACTIONS['add-period'](noProj, { kind: 'blank', diagramType: 'timeline' })
+    expect(noProj.intents).toEqual([])
+    expect(noProj.closed).toBe(0)
   })
 })

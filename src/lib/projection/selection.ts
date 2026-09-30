@@ -37,6 +37,10 @@ export type Selection =
   | { kind: 'er-entity'; name: string }
   | { kind: 'er-attribute'; elementId: string }
   | { kind: 'er-relation'; elementId: string }
+  // timeline（more-diagrams 工单 05）
+  | { kind: 'timeline-period'; elementId: string }
+  | { kind: 'timeline-event'; elementId: string }
+  | { kind: 'timeline-section'; elementId: string }
 
 export const DIAGRAM_SELECTION: Selection = { kind: 'diagram' }
 
@@ -86,6 +90,12 @@ export function selectionKey(sel: Selection): string {
       return `er-attribute:${sel.elementId}`
     case 'er-relation':
       return `er-relation:${sel.elementId}`
+    case 'timeline-period':
+      return `timeline-period:${sel.elementId}`
+    case 'timeline-event':
+      return `timeline-event:${sel.elementId}`
+    case 'timeline-section':
+      return `timeline-section:${sel.elementId}`
   }
 }
 

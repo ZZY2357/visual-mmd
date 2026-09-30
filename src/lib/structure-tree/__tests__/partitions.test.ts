@@ -8,6 +8,8 @@ import { buildFlowchartProjection } from '../../projection/flowchart-projection'
 import { buildSequenceProjection } from '../../projection/sequence-projection'
 import { buildClassProjection } from '../../projection/class-projection'
 import { buildMindmapProjection } from '../../projection/mindmap-projection'
+import { timelineParser } from '../../pipeline/timeline'
+import { buildTimelineProjection } from '../../projection/timeline-projection'
 import { DIAGRAM_TYPES, type AnyProjection } from '../../diagram-registry'
 
 /**
@@ -45,6 +47,12 @@ function mindmapProjection(source: string): AnyProjection {
   const parsed = mindmapParser.parse(source)
   if (!parsed.ok) throw new Error('解析失败')
   return { type: 'mindmap', mindmap: buildMindmapProjection(parsed.doc) }
+}
+
+function timelineProjection(source: string): AnyProjection {
+  const parsed = timelineParser.parse(source)
+  if (!parsed.ok) throw new Error('解析失败')
+  return { type: 'timeline', timeline: buildTimelineProjection(parsed.doc) }
 }
 
 describe('结构树分区描述（工单 06）', () => {
@@ -130,6 +138,27 @@ describe('结构树分区描述（工单 06）', () => {
     expect(sections[1].emptyText).toBe('app:propertyPanel.mindmapEmpty')
   })
 
+  it('timeline：图表级 + 分组 + 时期（事件嵌套为子条目）三个分区，时期带键盘', () => {
+    const sections = DIAGRAM_TYPES.timeline.tree(
+      timelineProjection('timeline\n    title T\n    section S\n        A : a1 : a2\n            : a3\n'),
+      { t },
+    )
+    expect(sections.map((s) => s.key)).toEqual(['diagram', 'sections', 'periods'])
+    expect(sections[0].entries[0]).toMatchObject({ depth: 0, selection: { kind: 'diagram' }, detail: 'T' })
+    expect(sections[1].entries[0]).toMatchObject({
+      depth: 1,
+      selection: { kind: 'timeline-section', elementId: 'section:1' },
+    })
+    const period = sections[2].entries[0]
+    expect(period).toMatchObject({ depth: 1, selection: { kind: 'timeline-period', elementId: 'period:1' } })
+    expect(period?.onKeyDown).toBeTypeOf('function')
+    expect(period?.children?.map((c) => c.selection)).toEqual([
+      { kind: 'timeline-event', elementId: 'event:1' },
+      { kind: 'timeline-event', elementId: 'event:2' },
+      { kind: 'timeline-event', elementId: 'event:3' },
+    ])
+  })
+
   it('每个图种注册表的 tree 字段都能对自身的投影求值（穷尽性）', () => {
     const sources: Record<keyof typeof DIAGRAM_TYPES, string> = {
       flowchart: 'flowchart TB\nn1[甲]',
@@ -138,6 +167,7 @@ describe('结构树分区描述（工单 06）', () => {
       mindmap: 'mindmap\n  root((圆))',
       state: 'stateDiagram-v2\n[*] --> s1',
       er: 'erDiagram\nCAR ||--o{ DRIVER : uses',
+      timeline: 'timeline\n    section S\n        A : a1 : a2\n            : a3',
     }
     for (const id of Object.keys(DIAGRAM_TYPES) as (keyof typeof DIAGRAM_TYPES)[]) {
       const registration = DIAGRAM_TYPES[id]

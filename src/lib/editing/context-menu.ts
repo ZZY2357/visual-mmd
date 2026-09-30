@@ -48,6 +48,11 @@ export type ContextMenuTarget =
   | { kind: 'er-entity'; name: string }
   | { kind: 'er-relation'; elementId: string }
   | { kind: 'er-attribute'; elementId: string }
+  // timeline（more-diagrams 工单 05）：时期是节点、事件是归属时期的元素，elementId
+  // 即投影 elementId（`period:N` / `event:N`）。**注**：timeline 画布无 data-id 寻址
+  // （见 timeline-adapter），这两个目标目前只能由测试/程序构造，画布右键实际只产出 blank。
+  | { kind: 'timeline-period'; elementId: string }
+  | { kind: 'timeline-event'; elementId: string }
 
 export type ContextMenuItemId =
   | 'add-node'
@@ -95,6 +100,13 @@ export type ContextMenuItemId =
   | 'cycle-er-line'
   | 'edit-er-relation'
   | 'edit-er-attribute'
+  // timeline（more-diagrams 工单 05）：空白 = 加时期 / 加分组；时期 = 改文本 / 加事件 / 删除；
+  // 事件 = 改文本 / 删除
+  | 'add-period'
+  | 'add-section'
+  | 'add-event'
+  | 'edit-period-text'
+  | 'edit-event-text'
 
 /**
  * 画布选中 → 菜单目标（工单 03 起为 `canvas-selection/selection-codec.ts` 的
@@ -125,6 +137,8 @@ function blankMenuItems(diagramType: DiagramTypeId): ContextMenuItemId[] {
       return ['add-state', 'link-mode']
     case 'er':
       return ['add-entity']
+    case 'timeline':
+      return ['add-period', 'add-section']
     // DiagramTypeId 是开放类型（more-diagrams 工单 01）：未接入画布能力包的图种
     // 没有空白右键入口（unsupported 态下画布右键整体停用，不会走到这里）
     default:
@@ -192,5 +206,10 @@ export function contextMenuItems(target: ContextMenuTarget): ContextMenuItemId[]
       return ['cycle-er-line', 'edit-er-relation', 'delete']
     case 'er-attribute':
       return ['edit-er-attribute', 'delete']
+    // timeline（more-diagrams 工单 05）：时期 = 改文本 / 加事件 / 删除；事件 = 改文本 / 删除
+    case 'timeline-period':
+      return ['edit-period-text', 'add-event', 'delete']
+    case 'timeline-event':
+      return ['edit-event-text', 'delete']
   }
 }
