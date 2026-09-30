@@ -39,11 +39,13 @@ function clearSelection() {
 }
 
 function visibilityLabel(t: (k: string) => string, vis: Visibility): string {
-  return t(`app:classVisibility.${vis === '' ? 'none' : vis}`)
+  const option = VISIBILITY_OPTIONS.find((o) => o.value === vis)
+  return t(option !== undefined ? option.labelKey : vis)
 }
 
 function relationKindLabel(t: (k: string) => string, kind: RelationKind): string {
-  return t(`app:classRelKinds.${kind}`)
+  const option = RELATION_KIND_OPTIONS.find((o) => o.value === kind)
+  return t(option !== undefined ? option.labelKey : kind)
 }
 
 // ---------- 类 ----------
@@ -121,7 +123,7 @@ export function MemberForm({ member }: { member: ProjectionMember }) {
       </Text>
       <Select
         label={t('app:propertyPanel.memberVisibility')}
-        data={VISIBILITY_OPTIONS.map((v) => ({ value: v, label: visibilityLabel(t, v) }))}
+        data={VISIBILITY_OPTIONS.map((v) => ({ value: v.value, label: t(v.labelKey) }))}
         value={member.vis}
         onChange={(v) => v !== null && applyVis(v as Visibility)}
         allowDeselect={false}
@@ -201,7 +203,7 @@ export function RelationForm({ relation }: { relation: ProjectionRelation }) {
       </Group>
       <Select
         label={t('app:propertyPanel.relationKind')}
-        data={RELATION_KIND_OPTIONS.map((k) => ({ value: k, label: relationKindLabel(t, k) }))}
+        data={RELATION_KIND_OPTIONS.map((k) => ({ value: k.value, label: t(k.labelKey) }))}
         value={relation.kind}
         onChange={(v) => v !== null && apply({ kind: v as RelationKind })}
         allowDeselect={false}
@@ -391,7 +393,7 @@ export function AddMemberInlineForm({
       />
       <Select
         label={t('app:propertyPanel.memberVisibility')}
-        data={VISIBILITY_OPTIONS.map((v) => ({ value: v, label: visibilityLabel(t, v) }))}
+        data={VISIBILITY_OPTIONS.map((v) => ({ value: v.value, label: t(v.labelKey) }))}
         value={vis}
         onChange={(v) => v !== null && setVis(v as Visibility)}
         allowDeselect={false}
@@ -447,7 +449,7 @@ export function AddRelationInlineForm({
       </Group>
       <Select
         label={t('app:propertyPanel.relationKind')}
-        data={RELATION_KIND_OPTIONS.map((k) => ({ value: k, label: relationKindLabel(t, k) }))}
+        data={RELATION_KIND_OPTIONS.map((k) => ({ value: k.value, label: t(k.labelKey) }))}
         value={kind}
         onChange={(v) => v !== null && setKind(v as RelationKind)}
         allowDeselect={false}

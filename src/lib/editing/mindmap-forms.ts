@@ -7,15 +7,15 @@ import { isValidMindmapNodeId, isValidMindmapNodeText } from '../pipeline/mindma
  * 意图集合与语义见 src/lib/pipeline/mindmap.ts。
  */
 
-/** mindmap 节点形状下拉选项（mermaid v12 全部形状 + 默认无形状） */
-export const MINDMAP_SHAPE_OPTIONS: Array<{ value: MindmapShapeType | 'default'; label: string }> = [
-  { value: 'default', label: 'default' },
-  { value: 'square', label: 'square' },
-  { value: 'rounded', label: 'rounded' },
-  { value: 'circle', label: 'circle' },
-  { value: 'bang', label: 'bang' },
-  { value: 'cloud', label: 'cloud' },
-  { value: 'hexagon', label: 'hexagon' },
+/** mindmap 节点形状下拉选项（mermaid v12 全部形状 + 默认无形状；工单 07：文案键与字典锁步） */
+export const MINDMAP_SHAPE_OPTIONS: Array<{ value: MindmapShapeType | 'default'; labelKey: string }> = [
+  { value: 'default', labelKey: 'app:mindmapShapes.default' },
+  { value: 'square', labelKey: 'app:mindmapShapes.square' },
+  { value: 'rounded', labelKey: 'app:mindmapShapes.rounded' },
+  { value: 'circle', labelKey: 'app:mindmapShapes.circle' },
+  { value: 'bang', labelKey: 'app:mindmapShapes.bang' },
+  { value: 'cloud', labelKey: 'app:mindmapShapes.cloud' },
+  { value: 'hexagon', labelKey: 'app:mindmapShapes.hexagon' },
 ]
 
 export function setMindmapNodeTextIntent(elementId: string, text: string): MindmapIntent | null {

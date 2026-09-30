@@ -106,8 +106,9 @@ export interface NodeFormState {
 
 /** 循环取值（工单 03）：取 options 中 current 的下一项；current 不在表中时取第一项。
  * 用于连线菜单「直接改」的字段（关系类型 / 消息箭头）——不新增表单浮层就能切换取值。 */
-function nextInCycle<T>(options: readonly T[], current: T): T {
-  return options[(options.indexOf(current) + 1) % options.length]
+function nextInCycle<V>(options: ReadonlyArray<{ value: V }>, current: V): V {
+  const i = options.findIndex((o) => o.value === current)
+  return options[(i + 1) % options.length].value
 }
 
 /**

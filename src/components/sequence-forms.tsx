@@ -4,6 +4,7 @@ import { useTranslation } from 'react-i18next'
 import type { BlockKeyword, MessageAct, MessageArrow, NotePos } from '../lib/pipeline/sequence'
 import {
   BLOCK_KEYWORD_OPTIONS,
+  MESSAGE_ACT_OPTIONS,
   MESSAGE_ARROW_OPTIONS,
   NOTE_POS_OPTIONS,
   addBlockIntent,
@@ -53,7 +54,8 @@ function clearSelection() {
 }
 
 function messageArrowLabel(t: (k: string) => string, arrow: MessageArrow): string {
-  return t(`app:seqArrows.${arrow}`)
+  const option = MESSAGE_ARROW_OPTIONS.find((o) => o.value === arrow)
+  return t(option !== undefined ? option.labelKey : arrow)
 }
 
 // ---------- 图表（autonumber） ----------
@@ -194,18 +196,14 @@ export function MessageForm({ message }: { message: ProjectionMessage }) {
       </Text>
       <Select
         label={t('app:propertyPanel.messageArrow')}
-        data={MESSAGE_ARROW_OPTIONS.map((a) => ({ value: a, label: messageArrowLabel(t, a) }))}
+        data={MESSAGE_ARROW_OPTIONS.map((a) => ({ value: a.value, label: t(a.labelKey) }))}
         value={message.arrow}
         onChange={(v) => v !== null && apply({ arrow: v as MessageArrow })}
         allowDeselect={false}
       />
       <Select
         label={t('app:propertyPanel.messageAct')}
-        data={[
-          { value: '', label: t('app:propertyPanel.actNone') },
-          { value: '+', label: t('app:propertyPanel.actActivate') },
-          { value: '-', label: t('app:propertyPanel.actDeactivate') },
-        ]}
+        data={MESSAGE_ACT_OPTIONS.map((a) => ({ value: a.value, label: t(a.labelKey) }))}
         value={message.act}
         onChange={(v) => v !== null && apply({ act: v as MessageAct })}
         allowDeselect={false}
@@ -272,7 +270,7 @@ export function NoteForm({ note }: { note: ProjectionNote }) {
       />
       <Select
         label={t('app:propertyPanel.notePosition')}
-        data={NOTE_POS_OPTIONS.map((p) => ({ value: p, label: t(`app:notePos.${p}`) }))}
+        data={NOTE_POS_OPTIONS.map((p) => ({ value: p.value, label: t(p.labelKey) }))}
         value={note.pos}
         onChange={(v) => v !== null && applyPos(v as NotePos)}
         allowDeselect={false}
@@ -466,7 +464,7 @@ export function AddNoteInlineForm({
     <Stack gap="sm">
       <Select
         label={t('app:propertyPanel.notePosition')}
-        data={NOTE_POS_OPTIONS.map((p) => ({ value: p, label: t(`app:notePos.${p}`) }))}
+        data={NOTE_POS_OPTIONS.map((p) => ({ value: p.value, label: t(p.labelKey) }))}
         value={pos}
         onChange={(v) => v !== null && setPos(v as NotePos)}
         allowDeselect={false}
@@ -514,7 +512,7 @@ export function AddBlockInlineForm({ afterElementId, onDone }: { afterElementId?
     <Stack gap="sm">
       <Select
         label={t('app:propertyPanel.addBlockKeyword')}
-        data={BLOCK_KEYWORD_OPTIONS.map((k) => ({ value: k, label: blockKeywordLabel(t, k) }))}
+        data={BLOCK_KEYWORD_OPTIONS.map((k) => ({ value: k.value, label: t(k.labelKey) }))}
         value={keyword}
         onChange={(v) => v !== null && setKeyword(v as BlockKeyword)}
         allowDeselect={false}
@@ -563,18 +561,14 @@ export function AddMessageInlineForm({
       <Group grow>
         <Select
           label={t('app:propertyPanel.messageArrow')}
-          data={MESSAGE_ARROW_OPTIONS.map((a) => ({ value: a, label: messageArrowLabel(t, a) }))}
+          data={MESSAGE_ARROW_OPTIONS.map((a) => ({ value: a.value, label: t(a.labelKey) }))}
           value={arrow}
           onChange={(v) => v !== null && setArrow(v as MessageArrow)}
           allowDeselect={false}
         />
         <Select
           label={t('app:propertyPanel.messageAct')}
-          data={[
-            { value: '', label: t('app:propertyPanel.actNone') },
-            { value: '+', label: t('app:propertyPanel.actActivate') },
-            { value: '-', label: t('app:propertyPanel.actDeactivate') },
-          ]}
+          data={MESSAGE_ACT_OPTIONS.map((a) => ({ value: a.value, label: t(a.labelKey) }))}
           value={act}
           onChange={(v) => v !== null && setAct(v as MessageAct)}
           allowDeselect={false}

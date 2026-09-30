@@ -6,6 +6,7 @@ import type {
   SequenceIntent,
 } from '../pipeline/sequence'
 import { isValidParticipantId } from '../pipeline/sequence'
+import type { OptionEntry } from './flowchart-forms'
 
 /**
  * sequence 表单值 → 编辑意图 的纯映射（工单 06）。
@@ -13,19 +14,35 @@ import { isValidParticipantId } from '../pipeline/sequence'
  * 意图集合与语义见 src/lib/pipeline/sequence.ts。
  */
 
-// ---------- 选项表（供表单控件与 i18n key 使用） ----------
+// ---------- 选项表（工单 07：{value, labelKey} 对，文案键与 src/i18n 字典锁步延伸） ----------
 
-export const MESSAGE_ARROW_OPTIONS: MessageArrow[] = ['->>', '-->', '-x', '--']
-
-export const MESSAGE_ACT_OPTIONS: Array<{ value: MessageAct; labelKey: string }> = [
-  { value: '', labelKey: 'none' },
-  { value: '+', labelKey: 'activate' },
-  { value: '-', labelKey: 'deactivate' },
+export const MESSAGE_ARROW_OPTIONS: Array<OptionEntry<MessageArrow>> = [
+  { value: '->>', labelKey: 'app:seqArrows.->>' },
+  { value: '-->', labelKey: 'app:seqArrows.-->' },
+  { value: '-x', labelKey: 'app:seqArrows.-x' },
+  { value: '--', labelKey: 'app:seqArrows.--' },
 ]
 
-export const NOTE_POS_OPTIONS: NotePos[] = ['over', 'left', 'right']
+export const MESSAGE_ACT_OPTIONS: Array<OptionEntry<MessageAct>> = [
+  { value: '', labelKey: 'app:propertyPanel.actNone' },
+  { value: '+', labelKey: 'app:propertyPanel.actActivate' },
+  { value: '-', labelKey: 'app:propertyPanel.actDeactivate' },
+]
 
-export const BLOCK_KEYWORD_OPTIONS: BlockKeyword[] = ['loop', 'alt', 'opt', 'par', 'critical', 'break']
+export const NOTE_POS_OPTIONS: Array<OptionEntry<NotePos>> = [
+  { value: 'over', labelKey: 'app:notePos.over' },
+  { value: 'left', labelKey: 'app:notePos.left' },
+  { value: 'right', labelKey: 'app:notePos.right' },
+]
+
+export const BLOCK_KEYWORD_OPTIONS: Array<OptionEntry<BlockKeyword>> = [
+  { value: 'loop', labelKey: 'app:blockKeywords.loop' },
+  { value: 'alt', labelKey: 'app:blockKeywords.alt' },
+  { value: 'opt', labelKey: 'app:blockKeywords.opt' },
+  { value: 'par', labelKey: 'app:blockKeywords.par' },
+  { value: 'critical', labelKey: 'app:blockKeywords.critical' },
+  { value: 'break', labelKey: 'app:blockKeywords.break' },
+]
 
 // ---------- participant 表单 → 意图 ----------
 

@@ -16,6 +16,7 @@ import {
   ARROW_OPTIONS,
   BORDER_DASH_OPTIONS,
   DIRECTION_OPTIONS,
+  DIRECTION_VALUES,
   LINK_STYLE_OPTIONS,
   SHAPE_OPTIONS,
   applyClassIntent,
@@ -63,7 +64,7 @@ export function useDraft(value: string, onCommit: (next: string) => void) {
 }
 
 function shapeOptions(t: (k: string) => string) {
-  return SHAPE_OPTIONS.map((s) => ({ value: s, label: t(`app:shapes.${s}`) }))
+  return SHAPE_OPTIONS.map((s) => ({ value: s.value, label: t(s.labelKey) }))
 }
 
 // ---------- 图表（方向） ----------
@@ -85,7 +86,7 @@ export function DiagramForm({
   direction,
   onSelect,
   allowFollowDefault = false,
-  knownDirections = DIRECTION_OPTIONS,
+  knownDirections = DIRECTION_VALUES,
 }: {
   direction: string | null
   /** `null` = 选「跟随 Mermaid 默认」（仅 allowFollowDefault 时可能传回） */
@@ -104,7 +105,7 @@ export function DiagramForm({
         ...(allowFollowDefault
           ? [{ value: FOLLOW_DIRECTION_VALUE, label: t('app:directions.followDefault') }]
           : []),
-        ...DIRECTION_OPTIONS.map((d) => ({ value: d, label: t(`app:directions.${d}`) })),
+        ...DIRECTION_OPTIONS.map((d) => ({ value: d.value, label: t(d.labelKey) })),
         ...(unknownRaw === null ? [] : [{ value: unknownRaw, label: unknownRaw }]),
       ]}
       // 无「跟随」形态（flowchart）时沿用旧口径：表头必有方向，缺省即 mermaid 的 TB
@@ -232,14 +233,14 @@ export function EdgeForm({ edge }: { edge: ProjectionEdge }) {
       </Text>
       <Select
         label={t('app:propertyPanel.edgeLineStyle')}
-        data={LINK_STYLE_OPTIONS.map((s) => ({ value: s, label: t(`app:linkStyles.${s}`) }))}
+        data={LINK_STYLE_OPTIONS.map((s) => ({ value: s.value, label: t(s.labelKey) }))}
         value={edge.spec.lineStyle}
         onChange={(v) => v !== null && apply({ lineStyle: v as never })}
         allowDeselect={false}
       />
       <Select
         label={t('app:propertyPanel.edgeArrow')}
-        data={ARROW_OPTIONS.map((a) => ({ value: a, label: t(`app:arrows.${a}`) }))}
+        data={ARROW_OPTIONS.map((a) => ({ value: a.value, label: t(a.labelKey) }))}
         value={edge.spec.head}
         onChange={(v) => v !== null && apply({ head: v as never })}
         allowDeselect={false}
@@ -353,7 +354,7 @@ export function ClassDefForm({ classDef }: { classDef: ProjectionClassDef }) {
       />
       <Select
         label={t('app:propertyPanel.styleDash')}
-        data={BORDER_DASH_OPTIONS.map((d) => ({ value: d, label: t(`app:borderDash.${d}`) }))}
+        data={BORDER_DASH_OPTIONS.map((d) => ({ value: d.value, label: t(d.labelKey) }))}
         value={dashStyle}
         onChange={(v) => v !== null && commitStyle({ dashStyle: v as BorderDashStyle })}
         allowDeselect={false}

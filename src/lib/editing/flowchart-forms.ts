@@ -7,40 +7,70 @@ import { isValidNewNodeId, type ArrowMarker, type LinkLineStyle, type NodeShapeT
  * 意图集合与语义见 src/lib/pipeline/flowchart.ts（工单 03）。
  */
 
-// ---------- 选项表（供表单控件与 i18n key 使用） ----------
+// ---------- 选项表（工单 07：{value, labelKey} 对，文案键与 src/i18n 字典锁步延伸） ----------
+
+/** 选项表条目：枚举值 + 它在 i18n 字典里的完整键 */
+export interface OptionEntry<V> {
+  value: V
+  labelKey: string
+}
 
 /** 节点形状下拉选项（ADR-0005 全部形状） */
-export const SHAPE_OPTIONS: NodeShapeType[] = [
-  'rectangle',
-  'rounded',
-  'stadium',
-  'subroutine',
-  'cylinder',
-  'circle',
-  'double-circle',
-  'asymmetric',
-  'rhombus',
-  'hexagon',
-  'parallelogram',
-  'parallelogram-alt',
-  'trapezoid',
-  'trapezoid-alt',
+export const SHAPE_OPTIONS: Array<OptionEntry<NodeShapeType>> = [
+  { value: 'rectangle', labelKey: 'app:shapes.rectangle' },
+  { value: 'rounded', labelKey: 'app:shapes.rounded' },
+  { value: 'stadium', labelKey: 'app:shapes.stadium' },
+  { value: 'subroutine', labelKey: 'app:shapes.subroutine' },
+  { value: 'cylinder', labelKey: 'app:shapes.cylinder' },
+  { value: 'circle', labelKey: 'app:shapes.circle' },
+  { value: 'double-circle', labelKey: 'app:shapes.double-circle' },
+  { value: 'asymmetric', labelKey: 'app:shapes.asymmetric' },
+  { value: 'rhombus', labelKey: 'app:shapes.rhombus' },
+  { value: 'hexagon', labelKey: 'app:shapes.hexagon' },
+  { value: 'parallelogram', labelKey: 'app:shapes.parallelogram' },
+  { value: 'parallelogram-alt', labelKey: 'app:shapes.parallelogram-alt' },
+  { value: 'trapezoid', labelKey: 'app:shapes.trapezoid' },
+  { value: 'trapezoid-alt', labelKey: 'app:shapes.trapezoid-alt' },
 ]
 
 /** 连线线型下拉选项 */
-export const LINK_STYLE_OPTIONS: LinkLineStyle[] = ['solid', 'dotted', 'thick', 'invisible']
+export const LINK_STYLE_OPTIONS: Array<OptionEntry<LinkLineStyle>> = [
+  { value: 'solid', labelKey: 'app:linkStyles.solid' },
+  { value: 'dotted', labelKey: 'app:linkStyles.dotted' },
+  { value: 'thick', labelKey: 'app:linkStyles.thick' },
+  { value: 'invisible', labelKey: 'app:linkStyles.invisible' },
+]
 
 /** 终点箭头下拉选项 */
-export const ARROW_OPTIONS: ArrowMarker[] = ['arrow', 'none', 'circle', 'cross']
+export const ARROW_OPTIONS: Array<OptionEntry<ArrowMarker>> = [
+  { value: 'arrow', labelKey: 'app:arrows.arrow' },
+  { value: 'none', labelKey: 'app:arrows.none' },
+  { value: 'circle', labelKey: 'app:arrows.circle' },
+  { value: 'cross', labelKey: 'app:arrows.cross' },
+]
 
 /** 图方向选项 */
-export const DIRECTION_OPTIONS = ['TB', 'BT', 'LR', 'RL'] as const
+export const DIRECTION_OPTIONS: Array<OptionEntry<'TB' | 'BT' | 'LR' | 'RL'>> = [
+  { value: 'TB', labelKey: 'app:directions.TB' },
+  { value: 'BT', labelKey: 'app:directions.BT' },
+  { value: 'LR', labelKey: 'app:directions.LR' },
+  { value: 'RL', labelKey: 'app:directions.RL' },
+]
+
+/** 方向 token 全集（DiagramForm 判定「手写值」等只用取值的场合） */
+export const DIRECTION_VALUES: ReadonlyArray<'TB' | 'BT' | 'LR' | 'RL'> = DIRECTION_OPTIONS.map(
+  (d) => d.value,
+)
 
 // ---------- classDef 常用样式项（工单验收：填充/边框/线型/文字色） ----------
 
 export type BorderDashStyle = 'solid' | 'dashed' | 'dotted'
 
-export const BORDER_DASH_OPTIONS: BorderDashStyle[] = ['solid', 'dashed', 'dotted']
+export const BORDER_DASH_OPTIONS: Array<OptionEntry<BorderDashStyle>> = [
+  { value: 'solid', labelKey: 'app:borderDash.solid' },
+  { value: 'dashed', labelKey: 'app:borderDash.dashed' },
+  { value: 'dotted', labelKey: 'app:borderDash.dotted' },
+]
 
 /** Mermaid 的 stroke-dasharray 取值 ↔ 表单枚举 */
 export const DASHARRAY_VALUE: Record<Exclude<BorderDashStyle, 'solid'>, string> = {

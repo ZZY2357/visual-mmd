@@ -7,11 +7,18 @@ import { isValidClassName, RELATION_KINDS } from '../pipeline/class'
  * 意图集合与语义见 src/lib/pipeline/class.ts。
  */
 
-// ---------- 选项表（供表单控件与 i18n key 使用） ----------
+// ---------- 选项表（工单 07：{value, labelKey} 对，文案键与 src/i18n 字典锁步延伸） ----------
 
-export const RELATION_KIND_OPTIONS: RelationKind[] = RELATION_KINDS
+export const RELATION_KIND_OPTIONS: Array<{ value: RelationKind; labelKey: string }> =
+  RELATION_KINDS.map((kind) => ({ value: kind, labelKey: `app:classRelKinds.${kind}` }))
 
-export const VISIBILITY_OPTIONS: Visibility[] = ['', '+', '-', '#', '~']
+export const VISIBILITY_OPTIONS: Array<{ value: Visibility; labelKey: string }> = [
+  { value: '', labelKey: 'app:classVisibility.none' },
+  { value: '+', labelKey: 'app:classVisibility.+' },
+  { value: '-', labelKey: 'app:classVisibility.-' },
+  { value: '#', labelKey: 'app:classVisibility.#' },
+  { value: '~', labelKey: 'app:classVisibility.~' },
+]
 
 // ---------- class 表单 → 意图 ----------
 

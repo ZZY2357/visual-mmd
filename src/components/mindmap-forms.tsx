@@ -29,10 +29,7 @@ function useCommitIntent() {
 }
 
 function shapeSelectData(t: (k: string) => string) {
-  return MINDMAP_SHAPE_OPTIONS.map((o) => ({
-    value: o.value,
-    label: o.value === 'default' ? t('app:mindmapShapes.default') : t(`app:mindmapShapes.${o.value}`),
-  }))
+  return MINDMAP_SHAPE_OPTIONS.map((o) => ({ value: o.value, label: t(o.labelKey) }))
 }
 
 export function MindmapNodeForm({ node }: { node: ProjectionMindmapNode }) {

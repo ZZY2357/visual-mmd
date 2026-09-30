@@ -1427,7 +1427,7 @@ describe('useCanvasContextMenu（工单 04 添加入口补全）', () => {
 
     // 六种块关键字都可选（选项文案来自 app:blockKeywords）
     const labels = await optionTexts(container, '块类型')
-    expect(labels).toEqual(BLOCK_KEYWORD_OPTIONS.map((k) => zhDict.app.blockKeywords[k]))
+    expect(labels).toEqual(BLOCK_KEYWORD_OPTIONS.map((k) => zhDict.app.blockKeywords[k.value]))
 
     const spy = spyCommitIntent()
     await selectOption(container, '块类型', zhDict.app.blockKeywords.alt)
