@@ -15,6 +15,7 @@ import { buildClassProjection } from '../../projection/class-projection'
 import { buildSequenceProjection } from '../../projection/sequence-projection'
 import { flowchartDataIdResolver } from '../../canvas-selection/flowchart-adapter'
 import { mindmapDataIdResolver } from '../../canvas-selection/mindmap-adapter'
+import { stateDataIdResolver } from '../../canvas-selection/state-adapter'
 import { nodeDataIdResolver, elementDataIdResolver } from '../../canvas-selection/data-id'
 import type { AnyProjection } from '../../diagram-registry'
 import { useCanvasContextMenu, type NodeFormState } from '../use-canvas-context-menu'
@@ -94,6 +95,7 @@ function resolverOf(projection: AnyProjection) {
     ])
     return (dataId: string) => nodes(dataId) ?? edges(dataId)
   }
+  if (projection.type === 'state') return stateDataIdResolver(projection.state)
   const nodes = nodeDataIdResolver(projection.class.classes.map((c) => c.name))
   const edges = elementDataIdResolver(projection.class.relations.map((r) => r.elementId))
   return (dataId: string) => nodes(dataId) ?? edges(dataId)
@@ -112,6 +114,8 @@ function createdIdOf(target: CanvasInlineEditTarget): string {
       return target.actorId
     case 'sequence-alias':
       return target.actorId
+    case 'state':
+      return target.id
   }
 }
 

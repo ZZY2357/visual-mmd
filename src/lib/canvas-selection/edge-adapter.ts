@@ -23,5 +23,8 @@ export function edgeSelectionOf(diagramType: DiagramTypeId, elementId: string): 
     if (parsed.kind === 'note') return { kind: 'note', elementId }
     if (parsed.kind === 'block') return { kind: 'block', elementId }
   }
+  if (diagramType === 'state') {
+    return parsed.kind === 'transition' ? { kind: 'state-transition', elementId } : null
+  }
   return null
 }

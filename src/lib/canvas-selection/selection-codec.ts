@@ -56,6 +56,12 @@ export function canvasIdOf(selection: Selection): string | null {
     case 'mindmap-node':
       // mindmap 无 data-id：高亮按节点 DOM id（node_{N-1}）匹配（highlight 已支持）
       return mindmapDomIdOf(selection.elementId)
+    // state（more-diagrams 工单 02）：状态 data-id 即状态 id（渲染后从 DOM id 反注），
+    // 转移走位置序身份 `transition:N`；note 块未纳入画布寻址，安静地不高亮。
+    case 'state':
+      return selection.id
+    case 'state-transition':
+      return selection.elementId
     default:
       return null
   }
@@ -72,6 +78,10 @@ export function fromCanvasId(diagramType: DiagramTypeId, canvas: CanvasSelection
   if (diagramType === 'flowchart') return toEditorSelection(canvas)
   if (diagramType === 'mindmap') {
     return canvas.kind === 'node' ? { kind: 'mindmap-node', elementId: canvas.id } : null
+  }
+  if (diagramType === 'state') {
+    if (canvas.kind === 'element') return edgeSelectionOf(diagramType, canvas.elementId)
+    return canvas.kind === 'node' ? { kind: 'state', id: canvas.id } : null
   }
   if (canvas.kind === 'element') return edgeSelectionOf(diagramType, canvas.elementId)
   if (canvas.kind === 'node') {
@@ -107,6 +117,10 @@ export function selectionOfMenuTarget(target: ContextMenuTarget): Selection | nu
       return { kind: 'note', elementId: target.elementId }
     case 'sequence-block':
       return { kind: 'block', elementId: target.elementId }
+    case 'state-node':
+      return { kind: 'state', id: target.id }
+    case 'state-transition':
+      return { kind: 'state-transition', elementId: target.elementId }
     case 'blank':
       return null
   }
@@ -128,6 +142,10 @@ export function menuTargetOfCanvas(
     if (diagramType === 'flowchart') return { kind: 'flowchart-node', nodeId: canvas.id }
     if (diagramType === 'mindmap') return { kind: 'mindmap-node', elementId: canvas.id }
     if (diagramType === 'class') return { kind: 'class-node', name: canvas.id }
+    if (diagramType === 'state') {
+      // composite 标志由调用方按投影补齐（menuTargetOfCanvas 不查投影，保持纯映射）
+      return { kind: 'state-node', id: canvas.id }
+    }
     return { kind: 'sequence-participant', actorId: canvas.id }
   }
   if (canvas.kind === 'element') {
@@ -143,6 +161,8 @@ export function menuTargetOfCanvas(
         return { kind: 'sequence-note', elementId: editorSelection.elementId }
       case 'block':
         return { kind: 'sequence-block', elementId: editorSelection.elementId }
+      case 'state-transition':
+        return { kind: 'state-transition', elementId: editorSelection.elementId }
       default:
         return null
     }

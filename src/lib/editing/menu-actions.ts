@@ -8,6 +8,7 @@ import type { CanvasInlineEditTarget } from './inline-edit'
 import type { NodeFormKind } from './use-canvas-context-menu'
 import { nextNodeId, mindmapActionIntents, applyPlan, type MindmapActionPlan, type KeyPlan } from './canvas-keyboard'
 import { nextFreeName } from '../pipeline/element-id'
+import { isValidStateId } from '../pipeline/state'
 import { setRelationIntent, RELATION_KIND_OPTIONS } from './class-forms'
 import {
   setMessageIntent,
@@ -113,6 +114,15 @@ export function createElement(ctx: MenuActionContext, target: ContextMenuTarget 
         },
       }
     }
+    if (proj.type === 'state') {
+      // state 空白：新建顶层状态 + 内联编辑描述（more-diagrams 工单 02）
+      const id = nextFreeName('s', proj.state.states.map((s) => s.id))
+      if (!isValidStateId(id)) return null
+      return {
+        intents: [{ type: 'add-state', id }],
+        newElementTarget: { selection: { kind: 'state', id }, inlineEdit: { kind: 'state', id } },
+      }
+    }
     // mindmap：节点目标 = 挂为其子节点；空白 / 无目标 = 建根（空文档）或挂到根节点下
     const text = ctx.newNodeText
     let mindPlan: MindmapActionPlan | null
@@ -202,7 +212,26 @@ function beginEditText(ctx: MenuActionContext, target: ContextMenuTarget | undef
   if (target === undefined) return
   if (target.kind === 'flowchart-node') ctx.beginInlineEdit({ kind: 'flowchart', nodeId: target.nodeId })
   else if (target.kind === 'mindmap-node') ctx.beginInlineEdit({ kind: 'mindmap', elementId: target.elementId })
+  else if (target.kind === 'state-node') ctx.beginInlineEdit({ kind: 'state', id: target.id })
   ctx.close()
+}
+
+/**
+ * state 复合状态：添加状态进复合内部（more-diagrams 工单 02）。
+ * 新状态 id 避重，落码锚点 = 该复合状态的声明（parentElementId 语义，插到匹配 } 之前），
+ * 落码成功后选中新状态并进入内联编辑描述。
+ */
+function addStateIntoComposite(ctx: MenuActionContext, target: ContextMenuTarget | undefined): void {
+  const proj = ctx.projection
+  if (target === undefined || target.kind !== 'state-node' || proj === null || proj.type !== 'state') return
+  const composite = proj.state.states.find((s) => s.id === target.id)
+  if (composite === undefined || composite.elementId === null) return
+  const id = nextFreeName('s', proj.state.states.map((s) => s.id))
+  const plan: KeyPlan = {
+    intents: [{ type: 'add-state', id, parentElementId: composite.elementId }],
+    newElementTarget: { selection: { kind: 'state', id }, inlineEdit: { kind: 'state', id } },
+  }
+  if (applyPlan(plan, { commitIntent: ctx.commitIntent, select: ctx.select, beginInlineEdit: ctx.beginInlineEdit })) ctx.close()
 }
 
 /** 添加型表单项共用：在菜单位置浮出对应小表单（锚点 / 预选值由 Hook 的 openForm 按目标算出） */
@@ -217,12 +246,15 @@ export const MENU_ACTIONS: Record<Exclude<ContextMenuItemId, 'apply-style'>, Men
   'add-participant': createElement,
   'add-root': createElement,
   'add-child': createElement,
+  // state（more-diagrams 工单 02）：空白处添加状态，同样走 createElement 的 state 分支
+  'add-state': createElement,
   'link-mode': (ctx) => ctx.enterLinkMode(),
   // add-style（空白菜单项）= 打开「添加样式」小表单；apply-style（节点子菜单）才不经分发
   'add-style': (ctx) => ctx.openStyleForm(),
   'link-from-here': (ctx, target) => {
-    // narrow 到 flowchart 节点才能带预选起点进入连线模式
+    // narrow 到 flowchart / state 节点才能带预选起点进入连线模式
     if (target !== undefined && target.kind === 'flowchart-node') ctx.enterLinkMode(target.nodeId)
+    else if (target !== undefined && target.kind === 'state-node') ctx.enterLinkMode(target.id)
   },
   'add-subgraph': addSubgraph,
   'add-member': openFormOf('member'),
@@ -230,6 +262,8 @@ export const MENU_ACTIONS: Record<Exclude<ContextMenuItemId, 'apply-style'>, Men
   'add-message': openFormOf('message'),
   'add-note': openFormOf('note'),
   'add-block': openFormOf('block'),
+  // state（more-diagrams 工单 02）：add-state 走 createElement 的 state 分支（空白入口）
+  'add-state-into': addStateIntoComposite,
   // 删除组 6 项共用 deleteTarget——直接写 6 行，不引入二级查表
   'delete-class': deleteTarget,
   'delete-participant': deleteTarget,
@@ -239,6 +273,8 @@ export const MENU_ACTIONS: Record<Exclude<ContextMenuItemId, 'apply-style'>, Men
   'delete-block': deleteTarget,
   delete: deleteTarget,
   'edit-text': beginEditText,
+  // state 状态节点的「编辑描述」与 edit-text 同语义（进入内联编辑）
+  'edit-state-desc': beginEditText,
   'edit-label': selectMenuTargetAndClose,
   'edit-relation': selectMenuTargetAndClose,
   'edit-message': selectMenuTargetAndClose,

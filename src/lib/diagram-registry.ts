@@ -4,15 +4,18 @@ import { flowchartParser } from './pipeline/flowchart'
 import { sequenceParser } from './pipeline/sequence'
 import { classParser } from './pipeline/class'
 import { mindmapParser } from './pipeline/mindmap'
+import { stateParser } from './pipeline/state'
 import { frontmatterEnd } from './pipeline/frontmatter'
 import { buildFlowchartProjection, type FlowchartProjection } from './projection/flowchart-projection'
 import { buildSequenceProjection, type SequenceProjection } from './projection/sequence-projection'
 import { buildClassProjection, type ClassProjection } from './projection/class-projection'
 import { buildMindmapProjection, type MindmapProjection } from './projection/mindmap-projection'
+import { buildStateProjection, type StateProjection } from './projection/state-projection'
 import { flowchartCanvasCapabilities } from './canvas-selection/flowchart-adapter'
 import { sequenceCanvasCapabilities } from './canvas-selection/sequence-adapter'
 import { classCanvasCapabilities } from './canvas-selection/class-adapter'
 import { mindmapCanvasCapabilities } from './canvas-selection/mindmap-adapter'
+import { stateCanvasCapabilities } from './canvas-selection/state-adapter'
 import type { CanvasCapabilities } from './canvas-selection/capabilities'
 import { treePartitions, type TreePartitions } from './structure-tree/partitions'
 import { DEFAULT_DIAGRAM_SOURCE } from './storage'
@@ -38,6 +41,7 @@ export interface ProjectionTypes {
   sequence: SequenceProjection
   class: ClassProjection
   mindmap: MindmapProjection
+  state: StateProjection
 }
 
 /** 已注册图种的 id 集合（字面量联合，随 ProjectionTypes 增长） */
@@ -129,6 +133,25 @@ export const MINDMAP_TEMPLATE = `mindmap
       导出 mmd / svg / png
 `
 
+/** state 起步模板（more-diagrams 工单 02）：初始转移、两个普通状态（其一带描述）、
+ * 一个复合状态、一条带标签转移、一个 note */
+export const STATE_TEMPLATE = `stateDiagram-v2
+    [*] --> idle
+    idle : 等待用户输入
+    idle --> running : 开始处理
+    running --> [*]
+
+    state archiving {
+        logging
+        reporting
+    }
+    running --> archiving : 归档
+
+    note right of idle
+        双击状态可编辑描述
+    end note
+`
+
 /**
  * 注册表：数组是唯一权威（more-diagrams 工单 01），DIAGRAM_TYPES 由它推导。
  * detectDiagramType 按数组顺序显式遍历——不再维护手写的 if 分发链，
@@ -170,6 +193,16 @@ export const DIAGRAM_TYPE_LIST: DiagramTypeRegistration[] = [
     buildProjection: (doc) => ({ type: 'mindmap', mindmap: buildMindmapProjection(doc) }),
     tree: treePartitions.mindmap,
     canvas: mindmapCanvasCapabilities,
+  },
+  {
+    id: 'state',
+    parser: stateParser,
+    template: STATE_TEMPLATE,
+    // v1 `stateDiagram` 与 v2 同认（mermaid 两个关键字都渲染）；投影按 v2 解析
+    detect: (source) => /^stateDiagram(-v2)?\b/i.test(firstStatementLine(source)),
+    buildProjection: (doc) => ({ type: 'state', state: buildStateProjection(doc) }),
+    tree: treePartitions.state,
+    canvas: stateCanvasCapabilities,
   },
 ]
 

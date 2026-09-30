@@ -68,6 +68,10 @@ export const zhDict = {
         'apply-style': '应用样式',
         applyStyleEmpty: '暂无样式',
         'add-child': '添加子节点',
+        // state（more-diagrams 工单 02）
+        'add-state': '添加状态',
+        'add-state-into': '添加状态（复合内部）',
+        'edit-state-desc': '编辑描述',
         delete: '删除',
         styleName: '样式名称',
         styleNameInvalid: '名称不能为空，且不能含空格或逗号',
@@ -94,6 +98,7 @@ export const zhDict = {
       sequence: '时序图',
       class: '类图',
       mindmap: '思维导图',
+      state: '状态图',
     },
     library: {
       title: '图表库',
@@ -321,6 +326,18 @@ export const zhDict = {
       // 工单 06：键盘添加节点的占位名（确认前落码用，内联命名确认后改写）
       mindmapNewNode: '新节点',
       cancel: '取消',
+      // ---- state（more-diagrams 工单 02） ----
+      states: '状态',
+      stateTransitions: '转移',
+      stateComposite: '复合状态',
+      stateId: '状态 {{id}}',
+      stateDesc: '描述（id : desc 的描述段）',
+      deleteState: '删除状态（含内部状态与触及转移）',
+      transitionLabel: '转移标签（可选）',
+      deleteTransition: '删除转移',
+      stateNoteTarget: '{{side}} {{target}}',
+      addStateFrom: '起点状态',
+      addStateTo: '终点状态',
     },
     shapes: {
       rectangle: '矩形',
@@ -371,6 +388,11 @@ export const zhDict = {
       bang: '爆炸 ))((',
       cloud: '云 )(',
       hexagon: '六边形 {{ }}',
+    },
+    statePseudoKinds: {
+      choice: 'choice（选择）',
+      fork: 'fork（分叉）',
+      join: 'join（汇合）',
     },
   },
 } as const

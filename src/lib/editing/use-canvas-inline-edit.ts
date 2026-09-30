@@ -61,6 +61,10 @@ export function inlineEditTextOf(projection: AnyProjection | null, target: Canva
   if (projection.type === 'sequence' && target.kind === 'sequence-alias') {
     return projection.sequence.participants.find((p) => p.actorId === target.actorId)?.alias ?? ''
   }
+  if (projection.type === 'state' && target.kind === 'state') {
+    // state 双击编辑的是描述段：无描述状态预填空串（输入即新增描述）
+    return projection.state.states.find((s) => s.id === target.id)?.desc ?? ''
+  }
   return ''
 }
 
@@ -103,6 +107,13 @@ function findTargetElement(root: Element, target: CanvasInlineEditTarget, text: 
       target.kind === 'flowchart' ? target.nodeId : target.kind === 'class' ? target.name : target.actorId
     for (const el of root.querySelectorAll('[data-id]')) {
       if (el.getAttribute('data-id') === dataId) return el
+    }
+    return null
+  }
+  if (target.kind === 'state') {
+    // state 的 data-id 即状态 id（渲染后处理从 DOM id 反注，more-diagrams 工单 02）
+    for (const el of root.querySelectorAll('[data-id]')) {
+      if (el.getAttribute('data-id') === target.id) return el
     }
     return null
   }
@@ -165,7 +176,15 @@ export function useCanvasInlineEdit({ projection, resolver, svg, containerRef, v
       const type = projection?.type
       const mindmapNodes = projection?.type === 'mindmap' ? projection.mindmap.nodes : []
       const kind: InlineEditDiagramKind =
-        type === 'mindmap' ? 'mindmap' : type === 'class' ? 'class' : type === 'sequence' ? 'sequence' : 'flowchart'
+        type === 'mindmap'
+          ? 'mindmap'
+          : type === 'class'
+            ? 'class'
+            : type === 'sequence'
+              ? 'sequence'
+              : type === 'state'
+                ? 'state'
+                : 'flowchart'
       const target = inlineEditTargetFromEvent(e.target, resolver, mindmapNodes, kind)
       if (target === null) return
       e.preventDefault()

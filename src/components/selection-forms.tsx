@@ -9,6 +9,7 @@ import {
 } from '../lib/projection/sequence-projection'
 import { type ClassProjection } from '../lib/projection/class-projection'
 import { type MindmapProjection } from '../lib/projection/mindmap-projection'
+import { type StateProjection } from '../lib/projection/state-projection'
 import { DIRECTIONS } from '../lib/pipeline/flowchart'
 import { setDirectionIntent } from '../lib/editing/flowchart-forms'
 import { setClassDirectionIntent } from '../lib/editing/class-forms'
@@ -18,6 +19,7 @@ import { DiagramForm, EdgeForm, ClassDefForm, NodeForm, SubgraphForm } from './p
 import { BlockForm, MessageForm, NoteForm, ParticipantForm, SequenceDiagramForm, SequenceRegionForm } from './sequence-forms'
 import { ClassForm, ClassNoteForm, MemberForm, NamespaceForm, RelationForm } from './class-forms'
 import { MindmapNodeForm } from './mindmap-forms'
+import { StateForm, StateNoteForm, StateTransitionForm } from './state-forms'
 
 /**
  * 选中元素的属性表单，按投影图种分发（工单 04-bundle 自 PropertyPanel 迁出）：
@@ -224,6 +226,53 @@ function MindmapSelectionForm({
       return null
   }
 }
+function StateSelectionForm({
+  projection,
+  selection,
+}: {
+  projection: StateProjection
+  selection: Selection | null
+}) {
+  const { t } = useTranslation()
+  if (selection === null) {
+    return (
+      <Text size="sm" c="dimmed" px="xs">
+        {t('app:propertyPanel.nothingSelected')}
+      </Text>
+    )
+  }
+  switch (selection.kind) {
+    case 'diagram':
+      // stateDiagram 的 direction 是独立语句行：没有该行时如实显示「跟随 Mermaid 默认」
+      return (
+        <DiagramForm
+          direction={projection.direction}
+          allowFollowDefault
+          onSelect={(next) => commitStateDirection(next)}
+        />
+      )
+    case 'state': {
+      const state = projection.states.find((s) => s.id === selection.id)
+      return state !== undefined ? <StateForm state={state} /> : null
+    }
+    case 'state-transition': {
+      const tr = projection.transitions.find((x) => x.elementId === selection.elementId)
+      return tr !== undefined ? <StateTransitionForm transition={tr} /> : null
+    }
+    case 'state-note': {
+      const n = projection.notes.find((x) => x.elementId === selection.elementId)
+      return n !== undefined ? <StateNoteForm note={n} /> : null
+    }
+    default:
+      return null
+  }
+}
+
+/** state 图表方向的表单值 → set-direction 意图（与 class 同口径：null = 删除 direction 行） */
+function commitStateDirection(direction: string | null): void {
+  useEditorStore.getState().commitIntent({ type: 'set-direction', direction })
+}
+
 export function ProjectionSelectionForm({ projection, selection }: { projection: AnyProjection; selection: Selection | null }) {
   if (projection.type === 'flowchart') {
     return <FlowchartSelectionForm projection={projection.flowchart} selection={selection} />
@@ -233,6 +282,9 @@ export function ProjectionSelectionForm({ projection, selection }: { projection:
   }
   if (projection.type === 'mindmap') {
     return <MindmapSelectionForm projection={projection.mindmap} selection={selection} />
+  }
+  if (projection.type === 'state') {
+    return <StateSelectionForm projection={projection.state} selection={selection} />
   }
   return <ClassSelectionForm projection={projection.class} selection={selection} />
 }

@@ -39,9 +39,9 @@ export interface StyleFormState {
   y: number
 }
 
-/** 菜单上浮出的添加型小表单种类（工单 06 三项 + 工单 04 补三项）：
+/** 菜单上浮出的添加型小表单种类（工单 06 三项 + 工单 04 补三项 + state 转移）：
  * 'note' 同时服务 sequence（注释）与 class（浮动 / note for X），由投影图种决定渲染哪个表单。 */
-export type NodeFormKind = 'member' | 'relation' | 'message' | 'note' | 'block'
+export type NodeFormKind = 'member' | 'relation' | 'message' | 'note' | 'block' | 'transition'
 
 export interface NodeFormState {
   kind: NodeFormKind

@@ -2,6 +2,7 @@ import type { EditIntent } from '../pipeline/parser'
 import { isValidMindmapNodeText } from '../pipeline/mindmap'
 import { isValidClassName } from '../pipeline/class'
 import { isValidParticipantId } from '../pipeline/sequence'
+import { isValidStateId } from '../pipeline/state'
 import type { ProjectionMindmapNode } from '../projection/mindmap-projection'
 import { selectionFromEventTarget, type CanvasSelection, type DataIdResolver } from '../canvas-selection/data-id'
 
@@ -42,6 +43,9 @@ export type CanvasInlineEditTarget =
   | { kind: 'sequence'; actorId: string }
   /** sequence 双击既有参与者：编辑 `as` 显示别名（显示文本） */
   | { kind: 'sequence-alias'; actorId: string }
+  /** state（more-diagrams 工单 02）：双击 / 键盘新建后编辑状态描述（`id : desc` 的 desc 段，
+   * set-state-desc 意图；id 是语法标识，不在此改） */
+  | { kind: 'state'; id: string }
 
 export type InlineEditCommit =
   | { action: 'commit'; intent: EditIntent }
@@ -96,8 +100,8 @@ function classTitleClicked(target: EventTarget | null, name: string): boolean {
   return false
 }
 
-/** 参与双击寻址的图种（四图种都用 data-id；mindmap 额外回落文本匹配） */
-export type InlineEditDiagramKind = 'flowchart' | 'mindmap' | 'class' | 'sequence'
+/** 参与双击寻址的图种（各图种都用 data-id；mindmap 额外回落文本匹配） */
+export type InlineEditDiagramKind = 'flowchart' | 'mindmap' | 'class' | 'sequence' | 'state'
 
 /**
  * 双击目标 → 编辑对象；两边都匹配不上时返回 null（如点在空白处/边上），
@@ -119,6 +123,8 @@ export function inlineEditTargetFromEvent(
     // class 只在类名文本上改类名；sequence 改显示别名（不碰 actorId）
     if (kind === 'class') return classTitleClicked(target, byId.nodeId) ? { kind: 'class', name: byId.nodeId } : null
     if (kind === 'sequence') return { kind: 'sequence-alias', actorId: byId.nodeId }
+    // state：双击状态节点 = 编辑描述（set-state-desc；无描述状态输入即新增描述行）
+    if (kind === 'state') return isValidStateId(byId.nodeId) ? { kind: 'state', id: byId.nodeId } : null
     return byId
   }
   return kind === 'mindmap' ? targetFromMindmapText(target, mindmapNodes) : null
@@ -146,6 +152,11 @@ export function inlineEditCommitOf(target: CanvasInlineEditTarget, text: string,
   if (target.kind === 'sequence-alias') {
     // 只改显示别名（set-participant）；清空视为未改动（去掉别名走属性面板，spec：只做改显示文本）
     return { action: 'commit', intent: { type: 'set-participant', actorId: target.actorId, alias: next } }
+  }
+  if (target.kind === 'state') {
+    if (!isValidStateId(target.id)) return { action: 'invalid' }
+    // 空白/未改动已被顶部守卫短路（unchanged）；到这里的非空改动 = set-state-desc
+    return { action: 'commit', intent: { type: 'set-state-desc', id: target.id, desc: next } }
   }
   if (!isValidMindmapNodeText(next)) return { action: 'invalid' }
   return { action: 'commit', intent: { type: 'set-node-text', elementId: target.elementId, text: next } }

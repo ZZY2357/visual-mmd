@@ -4,6 +4,7 @@ import type { AnyProjection } from '../lib/diagram-registry'
 import type { NodeFormState } from '../lib/editing/use-canvas-context-menu'
 import { AddMemberInlineForm, AddRelationInlineForm, AddClassNoteInlineForm } from './class-forms'
 import { AddMessageInlineForm, AddNoteInlineForm, AddBlockInlineForm } from './sequence-forms'
+import { AddTransitionInlineForm } from './state-forms'
 
 /**
  * class/sequence 节点菜单的表单浮层（工单 06/04；工单 04-canvas-bundle 自 CanvasPanel 迁出）：
@@ -68,6 +69,14 @@ export function NodeFormPopup(props: { state: NodeFormState; projection: AnyProj
         )}
         {state.kind === 'block' && projection.type === 'sequence' && (
           <AddBlockInlineForm afterElementId={state.anchorElementId} onDone={props.onClose} />
+        )}
+        {state.kind === 'transition' && projection.type === 'state' && (
+          <AddTransitionInlineForm
+            states={projection.state.states}
+            initialFrom={state.from}
+            afterElementId={state.anchorElementId}
+            onDone={props.onClose}
+          />
         )}
         {state.kind === 'note' && projection.type === 'class' && (
           <AddClassNoteInlineForm

@@ -90,6 +90,13 @@ function nodeFormForTarget(
     if (p === undefined) return null
     return { kind, anchorElementId: p.elementId, from: target.actorId, x, y }
   }
+  if (kind === 'transition') {
+    // state 转移表单（more-diagrams 工单 02）：状态节点右键 / Enter 键 → 预选起点该状态
+    if (target.kind !== 'state-node' || proj.type !== 'state') return null
+    const state = proj.state.states.find((s) => s.id === target.id)
+    if (state === undefined) return null
+    return { kind, anchorElementId: state.tailElementId ?? undefined, from: target.id, x, y }
+  }
   if (kind === 'block') {
     // sequence 独有的添加逻辑块：参与者上右键 → 锚点为该参与者的声明；
     // 空白处右键 → 无锚点（管线回退到文档最后一个元素）
@@ -117,10 +124,11 @@ function nodeFormForTarget(
   return null
 }
 
-/** 编辑器选中 → 可打开添加表单的菜单目标形态（仅类与参与者两种；其余选中无该形态） */
+/** 编辑器选中 → 可打开添加表单的菜单目标形态（类 / 参与者 / 状态三种；其余选中无该形态） */
 function formTargetOfSelection(selection: Selection): ContextMenuTarget | null {
   if (selection.kind === 'class') return { kind: 'class-node', name: selection.name }
   if (selection.kind === 'participant') return { kind: 'sequence-participant', actorId: selection.actorId }
+  if (selection.kind === 'state') return { kind: 'state-node', id: selection.id }
   return null
 }
 
@@ -173,6 +181,10 @@ export function useCanvasContextMenu(
       if (container === null || proj === null) return
       const selection = selectionFromEventTarget(e.target, r)
       const target = contextMenuTargetFromSelection(selection, proj.type)
+      // state 状态节点的 composite 标志由投影补齐（menuTargetOfCanvas 是纯映射，不查投影）
+      if (target !== null && target.kind === 'state-node' && proj.type === 'state') {
+        target.composite = proj.state.states.find((s) => s.id === target.id)?.composite ?? false
+      }
       if (target === null || contextMenuItems(target).length === 0) {
         // 无可弹项只收菜单（现状：不动已打开的表单浮层）
         setOpen((cur) => (cur.kind === 'menu' ? IDLE_OPEN : cur))
@@ -202,10 +214,15 @@ export function useCanvasContextMenu(
       )
       setOpen(t.state.open)
       if (t.completedLink !== null) {
-        // 两步完成：落码默认实线箭头连线并选中它
+        // 两步完成：落码一条连线并选中它（state 图种落 add-transition，其余落 flowchart add-edge）
         const { commitIntent, select } = useEditorStore.getState()
         const { from, to } = t.completedLink
-        if (commitIntent({ type: 'add-edge', from, to, lineStyle: 'solid', head: 'arrow' })) {
+        const proj = latest.current.projection
+        if (proj !== null && proj.type === 'state') {
+          if (commitIntent({ type: 'add-transition', from, to })) {
+            select({ kind: 'state-transition', elementId: `transition:${proj.state.transitions.length + 1}` })
+          }
+        } else if (commitIntent({ type: 'add-edge', from, to, lineStyle: 'solid', head: 'arrow' })) {
           select({ kind: 'edge', from, to, occurrence: 1 })
         }
       }
@@ -280,7 +297,7 @@ export function useCanvasContextMenu(
    * 与右键菜单共用 nodeFormForTarget，**不新造浮层**。选中不是类/参与者时安静地不打开。
    */
   const openFormForSelection = useCallback(
-    (kind: 'member' | 'relation' | 'message'): void => {
+    (kind: 'member' | 'relation' | 'message' | 'transition'): void => {
       const proj = latest.current.projection
       const { selection } = useEditorStore.getState()
       if (proj === null || selection === null) return
