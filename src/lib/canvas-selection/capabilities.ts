@@ -32,8 +32,11 @@ export interface CanvasCapabilities<T extends AnyProjection = AnyProjection> {
   dataIdResolver(projection: T): DataIdResolver
   /** 画布选中 → 编辑器选中（原 CanvasPanel.canvasToEditorSelection，工单 03 收敛后逐图种实现） */
   toSelection(canvas: CanvasSelection): Selection | null
-  /** 编辑器选中 → 画布 data-id（高亮用；不可寻址的 kind 返回 null——安静地不高亮） */
-  canvasIdOf(selection: Selection): string | null
+  /** 编辑器选中 → 画布 data-id（高亮用；不可寻址的 kind 返回 null——安静地不高亮）。
+   * more-diagrams 工单 11 起签名带投影（与 deleteIntent / resolveSelection 同形）：
+   * gantt 的 data-id 是 mermaid 渲染 id，只能由投影从位置序 elementId 反解，
+   * 无投影参与的字段映射在这类图种上不可能。 */
+  canvasIdOf(projection: T, selection: Selection): string | null
   /** 参与方位导航 / 回落首节点的 id 列表（**投影顺序**，工单 14 §3；原 nodeDataIdsOf） */
   navigationIds(projection: T): string[]
   /** 画布键盘的 tagged union（工单 14；原 keyboardProjectionOf） */

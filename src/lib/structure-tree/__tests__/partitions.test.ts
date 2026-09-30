@@ -233,6 +233,8 @@ describe('结构树分区描述（工单 06）', () => {
       pie: 'pie showData\n    title 预算\n    "研发" : 45\n    "市场" : 30',
       block: 'block-beta\n    columns 3\n    a["输入"]\n    b{"校验"}\n    a --> b',
       sankey: 'sankey-beta\n\nsrc,dst,3\n"n, ame",dst,1.5',
+      gantt:
+        'gantt\n    dateFormat YYYY-MM-DD\n    section 调研\n        需求梳理 :done, 2026-01-05, 3d',
     }
     for (const id of Object.keys(DIAGRAM_TYPES) as (keyof typeof DIAGRAM_TYPES)[]) {
       const registration = DIAGRAM_TYPES[id]

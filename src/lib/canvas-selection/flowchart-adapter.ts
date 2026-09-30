@@ -44,7 +44,7 @@ export const flowchartCanvasCapabilities: CanvasCapabilities<ProjectionOf<'flowc
   toSelection: toEditorSelection,
   // flowchart 的 edge 选中不进高亮 data-id 链路（`L_{from}_{to}_{n}` 尽力匹配，
   // 与 selection-codec.canvasIdOf 同约定）：只有节点可寻址
-  canvasIdOf: (selection) => (selection.kind === 'node' ? selection.nodeId : null),
+  canvasIdOf: (_projection, selection) => (selection.kind === 'node' ? selection.nodeId : null),
   navigationIds: (projection) => projection.flowchart.nodes.map((n) => n.nodeId),
   keyboardProjection: (projection) => ({ kind: 'flowchart', projection: projection.flowchart }),
   resolveSelection: (projection, selection) => resolveFlowchartSelection(projection.flowchart, selection),

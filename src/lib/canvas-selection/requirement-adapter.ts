@@ -68,7 +68,7 @@ export const requirementCanvasCapabilities: CanvasCapabilities<ProjectionOf<'req
   dataIdResolver: (projection) => requirementDataIdResolver(projection.requirement),
   toSelection: (canvas) => requirementSelectionOf(canvas),
   // data-id 即节点名字（渲染后从 DOM id 反注）；关系边是位置序 elementId
-  canvasIdOf: (selection) => {
+  canvasIdOf: (_projection, selection) => {
     if (selection.kind === 'requirement' || selection.kind === 'requirement-element') return selection.name
     if (selection.kind === 'requirement-relation') return selection.elementId
     return null

@@ -3,7 +3,6 @@ import { Alert, Box, Button, ColorInput, Group, Stack, Text, TextInput, Title, U
 import { useTranslation } from 'react-i18next'
 import type { MermaidPreview } from '../lib/use-mermaid-preview'
 import type { CanvasSelection } from '../lib/canvas-selection/data-id'
-import { canvasIdOf } from '../lib/canvas-selection/selection-codec'
 import { hitTestEdgeIdentity } from '../lib/canvas-selection/edge-locate'
 import { capabilitiesOf } from '../lib/canvas-selection/capabilities'
 import type { Selection } from '../lib/projection/selection'
@@ -337,10 +336,13 @@ export function CanvasPanel({ preview, projection, unsupported = false }: Canvas
         }
         return out
       },
-      // 选中已不在投影中（源码被外部改动等）也算无锚点 → 回落首节点
+      // 选中已不在投影中（源码被外部改动等）也算无锚点 → 回落首节点。
+      // data-id 映射查能力包（more-diagrams 工单 11 起 canvasIdOf 带投影）——
+      // gantt 的 data-id 是 mermaid 渲染 id，只能由投影从位置序 elementId 反解，
+      // 共享 codec 的 canvasIdOf 对这类图种无从下手（返回 null）。
       dataIdOf: (selection) => {
         if (selection === null) return null
-        const dataId = canvasIdOf(selection)
+        const dataId = caps.canvasIdOf(projection, selection)
         return dataId !== null && ids.includes(dataId) ? dataId : null
       },
       toSelection,
@@ -424,7 +426,10 @@ export function CanvasPanel({ preview, projection, unsupported = false }: Canvas
     svg,
     containerRef,
     resolver: canvasResolver,
-    selectedDataId: selection !== null && caps !== null ? caps.canvasIdOf(selection) : null,
+    selectedDataId:
+      selection !== null && caps !== null && projection !== null
+        ? caps.canvasIdOf(projection, selection)
+        : null,
     annotateEdges,
     hitTestEdge,
     onSelect: (canvasSelection) => {

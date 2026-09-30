@@ -10,6 +10,7 @@ import { isValidRequirementFieldValue } from '../pipeline/requirement'
 import { parseRequirementBlockElementId } from '../pipeline/element-id'
 import { isValidBlockLabel } from '../pipeline/block'
 import { parseBlockNodeElementId } from '../pipeline/element-id'
+import { isValidGanttTaskName } from '../pipeline/gantt'
 import type { ProjectionMindmapNode } from '../projection/mindmap-projection'
 import { selectionFromEventTarget, type CanvasSelection, type DataIdResolver } from '../canvas-selection/data-id'
 
@@ -67,6 +68,10 @@ export type CanvasInlineEditTarget =
   /** block（more-diagrams 工单 09）：双击块节点改标签（set-node-label 意图；id 是语法
    * 标识，不在此改。嵌套块无双击——组没有标签，宽度/列数在右侧属性表单改） */
   | { kind: 'block-node'; id: string }
+  /** gantt（more-diagrams 工单 11）：双击任务条/任务文本改任务名（set-task-name）。
+   * elementId 是位置序身份（`task:N`，提交寻址用）；taskId 是 mermaid 渲染 id
+   * （画布 data-id，浮层定位用——DOM 上只有它，无法从位置序 elementId 反解） */
+  | { kind: 'gantt-task'; elementId: string; taskId: string }
 
 export type InlineEditCommit =
   | { action: 'commit'; intent: EditIntent }
@@ -121,6 +126,23 @@ function classTitleClicked(target: EventTarget | null, name: string): boolean {
   return false
 }
 
+/**
+ * 沿 DOM 向上找最近的 data-id 属性值（gantt 双击用，more-diagrams 工单 11）：
+ * resolver 命中给出的是 elementId（`task:N`），而浮层定位要在 DOM 里找元素——
+ * 那里的身份是 mermaid 渲染 id（data-id 原文，即 taskId）。两种身份在同一元素上，
+ * 双击时一次取齐。找不到（点空白处）返回 null。
+ */
+function closestDataId(target: EventTarget | null): string | null {
+  if (target === null || !(target instanceof Element)) return null
+  let el: Element | null = target
+  while (el !== null) {
+    const dataId = el.getAttribute('data-id')
+    if (dataId !== null && dataId !== '') return dataId
+    el = el.parentElement
+  }
+  return null
+}
+
 /** 参与双击寻址的图种（各图种都用 data-id；mindmap 额外回落文本匹配） */
 export type InlineEditDiagramKind =
   | 'flowchart'
@@ -132,6 +154,7 @@ export type InlineEditDiagramKind =
   | 'kanban'
   | 'requirement'
   | 'block'
+  | 'gantt'
 
 /**
  * 双击目标 → 编辑对象；两边都匹配不上时返回 null（如点在空白处/边上），
@@ -175,6 +198,13 @@ export function inlineEditTargetFromEvent(
     if (kind === 'block') {
       const node = parseBlockNodeElementId(byId.nodeId)
       return node !== null ? { kind: 'block-node', id: node.id } : null
+    }
+    // gantt（more-diagrams 工单 11）：双击任务条/任务文本 = 改任务名（set-task-name）。
+    // resolver 把渲染 id（data-id）映射回位置序 elementId；taskId 取 DOM 上的 data-id
+    // 原文（浮层定位用，见 closestDataId）
+    if (kind === 'gantt') {
+      const taskId = closestDataId(target)
+      return taskId !== null ? { kind: 'gantt-task', elementId: byId.nodeId, taskId } : null
     }
     return byId
   }
@@ -236,6 +266,12 @@ export function inlineEditCommitOf(target: CanvasInlineEditTarget, text: string,
     // 非法；清空 = 去掉标签变裸形状，走属性表单而非双击——顶部守卫已按 unchanged 关闭）
     if (!isValidBlockLabel(next)) return { action: 'invalid' }
     return { action: 'commit', intent: { type: 'set-node-label', id: target.id, label: next } }
+  }
+  if (target.kind === 'gantt-task') {
+    // gantt（more-diagrams 工单 11）：非空改动 = set-task-name（任务名含 `:` `;` `#`
+    // 换行非法；elementId 位置序寻址，taskId 只用于浮层定位）
+    if (!isValidGanttTaskName(next)) return { action: 'invalid' }
+    return { action: 'commit', intent: { type: 'set-task-name', elementId: target.elementId, name: next } }
   }
   if (!isValidMindmapNodeText(next)) return { action: 'invalid' }
   return { action: 'commit', intent: { type: 'set-node-text', elementId: target.elementId, text: next } }

@@ -104,7 +104,7 @@ describe('timeline 画布能力包：如实降级（ADR-0007：无 data-id 不�
     expect(caps.dataIdResolver(projection)('period:1')).toBeNull()
     expect(caps.dataIdResolver(projection)('node_0')).toBeNull()
     expect(caps.toSelection({ kind: 'node', id: 'period:1' })).toBeNull()
-    expect(caps.canvasIdOf({ kind: 'timeline-period', elementId: 'period:1' })).toBeNull()
+    expect(caps.canvasIdOf(projection, { kind: 'timeline-period', elementId: 'period:1' })).toBeNull()
     expect(caps.navigationIds(projection)).toEqual([])
     expect(caps.edgeAnnotator).toBeUndefined()
     expect(caps.keyboardProjection(projection).kind).toBe('timeline')

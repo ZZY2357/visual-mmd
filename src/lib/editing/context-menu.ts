@@ -163,6 +163,11 @@ export type ContextMenuItemId =
   // 节点 = 重命名（选中 + 关菜单，在右侧属性表单改——节点不落码，改名即手术改写全部链路行）
   | 'add-sankey-link'
   | 'edit-sankey-name'
+  // gantt（more-diagrams 工单 11）：空白 = 加任务（缺省时长 1d，归属最后一个分组）/
+  // 加分组。任务条虽可寻址，但元素级编辑不做画布菜单（与 journey/pie 同口径），
+  // 由结构树选中 + 属性表单承接；section 与指令行不可寻址。
+  | 'add-gantt-task'
+  | 'add-gantt-section'
 
 /**
  * 画布选中 → 菜单目标（工单 03 起为 `canvas-selection/selection-codec.ts` 的
@@ -215,6 +220,9 @@ function blankMenuItems(diagramType: DiagramTypeId): ContextMenuItemId[] {
     case 'sankey':
       // sankey 的空白入口（more-diagrams 工单 13）：加链路（三列表单，提交才落码）
       return ['add-sankey-link']
+    case 'gantt':
+      // gantt 的空白入口（工单 11 定案）：加任务（缺省时长 1d，归属最后一个分组）与加分组
+      return ['add-gantt-task', 'add-gantt-section']
     // DiagramTypeId 是开放类型（more-diagrams 工单 01）：未接入画布能力包的图种
     // 没有空白右键入口（unsupported 态下画布右键整体停用，不会走到这里）
     default:

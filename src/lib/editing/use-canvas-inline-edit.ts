@@ -85,6 +85,10 @@ export function inlineEditTextOf(projection: AnyProjection | null, target: Canva
     // block 双击编辑的是标签（more-diagrams 工单 09）：无标签节点预填语法 id
     return projection.block.nodes.find((n) => n.id === target.id)?.label ?? target.id
   }
+  if (projection.type === 'gantt' && target.kind === 'gantt-task') {
+    // gantt 双击编辑的是任务名（more-diagrams 工单 11）：按位置序 elementId 取投影现名
+    return projection.gantt.tasks.find((task) => task.elementId === target.elementId)?.name ?? ''
+  }
   return ''
 }
 
@@ -172,6 +176,15 @@ function findTargetElement(root: Element, target: CanvasInlineEditTarget, text: 
     }
     return null
   }
+  if (target.kind === 'gantt-task') {
+    // gantt 的 data-id = mermaid 渲染 id（taskId，渲染后处理从 DOM id `<svgId>-<taskId>`
+    // 反注，more-diagrams 工单 11）；双击目标里已带（closestDataId 取原文），直接等值匹配。
+    // 任务条 rect 与任务文本 text 反注后同 data-id，命中任一即可（包围盒取先到者）
+    for (const el of root.querySelectorAll('[data-id]')) {
+      if (el.getAttribute('data-id') === target.taskId) return el
+    }
+    return null
+  }
   return findMindmapElement(root, target.elementId, text)
 }
 
@@ -247,7 +260,9 @@ export function useCanvasInlineEdit({ projection, resolver, svg, containerRef, v
                       ? 'kanban'
                       : type === 'block'
                         ? 'block'
-                        : 'flowchart'
+                        : type === 'gantt'
+                          ? 'gantt'
+                          : 'flowchart'
       const target = inlineEditTargetFromEvent(e.target, resolver, mindmapNodes, kind)
       if (target === null) return
       e.preventDefault()

@@ -142,6 +142,12 @@ export function fromCanvasId(diagramType: DiagramTypeId, canvas: CanvasSelection
     // pie（more-diagrams 工单 10）：画布 DOM 无 data-id（实测降级），画布选中不产生
     return null
   }
+  if (diagramType === 'gantt') {
+    // gantt（more-diagrams 工单 11）：任务条 data-id = mermaid 渲染 id（渲染后处理
+    // 反注），resolver 已把它映射回位置序 elementId（`task:N`）——node.id 即 elementId
+    if (canvas.kind !== 'node') return null
+    return { kind: 'gantt-task', elementId: canvas.id }
+  }
   if (diagramType === 'kanban') {
     // resolver 返回的 node.id 即 elementId（`kanban-card:<id>` / `kanban-column:<id>`），按前缀判种类
     if (canvas.kind !== 'node') return null
@@ -266,6 +272,11 @@ export function menuTargetOfCanvas(
     if (diagramType === 'gitgraph') return null // 无 data-id（实测降级），画布节点不可命中
     if (diagramType === 'journey') return null // 无 data-id（实测降级），画布节点不可命中
     if (diagramType === 'pie') return null // 无 data-id（实测降级），画布节点不可命中
+    if (diagramType === 'gantt') {
+      // gantt（more-diagrams 工单 11）：任务条虽可寻址，但元素级菜单不做（与 journey/pie
+      // 同口径），编辑由结构树选中 + 属性表单承接——画布节点不产生菜单目标
+      return null
+    }
     if (diagramType === 'kanban') {
       // 列 / 卡片都渲染成 `g.node` / `g.cluster`，反注后的 canvas.id 带 elementId 前缀，
       // 按前缀还原菜单目标种类；前缀不认识返回 null（安静地不弹菜单）。

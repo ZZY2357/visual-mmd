@@ -54,6 +54,13 @@ import { BlockDiagramForm, BlockEdgeForm, BlockGroupForm, BlockNodeForm } from '
 import { type BlockProjection } from '../lib/projection/block-projection'
 import { SankeyLinkForm, SankeyNodeForm } from './sankey-forms'
 import { type SankeyProjection } from '../lib/projection/sankey-projection'
+import {
+  GanttDiagramForm,
+  GanttDirectiveForm,
+  GanttSectionForm,
+  GanttTaskForm,
+} from './gantt-forms'
+import { type GanttProjection } from '../lib/projection/gantt-projection'
 
 /**
  * 选中元素的属性表单，按投影图种分发（工单 04-bundle 自 PropertyPanel 迁出）：
@@ -667,6 +674,46 @@ function SankeySelectionForm({
   }
 }
 
+/**
+ * gantt（more-diagrams 工单 11）：选中任务 / section / 指令行时渲染对应表单；
+ * 图表级 = 标题 + dateFormat。任务条画布可寻址但文本编辑入口统一在表单（与 journey/pie
+ * 同口径）；section 与指令行不可寻址，这三张表单是其唯一编辑入口。
+ */
+function GanttSelectionForm({
+  projection,
+  selection,
+}: {
+  projection: GanttProjection
+  selection: Selection | null
+}) {
+  const { t } = useTranslation()
+  if (selection === null) {
+    return (
+      <Text size="sm" c="dimmed" px="xs">
+        {t('app:propertyPanel.nothingSelected')}
+      </Text>
+    )
+  }
+  switch (selection.kind) {
+    case 'diagram':
+      return <GanttDiagramForm projection={projection} />
+    case 'gantt-task': {
+      const task = projection.tasks.find((task) => task.elementId === selection.elementId)
+      return task !== undefined ? <GanttTaskForm task={task} /> : null
+    }
+    case 'gantt-section': {
+      const section = projection.sections.find((s) => s.elementId === selection.elementId)
+      return section !== undefined ? <GanttSectionForm section={section} /> : null
+    }
+    case 'gantt-directive': {
+      const directive = projection.directives.find((d) => d.elementId === selection.elementId)
+      return directive !== undefined ? <GanttDirectiveForm directive={directive} /> : null
+    }
+    default:
+      return null
+  }
+}
+
 export function ProjectionSelectionForm({ projection, selection }: { projection: AnyProjection; selection: Selection | null }) {
   if (projection.type === 'flowchart') {
     return <FlowchartSelectionForm projection={projection.flowchart} selection={selection} />
@@ -706,6 +753,9 @@ export function ProjectionSelectionForm({ projection, selection }: { projection:
   }
   if (projection.type === 'sankey') {
     return <SankeySelectionForm projection={projection.sankey} selection={selection} />
+  }
+  if (projection.type === 'gantt') {
+    return <GanttSelectionForm projection={projection.gantt} selection={selection} />
   }
   return <ClassSelectionForm projection={projection.class} selection={selection} />
 }

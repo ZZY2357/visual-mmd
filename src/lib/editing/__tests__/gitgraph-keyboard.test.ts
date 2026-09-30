@@ -112,7 +112,7 @@ describe('gitgraphCanvasCapabilities（画布能力包降级项）', () => {
     expect(resolver('commit:1')).toBeNull()
     expect(resolver('node_0')).toBeNull()
     expect(caps.toSelection({ kind: 'node', id: 'x' })).toBeNull()
-    expect(caps.canvasIdOf({ kind: 'gitgraph-commit', elementId: 'commit:1' })).toBeNull()
+    expect(caps.canvasIdOf(projection, { kind: 'gitgraph-commit', elementId: 'commit:1' })).toBeNull()
     expect(caps.navigationIds(projection)).toEqual([])
   })
 

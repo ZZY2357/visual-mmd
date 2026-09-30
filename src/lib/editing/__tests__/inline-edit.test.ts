@@ -213,3 +213,52 @@ describe('overlayRectInContainer（浮层定位）', () => {
     expect(overlay).toEqual({ left: 90, top: 48, width: 60, height: 24 })
   })
 })
+
+describe('inlineEditTargetFromEvent / inlineEditCommitOf（more-diagrams 工单 11：gantt 双击改任务名）', () => {
+  // 真实口径：data-id = mermaid 渲染 id（taskId），resolver 把它映射回位置序 elementId
+  const ganttResolver = (dataId: string): CanvasSelection | null =>
+    dataId === 'a1' ? { kind: 'node', id: 'task:1' } : null
+
+  it('gantt：双击任务条（rect，data-id = 渲染 id）→ elementId 与 taskId 一次取齐', () => {
+    const rect = el('<svg><rect id="g-1-a1" data-id="a1"/></svg>').querySelector('rect')!
+    expect(inlineEditTargetFromEvent(rect, ganttResolver, [], 'gantt')).toEqual({
+      kind: 'gantt-task',
+      elementId: 'task:1',
+      taskId: 'a1',
+    })
+  })
+
+  it('gantt：双击任务文本（text，DOM id 带 -text 后缀）同样命中', () => {
+    const text = el(
+      '<svg><rect id="g-1-a1" data-id="a1"/><text id="g-1-a1-text" data-id="a1">需求梳理</text></svg>',
+    ).querySelector('text')!
+    expect(inlineEditTargetFromEvent(text, ganttResolver, [], 'gantt')).toEqual({
+      kind: 'gantt-task',
+      elementId: 'task:1',
+      taskId: 'a1',
+    })
+  })
+
+  it('gantt：点空白处（无 data-id，resolver 不命中）→ null，不进入编辑', () => {
+    const other = el('<svg><text>别的</text></svg>')
+    expect(inlineEditTargetFromEvent(other, ganttResolver, [], 'gantt')).toBeNull()
+  })
+
+  it('gantt：名字变化 → set-task-name 意图（位置序 elementId 寻址，taskId 只用于定位）', () => {
+    expect(
+      inlineEditCommitOf({ kind: 'gantt-task', elementId: 'task:1', taskId: 'a1' }, ' 需求评审 ', '需求梳理'),
+    ).toEqual({
+      action: 'commit',
+      intent: { type: 'set-task-name', elementId: 'task:1', name: '需求评审' },
+    })
+  })
+
+  it('gantt：非法任务名（含冒号）→ invalid；清空 → unchanged（不落码）', () => {
+    expect(inlineEditCommitOf({ kind: 'gantt-task', elementId: 'task:1', taskId: 'a1' }, 'a:b', '需求梳理')).toEqual({
+      action: 'invalid',
+    })
+    expect(inlineEditCommitOf({ kind: 'gantt-task', elementId: 'task:1', taskId: 'a1' }, '  ', '需求梳理')).toEqual({
+      action: 'unchanged',
+    })
+  })
+})

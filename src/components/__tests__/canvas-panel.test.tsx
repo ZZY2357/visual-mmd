@@ -26,7 +26,7 @@ const fake = vi.hoisted(() => {
   const fakeCaps: CanvasCapabilities = {
     dataIdResolver: () => (dataId) => (dataId === 'X1' ? { kind: 'node', id: 'X1' } : null),
     toSelection: () => ({ kind: 'node', nodeId: 'X1' }),
-    canvasIdOf: (selection) => (selection.kind === 'node' && selection.nodeId === 'X1' ? 'X1' : null),
+    canvasIdOf: (_projection, selection) => (selection.kind === 'node' && selection.nodeId === 'X1' ? 'X1' : null),
     navigationIds: () => ['X1'],
     keyboardProjection: () => ({ kind: 'flowchart', projection: null as never }),
     resolveSelection: () => null,
