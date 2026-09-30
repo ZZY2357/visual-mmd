@@ -4,6 +4,7 @@ import type { CanvasSelection } from './data-id'
 import { toEditorSelection } from './flowchart-adapter'
 import { edgeSelectionOf } from './edge-adapter'
 import { mindmapDomIdOf } from './mindmap-adapter'
+import { parseKanbanCardElementId, parseKanbanColumnElementId } from '../pipeline/element-id'
 import type { ContextMenuTarget } from '../editing/context-menu'
 
 /**
@@ -69,6 +70,12 @@ export function canvasIdOf(selection: Selection): string | null {
       return selection.name
     case 'er-relation':
       return selection.elementId
+    // kanban（more-diagrams 工单 06）：列 / 卡片的 data-id 即节点 id（渲染后处理从
+    // `.sections` / `.items` 内的 DOM id `${svgId}-${节点id}` 反注）。
+    case 'kanban-column':
+      return parseKanbanColumnElementId(selection.elementId)?.id ?? null
+    case 'kanban-card':
+      return parseKanbanCardElementId(selection.elementId)?.id ?? null
     default:
       return null
   }
@@ -93,6 +100,13 @@ export function fromCanvasId(diagramType: DiagramTypeId, canvas: CanvasSelection
   if (diagramType === 'er') {
     if (canvas.kind === 'element') return edgeSelectionOf(diagramType, canvas.elementId)
     return canvas.kind === 'node' ? { kind: 'er-entity', name: canvas.id } : null
+  }
+  if (diagramType === 'kanban') {
+    // resolver 返回的 node.id 即 elementId（`kanban-card:<id>` / `kanban-column:<id>`），按前缀判种类
+    if (canvas.kind !== 'node') return null
+    if (parseKanbanColumnElementId(canvas.id) !== null) return { kind: 'kanban-column', elementId: canvas.id }
+    if (parseKanbanCardElementId(canvas.id) !== null) return { kind: 'kanban-card', elementId: canvas.id }
+    return null
   }
   if (canvas.kind === 'element') return edgeSelectionOf(diagramType, canvas.elementId)
   if (canvas.kind === 'node') {
@@ -138,6 +152,11 @@ export function selectionOfMenuTarget(target: ContextMenuTarget): Selection | nu
       return { kind: 'er-relation', elementId: target.elementId }
     case 'er-attribute':
       return { kind: 'er-attribute', elementId: target.elementId }
+    // kanban（more-diagrams 工单 06）：列 / 卡片菜单目标一一对应各自 Selection kind。
+    case 'kanban-column':
+      return { kind: 'kanban-column', elementId: target.elementId }
+    case 'kanban-card':
+      return { kind: 'kanban-card', elementId: target.elementId }
     case 'blank':
       return null
   }
@@ -164,6 +183,13 @@ export function menuTargetOfCanvas(
       return { kind: 'state-node', id: canvas.id }
     }
     if (diagramType === 'er') return { kind: 'er-entity', name: canvas.id }
+    if (diagramType === 'kanban') {
+      // 列 / 卡片都渲染成 `g.node` / `g.cluster`，反注后的 canvas.id 带 elementId 前缀，
+      // 按前缀还原菜单目标种类；前缀不认识返回 null（安静地不弹菜单）。
+      if (parseKanbanColumnElementId(canvas.id) !== null) return { kind: 'kanban-column', elementId: canvas.id }
+      if (parseKanbanCardElementId(canvas.id) !== null) return { kind: 'kanban-card', elementId: canvas.id }
+      return null
+    }
     return { kind: 'sequence-participant', actorId: canvas.id }
   }
   if (canvas.kind === 'element') {

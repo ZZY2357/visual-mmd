@@ -6,6 +6,7 @@ import type { ClassProjection } from '../projection/class-projection'
 import type { MindmapProjection } from '../projection/mindmap-projection'
 import type { StateProjection } from '../projection/state-projection'
 import type { ErProjection } from '../projection/er-projection'
+import type { KanbanProjection } from '../projection/kanban-projection'
 import { DIAGRAM_SELECTION, type Selection } from '../projection/selection'
 import { applyPlan, mindmapKeyPlan } from '../editing/canvas-keyboard'
 import { useEditorStore } from '../../store/editor'
@@ -499,6 +500,50 @@ function erPartitions(projection: AnyProjection, { t }: TreePartitionsContext): 
   ]
 }
 
+// ---------- kanban（more-diagrams 工单 06） ----------
+
+/**
+ * kanban 结构树：列作为分组条目，其卡片作为 children（复用与 state 复合状态
+ * 同一套树形渲染器）。卡片显示描述，携带元数据的卡片把 assigned / ticket /
+ * priority 拼进 detail——结构树是画布未寻址内容（元数据）的完整编辑入口。
+ */
+function kanbanPartitions(projection: AnyProjection, { t }: TreePartitionsContext): TreeSection[] {
+  if (projection.type !== 'kanban') return []
+  const p: KanbanProjection = projection.kanban
+  return [
+    withDiagramLabel(diagramSection('kanban'), t('app:propertyPanel.diagram')),
+    {
+      key: 'columns',
+      heading: t('app:propertyPanel.kanbanColumns'),
+      count: p.columns.length,
+      entries: p.columns.map((column) => ({
+        key: column.elementId,
+        label: column.title,
+        detail: column.title !== column.id ? column.id : undefined,
+        depth: 1,
+        selection: { kind: 'kanban-column', elementId: column.elementId },
+        children:
+          column.cards.length > 0
+            ? column.cards.map((card) => ({
+                key: card.elementId,
+                label: card.description,
+                detail:
+                  [
+                    card.assigned !== null ? `@${card.assigned}` : undefined,
+                    card.ticket !== null ? `#${card.ticket}` : undefined,
+                    card.priority !== null ? t(`app:kanbanPriorities.${card.priority}`) : undefined,
+                  ]
+                    .filter((x) => x !== undefined)
+                    .join(' · ') || undefined,
+                depth: 2,
+                selection: { kind: 'kanban-card', elementId: card.elementId },
+              }))
+            : undefined,
+      })),
+    },
+  ]
+}
+
 /** 图种 → 分区描述（注册表 `tree` 字段的实参，registry 只持引用） */
 export const treePartitions: Record<DiagramTypeId, TreePartitions> = {
   flowchart: flowchartPartitions,
@@ -507,4 +552,5 @@ export const treePartitions: Record<DiagramTypeId, TreePartitions> = {
   mindmap: mindmapPartitions,
   state: statePartitions,
   er: erPartitions,
+  kanban: kanbanPartitions,
 }

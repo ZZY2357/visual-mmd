@@ -37,6 +37,9 @@ export type Selection =
   | { kind: 'er-entity'; name: string }
   | { kind: 'er-attribute'; elementId: string }
   | { kind: 'er-relation'; elementId: string }
+  // kanban（more-diagrams 工单 06）：列是分组元素、卡片是节点元素
+  | { kind: 'kanban-column'; elementId: string }
+  | { kind: 'kanban-card'; elementId: string }
 
 export const DIAGRAM_SELECTION: Selection = { kind: 'diagram' }
 
@@ -86,6 +89,10 @@ export function selectionKey(sel: Selection): string {
       return `er-attribute:${sel.elementId}`
     case 'er-relation':
       return `er-relation:${sel.elementId}`
+    case 'kanban-column':
+      return `kanban-column:${sel.elementId}`
+    case 'kanban-card':
+      return `kanban-card:${sel.elementId}`
   }
 }
 

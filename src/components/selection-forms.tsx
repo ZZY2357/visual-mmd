@@ -11,6 +11,7 @@ import { type ClassProjection } from '../lib/projection/class-projection'
 import { type MindmapProjection } from '../lib/projection/mindmap-projection'
 import { type StateProjection } from '../lib/projection/state-projection'
 import { type ErProjection } from '../lib/projection/er-projection'
+import { type KanbanProjection } from '../lib/projection/kanban-projection'
 import { DIRECTIONS } from '../lib/pipeline/flowchart'
 import { setDirectionIntent } from '../lib/editing/flowchart-forms'
 import { setClassDirectionIntent } from '../lib/editing/class-forms'
@@ -22,6 +23,7 @@ import { ClassForm, ClassNoteForm, MemberForm, NamespaceForm, RelationForm } fro
 import { MindmapNodeForm } from './mindmap-forms'
 import { StateForm, StateNoteForm, StateTransitionForm } from './state-forms'
 import { ErAttributeForm, ErEntityForm, ErRelationForm } from './er-forms'
+import { KanbanCardForm, KanbanColumnForm } from './kanban-forms'
 
 /**
  * 选中元素的属性表单，按投影图种分发（工单 04-bundle 自 PropertyPanel 迁出）：
@@ -318,6 +320,47 @@ function ErSelectionForm({
   }
 }
 
+/**
+ * kanban（more-diagrams 工单 06）：选中列 / 卡片时渲染对应表单；图表级（无方向概念）
+ * 显示看板操作提示。卡片表单需要归属列标题，按 `columnElementId` 反查。
+ */
+function KanbanSelectionForm({
+  projection,
+  selection,
+}: {
+  projection: KanbanProjection
+  selection: Selection | null
+}) {
+  const { t } = useTranslation()
+  if (selection === null) {
+    return (
+      <Text size="sm" c="dimmed" px="xs">
+        {t('app:propertyPanel.nothingSelected')}
+      </Text>
+    )
+  }
+  switch (selection.kind) {
+    case 'diagram':
+      return (
+        <Text size="sm" c="dimmed" px="xs">
+          {t('app:propertyPanel.kanbanHint')}
+        </Text>
+      )
+    case 'kanban-column': {
+      const column = projection.columns.find((c) => c.elementId === selection.elementId)
+      return column !== undefined ? <KanbanColumnForm column={column} /> : null
+    }
+    case 'kanban-card': {
+      const card = projection.cards.find((c) => c.elementId === selection.elementId)
+      if (card === undefined) return null
+      const column = projection.columns.find((c) => c.elementId === card.columnElementId)
+      return <KanbanCardForm card={card} columnTitle={column?.title ?? card.columnElementId} />
+    }
+    default:
+      return null
+  }
+}
+
 export function ProjectionSelectionForm({ projection, selection }: { projection: AnyProjection; selection: Selection | null }) {
   if (projection.type === 'flowchart') {
     return <FlowchartSelectionForm projection={projection.flowchart} selection={selection} />
@@ -333,6 +376,9 @@ export function ProjectionSelectionForm({ projection, selection }: { projection:
   }
   if (projection.type === 'er') {
     return <ErSelectionForm projection={projection.er} selection={selection} />
+  }
+  if (projection.type === 'kanban') {
+    return <KanbanSelectionForm projection={projection.kanban} selection={selection} />
   }
   return <ClassSelectionForm projection={projection.class} selection={selection} />
 }

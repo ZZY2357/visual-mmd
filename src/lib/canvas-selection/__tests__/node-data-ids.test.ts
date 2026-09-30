@@ -2,6 +2,9 @@ import { describe, expect, it } from 'vitest'
 import { annotateNodeDataIds } from '../node-data-ids'
 import { nodeDataIdResolver, selectionFromEventTarget } from '../data-id'
 import { applyHighlight } from '../highlight'
+import { kanbanDataIdResolver } from '../kanban-adapter'
+import { buildKanbanProjection } from '../../projection/kanban-projection'
+import { kanbanParser } from '../../pipeline/kanban'
 
 function svg(html: string): ParentNode {
   const root = document.createElement('div')
@@ -85,6 +88,63 @@ describe('annotateNodeDataIds 的 class 形态（工单 09）', () => {
     annotateNodeDataIds(root)
     expect(root.querySelector('[id="mmd-preview-1-flowchart-A-0"]')?.getAttribute('data-id')).toBe('A')
     expect(root.querySelector('[id="mmd-preview-1-classId-B-2"]')?.getAttribute('data-id')).toBe('B')
+  })
+})
+
+describe('kanban 节点寻址链路（more-diagrams 工单 06）', () => {
+  const KANBAN_SOURCE = `kanban
+  Todo[待办]
+    t1[写代码]
+  Done[已完成]
+`
+  /** mermaid v12 kanban 渲染产物：列在 g.sections > g.cluster、卡片在 g.items > g.node，
+   * DOM id 都是 `{svgId}-{节点id}`（无词元、无序号后缀） */
+  function kanbanSvg(): HTMLElement {
+    const root = document.createElement('div')
+    root.innerHTML =
+      '<svg id="mmd-preview-7">' +
+      '<g class="sections">' +
+      '<g class="cluster" id="mmd-preview-7-Todo"><rect/></g>' +
+      '<g class="cluster" id="mmd-preview-7-Done"><rect/></g>' +
+      '</g>' +
+      '<g class="items">' +
+      '<g class="node" id="mmd-preview-7-t1"><rect/><text>写代码</text></g>' +
+      '</g>' +
+      '</svg>'
+    annotateNodeDataIds(root)
+    return root
+  }
+
+  it('以 svg 根 id 剥离前缀，反注 g.cluster / g.node 的 data-id（作用域限定 sections/items）', () => {
+    const root = kanbanSvg()
+    expect(root.querySelector('[id="mmd-preview-7-Todo"]')?.getAttribute('data-id')).toBe('Todo')
+    expect(root.querySelector('[id="mmd-preview-7-Done"]')?.getAttribute('data-id')).toBe('Done')
+    expect(root.querySelector('[id="mmd-preview-7-t1"]')?.getAttribute('data-id')).toBe('t1')
+  })
+
+  it('包裹组之外的 g.node 不反注（不误伤其它图种）', () => {
+    const root = document.createElement('div')
+    root.innerHTML =
+      '<svg id="mmd-preview-8">' +
+      '<g class="node" id="mmd-preview-8-孤立"><rect/></g>' +
+      '</svg>'
+    annotateNodeDataIds(root)
+    expect(root.querySelector('g.node')?.getAttribute('data-id')).toBeNull()
+  })
+
+  it('反注后可经 kanbanDataIdResolver + selectionFromEventTarget 命中列 / 卡片选中', () => {
+    const root = kanbanSvg()
+    const parsed = kanbanParser.parse(KANBAN_SOURCE)
+    if (!parsed.ok) throw new Error('解析失败')
+    const resolve = kanbanDataIdResolver(buildKanbanProjection(parsed.doc))
+    expect(selectionFromEventTarget(root.querySelector('[id="mmd-preview-7-t1"] text'), resolve)).toEqual({
+      kind: 'node',
+      id: 'kanban-card:t1',
+    })
+    expect(selectionFromEventTarget(root.querySelector('[id="mmd-preview-7-Todo"] rect'), resolve)).toEqual({
+      kind: 'node',
+      id: 'kanban-column:Todo',
+    })
   })
 })
 

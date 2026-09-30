@@ -79,6 +79,11 @@ export const zhDict = {
         'cycle-er-line': '切换线型',
         'edit-er-relation': '在属性面板中编辑',
         'edit-er-attribute': '在属性面板中编辑',
+        // kanban（more-diagrams 工单 06）：空白加列、列上加卡片、卡片改元数据（D5：选中 + 关菜单）。
+        // 改标题 / 改描述复用 edit-text（内联编辑），删除复用 delete。
+        'add-column': '添加列',
+        'add-card': '添加卡片',
+        'edit-kanban-metadata': '在属性面板中编辑',
         delete: '删除',
         styleName: '样式名称',
         styleNameInvalid: '名称不能为空，且不能含空格或逗号',
@@ -107,6 +112,7 @@ export const zhDict = {
       mindmap: '思维导图',
       state: '状态图',
       er: 'ER 图',
+      kanban: '看板',
     },
     library: {
       title: '图表库',
@@ -369,6 +375,19 @@ export const zhDict = {
       deleteErRelation: '删除关系',
       erFrom: '起点实体',
       erTo: '终点实体',
+      // ---- kanban（more-diagrams 工单 06） ----
+      kanbanColumns: '列',
+      kanbanColumnName: '列 {{title}}',
+      kanbanColumnTitle: '列标题',
+      kanbanCardDescription: '卡片描述',
+      kanbanAssigned: '负责人（assigned）',
+      kanbanTicket: '工单号（ticket）',
+      kanbanPriority: '优先级（priority）',
+      kanbanPriorityNone: '（不设置）',
+      kanbanCardOwner: '所属列 {{column}}',
+      deleteKanbanColumn: '删除列（含其卡片）',
+      deleteKanbanCard: '删除卡片',
+      kanbanHint: '看板：右键列可加卡片，右键卡片可改描述与元数据；双击可内联编辑。',
     },
     shapes: {
       rectangle: '矩形',
@@ -434,6 +453,13 @@ export const zhDict = {
     erLines: {
       identifying: '实线（identifying）',
       'non-identifying': '虚线（non-identifying）',
+    },
+    // kanban priority 枚举（mermaid 文档记载的取值；与 pipeline/kanban.KANBAN_PRIORITIES 同源）
+    kanbanPriorities: {
+      'Very High': '非常高（Very High）',
+      High: '高（High）',
+      Low: '低（Low）',
+      'Very Low': '非常低（Very Low）',
     },
   },
 } as const

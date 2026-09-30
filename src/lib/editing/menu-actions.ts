@@ -7,9 +7,10 @@ import type { ContextMenuItemId, ContextMenuTarget } from './context-menu'
 import type { CanvasInlineEditTarget } from './inline-edit'
 import type { NodeFormKind } from './use-canvas-context-menu'
 import { nextNodeId, mindmapActionIntents, applyPlan, type MindmapActionPlan, type KeyPlan } from './canvas-keyboard'
-import { nextFreeName } from '../pipeline/element-id'
+import { kanbanCardElementId, kanbanColumnElementId, nextFreeName } from '../pipeline/element-id'
 import { isValidStateId } from '../pipeline/state'
 import { isValidErName } from '../pipeline/er'
+import { isValidKanbanId } from '../pipeline/kanban'
 import { setRelationIntent, RELATION_KIND_OPTIONS } from './class-forms'
 import {
   setMessageIntent,
@@ -133,6 +134,20 @@ export function createElement(ctx: MenuActionContext, target: ContextMenuTarget 
         newElementTarget: { selection: { kind: 'er-entity', name }, inlineEdit: { kind: 'er', name } },
       }
     }
+    if (proj.type === 'kanban') {
+      // kanban 空白：新建列 + 内联编辑标题（more-diagrams 工单 06）。
+      // id 全局唯一（列 + 卡片一起避重），显示标题与语法 id 分离——用户改的是 [] 内文本。
+      const used = [...proj.kanban.columns.map((c) => c.id), ...proj.kanban.cards.map((c) => c.id)]
+      const id = nextFreeName('col', used)
+      if (!isValidKanbanId(id)) return null
+      return {
+        intents: [{ type: 'add-column', id, title: '新列' }],
+        newElementTarget: {
+          selection: { kind: 'kanban-column', elementId: kanbanColumnElementId(id) },
+          inlineEdit: { kind: 'kanban-column', elementId: kanbanColumnElementId(id) },
+        },
+      }
+    }
     // mindmap：节点目标 = 挂为其子节点；空白 / 无目标 = 建根（空文档）或挂到根节点下
     const text = ctx.newNodeText
     let mindPlan: MindmapActionPlan | null
@@ -224,6 +239,9 @@ function beginEditText(ctx: MenuActionContext, target: ContextMenuTarget | undef
   else if (target.kind === 'mindmap-node') ctx.beginInlineEdit({ kind: 'mindmap', elementId: target.elementId })
   else if (target.kind === 'state-node') ctx.beginInlineEdit({ kind: 'state', id: target.id })
   else if (target.kind === 'er-entity') ctx.beginInlineEdit({ kind: 'er', name: target.name })
+  // kanban（more-diagrams 工单 06）：列 = 改标题、卡片 = 改描述（都是内联编辑显示文本）
+  else if (target.kind === 'kanban-column') ctx.beginInlineEdit({ kind: 'kanban-column', elementId: target.elementId })
+  else if (target.kind === 'kanban-card') ctx.beginInlineEdit({ kind: 'kanban-card', elementId: target.elementId })
   ctx.close()
 }
 
@@ -262,6 +280,30 @@ function openFormOf(kind: NodeFormKind): MenuAction {
   return (ctx) => ctx.openForm(kind)
 }
 
+/**
+ * kanban 列上加卡片（more-diagrams 工单 06）：在右键的那一列末尾追加一张卡片，
+ * 落码成功后选中它并进入内联编辑描述。id 全局唯一（列 + 卡片一起避重）。
+ */
+function addKanbanCard(ctx: MenuActionContext, target: ContextMenuTarget | undefined): void {
+  const proj = ctx.projection
+  if (target === undefined || target.kind !== 'kanban-column' || proj === null || proj.type !== 'kanban') return
+  const column = proj.kanban.columns.find((c) => c.elementId === target.elementId)
+  if (column === undefined) return
+  const used = [...proj.kanban.columns.map((c) => c.id), ...proj.kanban.cards.map((c) => c.id)]
+  const id = nextFreeName('t', used)
+  if (!isValidKanbanId(id)) return
+  const plan: KeyPlan = {
+    intents: [{ type: 'add-card', columnElementId: column.elementId, id, description: '新卡片' }],
+    newElementTarget: {
+      selection: { kind: 'kanban-card', elementId: kanbanCardElementId(id) },
+      inlineEdit: { kind: 'kanban-card', elementId: kanbanCardElementId(id) },
+    },
+  }
+  if (applyPlan(plan, { commitIntent: ctx.commitIntent, select: ctx.select, beginInlineEdit: ctx.beginInlineEdit })) {
+    ctx.close()
+  }
+}
+
 export const MENU_ACTIONS: Record<Exclude<ContextMenuItemId, 'apply-style'>, MenuAction> = {
   // 「创建 + 选中 + 内联命名」五个入口共用 createElement（工单 01 收敛）
   'add-node': createElement,
@@ -295,6 +337,11 @@ export const MENU_ACTIONS: Record<Exclude<ContextMenuItemId, 'apply-style'>, Men
   'edit-er-attribute': selectMenuTargetAndClose,
   // state（more-diagrams 工单 02）：add-state 走 createElement 的 state 分支（空白入口）
   'add-state-into': addStateIntoComposite,
+  // kanban（more-diagrams 工单 06）：add-column 走 createElement 的 kanban 分支（空白入口）；
+  // add-card 落在右键的那一列末尾；edit-kanban-metadata = D5「选中 + 关菜单」，字段在右侧属性面板改。
+  'add-column': createElement,
+  'add-card': addKanbanCard,
+  'edit-kanban-metadata': selectMenuTargetAndClose,
   // 删除组 6 项共用 deleteTarget——直接写 6 行，不引入二级查表
   'delete-class': deleteTarget,
   'delete-participant': deleteTarget,
