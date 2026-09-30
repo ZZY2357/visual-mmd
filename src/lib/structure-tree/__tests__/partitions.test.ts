@@ -180,6 +180,27 @@ describe('结构树分区描述（工单 06）', () => {
     expect(done?.children).toBeUndefined()
   })
 
+  it('journey：图表级 + 分组（任务嵌套为子条目）+ 未分组任务三个分区，任务带键盘', () => {
+    const source =
+      'journey\n    title 旅程\n    section 发现\n        访问首页: 5: 用户\n        浏览商品: 3\nsection 决策\n    对比价格: 9: 客服\n'
+    const parsed = DIAGRAM_TYPES.journey.parser.parse(source)
+    if (!parsed.ok) throw new Error('解析失败')
+    const sections = DIAGRAM_TYPES.journey.tree(DIAGRAM_TYPES.journey.buildProjection(parsed.doc), { t })
+    expect(sections.map((s) => s.key)).toEqual(['diagram', 'sections', 'tasks'])
+    expect(sections[0].entries[0]).toMatchObject({ depth: 0, selection: { kind: 'diagram' }, detail: '旅程' })
+    const [found, decide] = sections[1].entries
+    expect(found).toMatchObject({ depth: 1, selection: { kind: 'journey-section', elementId: 'section:1' } })
+    expect(found?.children?.[0]).toMatchObject({
+      depth: 2,
+      selection: { kind: 'journey-task', elementId: 'task:1' },
+    })
+    expect(found?.children?.[0]?.onKeyDown).toBeTypeOf('function')
+    // 越界 score 走「越界」标注键（t 替身直返键名；score 原文在 opts 里透传）
+    expect(decide?.children?.[0]?.detail).toContain('app:propertyPanel.journeyScoreInvalidShort')
+    // 未分组任务分区（本样例为空，仅分区形状）
+    expect(sections[2].count).toBe(0)
+  })
+
   it('每个图种注册表的 tree 字段都能对自身的投影求值（穷尽性）', () => {
     const sources: Record<keyof typeof DIAGRAM_TYPES, string> = {
       flowchart: 'flowchart TB\nn1[甲]',
@@ -193,6 +214,8 @@ describe('结构树分区描述（工单 06）', () => {
       kanban: 'kanban\n  Todo[待办]\n    t1[写代码]',
       requirement:
         'requirementDiagram\n    functionalRequirement login {\n        id: "REQ-1"\n        text: "登录"\n        risk: Medium\n        verifymethod: Test\n    }\n\n    element loginUI {\n        type: "界面"\n    }\n\n    loginUI - satisfies -> login',
+      journey:
+        'journey\n    title 旅程\n    section 发现\n        访问首页: 5: 用户\n        浏览商品: 3\n    section 决策\n        对比价格: 2: 用户, 客服',
     }
     for (const id of Object.keys(DIAGRAM_TYPES) as (keyof typeof DIAGRAM_TYPES)[]) {
       const registration = DIAGRAM_TYPES[id]

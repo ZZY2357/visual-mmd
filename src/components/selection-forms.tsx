@@ -46,6 +46,8 @@ import {
   TimelineSectionForm,
 } from './timeline-forms'
 import { KanbanCardForm, KanbanColumnForm } from './kanban-forms'
+import { JourneyDiagramForm, JourneySectionForm, JourneyTaskForm } from './journey-forms'
+import { type JourneyProjection } from '../lib/projection/journey-projection'
 
 /**
  * 选中元素的属性表单，按投影图种分发（工单 04-bundle 自 PropertyPanel 迁出）：
@@ -515,6 +517,41 @@ function RequirementSelectionForm({
   }
 }
 
+/**
+ * journey（more-diagrams 工单 08）：选中任务 / section 时渲染对应表单；图表级 = 标题。
+ * journey 画布无 data-id 寻址（见 journey-adapter），这三张表单是唯一文本编辑入口。
+ */
+function JourneySelectionForm({
+  projection,
+  selection,
+}: {
+  projection: JourneyProjection
+  selection: Selection | null
+}) {
+  const { t } = useTranslation()
+  if (selection === null) {
+    return (
+      <Text size="sm" c="dimmed" px="xs">
+        {t('app:propertyPanel.nothingSelected')}
+      </Text>
+    )
+  }
+  switch (selection.kind) {
+    case 'diagram':
+      return <JourneyDiagramForm projection={projection} />
+    case 'journey-section': {
+      const section = projection.sections.find((s) => s.elementId === selection.elementId)
+      return section !== undefined ? <JourneySectionForm section={section} /> : null
+    }
+    case 'journey-task': {
+      const task = projection.tasks.find((task) => task.elementId === selection.elementId)
+      return task !== undefined ? <JourneyTaskForm task={task} /> : null
+    }
+    default:
+      return null
+  }
+}
+
 export function ProjectionSelectionForm({ projection, selection }: { projection: AnyProjection; selection: Selection | null }) {
   if (projection.type === 'flowchart') {
     return <FlowchartSelectionForm projection={projection.flowchart} selection={selection} />
@@ -542,6 +579,9 @@ export function ProjectionSelectionForm({ projection, selection }: { projection:
   }
   if (projection.type === 'requirement') {
     return <RequirementSelectionForm projection={projection.requirement} selection={selection} />
+  }
+  if (projection.type === 'journey') {
+    return <JourneySelectionForm projection={projection.journey} selection={selection} />
   }
   return <ClassSelectionForm projection={projection.class} selection={selection} />
 }

@@ -11,6 +11,8 @@ import { buildClassProjection } from '../../projection/class-projection'
 import { buildSequenceProjection } from '../../projection/sequence-projection'
 import { timelineParser } from '../../pipeline/timeline'
 import { buildTimelineProjection } from '../../projection/timeline-projection'
+import { journeyParser } from '../../pipeline/journey'
+import { buildJourneyProjection } from '../../projection/journey-projection'
 import type { AnyProjection } from '../../diagram-registry'
 import type { EditIntent } from '../../pipeline/parser'
 import type { Selection } from '../../projection/selection'
@@ -153,6 +155,8 @@ describe('MENU_ACTIONS 穷尽性（工单 05 → 工单 01）', () => {
       { kind: 'requirement-node', name: 'login' },
       { kind: 'requirement-element', name: 'ui' },
       { kind: 'requirement-relation', elementId: 'relation:0' },
+      // journey（more-diagrams 工单 08）：画布 DOM 无 data-id（实测降级），只有空白添加入口
+      { kind: 'blank', diagramType: 'journey' },
     ]
     const reachableIds = new Set(allTargets.flatMap((target) => contextMenuItems(target)))
     // apply-style 不经 onMenuItem 分发（CanvasPanel 渲染成子菜单开关，点样式名直接调
@@ -431,6 +435,54 @@ describe('编辑类与添加表单类菜单项（分发语义）', () => {
     const edgeCtx = fakeCtx()
     MENU_ACTIONS['link-from-here'](edgeCtx, { kind: 'flowchart-edge', from: 'A', to: 'B', occurrence: 1 })
     expect(edgeCtx.enterLinkMode).not.toHaveBeenCalled()
+  })
+})
+
+describe('journey 菜单动作（more-diagrams 工单 08）', () => {
+  const JOURNEY = `journey
+    title 旅程
+    section 发现
+        访问首页: 5: 用户
+        浏览商品: 3
+    section 决策
+        对比价格: 2: 用户, 客服
+`
+
+  function journeyProjectionOf(source: string): AnyProjection {
+    const parsed = journeyParser.parse(source)
+    if (!parsed.ok) throw new Error(parsed.error.message)
+    return { type: 'journey' as const, journey: buildJourneyProjection(parsed.doc) }
+  }
+
+  it('add-journey-task（空白）：锚到最后一个 section 末尾，落「新任务: 3」并选中（不做内联编辑）', () => {
+    const ctx = fakeCtx({ projection: journeyProjectionOf(JOURNEY) })
+
+    MENU_ACTIONS['add-journey-task'](ctx, { kind: 'blank', diagramType: 'journey' })
+
+    expect(ctx.intents).toEqual([
+      { type: 'add-task', name: '新任务', score: 3, actors: [], sectionElementId: 'section:2' },
+    ])
+    // 已有 3 个任务 → 新任务预测 task:4
+    expect(ctx.selections).toEqual([{ kind: 'journey-task', elementId: 'task:4' }])
+    expect(ctx.inlineEdits).toEqual([])
+    expect(ctx.closed).toBe(1)
+  })
+
+  it('add-journey-section（空白）：落 `section 新分组` 并选中新分组的预测 elementId', () => {
+    const ctx = fakeCtx({ projection: journeyProjectionOf(JOURNEY) })
+
+    MENU_ACTIONS['add-journey-section'](ctx, { kind: 'blank', diagramType: 'journey' })
+
+    expect(ctx.intents).toEqual([{ type: 'add-section', name: '新分组' }])
+    expect(ctx.selections).toEqual([{ kind: 'journey-section', elementId: 'section:3' }])
+    expect(ctx.closed).toBe(1)
+  })
+
+  it('投影未就绪（null）时安静地不执行', () => {
+    const ctx = fakeCtx()
+    MENU_ACTIONS['add-journey-task'](ctx, { kind: 'blank', diagramType: 'journey' })
+    expect(ctx.intents).toEqual([])
+    expect(ctx.closed).toBe(0)
   })
 })
 

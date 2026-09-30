@@ -13,6 +13,7 @@ import { isValidErName } from '../pipeline/er'
 import { REQUIREMENT_RELATION_KINDS } from '../pipeline/requirement'
 import { isValidGitgraphBranchName } from '../pipeline/gitgraph'
 import { isValidTimelineSectionName, type TimelineIntent } from '../pipeline/timeline'
+import { isValidJourneySectionName, isValidJourneyTaskName, type JourneyIntent } from '../pipeline/journey'
 import { isValidKanbanId } from '../pipeline/kanban'
 import { setRelationIntent, RELATION_KIND_OPTIONS } from './class-forms'
 import {
@@ -163,6 +164,12 @@ export function createElement(ctx: MenuActionContext, target: ContextMenuTarget 
     if (proj.type === 'requirement') {
       // requirement（more-diagrams 工单 07）：添加入口是独立的 add-requirement /
       // add-requirement-element 动作（type 在表单枚举里选，无「创建 + 内联命名」形态），
+      // 不走 createElement
+      return null
+    }
+    if (proj.type === 'journey') {
+      // journey（more-diagrams 工单 08）：添加入口是独立的 add-journey-task /
+      // add-journey-section 动作（不做内联编辑——画布无 data-id，工单降级定案），
       // 不走 createElement
       return null
     }
@@ -401,6 +408,53 @@ function invertRequirementRelation(ctx: MenuActionContext, target: ContextMenuTa
   })
 }
 
+// ---------- journey（more-diagrams 工单 08） ----------
+
+/**
+ * 空白处加任务（journey）：落一行「新任务: 3」+ 选中新任务（无 actor 段，score 取中位 3）。
+ * 锚点 = 最后一个 section 的末尾（其最后一个任务 ?? section 行）——mermaid 按书写位置
+ * 归组，锚到「文档最后一个元素」会落进倒数第二个 section（它后面还有空 section 行）；
+ * 无 section 时无锚点（回退文档末尾，归属空分组）。不做内联编辑（journey 画布无
+ * data-id，工单降级定案）——名字/score/actors 在右侧表单改。
+ */
+function addJourneyTask(ctx: MenuActionContext): void {
+  const proj = ctx.projection
+  if (proj === null || proj.type !== 'journey') return
+  const name = nextFreeName('新任务', proj.journey.tasks.map((t) => t.name))
+  if (!isValidJourneyTaskName(name)) return
+  const lastSection = proj.journey.sections[proj.journey.sections.length - 1]
+  const plan: KeyPlan = {
+    intents: [
+      {
+        type: 'add-task',
+        name,
+        score: 3,
+        actors: [],
+        sectionElementId: lastSection?.elementId,
+      } satisfies JourneyIntent,
+    ],
+    newElementTarget: {
+      selection: { kind: 'journey-task', elementId: `task:${proj.journey.nextTaskOrdinal}` },
+    },
+  }
+  if (applyPlan(plan, { commitIntent: ctx.commitIntent, select: ctx.select })) ctx.close()
+}
+
+/** 空白处加分组 section（journey）：落一行 `section 名称` + 选中新分组 */
+function addJourneySection(ctx: MenuActionContext): void {
+  const proj = ctx.projection
+  if (proj === null || proj.type !== 'journey') return
+  const name = nextFreeName('新分组', proj.journey.sections.map((s) => s.name))
+  if (!isValidJourneySectionName(name)) return
+  const plan: KeyPlan = {
+    intents: [{ type: 'add-section', name } satisfies JourneyIntent],
+    newElementTarget: {
+      selection: { kind: 'journey-section', elementId: `section:${proj.journey.nextSectionOrdinal}` },
+    },
+  }
+  if (applyPlan(plan, { commitIntent: ctx.commitIntent, select: ctx.select })) ctx.close()
+}
+
 export const MENU_ACTIONS: Record<Exclude<ContextMenuItemId, 'apply-style'>, MenuAction> = {
   // 「创建 + 选中 + 内联命名」五个入口共用 createElement（工单 01 收敛）
   'add-node': createElement,
@@ -490,4 +544,7 @@ export const MENU_ACTIONS: Record<Exclude<ContextMenuItemId, 'apply-style'>, Men
   'add-event': addTimelineEvent,
   'edit-period-text': selectMenuTargetAndClose,
   'edit-event-text': selectMenuTargetAndClose,
+  // journey（more-diagrams 工单 08）：空白加任务 / 加分组；元素级编辑降级到结构树 + 属性表单
+  'add-journey-task': addJourneyTask,
+  'add-journey-section': addJourneySection,
 }

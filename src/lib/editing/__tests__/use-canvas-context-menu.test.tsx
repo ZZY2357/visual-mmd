@@ -105,6 +105,8 @@ function resolverOf(projection: AnyProjection) {
   if (projection.type === 'timeline') return () => null
   if (projection.type === 'kanban') return kanbanDataIdResolver(projection.kanban)
   if (projection.type === 'requirement') return requirementDataIdResolver(projection.requirement)
+  // journey：无 data-id 寻址（more-diagrams 工单 08），resolver 永不命中
+  if (projection.type === 'journey') return () => null
   const nodes = nodeDataIdResolver(projection.class.classes.map((c) => c.name))
   const edges = elementDataIdResolver(projection.class.relations.map((r) => r.elementId))
   return (dataId: string) => nodes(dataId) ?? edges(dataId)

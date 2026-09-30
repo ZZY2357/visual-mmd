@@ -31,6 +31,11 @@ describe('金样合法性：默认图表模板能被 mermaid 渲染', () => {
     await expect(mermaid.parse(KANBAN_TEMPLATE)).resolves.toBeTruthy()
   })
 
+  it('journey 起步模板 parse 通过（more-diagrams 工单 08）', async () => {
+    const { JOURNEY_TEMPLATE } = await import('../diagram-registry')
+    await expect(mermaid.parse(JOURNEY_TEMPLATE)).resolves.toBeTruthy()
+  })
+
   it('sequence 源码 parse 通过', async () => {
     const src = `sequenceDiagram
     Alice->>Bob: 你好
@@ -68,5 +73,34 @@ describe('金样合法性：默认图表模板能被 mermaid 渲染', () => {
     doc = apply(doc, { type: 'delete-commit', elementId: 'commit:2' }) // 删提交
 
     await expect(mermaid.parse(doc.source)).resolves.toBeTruthy()
+  })
+
+  it('journey 端到端编辑场景（工单 08）落在合法 mermaid 源码上', async () => {
+    const { JOURNEY_TEMPLATE } = await import('../diagram-registry')
+    const { journeyParser } = await import('../pipeline/journey')
+    const { reassemble } = await import('../pipeline/document')
+    const parse = (src: string) => {
+      const r = journeyParser.parse(src)
+      if (!r.ok) throw new Error(`解析失败：${r.error.message}`)
+      return r.doc
+    }
+    const apply = (doc: ReturnType<typeof parse>, intent: Parameters<typeof journeyParser.resolveRewrites>[1]) => {
+      const rewrites = journeyParser.resolveRewrites(doc, intent)
+      if (rewrites === null) throw new Error(`意图被拒绝：${JSON.stringify(intent)}`)
+      return parse(reassemble(doc, rewrites))
+    }
+
+    let doc = parse(JOURNEY_TEMPLATE)
+    doc = apply(doc, { type: 'add-section', name: '售后' }) // 加分组（落文档末尾）
+    doc = apply(doc, { type: 'add-task', name: '申请退款', score: 2, actors: ['用户', '客服'], sectionElementId: 'section:3' }) // 加任务
+    doc = apply(doc, { type: 'set-task-name', elementId: 'task:5', name: '发起退单' }) // 改任务名
+    doc = apply(doc, { type: 'set-task-score', elementId: 'task:5', score: 5 }) // score 2 → 5
+    doc = apply(doc, { type: 'set-task-actors', elementId: 'task:5', actors: ['用户', '平台', '客服'] }) // 改 actors
+    doc = apply(doc, { type: 'delete-section', elementId: 'section:1' }) // 删分组（级联删任务）
+
+    const source = doc.source
+    expect(source).toContain('发起退单: 5: 用户, 平台, 客服')
+    expect(source).not.toContain('访问首页')
+    await expect(mermaid.parse(source)).resolves.toBeTruthy()
   })
 })

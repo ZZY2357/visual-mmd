@@ -10,6 +10,7 @@ import { gitgraphParser } from './pipeline/gitgraph'
 import { timelineParser } from './pipeline/timeline'
 import { kanbanParser } from './pipeline/kanban'
 import { requirementParser } from './pipeline/requirement'
+import { journeyParser } from './pipeline/journey'
 import { frontmatterEnd } from './pipeline/frontmatter'
 import { buildFlowchartProjection, type FlowchartProjection } from './projection/flowchart-projection'
 import { buildSequenceProjection, type SequenceProjection } from './projection/sequence-projection'
@@ -24,6 +25,7 @@ import {
   buildRequirementProjection,
   type RequirementProjection,
 } from './projection/requirement-projection'
+import { buildJourneyProjection, type JourneyProjection } from './projection/journey-projection'
 import { flowchartCanvasCapabilities } from './canvas-selection/flowchart-adapter'
 import { sequenceCanvasCapabilities } from './canvas-selection/sequence-adapter'
 import { classCanvasCapabilities } from './canvas-selection/class-adapter'
@@ -34,6 +36,7 @@ import { gitgraphCanvasCapabilities } from './canvas-selection/gitgraph-adapter'
 import { timelineCanvasCapabilities } from './canvas-selection/timeline-adapter'
 import { kanbanCanvasCapabilities } from './canvas-selection/kanban-adapter'
 import { requirementCanvasCapabilities } from './canvas-selection/requirement-adapter'
+import { journeyCanvasCapabilities } from './canvas-selection/journey-adapter'
 import type { CanvasCapabilities } from './canvas-selection/capabilities'
 import { treePartitions, type TreePartitions } from './structure-tree/partitions'
 import { DEFAULT_DIAGRAM_SOURCE } from './storage'
@@ -65,6 +68,7 @@ export interface ProjectionTypes {
   timeline: TimelineProjection
   kanban: KanbanProjection
   requirement: RequirementProjection
+  journey: JourneyProjection
 }
 
 /** 已注册图种的 id 集合（字面量联合，随 ProjectionTypes 增长） */
@@ -251,6 +255,21 @@ export const REQUIREMENT_TEMPLATE = `requirementDiagram
 `
 
 /**
+ * journey 起步模板（more-diagrams 工单 08）：一个 title、两个 section、每个 section
+ * 两个任务（score 与多 actor 各有示例）。任务行语法 `名称: score: actor1, actor2`；
+ * 任务名内不得再出现裸冒号（词法边界，见 pipeline/journey.ts）。
+ */
+export const JOURNEY_TEMPLATE = `journey
+    title 用户旅程示例
+    section 发现
+        访问首页: 5: 用户, 搜索引擎
+        浏览商品: 3: 用户
+    section 决策
+        对比价格: 2: 用户
+        下单购买: 4: 用户, 客服
+`
+
+/**
  * 注册表：数组是唯一权威（more-diagrams 工单 01），DIAGRAM_TYPES 由它推导。
  * detectDiagramType 按数组顺序显式遍历——不再维护手写的 if 分发链，
  * 新图种挂一条即可参与识别，无法识别时不再默认 flowchart（见下）。
@@ -349,6 +368,15 @@ export const DIAGRAM_TYPE_LIST: DiagramTypeRegistration[] = [
     buildProjection: (doc) => ({ type: 'requirement', requirement: buildRequirementProjection(doc) }),
     tree: treePartitions.requirement,
     canvas: requirementCanvasCapabilities,
+  },
+  {
+    id: 'journey',
+    parser: journeyParser,
+    template: JOURNEY_TEMPLATE,
+    detect: (source) => /^journey\b/i.test(firstStatementLine(source)),
+    buildProjection: (doc) => ({ type: 'journey', journey: buildJourneyProjection(doc) }),
+    tree: treePartitions.journey,
+    canvas: journeyCanvasCapabilities,
   },
 ]
 

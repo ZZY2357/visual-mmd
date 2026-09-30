@@ -56,6 +56,10 @@ export type Selection =
   | { kind: 'requirement'; name: string }
   | { kind: 'requirement-element'; name: string }
   | { kind: 'requirement-relation'; elementId: string }
+  // journey（more-diagrams 工单 08）：任务/section 走位置序身份（`task:N` / `section:N`，
+  // journey 语法无节点 id）。画布 DOM 无 data-id（实测降级），选中只来自结构树 / 表单 / 键盘。
+  | { kind: 'journey-task'; elementId: string }
+  | { kind: 'journey-section'; elementId: string }
 
 export const DIAGRAM_SELECTION: Selection = { kind: 'diagram' }
 
@@ -129,6 +133,10 @@ export function selectionKey(sel: Selection): string {
       return `requirement-element:${sel.name}`
     case 'requirement-relation':
       return `requirement-relation:${sel.elementId}`
+    case 'journey-task':
+      return `journey-task:${sel.elementId}`
+    case 'journey-section':
+      return `journey-section:${sel.elementId}`
   }
 }
 

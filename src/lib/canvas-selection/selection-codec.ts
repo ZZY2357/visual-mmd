@@ -116,6 +116,10 @@ export function fromCanvasId(diagramType: DiagramTypeId, canvas: CanvasSelection
     // gitGraph（more-diagrams 工单 04）：画布 DOM 无 data-id（实测降级），画布选中不产生
     return null
   }
+  if (diagramType === 'journey') {
+    // journey（more-diagrams 工单 08）：画布 DOM 无 data-id（实测降级），画布选中不产生
+    return null
+  }
   if (diagramType === 'kanban') {
     // resolver 返回的 node.id 即 elementId（`kanban-card:<id>` / `kanban-column:<id>`），按前缀判种类
     if (canvas.kind !== 'node') return null
@@ -214,6 +218,7 @@ export function menuTargetOfCanvas(
     }
     if (diagramType === 'er') return { kind: 'er-entity', name: canvas.id }
     if (diagramType === 'gitgraph') return null // 无 data-id（实测降级），画布节点不可命中
+    if (diagramType === 'journey') return null // 无 data-id（实测降级），画布节点不可命中
     if (diagramType === 'kanban') {
       // 列 / 卡片都渲染成 `g.node` / `g.cluster`，反注后的 canvas.id 带 elementId 前缀，
       // 按前缀还原菜单目标种类；前缀不认识返回 null（安静地不弹菜单）。

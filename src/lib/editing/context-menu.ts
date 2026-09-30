@@ -63,6 +63,8 @@ export type ContextMenuTarget =
   | { kind: 'requirement-node'; name: string }
   | { kind: 'requirement-element'; name: string }
   | { kind: 'requirement-relation'; elementId: string }
+// journey（more-diagrams 工单 08）：画布 DOM 无 data-id（实测降级），无元素级菜单目标；
+// 空白菜单提供添加入口（任务/section 的编辑由结构树选中 + 属性表单承接）
 
 export type ContextMenuItemId =
   | 'add-node'
@@ -134,6 +136,10 @@ export type ContextMenuItemId =
   | 'edit-requirement-field'
   | 'cycle-requirement-kind'
   | 'invert-requirement-relation'
+  // journey（more-diagrams 工单 08）：空白 = 加任务 / 加分组。任务与分组的编辑不做
+  // 元素级画布菜单（无 data-id 可命中），由结构树选中 + 属性表单承接。
+  | 'add-journey-task'
+  | 'add-journey-section'
 
 /**
  * 画布选中 → 菜单目标（工单 03 起为 `canvas-selection/selection-codec.ts` 的
@@ -174,6 +180,9 @@ function blankMenuItems(diagramType: DiagramTypeId): ContextMenuItemId[] {
       // requirement 的空白入口（工单 07 定案）：加 requirement（type 在添加表单的枚举里选）与加 element。
       // 拉关系不做空白入口——关系两端都是节点，从节点菜单「从这里连线」进入更省一步
       return ['add-requirement', 'add-requirement-element']
+    case 'journey':
+      // journey 的空白入口（工单 08 定案）：加任务（默认 score 3、归属最后一个分组）与加分组
+      return ['add-journey-task', 'add-journey-section']
     // DiagramTypeId 是开放类型（more-diagrams 工单 01）：未接入画布能力包的图种
     // 没有空白右键入口（unsupported 态下画布右键整体停用，不会走到这里）
     default:
