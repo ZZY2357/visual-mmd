@@ -22,6 +22,7 @@ import { requirementDataIdResolver } from '../../canvas-selection/requirement-ad
 import { blockDataIdResolver } from '../../canvas-selection/block-adapter'
 import { sankeyDataIdResolver } from '../../canvas-selection/sankey-adapter'
 import { ganttDataIdResolver } from '../../canvas-selection/gantt-adapter'
+import { quadrantDataIdResolver } from '../../canvas-selection/quadrant-adapter'
 import { nodeDataIdResolver, elementDataIdResolver } from '../../canvas-selection/data-id'
 import type { AnyProjection } from '../../diagram-registry'
 import { useCanvasContextMenu, type NodeFormState } from '../use-canvas-context-menu'
@@ -117,6 +118,9 @@ function resolverOf(projection: AnyProjection) {
   if (projection.type === 'sankey') return sankeyDataIdResolver(projection.sankey)
   // gantt（more-diagrams 工单 11）：任务条 data-id = mermaid 渲染 id，由能力包 resolver 承担
   if (projection.type === 'gantt') return ganttDataIdResolver(projection.gantt)
+  // quadrant：data-id 由 nodeAnnotator 按位置序反注，resolver 与真实能力包同源
+  // （quadrantDataIdResolver，more-diagrams 工单 12）
+  if (projection.type === 'quadrant') return quadrantDataIdResolver(projection.quadrant)
   const nodes = nodeDataIdResolver(projection.class.classes.map((c) => c.name))
   const edges = elementDataIdResolver(projection.class.relations.map((r) => r.elementId))
   return (dataId: string) => nodes(dataId) ?? edges(dataId)
@@ -148,6 +152,8 @@ function createdIdOf(target: CanvasInlineEditTarget): string {
       return target.id
     // gantt（more-diagrams 工单 11）：菜单添加路径不进内联编辑，此函数不会收到该目标
     case 'gantt-task':
+      return target.elementId
+    case 'quadrant-point':
       return target.elementId
   }
 }

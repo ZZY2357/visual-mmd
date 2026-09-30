@@ -15,6 +15,7 @@ import { pieParser } from './pipeline/pie'
 import { blockParser } from './pipeline/block'
 import { sankeyParser } from './pipeline/sankey'
 import { ganttParser } from './pipeline/gantt'
+import { quadrantParser } from './pipeline/quadrant'
 import { frontmatterEnd } from './pipeline/frontmatter'
 import { buildFlowchartProjection, type FlowchartProjection } from './projection/flowchart-projection'
 import { buildSequenceProjection, type SequenceProjection } from './projection/sequence-projection'
@@ -34,6 +35,10 @@ import { buildPieProjection, type PieProjection } from './projection/pie-project
 import { buildBlockProjection, type BlockProjection } from './projection/block-projection'
 import { buildSankeyProjection, type SankeyProjection } from './projection/sankey-projection'
 import { buildGanttProjection, type GanttProjection } from './projection/gantt-projection'
+import {
+  buildQuadrantProjection,
+  type QuadrantProjection,
+} from './projection/quadrant-projection'
 import { flowchartCanvasCapabilities } from './canvas-selection/flowchart-adapter'
 import { sequenceCanvasCapabilities } from './canvas-selection/sequence-adapter'
 import { classCanvasCapabilities } from './canvas-selection/class-adapter'
@@ -49,6 +54,7 @@ import { pieCanvasCapabilities } from './canvas-selection/pie-adapter'
 import { blockCanvasCapabilities } from './canvas-selection/block-adapter'
 import { sankeyCanvasCapabilities } from './canvas-selection/sankey-adapter'
 import { ganttCanvasCapabilities } from './canvas-selection/gantt-adapter'
+import { quadrantCanvasCapabilities } from './canvas-selection/quadrant-adapter'
 import type { CanvasCapabilities } from './canvas-selection/capabilities'
 import { treePartitions, type TreePartitions } from './structure-tree/partitions'
 import { DEFAULT_DIAGRAM_SOURCE } from './storage'
@@ -85,6 +91,7 @@ export interface ProjectionTypes {
   block: BlockProjection
   sankey: SankeyProjection
   gantt: GanttProjection
+  quadrant: QuadrantProjection
 }
 
 /** 已注册图种的 id 集合（字面量联合，随 ProjectionTypes 增长） */
@@ -352,6 +359,26 @@ export const GANTT_TEMPLATE = `gantt
 `
 
 /**
+ * quadrantChart 起步模板（more-diagrams 工单 12）：title、双段双轴（`低 --> 高`）、
+ * quadrant-1..4、三个点（其一带 `:::class` 类标注、其一带内联样式段）与一条 classDef。
+ * 点行语法 `文本[: [x, y]][ 样式段]`——坐标 0–1；样式段紧跟 `]`，`key: value` 逗号串联；
+ * `:::类名` 落在文本与点冒号之间。classDef 行由解析器逐字保留（ADR-0004）。
+ */
+export const QUADRANT_TEMPLATE = `quadrantChart
+    title 需求优先级评估
+    x-axis 低价值 --> 高价值
+    y-axis 低成本 --> 高成本
+    quadrant-1 立即去做
+    quadrant-2 规划排期
+    quadrant-3 重新评估
+    quadrant-4 谨慎投入
+    Campaign A: [0.3, 0.6]
+    Campaign B:::highlight: [0.45, 0.23]
+    Campaign C: [0.57, 0.69] radius: 8, color: #ff6b00
+    classDef highlight color:#f08c00
+`
+
+/**
  * 注册表：数组是唯一权威（more-diagrams 工单 01），DIAGRAM_TYPES 由它推导。
  * detectDiagramType 按数组顺序显式遍历——不再维护手写的 if 分发链，
  * 新图种挂一条即可参与识别，无法识别时不再默认 flowchart（见下）。
@@ -503,6 +530,16 @@ export const DIAGRAM_TYPE_LIST: DiagramTypeRegistration[] = [
     buildProjection: (doc) => ({ type: 'gantt', gantt: buildGanttProjection(doc) }),
     tree: treePartitions.gantt,
     canvas: ganttCanvasCapabilities,
+  },
+  {
+    id: 'quadrant',
+    parser: quadrantParser,
+    template: QUADRANT_TEMPLATE,
+    // `\b` 让关键字不被 `quadrantChartX` 之类的更长词误认
+    detect: (source) => /^quadrantChart\b/i.test(firstStatementLine(source)),
+    buildProjection: (doc) => ({ type: 'quadrant', quadrant: buildQuadrantProjection(doc) }),
+    tree: treePartitions.quadrant,
+    canvas: quadrantCanvasCapabilities,
   },
 ]
 

@@ -171,6 +171,11 @@ describe('MENU_ACTIONS 穷尽性（工单 05 → 工单 01）', () => {
       // gantt（more-diagrams 工单 11）：任务条可寻址但元素级菜单不做（与 journey/pie 同口径），
       // 只有空白添加入口
       { kind: 'blank', diagramType: 'gantt' },
+      // quadrant（more-diagrams 工单 12）：空白加点 + 点（改文本/坐标/样式/删除）+ 轴/象限标题（改文本）
+      { kind: 'blank', diagramType: 'quadrant' },
+      { kind: 'quadrant-point', elementId: 'point:1' },
+      { kind: 'quadrant-axis', elementId: 'x-axis' },
+      { kind: 'quadrant-quadrant', elementId: 'quadrant:2' },
     ]
     const reachableIds = new Set(allTargets.flatMap((target) => contextMenuItems(target)))
     // apply-style 不经 onMenuItem 分发（CanvasPanel 渲染成子菜单开关，点样式名直接调

@@ -163,6 +163,50 @@ function annotateGanttDataIds(root: ParentNode): void {
   }
 }
 
+/**
+ * mermaid v12 quadrantChart（more-diagrams 工单 12）：渲染器（`quadrantDiagram-O4NWA36T.mjs`
+ * 的 draw）**不写任何 id / data-id**，但包裹组结构稳定且类名专属（其余图种无
+ * `g.quadrants` / `g.data-points` / `g.labels`），故按**位置序**在此反注（ADR-0012），
+ * 作用域严格限定在这三个 quadrant 专属包裹内——绝不进 `nodeIdOfDomId` 通用循环
+ * （工单 06 钉死的收口约定）。走专责 `nodeAnnotator`（需投影信息给条数门卫），
+ * 不像 flowchart/class 那样由无参的 `annotateNodeDataIds` 承担。
+ *
+ * DOM 序证据（离线核查渲染器源码，已记入工单 Comments）：
+ * - 象限：`getQuadrants` 数组序固定为 quadrant-1..4 → `g.quadrants > g.quadrant` 的
+ *   DOM 序恒为 1..4。
+ * - 点：`addPoint` → `addPoints` **头插**（`this.data.points = [...points, ...this.data.points]`），
+ *   `getQuadrantPoints` 按数组序 map 后 d3 enter().append() —— DOM 序 = 源码点序的**逆序**。
+ * - 轴标签：`getAxisLabels` 依条件 push，顺序恒为 x左 → x右 → y下 → y上；条数取决于
+ *   各段文本有无（config 默认 showXAxis/showYAxis=true，用户手写 config 关闭时
+ *   条数与预测不符 → 整体不标，绝不误归属——与 er 位置序反注同门卫）。
+ */
+export function annotateQuadrantDataIds(
+  root: ParentNode,
+  opts: { pointCount: number; axisLabels: readonly string[] },
+): void {
+  // 门卫：g.quadrants 是 quadrant 渲染器专属类名（其余图种的产物不含）
+  if (root.querySelector('g.quadrants') === null) return
+  // 象限：恒 4 个，DOM 序 = quadrant-1..4
+  root.querySelectorAll('g.quadrants > g.quadrant').forEach((g, i) => {
+    if (g.getAttribute('data-id') === null) g.setAttribute('data-id', `quadrant:${i + 1}`)
+  })
+  // 点：DOM 序 = 源码逆序（头插）；条数与投影不符整体不标（绝不误归属）
+  const pointGroups = root.querySelectorAll('g.data-points > g.data-point')
+  if (opts.pointCount > 0 && pointGroups.length === opts.pointCount) {
+    pointGroups.forEach((g, i) => {
+      if (g.getAttribute('data-id') === null) g.setAttribute('data-id', `point:${opts.pointCount - i}`)
+    })
+  }
+  // 轴标签：DOM 序 = x左 → x右 → y下 → y上（条件渲染）；条数与预测不符整体不标
+  const labels = root.querySelectorAll('g.labels > g.label')
+  if (opts.axisLabels.length > 0 && labels.length === opts.axisLabels.length) {
+    labels.forEach((g, i) => {
+      const dataId = opts.axisLabels[i]
+      if (dataId !== undefined && g.getAttribute('data-id') === null) g.setAttribute('data-id', dataId)
+    })
+  }
+}
+
 export function annotateNodeDataIds(root: ParentNode): void {
   for (const g of root.querySelectorAll('g.node')) {
     if (g.getAttribute('data-id') !== null) continue

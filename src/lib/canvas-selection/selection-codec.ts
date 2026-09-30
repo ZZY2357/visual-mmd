@@ -6,6 +6,7 @@ import { edgeSelectionOf } from './edge-adapter'
 import { mindmapDomIdOf } from './mindmap-adapter'
 import { parseKanbanCardElementId, parseKanbanColumnElementId } from '../pipeline/element-id'
 import { requirementSelectionOf } from './requirement-adapter'
+import { quadrantSelectionOf } from './quadrant-adapter'
 import {
   parseRequirementBlockElementId,
   parseRequirementElemBlockElementId,
@@ -105,6 +106,12 @@ export function canvasIdOf(selection: Selection): string | null {
       return selection.name
     case 'sankey-link':
       return selection.elementId
+    // quadrant（more-diagrams 工单 12）：点/轴/象限的 data-id 即投影 elementId
+    // （渲染后按位置序反注，见 quadrant-adapter / node-data-ids）
+    case 'quadrant-point':
+    case 'quadrant-axis':
+    case 'quadrant-quadrant':
+      return selection.elementId
     default:
       return null
   }
@@ -147,6 +154,11 @@ export function fromCanvasId(diagramType: DiagramTypeId, canvas: CanvasSelection
     // 反注），resolver 已把它映射回位置序 elementId（`task:N`）——node.id 即 elementId
     if (canvas.kind !== 'node') return null
     return { kind: 'gantt-task', elementId: canvas.id }
+  }
+  if (diagramType === 'quadrant') {
+    // quadrant（more-diagrams 工单 12）：node.id 即投影 elementId（`point:N` / `x-axis` /
+    // `y-axis` / `quadrant:N`，渲染后按位置序反注），按形态解回三类选中
+    return quadrantSelectionOf(canvas)
   }
   if (diagramType === 'kanban') {
     // resolver 返回的 node.id 即 elementId（`kanban-card:<id>` / `kanban-column:<id>`），按前缀判种类
@@ -243,6 +255,13 @@ export function selectionOfMenuTarget(target: ContextMenuTarget): Selection | nu
       return { kind: 'sankey-node', name: target.name }
     case 'sankey-link':
       return { kind: 'sankey-link', elementId: target.elementId }
+    // quadrant（more-diagrams 工单 12）：点/轴/象限菜单目标一一对应各自 Selection kind
+    case 'quadrant-point':
+      return { kind: 'quadrant-point', elementId: target.elementId }
+    case 'quadrant-axis':
+      return { kind: 'quadrant-axis', elementId: target.elementId }
+    case 'quadrant-quadrant':
+      return { kind: 'quadrant-quadrant', elementId: target.elementId }
     case 'blank':
       return null
   }
@@ -276,6 +295,22 @@ export function menuTargetOfCanvas(
       // gantt（more-diagrams 工单 11）：任务条虽可寻址，但元素级菜单不做（与 journey/pie
       // 同口径），编辑由结构树选中 + 属性表单承接——画布节点不产生菜单目标
       return null
+    }
+    // quadrant（more-diagrams 工单 12）：node.id = 投影 elementId（渲染后位置序反注），
+    // 三类元素都有画布菜单
+    if (diagramType === 'quadrant') {
+      const selection = quadrantSelectionOf(canvas)
+      if (selection === null) return null
+      switch (selection.kind) {
+        case 'quadrant-point':
+          return { kind: 'quadrant-point', elementId: selection.elementId }
+        case 'quadrant-axis':
+          return { kind: 'quadrant-axis', elementId: selection.elementId }
+        case 'quadrant-quadrant':
+          return { kind: 'quadrant-quadrant', elementId: selection.elementId }
+        default:
+          return null
+      }
     }
     if (diagramType === 'kanban') {
       // 列 / 卡片都渲染成 `g.node` / `g.cluster`，反注后的 canvas.id 带 elementId 前缀，

@@ -76,6 +76,11 @@ export type ContextMenuTarget =
 // 链路 elementId 即投影 elementId（`link:N`，位置序身份）
   | { kind: 'sankey-node'; name: string }
   | { kind: 'sankey-link'; elementId: string }
+// quadrant（more-diagrams 工单 12）：点/轴/象限经位置序反注可寻址（见 quadrant-adapter），
+// 三类元素都有画布菜单；轴/象限是文档级属性元素，无添加/删除入口
+  | { kind: 'quadrant-point'; elementId: string }
+  | { kind: 'quadrant-axis'; elementId: string }
+  | { kind: 'quadrant-quadrant'; elementId: string }
 
 export type ContextMenuItemId =
   | 'add-node'
@@ -168,6 +173,13 @@ export type ContextMenuItemId =
   // 由结构树选中 + 属性表单承接；section 与指令行不可寻址。
   | 'add-gantt-task'
   | 'add-gantt-section'
+  // quadrant（more-diagrams 工单 12）：空白 = 加点（坐标落 0.5, 0.5，可在右侧表单改）；
+  // 点 = 改文本（内联编辑）/ 改坐标 / 改样式（D5：选中 + 关菜单，右侧表单改）/ 删除；
+  // 轴/象限 = 改文本（D5：选中 + 关菜单，右侧表单改）。
+  | 'add-quadrant-point'
+  | 'edit-quadrant-coords'
+  | 'edit-quadrant-style'
+  | 'edit-quadrant-text'
 
 /**
  * 画布选中 → 菜单目标（工单 03 起为 `canvas-selection/selection-codec.ts` 的
@@ -223,6 +235,9 @@ function blankMenuItems(diagramType: DiagramTypeId): ContextMenuItemId[] {
     case 'gantt':
       // gantt 的空白入口（工单 11 定案）：加任务（缺省时长 1d，归属最后一个分组）与加分组
       return ['add-gantt-task', 'add-gantt-section']
+    case 'quadrant':
+      // quadrant 的空白入口（工单 12 定案）：加点（坐标落 0.5, 0.5，文本避重，右侧表单可改）
+      return ['add-quadrant-point']
     // DiagramTypeId 是开放类型（more-diagrams 工单 01）：未接入画布能力包的图种
     // 没有空白右键入口（unsupported 态下画布右键整体停用，不会走到这里）
     default:
@@ -323,5 +338,13 @@ export function contextMenuItems(target: ContextMenuTarget): ContextMenuItemId[]
       return ['edit-sankey-name']
     case 'sankey-link':
       return ['edit-label', 'delete']
+    // quadrant（more-diagrams 工单 12）：点 = 改文本（内联编辑）/ 改坐标 / 改样式（都是
+    // D5「选中 + 关菜单」，字段在右侧 QuadrantPointForm 改）/ 删除；
+    // 轴 / 象限标题 = 改文本（D5「选中 + 关菜单」，右侧表单改——文档级属性元素无删除）
+    case 'quadrant-point':
+      return ['edit-text', 'edit-quadrant-coords', 'edit-quadrant-style', 'delete']
+    case 'quadrant-axis':
+    case 'quadrant-quadrant':
+      return ['edit-quadrant-text']
   }
 }

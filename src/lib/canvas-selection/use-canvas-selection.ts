@@ -25,6 +25,9 @@ export interface CanvasSelectionOptions {
   containerRef?: React.RefObject<HTMLDivElement | null>
   /** 渲染后把连线位置序身份写进 DOM（工单 02）；缺省不标注（该图种无位置序连线） */
   annotateEdges?: (root: ParentNode) => void
+  /** 渲染后把节点级 data-id 写进 DOM（more-diagrams 工单 12，quadrant 位置序反注）；
+   * 缺省不标注（该图种由 annotateNodeDataIds 的通用/专属形态承担） */
+  annotateNodes?: (root: ParentNode) => void
   /** data-id 未命中时的连线几何兜底命中（工单 02，沿真实路径采样）；缺省不兜底 */
   hitTestEdge?: (root: ParentNode, clientX: number, clientY: number) => CanvasSelection | null
 }
@@ -36,6 +39,7 @@ export function useCanvasSelection({
   onSelect,
   containerRef: externalRef,
   annotateEdges,
+  annotateNodes,
   hitTestEdge,
 }: CanvasSelectionOptions) {
   const ownRef = useRef<HTMLDivElement | null>(null)
@@ -46,6 +50,8 @@ export function useCanvasSelection({
   // 故用 ref 取最新值而不把闭包塞进依赖数组
   const annotateEdgesRef = useRef(annotateEdges)
   annotateEdgesRef.current = annotateEdges
+  const annotateNodesRef = useRef(annotateNodes)
+  annotateNodesRef.current = annotateNodes
 
   // 高亮：SVG 重新注入（dangerouslySetInnerHTML 换子树）或选中变化时重新标记。
   // 放在 ref 所指容器上而非 svg 节点本身，兼容容器内其它静态元素。
@@ -56,6 +62,7 @@ export function useCanvasSelection({
     const root = containerRef.current
     if (root === null) return
     annotateNodeDataIds(root)
+    annotateNodesRef.current?.(root)
     annotateEdgesRef.current?.(root)
     addEdgeHitAreas(root)
     if (selectedDataId === null) {

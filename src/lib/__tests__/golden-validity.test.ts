@@ -56,6 +56,43 @@ describe('金样合法性：默认图表模板能被 mermaid 渲染', () => {
     await expect(mermaid.parse(GANTT_TEMPLATE)).resolves.toBeTruthy()
   })
 
+  it('quadrant 起步模板 parse 通过（more-diagrams 工单 12）', async () => {
+    const { QUADRANT_TEMPLATE } = await import('../diagram-registry')
+    await expect(mermaid.parse(QUADRANT_TEMPLATE)).resolves.toBeTruthy()
+  })
+
+  it('quadrant 端到端编辑场景（工单 12）落在合法 mermaid 源码上', async () => {
+    const { QUADRANT_TEMPLATE } = await import('../diagram-registry')
+    const { quadrantParser } = await import('../pipeline/quadrant')
+    const { reassemble } = await import('../pipeline/document')
+    const parse = (src: string) => {
+      const r = quadrantParser.parse(src)
+      if (!r.ok) throw new Error(`解析失败：${r.error.message}`)
+      return r.doc
+    }
+    const apply = (doc: ReturnType<typeof parse>, intent: Parameters<typeof quadrantParser.resolveRewrites>[1]) => {
+      const rewrites = quadrantParser.resolveRewrites(doc, intent)
+      if (rewrites === null) throw new Error(`意图被拒绝：${JSON.stringify(intent)}`)
+      return parse(reassemble(doc, rewrites))
+    }
+
+    // 工单端到端验收场景：加点 → 改点坐标 → 加 radius 样式 → 改点文本 →
+    // 改 quadrant-2 标题 → 删除一个点
+    let doc = parse(QUADRANT_TEMPLATE)
+    doc = apply(doc, { type: 'add-point', text: '新点', x: '0.5', y: '0.5' }) // 加点
+    doc = apply(doc, { type: 'set-point-coords', elementId: 'point:4', x: '0.8', y: '0.2' }) // 改坐标
+    doc = apply(doc, { type: 'set-point-style', elementId: 'point:4', field: 'radius', value: '12' }) // 加样式
+    doc = apply(doc, { type: 'set-point-text', elementId: 'point:4', text: '重点项' }) // 改文本
+    doc = apply(doc, { type: 'set-quadrant-text', elementId: 'quadrant:2', text: '排期跟进' }) // 改象限标题
+    doc = apply(doc, { type: 'delete-point', elementId: 'point:1' }) // 删除点
+
+    const source = doc.source
+    expect(source).toContain('重点项: [0.8, 0.2] radius: 12')
+    expect(source).toContain('quadrant-2 排期跟进')
+    expect(source).not.toContain('Campaign A:')
+    await expect(mermaid.parse(source)).resolves.toBeTruthy()
+  })
+
   it('sequence 源码 parse 通过', async () => {
     const src = `sequenceDiagram
     Alice->>Bob: 你好

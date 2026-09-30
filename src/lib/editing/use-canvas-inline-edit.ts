@@ -89,6 +89,10 @@ export function inlineEditTextOf(projection: AnyProjection | null, target: Canva
     // gantt 双击编辑的是任务名（more-diagrams 工单 11）：按位置序 elementId 取投影现名
     return projection.gantt.tasks.find((task) => task.elementId === target.elementId)?.name ?? ''
   }
+  if (projection.type === 'quadrant' && target.kind === 'quadrant-point') {
+    // quadrant 双击编辑的是点文本（more-diagrams 工单 12）
+    return projection.quadrant.points.find((p) => p.elementId === target.elementId)?.text ?? ''
+  }
   return ''
 }
 
@@ -185,6 +189,14 @@ function findTargetElement(root: Element, target: CanvasInlineEditTarget, text: 
     }
     return null
   }
+  if (target.kind === 'quadrant-point') {
+    // quadrant 点的 data-id 即投影 elementId `point:N`（渲染后按位置序反注，工单 12；
+    // DOM 序与源码序相反由反注方换算，寻址只认 data-id 值）
+    for (const el of root.querySelectorAll('[data-id]')) {
+      if (el.getAttribute('data-id') === target.elementId) return el
+    }
+    return null
+  }
   return findMindmapElement(root, target.elementId, text)
 }
 
@@ -262,7 +274,9 @@ export function useCanvasInlineEdit({ projection, resolver, svg, containerRef, v
                         ? 'block'
                         : type === 'gantt'
                           ? 'gantt'
-                          : 'flowchart'
+                          : type === 'quadrant'
+                            ? 'quadrant'
+                            : 'flowchart'
       const target = inlineEditTargetFromEvent(e.target, resolver, mindmapNodes, kind)
       if (target === null) return
       e.preventDefault()

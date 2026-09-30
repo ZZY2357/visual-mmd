@@ -11,6 +11,7 @@ import { parseRequirementBlockElementId } from '../pipeline/element-id'
 import { isValidBlockLabel } from '../pipeline/block'
 import { parseBlockNodeElementId } from '../pipeline/element-id'
 import { isValidGanttTaskName } from '../pipeline/gantt'
+import { isValidQuadrantPointText } from '../pipeline/quadrant'
 import type { ProjectionMindmapNode } from '../projection/mindmap-projection'
 import { selectionFromEventTarget, type CanvasSelection, type DataIdResolver } from '../canvas-selection/data-id'
 
@@ -72,6 +73,9 @@ export type CanvasInlineEditTarget =
    * elementId 是位置序身份（`task:N`，提交寻址用）；taskId 是 mermaid 渲染 id
    * （画布 data-id，浮层定位用——DOM 上只有它，无法从位置序 elementId 反解） */
   | { kind: 'gantt-task'; elementId: string; taskId: string }
+  /** quadrant（more-diagrams 工单 12）：双击点改文本（set-point-text 意图）。
+   * 点有 data-id 寻址（渲染后位置序反注）；轴/象限标题不做双击（右侧表单改） */
+  | { kind: 'quadrant-point'; elementId: string }
 
 export type InlineEditCommit =
   | { action: 'commit'; intent: EditIntent }
@@ -155,6 +159,7 @@ export type InlineEditDiagramKind =
   | 'requirement'
   | 'block'
   | 'gantt'
+  | 'quadrant'
 
 /**
  * 双击目标 → 编辑对象；两边都匹配不上时返回 null（如点在空白处/边上），
@@ -205,6 +210,11 @@ export function inlineEditTargetFromEvent(
     if (kind === 'gantt') {
       const taskId = closestDataId(target)
       return taskId !== null ? { kind: 'gantt-task', elementId: byId.nodeId, taskId } : null
+    }
+    // quadrant（more-diagrams 工单 12）：data-id = 投影 elementId（渲染后位置序反注），
+    // 只有点可双击（改文本）；轴/象限标题双击安静忽略（右侧表单改）
+    if (kind === 'quadrant') {
+      return byId.nodeId.startsWith('point:') ? { kind: 'quadrant-point', elementId: byId.nodeId } : null
     }
     return byId
   }
@@ -272,6 +282,12 @@ export function inlineEditCommitOf(target: CanvasInlineEditTarget, text: string,
     // 换行非法；elementId 位置序寻址，taskId 只用于浮层定位）
     if (!isValidGanttTaskName(next)) return { action: 'invalid' }
     return { action: 'commit', intent: { type: 'set-task-name', elementId: target.elementId, name: next } }
+  }
+  if (target.kind === 'quadrant-point') {
+    // quadrant（more-diagrams 工单 12）：非空改动 = set-point-text（文本含冒号/引号/
+    // 关键字前缀等非法输入拒绝落码，见 isValidQuadrantPointText）
+    if (!isValidQuadrantPointText(next)) return { action: 'invalid' }
+    return { action: 'commit', intent: { type: 'set-point-text', elementId: target.elementId, text: next } }
   }
   if (!isValidMindmapNodeText(next)) return { action: 'invalid' }
   return { action: 'commit', intent: { type: 'set-node-text', elementId: target.elementId, text: next } }

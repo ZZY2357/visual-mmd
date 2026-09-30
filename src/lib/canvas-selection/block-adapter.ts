@@ -61,7 +61,7 @@ export const blockCanvasCapabilities: CanvasCapabilities<ProjectionOf<'block'>> 
   dataIdResolver: (projection) => blockDataIdResolver(projection.block),
   toSelection: (canvas) => blockSelectionOf(canvas),
   // data-id 即块 id（渲染后从 DOM id 反注）；边是位置序 elementId
-  canvasIdOf: (selection) => {
+  canvasIdOf: (_projection, selection) => {
     if (selection.kind === 'block-node' || selection.kind === 'block-group') return selection.id
     if (selection.kind === 'block-edge') return selection.elementId
     return null

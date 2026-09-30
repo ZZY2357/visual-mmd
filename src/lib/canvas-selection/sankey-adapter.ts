@@ -47,7 +47,7 @@ export const sankeyCanvasCapabilities: CanvasCapabilities<ProjectionOf<'sankey'>
   dataIdResolver: (projection) => sankeyDataIdResolver(projection.sankey),
   toSelection: (canvas) => sankeySelectionOf(canvas),
   // data-id 即节点名；链路是位置序 elementId
-  canvasIdOf: (selection) => {
+  canvasIdOf: (_projection, selection) => {
     if (selection.kind === 'sankey-node') return selection.name
     if (selection.kind === 'sankey-link') return selection.elementId
     return null

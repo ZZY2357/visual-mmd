@@ -413,6 +413,9 @@ export function CanvasPanel({ preview, projection, unsupported = false }: Canvas
   const canvasResolver = caps !== null && projection !== null ? caps.dataIdResolver(projection) : null
   // 有 edgeAnnotator 的图种（class / sequence）才有位置序连线，才需要兜底命中
   const annotateEdges = projection !== null ? caps?.edgeAnnotator?.(projection) : undefined
+  // 节点级位置序反注（more-diagrams 工单 12）：quadrant 渲染器不写任何 id/data-id，
+  // 由能力包的 nodeAnnotator 在 quadrant 专属包裹内按位置序反注（其余图种无此成员）
+  const annotateNodes = projection !== null ? caps?.nodeAnnotator?.(projection) : undefined
   // 兜底命中：data-id 没命中时按屏幕坐标沿真实路径采样（只对位置序连线开的图种启用）
   const hitTestEdge =
     canvasResolver === null || annotateEdges === undefined
@@ -431,6 +434,7 @@ export function CanvasPanel({ preview, projection, unsupported = false }: Canvas
         ? caps.canvasIdOf(projection, selection)
         : null,
     annotateEdges,
+    annotateNodes,
     hitTestEdge,
     onSelect: (canvasSelection) => {
       const editorSelection = caps !== null ? caps.toSelection(canvasSelection) : null
