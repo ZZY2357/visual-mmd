@@ -7,6 +7,7 @@ import { mindmapParser } from './pipeline/mindmap'
 import { stateParser } from './pipeline/state'
 import { erParser } from './pipeline/er'
 import { gitgraphParser } from './pipeline/gitgraph'
+import { requirementParser } from './pipeline/requirement'
 import { frontmatterEnd } from './pipeline/frontmatter'
 import { buildFlowchartProjection, type FlowchartProjection } from './projection/flowchart-projection'
 import { buildSequenceProjection, type SequenceProjection } from './projection/sequence-projection'
@@ -15,6 +16,10 @@ import { buildMindmapProjection, type MindmapProjection } from './projection/min
 import { buildStateProjection, type StateProjection } from './projection/state-projection'
 import { buildErProjection, type ErProjection } from './projection/er-projection'
 import { buildGitgraphProjection, type GitgraphProjection } from './projection/gitgraph-projection'
+import {
+  buildRequirementProjection,
+  type RequirementProjection,
+} from './projection/requirement-projection'
 import { flowchartCanvasCapabilities } from './canvas-selection/flowchart-adapter'
 import { sequenceCanvasCapabilities } from './canvas-selection/sequence-adapter'
 import { classCanvasCapabilities } from './canvas-selection/class-adapter'
@@ -22,6 +27,7 @@ import { mindmapCanvasCapabilities } from './canvas-selection/mindmap-adapter'
 import { stateCanvasCapabilities } from './canvas-selection/state-adapter'
 import { erCanvasCapabilities } from './canvas-selection/er-adapter'
 import { gitgraphCanvasCapabilities } from './canvas-selection/gitgraph-adapter'
+import { requirementCanvasCapabilities } from './canvas-selection/requirement-adapter'
 import type { CanvasCapabilities } from './canvas-selection/capabilities'
 import { treePartitions, type TreePartitions } from './structure-tree/partitions'
 import { DEFAULT_DIAGRAM_SOURCE } from './storage'
@@ -50,6 +56,7 @@ export interface ProjectionTypes {
   state: StateProjection
   er: ErProjection
   gitgraph: GitgraphProjection
+  requirement: RequirementProjection
 }
 
 /** 已注册图种的 id 集合（字面量联合，随 ProjectionTypes 增长） */
@@ -188,6 +195,27 @@ export const GITGRAPH_TEMPLATE = `gitGraph
     merge feature tag: "v1.0"
 `
 
+/** requirementDiagram 起步模板（more-diagrams 工单 07）：一个 functionalRequirement
+ * （id / text / risk / verifymethod 四字段齐全）、一个 element、一条 satisfies 关系。
+ * 注：v12 只认 `requirementDiagram`（`requirementDiagram_v2` 关键字已消失） */
+export const REQUIREMENT_TEMPLATE = `requirementDiagram
+    direction LR
+
+    functionalRequirement login {
+        id: "REQ-1"
+        text: "用户可使用账号密码登录"
+        risk: Medium
+        verifymethod: Test
+    }
+
+    element loginUI {
+        type: "登录界面"
+        docref: "docs/ui.md"
+    }
+
+    loginUI - satisfies -> login
+`
+
 /**
  * 注册表：数组是唯一权威（more-diagrams 工单 01），DIAGRAM_TYPES 由它推导。
  * detectDiagramType 按数组顺序显式遍历——不再维护手写的 if 分发链，
@@ -258,6 +286,17 @@ export const DIAGRAM_TYPE_LIST: DiagramTypeRegistration[] = [
     buildProjection: (doc) => ({ type: 'gitgraph', gitgraph: buildGitgraphProjection(doc) }),
     tree: treePartitions.gitgraph,
     canvas: gitgraphCanvasCapabilities,
+  },
+  {
+    id: 'requirement',
+    parser: requirementParser,
+    template: REQUIREMENT_TEMPLATE,
+    // v12 只认 `requirementDiagram`（`requirementDiagram_v2` 关键字已消失，见 research/
+    // timeline-kanban-requirement.md）；`\b` 让关键字不被 `requirementDiagramX` 误认
+    detect: (source) => /^requirementDiagram\b/i.test(firstStatementLine(source)),
+    buildProjection: (doc) => ({ type: 'requirement', requirement: buildRequirementProjection(doc) }),
+    tree: treePartitions.requirement,
+    canvas: requirementCanvasCapabilities,
   },
 ]
 

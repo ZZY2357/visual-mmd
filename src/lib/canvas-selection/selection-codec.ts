@@ -4,6 +4,11 @@ import type { CanvasSelection } from './data-id'
 import { toEditorSelection } from './flowchart-adapter'
 import { edgeSelectionOf } from './edge-adapter'
 import { mindmapDomIdOf } from './mindmap-adapter'
+import { requirementSelectionOf } from './requirement-adapter'
+import {
+  parseRequirementBlockElementId,
+  parseRequirementElemBlockElementId,
+} from '../pipeline/element-id'
 import type { ContextMenuTarget } from '../editing/context-menu'
 
 /**
@@ -69,6 +74,12 @@ export function canvasIdOf(selection: Selection): string | null {
       return selection.name
     case 'er-relation':
       return selection.elementId
+    // requirement（more-diagrams 工单 07）：两类节点 data-id 都是名字；关系走位置序
+    case 'requirement':
+    case 'requirement-element':
+      return selection.name
+    case 'requirement-relation':
+      return selection.elementId
     default:
       return null
   }
@@ -97,6 +108,11 @@ export function fromCanvasId(diagramType: DiagramTypeId, canvas: CanvasSelection
   if (diagramType === 'gitgraph') {
     // gitGraph（more-diagrams 工单 04）：画布 DOM 无 data-id（实测降级），画布选中不产生
     return null
+  }
+  if (diagramType === 'requirement') {
+    // requirement（more-diagrams 工单 07）：节点 data-id 即**投影 elementId**
+    // （`requirement:<名>` / `requirement-element:<名>`，由 resolver 反注），关系走位置序
+    return requirementSelectionOf(canvas)
   }
   if (canvas.kind === 'element') return edgeSelectionOf(diagramType, canvas.elementId)
   if (canvas.kind === 'node') {
@@ -142,6 +158,12 @@ export function selectionOfMenuTarget(target: ContextMenuTarget): Selection | nu
       return { kind: 'er-relation', elementId: target.elementId }
     case 'er-attribute':
       return { kind: 'er-attribute', elementId: target.elementId }
+    case 'requirement-node':
+      return { kind: 'requirement', name: target.name }
+    case 'requirement-element':
+      return { kind: 'requirement-element', name: target.name }
+    case 'requirement-relation':
+      return { kind: 'requirement-relation', elementId: target.elementId }
     case 'blank':
       return null
   }
@@ -169,6 +191,15 @@ export function menuTargetOfCanvas(
     }
     if (diagramType === 'er') return { kind: 'er-entity', name: canvas.id }
     if (diagramType === 'gitgraph') return null // 无 data-id（实测降级），画布节点不可命中
+    // requirement（more-diagrams 工单 07）：node.id = 投影 elementId（`requirement:<名>` /
+    // `requirement-element:<名>`），按前缀解回两类节点；都解不开（含空格的引号名在渲染
+    // DOM 上不可寻址，本就到不了这里）→ null
+    if (diagramType === 'requirement') {
+      const requirement = parseRequirementBlockElementId(canvas.id)
+      if (requirement !== null) return { kind: 'requirement-node', name: requirement.name }
+      const element = parseRequirementElemBlockElementId(canvas.id)
+      return element !== null ? { kind: 'requirement-element', name: element.name } : null
+    }
     return { kind: 'sequence-participant', actorId: canvas.id }
   }
   if (canvas.kind === 'element') {
@@ -188,6 +219,8 @@ export function menuTargetOfCanvas(
         return { kind: 'state-transition', elementId: editorSelection.elementId }
       case 'er-relation':
         return { kind: 'er-relation', elementId: editorSelection.elementId }
+      case 'requirement-relation':
+        return { kind: 'requirement-relation', elementId: editorSelection.elementId }
       default:
         return null
     }

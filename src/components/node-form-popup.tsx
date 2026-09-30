@@ -6,6 +6,11 @@ import { AddMemberInlineForm, AddRelationInlineForm, AddClassNoteInlineForm } fr
 import { AddMessageInlineForm, AddNoteInlineForm, AddBlockInlineForm } from './sequence-forms'
 import { AddTransitionInlineForm } from './state-forms'
 import { AddErAttributeInlineForm, AddErRelationInlineForm } from './er-forms'
+import {
+  AddRequirementElementInlineForm,
+  AddRequirementInlineForm,
+  AddRequirementRelationInlineForm,
+} from './requirement-forms'
 
 /**
  * class/sequence 节点菜单的表单浮层（工单 06/04；工单 04-canvas-bundle 自 CanvasPanel 迁出）：
@@ -89,6 +94,21 @@ export function NodeFormPopup(props: { state: NodeFormState; projection: AnyProj
         {state.kind === 'er-relation' && projection.type === 'er' && (
           <AddErRelationInlineForm
             entities={projection.er.entities}
+            initialFrom={state.from}
+            afterElementId={state.anchorElementId}
+            onDone={props.onClose}
+          />
+        )}
+        {state.kind === 'requirement-node' && projection.type === 'requirement' && (
+          <AddRequirementInlineForm afterElementId={state.anchorElementId} onDone={props.onClose} />
+        )}
+        {state.kind === 'requirement-element' && projection.type === 'requirement' && (
+          <AddRequirementElementInlineForm afterElementId={state.anchorElementId} onDone={props.onClose} />
+        )}
+        {state.kind === 'requirement-relation' && projection.type === 'requirement' && (
+          <AddRequirementRelationInlineForm
+            requirements={projection.requirement.requirements}
+            elements={projection.requirement.elements}
             initialFrom={state.from}
             afterElementId={state.anchorElementId}
             onDone={props.onClose}

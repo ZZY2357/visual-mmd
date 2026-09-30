@@ -175,30 +175,41 @@ export function annotateSequenceIdentities(
   annotateHostAnchors(hostGroupsOf(Array.from(root.querySelectorAll(SEQUENCE_BLOCK_LINE))), 'block', counts.blocks)
 }
 
-/** state 转移边：与 class 同构——`.edgePaths > path` 相邻去重分组，第 k 组 = `transition:(k+1)`；
- * 条数与投影不符时整体放弃（绝不误标，more-diagrams 工单 02） */
-export function annotateStateTransitionIdentities(root: ParentNode, expected: number): void {
+/**
+ * 「位置序关系边」标注的唯一实现（class 的标签/基数组除外——那部分只有 class 有）：
+ * `.edgePaths > path`（排除命中克隆）按相邻同值去重分组，第 k 组 = `<kind>:(k+1)`；
+ * **条数与投影不符时整体放弃**（绝不误标）。state / er / requirement 三处同构，故收在此。
+ */
+function annotatePositionalEdgeGroups(root: ParentNode, kind: EdgeIdentityKind, expected: number): void {
   if (expected <= 0) return
   const groups = groupRepeats(Array.from(root.querySelectorAll(CLASS_RELATION_PATH)))
   if (groups.length !== expected) return
   groups.forEach((group, ordinal) => {
-    const elementId = edgeElementIdOf('transition', ordinal)
+    const elementId = edgeElementIdOf(kind, ordinal)
     if (elementId === null) return
     for (const path of group) path.setAttribute('data-id', elementId)
   })
 }
 
+/** state 转移边：`.edgePaths > path` 相邻去重分组，第 k 组 = `transition:(k+1)`；
+ * 条数与投影不符时整体放弃（绝不误标，more-diagrams 工单 02） */
+export function annotateStateTransitionIdentities(root: ParentNode, expected: number): void {
+  annotatePositionalEdgeGroups(root, 'transition', expected)
+}
+
 /** er 关系边（more-diagrams 工单 03）：ER 走 unified 渲染器，`.edgePaths > path` 与
  * class / state 同构——第 k 组 = `relation:(k+1)`；条数与投影不符时整体放弃（绝不误标） */
 export function annotateErRelationIdentities(root: ParentNode, expected: number): void {
-  if (expected <= 0) return
-  const groups = groupRepeats(Array.from(root.querySelectorAll(CLASS_RELATION_PATH)))
-  if (groups.length !== expected) return
-  groups.forEach((group, ordinal) => {
-    const elementId = edgeElementIdOf('relation', ordinal)
-    if (elementId === null) return
-    for (const path of group) path.setAttribute('data-id', elementId)
-  })
+  annotatePositionalEdgeGroups(root, 'relation', expected)
+}
+
+/** requirement 关系边（more-diagrams 工单 07）：requirement 也走 unified 渲染器
+ * （`chunk-GNY47TPC` 的 render → insertEdge 写 `data-id = ${src}-${dst}-${counter}`，
+ * 路径同样落在 `g.edgePaths`），故与 er / state 同构——第 k 组 = `relation:(k+1)`；
+ * 条数与投影不符时整体放弃（绝不误标）。mermaid 每条边的原始 data-id 互不相同，
+ * 因此即便只有一条关系，`groupRepeats` 也稳定产出 1 组。 */
+export function annotateRequirementRelationIdentities(root: ParentNode, expected: number): void {
+  annotatePositionalEdgeGroups(root, 'relation', expected)
 }
 
 /** 屏幕命中容差（CSS px）：sequence 消息 only 1.5px 描边，给一点余量但不足以吃到空白 */

@@ -17,6 +17,7 @@ import { flowchartDataIdResolver } from '../../canvas-selection/flowchart-adapte
 import { mindmapDataIdResolver } from '../../canvas-selection/mindmap-adapter'
 import { stateDataIdResolver } from '../../canvas-selection/state-adapter'
 import { erDataIdResolver } from '../../canvas-selection/er-adapter'
+import { requirementDataIdResolver } from '../../canvas-selection/requirement-adapter'
 import { nodeDataIdResolver, elementDataIdResolver } from '../../canvas-selection/data-id'
 import type { AnyProjection } from '../../diagram-registry'
 import { useCanvasContextMenu, type NodeFormState } from '../use-canvas-context-menu'
@@ -99,6 +100,7 @@ function resolverOf(projection: AnyProjection) {
   if (projection.type === 'state') return stateDataIdResolver(projection.state)
   if (projection.type === 'er') return erDataIdResolver(projection.er)
   if (projection.type === 'gitgraph') return () => null // 画布 DOM 无 data-id（工单 04 实测降级）
+  if (projection.type === 'requirement') return requirementDataIdResolver(projection.requirement)
   const nodes = nodeDataIdResolver(projection.class.classes.map((c) => c.name))
   const edges = elementDataIdResolver(projection.class.relations.map((r) => r.elementId))
   return (dataId: string) => nodes(dataId) ?? edges(dataId)
@@ -120,6 +122,8 @@ function createdIdOf(target: CanvasInlineEditTarget): string {
     case 'state':
       return target.id
     case 'er':
+      return target.name
+    case 'requirement':
       return target.name
   }
 }

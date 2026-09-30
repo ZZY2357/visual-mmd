@@ -42,7 +42,21 @@ export interface StyleFormState {
 /** 菜单上浮出的添加型小表单种类（工单 06 三项 + 工单 04 补三项 + state 转移 +
  * er 工单 03 补属性 / 关系）：'note' 同时服务 sequence（注释）与 class（浮动 / note for X），
  * 由投影图种决定渲染哪个表单。 */
-export type NodeFormKind = 'member' | 'relation' | 'message' | 'note' | 'block' | 'transition' | 'er-attribute' | 'er-relation'
+// requirement（more-diagrams 工单 07）：'requirement-relation' = 从选中节点拉一条关系
+export type NodeFormKind =
+  | 'member'
+  | 'relation'
+  | 'message'
+  | 'note'
+  | 'block'
+  | 'transition'
+  | 'er-attribute'
+  | 'er-relation'
+  // requirement（more-diagrams 工单 07）：添加 requirement 块（type 在表单枚举里选）/
+  // 添加 element 块 / 从节点拉一条关系
+  | 'requirement-node'
+  | 'requirement-element'
+  | 'requirement-relation'
 
 export interface NodeFormState {
   kind: NodeFormKind

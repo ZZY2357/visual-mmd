@@ -37,7 +37,22 @@ const STATE_NODE_DOM_ID = /(?:^|-)state-(.+)-(\d+)$/
  * 含空格的实体名 mermaid 会原样放进 id（非法 DOM id），此类实体安静降级为不可寻址。 */
 const ER_ENTITY_DOM_ID = /(?:^)entity-(.+)-(\d+)$/
 
-/** DOM id → 节点 id（flowchart / class / state / er 四种形态）；不是节点 id 时返回 null */
+/**
+ * mermaid v12 requirementDiagram 节点 DOM id 形态：`{svgId}-{名字}`（more-diagrams 工单 07）。
+ * requirementDb.getData 直接以 `node.id = requirement.name` / `element.name` 建节点
+ * （**不追加 `-序号`**），unified 渲染器再拼上 `data4Layout.diagramId`
+ * （= 预览 render id `mmd-preview-N`）前缀，`requirementBox` 以 `node.domId ?? node.id` 落 DOM id。
+ *
+ * 排在最后（前面四种形态更具体，先匹配），并显式排除 mindmap 的 `node_{N}`——
+ * mindmap 的 DOM id 也是 `{svgId}-` 前缀，但它的节点身份由 mindmap-adapter 自己的
+ * **后缀**匹配（`node_{N}`）承担，若被反注成 data-id 会与既有约定冲突
+ * （node-data-ids.test.ts 的「不误伤其它图种」用例钉住了这条）。
+ * 副作用：名字恰为 `node_<数字>` 的 requirement 节点不被反注（安静降级，极少见）。
+ * 含空格的引号名同理降级为不可寻址。
+ */
+const REQUIREMENT_NODE_DOM_ID = /^mmd-preview-[0-9]+-(?!node_[0-9]+$)(.+)$/
+
+/** DOM id → 节点 id（flowchart / class / state / er / requirement 五种形态）；不是节点 id 时 null */
 function nodeIdOfDomId(domId: string): string | null {
   const flow = FLOWCHART_NODE_DOM_ID.exec(domId)
   if (flow !== null) return flow[1]
@@ -46,7 +61,9 @@ function nodeIdOfDomId(domId: string): string | null {
   const state = STATE_NODE_DOM_ID.exec(domId)
   if (state !== null) return state[1]
   const er = ER_ENTITY_DOM_ID.exec(domId)
-  return er !== null ? er[1] : null
+  if (er !== null) return er[1]
+  const requirement = REQUIREMENT_NODE_DOM_ID.exec(domId)
+  return requirement !== null ? requirement[1] : null
 }
 
 export function annotateNodeDataIds(root: ParentNode): void {

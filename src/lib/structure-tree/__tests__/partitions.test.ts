@@ -139,6 +139,8 @@ describe('结构树分区描述（工单 06）', () => {
       state: 'stateDiagram-v2\n[*] --> s1',
       er: 'erDiagram\nCAR ||--o{ DRIVER : uses',
       gitgraph: 'gitGraph\n    commit id: "a"\n    branch dev\n    commit',
+      requirement:
+        'requirementDiagram\n    functionalRequirement login {\n        id: "REQ-1"\n        text: "登录"\n        risk: Medium\n        verifymethod: Test\n    }\n\n    element loginUI {\n        type: "界面"\n    }\n\n    loginUI - satisfies -> login',
     }
     for (const id of Object.keys(DIAGRAM_TYPES) as (keyof typeof DIAGRAM_TYPES)[]) {
       const registration = DIAGRAM_TYPES[id]

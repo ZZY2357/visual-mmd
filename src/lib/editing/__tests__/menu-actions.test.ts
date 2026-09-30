@@ -127,6 +127,11 @@ describe('MENU_ACTIONS 穷尽性（工单 05 → 工单 01）', () => {
       { kind: 'er-attribute', elementId: 'attr:1' },
       // gitGraph（more-diagrams 工单 04）：画布 DOM 无 data-id（实测降级），只有空白添加入口
       { kind: 'blank', diagramType: 'gitgraph' },
+      // requirement（more-diagrams 工单 07）：空白添加入口 + 两类节点 + 关系边
+      { kind: 'blank', diagramType: 'requirement' },
+      { kind: 'requirement-node', name: 'login' },
+      { kind: 'requirement-element', name: 'ui' },
+      { kind: 'requirement-relation', elementId: 'relation:0' },
     ]
     const reachableIds = new Set(allTargets.flatMap((target) => contextMenuItems(target)))
     // apply-style 不经 onMenuItem 分发（CanvasPanel 渲染成子菜单开关，点样式名直接调

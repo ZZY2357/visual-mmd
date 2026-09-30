@@ -143,6 +143,40 @@ export function erEntityElementId(name: string, occurrence = 1): string {
   return keyed('entity', name, occurrence)
 }
 
+// ---------- requirement（more-diagrams 工单 07） ----------
+
+/**
+ * requirement 块声明（`requirement:login` / 同名重复 `requirement:login#2`）与
+ * element 块声明（`requirement-element:loginUI` / `…#2`）。
+ *
+ * element 块的前缀带图种名（不是裸 `element:`）：`element` 这个词在本仓库已是
+ * 「画布选中 kind」（`CanvasElementSelection`）的名字，裸用会让「elementId = element:foo」
+ * 与「画布选中 kind = element」在同一份日志/断点里无法区分。
+ */
+export function requirementBlockElementId(name: string, occurrence = 1): string {
+  return keyed('requirement', name, occurrence)
+}
+
+export function parseRequirementBlockElementId(id: string): { name: string; occurrence: number } | null {
+  const parsed = parseKeyed('requirement', id)
+  return parsed === null ? null : { name: parsed.key, occurrence: parsed.occurrence }
+}
+
+export function requirementElemBlockElementId(name: string, occurrence = 1): string {
+  return keyed('requirement-element', name, occurrence)
+}
+
+export function parseRequirementElemBlockElementId(id: string): { name: string; occurrence: number } | null {
+  const parsed = parseKeyed('requirement-element', id)
+  return parsed === null ? null : { name: parsed.key, occurrence: parsed.occurrence }
+}
+
+/** 字段行（`field:3`）：文档序 1 基编号，**跨块全局计数**（与 parser 计数器一致）。
+ * 字段按「所属块 + 字段名」寻址（`set-requirement-field`），故只需编码。 */
+export function requirementFieldElementId(ordinal: number): string {
+  return `field:${ordinal}`
+}
+
 // ---------- 下一个可用名/ID（architecture-deepening-2 工单 04） ----------
 
 export interface NextFreeNameOptions {

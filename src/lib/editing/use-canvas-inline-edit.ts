@@ -69,6 +69,11 @@ export function inlineEditTextOf(projection: AnyProjection | null, target: Canva
     // er 双击编辑的是别名：无别名实体预填空串（输入即新增别名）
     return projection.er.entities.find((e) => e.name === target.name)?.alias ?? ''
   }
+  if (projection.type === 'requirement' && target.kind === 'requirement') {
+    // requirement 双击编辑的是 text 字段（more-diagrams 工单 07）：无 text 字段预填空串
+    //（输入即新增字段行；清空字段 = 删字段行，走右侧属性表单）
+    return projection.requirement.requirements.find((r) => r.name === target.name)?.text ?? ''
+  }
   return ''
 }
 
@@ -123,6 +128,14 @@ function findTargetElement(root: Element, target: CanvasInlineEditTarget, text: 
   }
   if (target.kind === 'er') {
     // er 的 data-id 即实体名（渲染后处理从 DOM id `entity-{名}-{n}` 反注，工单 03）
+    for (const el of root.querySelectorAll('[data-id]')) {
+      if (el.getAttribute('data-id') === target.name) return el
+    }
+    return null
+  }
+  if (target.kind === 'requirement') {
+    // requirement 的 data-id 即节点名字（渲染后处理从 DOM id `{svgId}-{名}` 反注，工单 07；
+    // 同名 element 让位 requirement，与点选消歧同口径）
     for (const el of root.querySelectorAll('[data-id]')) {
       if (el.getAttribute('data-id') === target.name) return el
     }
@@ -197,7 +210,9 @@ export function useCanvasInlineEdit({ projection, resolver, svg, containerRef, v
                 ? 'state'
                 : type === 'er'
                   ? 'er'
-                  : 'flowchart'
+                  : type === 'requirement'
+                    ? 'requirement'
+                    : 'flowchart'
       const target = inlineEditTargetFromEvent(e.target, resolver, mindmapNodes, kind)
       if (target === null) return
       e.preventDefault()

@@ -9,9 +9,11 @@ import type { EditIntent } from '../pipeline/parser'
 import type { SequenceIntent } from '../pipeline/sequence'
 import type { StateIntent } from '../pipeline/state'
 import type { GitgraphIntent } from '../pipeline/gitgraph'
+import type { RequirementIntent } from '../pipeline/requirement'
 import type { GitgraphProjection } from '../projection/gitgraph-projection'
 import type { ClassProjection } from '../projection/class-projection'
 import type { ErProjection } from '../projection/er-projection'
+import type { RequirementProjection } from '../projection/requirement-projection'
 import type { FlowchartProjection } from '../projection/flowchart-projection'
 import type { MindmapProjection } from '../projection/mindmap-projection'
 import type { SequenceProjection } from '../projection/sequence-projection'
@@ -48,6 +50,7 @@ export type CanvasKeyboardProjection =
   | { kind: 'state'; projection: StateProjection }
   | { kind: 'er'; projection: ErProjection }
   | { kind: 'gitgraph'; projection: GitgraphProjection }
+  | { kind: 'requirement'; projection: RequirementProjection }
 
 export type NodeKeyAction = 'delete' | 'add-child' | 'add-sibling'
 
@@ -158,7 +161,14 @@ export function mindmapActionIntents(
 
 /** 编辑键请求打开的添加表单种类：member / relation / message 落到已有表单浮层
  * （锚点/预选由右键菜单 hook 从选中推出），participant 走既有创建路径（内联命名） */
-export type KeyFormKind = 'member' | 'relation' | 'message' | 'participant' | 'transition' | 'er-relation'
+export type KeyFormKind =
+  | 'member'
+  | 'relation'
+  | 'message'
+  | 'participant'
+  | 'transition'
+  | 'er-relation'
+  | 'requirement-relation'
 
 /** 键事件的语义 plan：执行器（applyPlan）按字段决定提交 / 选中 / 内联编辑 / 表单 */
 export interface KeyPlan {
@@ -505,6 +515,70 @@ export function gitgraphKeyPlan(projection: GitgraphProjection, input: KeyInput)
   return {
     intents: [{ type: 'add-branch', name, afterElementId: selection.elementId }],
     newElementTarget: { selection: { kind: 'gitgraph-branch', name } },
+  }
+}
+
+// ---------- requirement 编辑键（more-diagrams 工单 07 / ADR-0013）：就近结构映射 ----------
+
+/**
+ * 选中元素 → 删除意图（requirement）：requirement（级联删块内字段与触及关系，由管线负责）、
+ * element、relation 三类各映射到既有 delete-* 意图；已不在投影 / null / 别种选中 → null。
+ */
+export function requirementDeleteIntent(
+  projection: RequirementProjection,
+  selection: Selection | null,
+): RequirementIntent | null {
+  if (selection === null) return null
+  switch (selection.kind) {
+    case 'requirement':
+      return projection.requirements.some((r) => r.name === selection.name)
+        ? { type: 'delete-requirement', name: selection.name }
+        : null
+    case 'requirement-element':
+      return projection.elements.some((e) => e.name === selection.name)
+        ? { type: 'delete-element', name: selection.name }
+        : null
+    case 'requirement-relation':
+      return projection.relations.some((r) => r.elementId === selection.elementId)
+        ? { type: 'delete-relation', elementId: selection.elementId }
+        : null
+    default:
+      return null
+  }
+}
+
+/**
+ * 键 → plan（requirement，工单 07 / ADR-0013，工单定案）：
+ * - Delete = 删除选中元素（查 requirementDeleteIntent 唯一映射）
+ * - Tab = 加 element（requirementDiagram 里「就近的结构」另一类节点就是 element；
+ *   落码 + 选中；element 不做内联命名——工单明确 element 无双击编辑）
+ * - Enter = 从该节点拉一条关系（落到 `AddRequirementRelationInlineForm` 表单浮层，不新造）
+ * 关系 / 其他选中上无 Tab/Enter 语义（不扩就近类比）。
+ */
+export function requirementKeyPlan(projection: RequirementProjection, input: KeyInput): KeyPlan | null {
+  if (input.key === 'Delete' || input.key === 'Backspace') {
+    const intent = requirementDeleteIntent(projection, input.selection)
+    return intent === null ? null : { intents: [intent], clearSelection: true }
+  }
+  if (input.key !== 'Tab' && input.key !== 'Enter') return null
+  if (input.mods?.shift === true) return null
+  const selection = input.selection
+  if (selection === null) return null
+  const anchor =
+    selection.kind === 'requirement'
+      ? projection.requirements.find((r) => r.name === selection.name)?.tailElementId
+      : selection.kind === 'requirement-element'
+        ? projection.elements.find((e) => e.name === selection.name)?.tailElementId
+        : undefined
+  if (anchor === undefined) return null
+  if (input.key === 'Enter') return { intents: [], form: 'requirement-relation' }
+  const name = nextFreeName('e', [
+    ...projection.requirements.map((r) => r.name),
+    ...projection.elements.map((e) => e.name),
+  ])
+  return {
+    intents: [{ type: 'add-element', name, afterElementId: anchor }],
+    newElementTarget: { selection: { kind: 'requirement-element', name } },
   }
 }
 

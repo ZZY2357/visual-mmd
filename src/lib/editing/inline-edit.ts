@@ -4,6 +4,8 @@ import { isValidClassName } from '../pipeline/class'
 import { isValidParticipantId } from '../pipeline/sequence'
 import { isValidStateId } from '../pipeline/state'
 import { isValidErName } from '../pipeline/er'
+import { isValidRequirementFieldValue } from '../pipeline/requirement'
+import { parseRequirementBlockElementId } from '../pipeline/element-id'
 import type { ProjectionMindmapNode } from '../projection/mindmap-projection'
 import { selectionFromEventTarget, type CanvasSelection, type DataIdResolver } from '../canvas-selection/data-id'
 
@@ -50,6 +52,10 @@ export type CanvasInlineEditTarget =
   /** er（more-diagrams 工单 03）：双击实体改别名（set-alias 意图；实体名是语法标识，
    * 不在此改。属性不做双击——工单 03 明确） */
   | { kind: 'er'; name: string }
+  /** requirement（more-diagrams 工单 07）：双击 requirement 节点改 `text` 字段
+   * （set-requirement-field 意图；名字是语法标识，不在此改。element 无双击编辑——
+   * 工单 07 明确：element 的 type/docref 是元数据，展示与编辑都在右侧表单） */
+  | { kind: 'requirement'; name: string }
 
 export type InlineEditCommit =
   | { action: 'commit'; intent: EditIntent }
@@ -105,7 +111,14 @@ function classTitleClicked(target: EventTarget | null, name: string): boolean {
 }
 
 /** 参与双击寻址的图种（各图种都用 data-id；mindmap 额外回落文本匹配） */
-export type InlineEditDiagramKind = 'flowchart' | 'mindmap' | 'class' | 'sequence' | 'state' | 'er'
+export type InlineEditDiagramKind =
+  | 'flowchart'
+  | 'mindmap'
+  | 'class'
+  | 'sequence'
+  | 'state'
+  | 'er'
+  | 'requirement'
 
 /**
  * 双击目标 → 编辑对象；两边都匹配不上时返回 null（如点在空白处/边上），
@@ -131,6 +144,13 @@ export function inlineEditTargetFromEvent(
     if (kind === 'state') return isValidStateId(byId.nodeId) ? { kind: 'state', id: byId.nodeId } : null
     // er：双击实体 = 编辑别名（set-alias；实体名是语法标识，不在此改）
     if (kind === 'er') return isValidErName(byId.nodeId) ? { kind: 'er', name: byId.nodeId } : null
+    // requirement（more-diagrams 工单 07）：data-id = 名字（渲染后处理反注），但节点
+    // elementId 带 `requirement:` / `requirement-element:` 前缀——只有 requirement 块
+    // 可双击（改 text 字段）；element 双击安静忽略（工单 07 明确不做）
+    if (kind === 'requirement') {
+      const requirement = parseRequirementBlockElementId(byId.nodeId)
+      return requirement !== null ? { kind: 'requirement', name: requirement.name } : null
+    }
     return byId
   }
   return kind === 'mindmap' ? targetFromMindmapText(target, mindmapNodes) : null
@@ -168,6 +188,15 @@ export function inlineEditCommitOf(target: CanvasInlineEditTarget, text: string,
     if (!isValidErName(target.name)) return { action: 'invalid' }
     // 空白/未改动已被顶部守卫短路（unchanged）；到这里的非空改动 = set-alias
     return { action: 'commit', intent: { type: 'set-alias', name: target.name, alias: next } }
+  }
+  if (target.kind === 'requirement') {
+    // requirement（more-diagrams 工单 07）：非空改动 = set text 字段（值含引号/换行非法；
+    // 清空字段 = 删字段行，走属性表单而非双击——顶部守卫已把清空按 unchanged 关闭）
+    if (!isValidRequirementFieldValue(next)) return { action: 'invalid' }
+    return {
+      action: 'commit',
+      intent: { type: 'set-requirement-field', requirement: target.name, field: 'text', value: next },
+    }
   }
   if (!isValidMindmapNodeText(next)) return { action: 'invalid' }
   return { action: 'commit', intent: { type: 'set-node-text', elementId: target.elementId, text: next } }

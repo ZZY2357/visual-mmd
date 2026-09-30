@@ -50,6 +50,11 @@ export type ContextMenuTarget =
   | { kind: 'er-attribute'; elementId: string }
 // gitGraph（more-diagrams 工单 04）：画布 DOM 无 data-id（实测降级），无元素级菜单目标；
 // 空白菜单提供添加入口（语句序即拓扑，追加 = 文档末尾落码）
+// requirement（more-diagrams 工单 07）：两类节点（requirement / element）选中 id 即名字；
+// 关系边 elementId 即投影 elementId（`relation:N`，位置序身份）
+  | { kind: 'requirement-node'; name: string }
+  | { kind: 'requirement-element'; name: string }
+  | { kind: 'requirement-relation'; elementId: string }
 
 export type ContextMenuItemId =
   | 'add-node'
@@ -101,6 +106,14 @@ export type ContextMenuItemId =
   // 提交/分支的编辑动作不做画布菜单（无 data-id 可命中），由结构树选中 + 属性表单承接。
   | 'add-commit'
   | 'add-branch'
+  // requirement（more-diagrams 工单 07）：空白 = 加 requirement（type 在添加表单里选）/
+  // 加 element；节点 = 改字段（选中该节点在右侧表单编辑）/ 从这里连线 / 删除；
+  // 关系 = 切换关系类型（循环直接改）/ 反转方向（直接改）/ 删除
+  | 'add-requirement'
+  | 'add-requirement-element'
+  | 'edit-requirement-field'
+  | 'cycle-requirement-kind'
+  | 'invert-requirement-relation'
 
 /**
  * 画布选中 → 菜单目标（工单 03 起为 `canvas-selection/selection-codec.ts` 的
@@ -133,6 +146,10 @@ function blankMenuItems(diagramType: DiagramTypeId): ContextMenuItemId[] {
       return ['add-entity']
     case 'gitgraph':
       return ['add-commit', 'add-branch']
+    case 'requirement':
+      // requirement 的空白入口（工单 07 定案）：加 requirement（type 在添加表单的枚举里选）与加 element。
+      // 拉关系不做空白入口——关系两端都是节点，从节点菜单「从这里连线」进入更省一步
+      return ['add-requirement', 'add-requirement-element']
     // DiagramTypeId 是开放类型（more-diagrams 工单 01）：未接入画布能力包的图种
     // 没有空白右键入口（unsupported 态下画布右键整体停用，不会走到这里）
     default:
@@ -200,5 +217,13 @@ export function contextMenuItems(target: ContextMenuTarget): ContextMenuItemId[]
       return ['cycle-er-line', 'edit-er-relation', 'delete']
     case 'er-attribute':
       return ['edit-er-attribute', 'delete']
+    // requirement（more-diagrams 工单 07）：节点（两类同构）= 改字段（选中它，字段在右侧
+    // RequirementForm 里改）/ 从这里连线 / 删除；关系 = 切换关系类型（循环直接改）/
+    // 反转方向（直接改）/ 删除
+    case 'requirement-node':
+    case 'requirement-element':
+      return ['edit-requirement-field', 'link-from-here', 'delete']
+    case 'requirement-relation':
+      return ['cycle-requirement-kind', 'invert-requirement-relation', 'delete']
   }
 }
