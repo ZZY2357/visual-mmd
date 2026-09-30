@@ -12,7 +12,11 @@ import { applyEdit } from '../lib/pipeline/pipeline'
 import { applySetTheme, isMermaidTheme } from '../lib/pipeline/frontmatter'
 import type { EditIntent } from '../lib/pipeline/parser'
 import type { InlineEditTarget } from '../lib/editing/inline-edit'
-import { detectDiagramType, DIAGRAM_TYPES, type DiagramTypeId } from '../lib/diagram-registry'
+import {
+  detectDiagramType,
+  DIAGRAM_TYPES,
+  type RegisteredDiagramTypeId,
+} from '../lib/diagram-registry'
 import { DIAGRAM_SELECTION, type Selection } from '../lib/projection/flowchart-projection'
 
 /**
@@ -71,8 +75,8 @@ interface EditorState {
   undo: () => void
   redo: () => void
   // ---- 图表库操作（工单 09）----
-  /** 新建指定类型的图表（按模板起步）并切换为活跃图表 */
-  newDiagram: (typeId: DiagramTypeId, baseName?: string) => void
+  /** 新建指定类型的图表（按模板起步）并切换为活跃图表（typeId 须是已注册图种） */
+  newDiagram: (typeId: RegisteredDiagramTypeId, baseName?: string) => void
   /** 打开（切换到）另一张图表：源码、撤销栈、选中状态完整换装 */
   openDiagram: (id: string) => void
   renameDiagram: (id: string, name: string) => void
@@ -188,7 +192,11 @@ export const useEditorStore = create<EditorState>((set, get) => ({
       set({ source: next, diagrams: withActiveSource(state, next), ...historyOf(snapshotStack) })
       return true
     }
-    const result = applyEdit(current, detectDiagramType(current).parser, intent)
+    // 源码不属于任何已注册图种（unsupported 态，more-diagrams 工单 01）时
+    // 没有解析器可落码：拒绝意图而不是喂给 flowchart 误解析
+    const registration = detectDiagramType(current)
+    if (registration === null) return false
+    const result = applyEdit(current, registration.parser, intent)
     if (!result.ok) return false
     snapshotStack.commit(result.source)
     set({ source: result.source, diagrams: withActiveSource(state, result.source), ...historyOf(snapshotStack) })
@@ -268,7 +276,7 @@ export function resetEditorHistory(source: string): void {
 }
 
 /** 旧入口：以指定类型模板替换当前活跃图表（工单 04 行为，保留给既有测试） */
-export function newDiagramLegacy(typeId: DiagramTypeId): void {
+export function newDiagramLegacy(typeId: RegisteredDiagramTypeId): void {
   resetEditorHistory(DIAGRAM_TYPES[typeId].template)
 }
 

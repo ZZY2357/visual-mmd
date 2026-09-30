@@ -24,6 +24,9 @@ export const zhDict = {
       errorTitle: '源码存在语法错误，画布已停留在最近一次合法状态',
       emptySource: '暂无内容，请在左侧代码面板输入 Mermaid 源码',
       keyboardHint: '点击节点选中后：方向键移动选中 · Delete 删除 · Tab 添加子节点 · Enter 添加同级节点',
+      // ---- unsupported 只读降级（more-diagrams 工单 01）：源码合法但图种未注册 ----
+      unsupportedTitle: '该图种暂不支持可视化编辑',
+      unsupportedHint: 'Mermaid 预览照常渲染；画布选中、键盘与右键操作在支持该图种后开放。',
       fitView: '适应窗口',
       selectHint: '点击图中的节点可在属性面板查看其属性',
       inlineEditAria: '编辑节点文本',
@@ -180,6 +183,9 @@ export const zhDict = {
       disabledTitle: '源码存在语法错误，表单编辑已暂停',
       disabledHint: '修复语法错误后即可继续使用属性面板；画布停留在最近一次合法状态。',
       gotoError: '跳转到错误行',
+      // ---- unsupported 只读降级（more-diagrams 工单 01）：源码合法但图种未注册 ----
+      unsupportedTitle: '该图种暂不支持可视化编辑',
+      unsupportedHint: 'Mermaid 预览与源码编辑照常可用；结构树与属性表单在支持该图种后开放。',
       // ---- 表单通用 ----
       add: '添加',
       delete: '删除',

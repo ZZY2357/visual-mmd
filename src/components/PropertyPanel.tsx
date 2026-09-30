@@ -19,9 +19,12 @@ import { ThemePicker } from './ThemePicker'
 interface PropertyPanelProps {
   projection: AnyProjection | null
   parseError: SourceParseError | null
+  /** unsupported 态（more-diagrams 工单 01）：源码不属于任何已注册图种——
+   * mermaid 预览与源码编辑照常，结构树/属性表单降级为占位提示 */
+  unsupported?: boolean
 }
 
-export function PropertyPanel({ projection, parseError }: PropertyPanelProps) {
+export function PropertyPanel({ projection, parseError, unsupported = false }: PropertyPanelProps) {
   const { t } = useTranslation()
   const selection = useEditorStore((s) => s.selection)
   const requestGotoLine = useEditorStore((s) => s.requestGotoLine)
@@ -42,6 +45,12 @@ export function PropertyPanel({ projection, parseError }: PropertyPanelProps) {
       <Box px="xs">
         <ThemePicker disabled={disabled} />
       </Box>
+
+      {unsupported && parseError === null && (
+        <Alert color="yellow" title={t('app:propertyPanel.unsupportedTitle')}>
+          <Text size="sm">{t('app:propertyPanel.unsupportedHint')}</Text>
+        </Alert>
+      )}
 
       {parseError !== null && (
         <Alert color="red" title={t('app:propertyPanel.disabledTitle')}>
