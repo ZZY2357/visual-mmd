@@ -3,6 +3,7 @@ import type { AnyProjection } from '../diagram-registry'
 import type { DataIdResolver } from '../canvas-selection/data-id'
 import { selectionFromEventTarget } from '../canvas-selection/data-id'
 import { mindmapActionIntents, nextNodeId, type MindmapActionPlan } from './canvas-keyboard'
+import { nextFreeName } from '../pipeline/element-id'
 import { addClassDefIntent } from './flowchart-forms'
 import {
   deleteClassIntent,
@@ -100,16 +101,8 @@ export interface NodeFormState {
 }
 
 /** 生成未冲突的默认名：base、base2、base3……（跳过已占用的名字）。
- * 类名/参与者 id 有引用语义（重名会让后续改名连带影响多份声明），新建时必须避重。 */
-function nextFreeName(base: string, used: Iterable<string>): string {
-  const taken = new Set(used)
-  if (!taken.has(base)) return base
-  for (let i = 2; i < 10000; i++) {
-    const candidate = `${base}${i}`
-    if (!taken.has(candidate)) return candidate
-  }
-  return `${base}${Date.now()}` // 理论不可达的兜底
-}
+ * 编号口径收在 pipeline 的 nextFreeName（architecture-deepening-2 工单 04），
+ * 这里以可引用名语义调用（referential 缺省）。 */
 
 /** 循环取值（工单 03）：取 options 中 current 的下一项；current 不在表中时取第一项。
  * 用于连线菜单「直接改」的字段（关系类型 / 消息箭头）——不新增表单浮层就能切换取值。 */

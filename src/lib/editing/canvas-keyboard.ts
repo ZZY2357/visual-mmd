@@ -1,7 +1,7 @@
 import type { ClassIntent } from '../pipeline/class'
 import type { FlowchartIntent } from '../pipeline/flowchart'
 import { nodeElementId } from '../pipeline/flowchart'
-import { mindmapNodeElementId } from '../pipeline/element-id'
+import { mindmapNodeElementId, nextFreeName } from '../pipeline/element-id'
 import type { MindmapIntent } from '../pipeline/mindmap'
 import type { SequenceIntent } from '../pipeline/sequence'
 import type { ClassProjection } from '../projection/class-projection'
@@ -44,14 +44,11 @@ export function keyToNodeAction(key: string, mods: { shift?: boolean } = {}): No
   return null
 }
 
-/** 生成未冲突的新节点 id：n1、n2……跳过已有 id */
+/** 生成未冲突的新节点 id：n1、n2……跳过已有 id。
+ * 编号口径收在 pipeline 的 nextFreeName（architecture-deepening-2 工单 04）：
+ * 生成式 id 无引用语义，referential: false——从 1 起编号，不做 base 本身检查。 */
 export function nextNodeId(existingIds: Iterable<string>): string {
-  const used = new Set(existingIds)
-  for (let i = 1; i < 10000; i++) {
-    const id = `n${i}`
-    if (!used.has(id)) return id
-  }
-  return `n${Date.now()}` // 理论不可达的兜底
+  return nextFreeName('n', existingIds, { referential: false })
 }
 
 export interface NodeActionPlan {

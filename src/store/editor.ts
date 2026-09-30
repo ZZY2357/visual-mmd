@@ -7,6 +7,7 @@ import {
   type StoredLibraryDiagram,
 } from '../lib/library-storage'
 import { SnapshotStack } from '../lib/pipeline/snapshot-stack'
+import { nextFreeName } from '../lib/pipeline/element-id'
 import { applyEdit } from '../lib/pipeline/pipeline'
 import { applySetTheme, isMermaidTheme } from '../lib/pipeline/frontmatter'
 import type { EditIntent } from '../lib/pipeline/parser'
@@ -102,14 +103,11 @@ function nextId(): string {
   return `${createDiagramId()}-${++idCounter}`
 }
 
-/** 让 baseName 在当前库内唯一（如「流程图」→「流程图 2」） */
+/** 让 baseName 在当前库内唯一（如「流程图」→「流程图 2」）。
+ * 编号口径收在 pipeline 的 nextFreeName（architecture-deepening-2 工单 04）：
+ * 条目名是可引用名（referential 缺省），分隔符为空格。 */
 function uniqueName(name: string, diagrams: StoredLibraryDiagram[]): string {
-  const taken = new Set(diagrams.map((d) => d.name))
-  if (!taken.has(name)) return name
-  for (let i = 2; ; i++) {
-    const candidate = `${name} ${i}`
-    if (!taken.has(candidate)) return candidate
-  }
+  return nextFreeName(name, diagrams.map((d) => d.name), { separator: ' ' })
 }
 
 /** 启动引导：读图表库（含旧版单图迁移），空库时以默认模板建一张起步图表 */

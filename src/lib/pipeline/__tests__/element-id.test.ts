@@ -5,6 +5,7 @@ import {
   linkElementId,
   mindmapNodeElementId,
   namespaceElementId,
+  nextFreeName,
   nodeElementId,
   participantElementId,
   parseClassDefElementId,
@@ -127,5 +128,51 @@ describe('mindmap 节点 ID：位置序（1 基）成对', () => {
     for (const n of [1, 2, 12]) {
       expect(parseMindmapNodeElementId(mindmapNodeElementId(n))).toBe(n)
     }
+  })
+})
+
+describe('nextFreeName：下一个可用名/ID（architecture-deepening-2 工单 04）', () => {
+  describe('referential（默认）：可引用名的冲突语义', () => {
+    it('base 未被占用 → 原样返回', () => {
+      expect(nextFreeName('新类', [])).toBe('新类')
+      expect(nextFreeName('新类', ['其他'])).toBe('新类')
+    })
+
+    it('base 被占用 → base2、base3……（无分隔符直接拼编号）', () => {
+      expect(nextFreeName('新类', ['新类'])).toBe('新类2')
+      expect(nextFreeName('新类', ['新类', '新类2'])).toBe('新类3')
+    })
+
+    it('中间缺号不回填：新类2 占用而新类3 空闲，仍取最靠后的空闲号', () => {
+      expect(nextFreeName('新类', ['新类', '新类2', '新类4'])).toBe('新类3')
+    })
+
+    it('used 是 Iterable，重复项不影响结果', () => {
+      expect(nextFreeName('A', new Set(['A', 'A']))).toBe('A2')
+    })
+  })
+
+  describe('非 referential（{ referential: false }）：生成式 id 的冲突语义', () => {
+    it('base 是前缀，从 1 起编号，不做「base 本身是否占用」检查', () => {
+      expect(nextFreeName('n', [], { referential: false })).toBe('n1')
+      expect(nextFreeName('n', ['n'], { referential: false })).toBe('n1')
+    })
+
+    it('跳过已占用的编号，且不要求连续', () => {
+      expect(nextFreeName('n', ['n1'], { referential: false })).toBe('n2')
+      expect(nextFreeName('n', ['n1', 'n3'], { referential: false })).toBe('n2')
+      expect(nextFreeName('n', ['n1', 'n2', 'n3'], { referential: false })).toBe('n4')
+    })
+  })
+
+  describe('separator：base 与编号之间的分隔符', () => {
+    it('缺省无分隔符；图表库命名用空格分隔', () => {
+      expect(nextFreeName('流程图', ['流程图'], { separator: ' ' })).toBe('流程图 2')
+      expect(nextFreeName('流程图', ['流程图', '流程图 2'], { separator: ' ' })).toBe('流程图 3')
+    })
+
+    it('separator 与 referential: false 可组合', () => {
+      expect(nextFreeName('n', ['n 1'], { referential: false, separator: ' ' })).toBe('n 2')
+    })
   })
 })

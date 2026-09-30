@@ -1,4 +1,4 @@
-import { getElementById, type SourceDocument } from './document'
+import { getElementById, type ElementPart, type SourceDocument } from './document'
 import { lineAtOffset } from './span'
 
 /** 元素所在行的行首缩进（插入新行时跟随用户缩进习惯） */
@@ -15,11 +15,26 @@ export function indentLines(indent: string, lines: string[]): string {
 }
 
 /**
+ * 「afterElementId 锚点，缺省回退文档末尾」的唯一形式化（architecture-deepening-2 工单 04）：
+ * - 给定存在的 afterElementId → 该元素；
+ * - 缺省或不存在 → 文档最后一个元素（右键空白 / 意图未带锚点时的新元素落点）；
+ * - 文档无元素 → null（不抛错、不产生重写）。
+ * 各图种 resolveRewrites 经 `insertAfter`（内部即本助手）落码，回退语义只此一处定义。
+ */
+export function resolveAnchor(doc: SourceDocument, afterElementId?: string): ElementPart | null {
+  return (
+    (afterElementId !== undefined ? getElementById(doc, afterElementId) : undefined) ??
+    doc.elements[doc.elements.length - 1] ??
+    null
+  )
+}
+
+/**
  * 手术式插入的共享内核（architecture-deepening 工单 02）：
  * 重写锚点元素 span = 锚点原文 + 插入文本，未触碰原文逐字保留（ADR-0008）。
  * 四份 parser 只在两个轴上不同——锚点策略与行拼接方式——故由调用方以参数给出。
  *
- * @param afterElementId 缺省 = 文档最后一个元素
+ * @param afterElementId 缺省 = 文档最后一个元素（回退语义见 `resolveAnchor`）
  * @param anchor 'self' = 元素本身；'line-end' = 推到该行最靠后的元素（flowchart 链式语句）
  * @param render 追加到锚点原文之后的文本；indent 由内核算出，original 是锚点原文
  * @returns 重写表；锚点不存在 / 文档无元素时 null（不抛错、不产生重写）
@@ -32,10 +47,8 @@ export function insertAfter(
     render(indent: string, original: string): string
   },
 ): Map<string, string> | null {
-  let requested =
-    (opts.afterElementId !== undefined ? getElementById(doc, opts.afterElementId) : undefined) ??
-    doc.elements[doc.elements.length - 1]
-  if (requested === undefined) return null
+  let requested = resolveAnchor(doc, opts.afterElementId)
+  if (requested === null) return null
   if (opts.anchor === 'line-end') {
     // 新行插在锚点所在行的行尾：锚点取该行 span 最靠后的元素（链式语句的行末节点）
     const line = lineAtOffset(doc.source, requested.span.start)

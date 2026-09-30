@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { insertAfter } from '../insert'
+import { insertAfter, resolveAnchor } from '../insert'
 import { flowchartParser } from '../flowchart'
 import { classParser } from '../class'
 
@@ -72,6 +72,46 @@ describe('insertAfter 内核（architecture-deepening 工单 02）', () => {
     const result = insertAfter(doc, { render: (indent) => indentLines(indent, ['class Gamma']) })
     const rewritten = [...result!.values()][0]
     expect(rewritten).toBe('class Beta\n  class Gamma')
+  })
+})
+
+describe('resolveAnchor：afterElementId 锚点，缺省回退文档末尾（architecture-deepening-2 工单 04）', () => {
+  const CLASS_SRC = `classDiagram
+  class Alpha
+  class Beta
+`
+
+  it('给定存在的 afterElementId → 返回该元素', () => {
+    const doc = parse(classParser, CLASS_SRC)
+    const anchor = resolveAnchor(doc, 'class:Alpha')
+    expect(anchor?.id).toBe('class:Alpha')
+    expect(doc.source.slice(anchor!.span.start, anchor!.span.end)).toBe('class Alpha')
+  })
+
+  it('afterElementId 缺省 → 文档最后一个元素', () => {
+    const doc = parse(classParser, CLASS_SRC)
+    expect(resolveAnchor(doc)?.id).toBe('class:Beta')
+  })
+
+  it('afterElementId 不存在 → 回退文档最后一个元素（回退语义只有一处定义）', () => {
+    const doc = parse(classParser, CLASS_SRC)
+    expect(resolveAnchor(doc, 'nonexistent')?.id).toBe('class:Beta')
+  })
+
+  it('文档无元素 → null（不抛错）', () => {
+    const empty = { ...parse(classParser, 'classDiagram\n'), elements: [] }
+    expect(resolveAnchor(empty)).toBeNull()
+    expect(resolveAnchor(empty, 'class:Alpha')).toBeNull()
+  })
+
+  it('insertAfter 与 resolveAnchor 对同一输入选同一锚点', () => {
+    const doc = parse(classParser, CLASS_SRC)
+    const anchor = resolveAnchor(doc, 'class:Alpha')!
+    const result = insertAfter(doc, {
+      afterElementId: 'class:Alpha',
+      render: (indent, _original) => indentLines(indent, ['class Gamma']),
+    })
+    expect(result!.has(anchor.id)).toBe(true)
   })
 })
 

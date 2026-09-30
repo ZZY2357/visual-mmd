@@ -123,3 +123,41 @@ export function parseMindmapNodeElementId(id: string): number | null {
   const m = /^mindmap-node:([1-9][0-9]*)$/.exec(id)
   return m === null ? null : Number(m[1])
 }
+
+// ---------- 下一个可用名/ID（architecture-deepening-2 工单 04） ----------
+
+export interface NextFreeNameOptions {
+  /**
+   * 冲突语义（architecture-deepening-2 工单 04）：
+   * - `true`（默认）：base 是**可引用名**（类名 / 参与者 id / 图表库条目名）——重名会让
+   *   后续引用连带漂移，新建必须避重，从 base 本身查起：base、base2、base3……
+   * - `false`：base 是**生成式 id 的前缀**（flowchart 的 `n`）——id 无引用语义，
+   *   从 1 起编号即可：n1、n2、n3……
+   */
+  referential?: boolean
+  /** base 与编号之间的分隔符（缺省直接拼接；图表库条目名用 `' '`） */
+  separator?: string
+}
+
+/**
+ * 「下一个可用名/ID」的唯一实现（architecture-deepening-2 工单 04）：
+ * 全库的新建命名——class / sequence 的可引用名（右键菜单）、flowchart 的生成式节点 id
+ * （画布键盘）、图表库条目名（store）——都经由本函数，编号口径只写这一处。
+ *
+ * 放在元素 ID codec 同层：它与 `withOccurrence` 同属「身份的编号规则」，都是
+ * 生成端与消费端必须一致的纯函数，改口径时 locality 落在同一文件。
+ */
+export function nextFreeName(
+  base: string,
+  used: Iterable<string>,
+  opts: NextFreeNameOptions = {},
+): string {
+  const taken = new Set(used)
+  const referential = opts.referential !== false
+  const separator = opts.separator ?? ''
+  if (referential && !taken.has(base)) return base
+  for (let i = referential ? 2 : 1; ; i++) {
+    const candidate = `${base}${separator}${i}`
+    if (!taken.has(candidate)) return candidate
+  }
+}
