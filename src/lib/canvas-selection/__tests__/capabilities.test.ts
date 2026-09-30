@@ -5,6 +5,7 @@ import {
   DIAGRAM_TYPES,
   KANBAN_TEMPLATE,
   MINDMAP_TEMPLATE,
+  SANKEY_TEMPLATE,
   SEQUENCE_TEMPLATE,
   type AnyProjection,
 } from '../../diagram-registry'
@@ -14,6 +15,7 @@ import { classDataIdResolver } from '../class-adapter'
 import { sequenceDataIdResolver } from '../sequence-adapter'
 import { kanbanDataIdResolver } from '../kanban-adapter'
 import { blockDataIdResolver } from '../block-adapter'
+import { sankeyDataIdResolver } from '../sankey-adapter'
 import type { Selection } from '../../projection/selection'
 
 /**
@@ -31,6 +33,7 @@ const SOURCES = {
   mindmap: MINDMAP_TEMPLATE,
   kanban: KANBAN_TEMPLATE,
   block: BLOCK_TEMPLATE,
+  sankey: SANKEY_TEMPLATE,
 } as const
 
 function projectionOf(type: keyof typeof SOURCES): AnyProjection {
@@ -40,9 +43,9 @@ function projectionOf(type: keyof typeof SOURCES): AnyProjection {
   return registration.buildProjection(parsed.doc)
 }
 
-const TYPES = ['flowchart', 'sequence', 'class', 'mindmap', 'kanban', 'block'] as const
+const TYPES = ['flowchart', 'sequence', 'class', 'mindmap', 'kanban', 'block', 'sankey'] as const
 
-describe('capabilitiesOf：6 图种 × 8 能力查表（工单 04 + architecture-deepening-2 工单 03 + 工单 09）', () => {
+describe('capabilitiesOf：7 图种 × 8 能力查表（工单 04 + architecture-deepening-2 工单 03 + 工单 09/13）', () => {
   for (const type of TYPES) {
     it(`${type}：八项能力齐备（edgeAnnotator 按图种有无位置序连线）`, () => {
       const projection = projectionOf(type)
@@ -63,7 +66,7 @@ describe('capabilitiesOf：6 图种 × 8 能力查表（工单 04 + architecture
       expect(typeof caps.resolveSelection).toBe('function')
       expect(typeof caps.deleteIntent).toBe('function')
 
-      const hasOrdinalEdges = type === 'class' || type === 'sequence' || type === 'block'
+      const hasOrdinalEdges = type === 'class' || type === 'sequence' || type === 'block' || type === 'sankey'
       if (hasOrdinalEdges) {
         expect(typeof caps.edgeAnnotator).toBe('function')
         expect(typeof caps.edgeAnnotator?.(projection)).toBe('function')
@@ -157,6 +160,18 @@ describe('class/sequence adapter resolver 对照（与原 CanvasPanel.resolverOf
     expect(resolve(group.id)).toEqual({ kind: 'node', id: `block-group:${group.id}` })
     const edge = projection.block.edges[0]
     expect(resolve(edge.elementId)).toEqual({ kind: 'element', elementId: edge.elementId })
+    expect(resolve('__nope__')).toBeNull()
+  })
+
+  it('sankey（more-diagrams 工单 13）：节点名 → 节点选中，链路 elementId → 位置序选中，未知 → null', () => {
+    const projection = projectionOf('sankey') as Extract<AnyProjection, { type: 'sankey' }>
+    const resolve = sankeyDataIdResolver(projection.sankey)
+    const node = projection.sankey.nodes[0]
+    expect(resolve(node.name)).toEqual({ kind: 'node', id: node.name })
+    const link = projection.sankey.links[0]
+    expect(resolve(link.elementId)).toEqual({ kind: 'element', elementId: link.elementId })
+    // 渲染器的全局计数器 id 形态（node-N）不是身份，安静拒绝
+    expect(resolve('node-1')).toBeNull()
     expect(resolve('__nope__')).toBeNull()
   })
 })

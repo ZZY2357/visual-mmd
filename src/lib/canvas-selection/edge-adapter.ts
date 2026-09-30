@@ -38,5 +38,9 @@ export function edgeSelectionOf(diagramType: DiagramTypeId, elementId: string): 
     // block 边走专属的 `edge:N` 位置序身份（more-diagrams 工单 09）
     return parsed.kind === 'edge' ? { kind: 'block-edge', elementId } : null
   }
+  if (diagramType === 'sankey') {
+    // sankey 链路走专属的 `link:N` 位置序身份（more-diagrams 工单 13）
+    return parsed.kind === 'link' ? { kind: 'sankey-link', elementId } : null
+  }
   return null
 }

@@ -69,6 +69,13 @@ describe('detectDiagramType：无法识别 → unsupported（null），绝不默
     expect(DIAGRAM_TYPES.block.detect('block:gid\n    A\nend\n')).toBe(false)
   })
 
+  it('sankey(-beta) 识别（more-diagrams 工单 13）：两个关键字都认领；声明行必须是裸关键字', () => {
+    expect(detectDiagramType('sankey-beta\n\na,b,1\n')?.id).toBe('sankey')
+    expect(detectDiagramType('sankey\n\na,b,1\n')?.id).toBe('sankey')
+    // 正文是 CSV 流：带尾随内容的声明行不是表头，不认领
+    expect(DIAGRAM_TYPES.sankey.detect('sankey-beta extra\na,b,1\n')).toBe(false)
+  })
+
   it('双关键字 detect 例（后续图种工单的写法约定）：-beta 可选且不越界误判', () => {
     // 后续 block/packet/xychart 工单应采用 `^<kw>(-beta)?\b` 形态；这里把形态锁死：
     // 可选 -beta 不妨碍裸关键字的识别，也不把更长的词（如 block-chain）误吞。

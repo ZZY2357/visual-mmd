@@ -46,6 +46,11 @@ describe('金样合法性：默认图表模板能被 mermaid 渲染', () => {
     await expect(mermaid.parse(BLOCK_TEMPLATE)).resolves.toBeTruthy()
   })
 
+  it('sankey 起步模板 parse 通过（more-diagrams 工单 13）', async () => {
+    const { SANKEY_TEMPLATE } = await import('../diagram-registry')
+    await expect(mermaid.parse(SANKEY_TEMPLATE)).resolves.toBeTruthy()
+  })
+
   it('sequence 源码 parse 通过', async () => {
     const src = `sequenceDiagram
     Alice->>Bob: 你好
@@ -145,5 +150,35 @@ describe('金样合法性：默认图表模板能被 mermaid 渲染', () => {
     doc = apply(doc, { type: 'delete-group', id: 'group1' }) // 删嵌套块
 
     await expect(mermaid.parse(doc.source)).resolves.toBeTruthy()
+  })
+
+  it('sankey 端到端编辑场景（工单 13 验收：加链路 → 改 value → 重命名节点 → 删链路）落在合法 mermaid 源码上', async () => {
+    const { SANKEY_TEMPLATE } = await import('../diagram-registry')
+    const { sankeyParser } = await import('../pipeline/sankey')
+    const { reassemble } = await import('../pipeline/document')
+    const parse = (src: string) => {
+      const r = sankeyParser.parse(src)
+      if (!r.ok) throw new Error(`解析失败：${r.error.message}`)
+      return r.doc
+    }
+    const apply = (doc: ReturnType<typeof parse>, intent: Parameters<typeof sankeyParser.resolveRewrites>[1]) => {
+      const rewrites = sankeyParser.resolveRewrites(doc, intent)
+      if (rewrites === null) throw new Error(`意图被拒绝：${JSON.stringify(intent)}`)
+      return parse(reassemble(doc, rewrites))
+    }
+
+    let doc = parse(SANKEY_TEMPLATE)
+    doc = apply(doc, { type: 'add-link', source: 'grid', target: 'factory', value: '5' }) // 加链路
+    doc = apply(doc, { type: 'set-link', elementId: 'link:1', changes: { value: '12.5' } }) // 改 value
+    // 重命名节点：全部链路行同步改写（含带引号含逗号的 source 列）
+    doc = apply(doc, { type: 'rename-node', name: 'electricity', newName: 'power' })
+    expect(doc.source).toContain('power,grid,12.5')
+    expect(doc.source).toContain('power,"gas, natural",6')
+    expect(doc.source).not.toContain('electricity')
+    doc = apply(doc, { type: 'delete-link', elementId: 'link:2' }) // 删链路
+
+    const source = doc.source
+    expect(source).not.toContain('power,"gas, natural"')
+    await expect(mermaid.parse(source)).resolves.toBeTruthy()
   })
 })

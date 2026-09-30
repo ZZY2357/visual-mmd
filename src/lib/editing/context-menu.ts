@@ -72,6 +72,10 @@ export type ContextMenuTarget =
   | { kind: 'block-node'; id: string }
   | { kind: 'block-group'; id: string }
   | { kind: 'block-edge'; elementId: string }
+// sankey（more-diagrams 工单 13）：节点选中 id 即名字（名字即身份，经位置序反注可寻址）；
+// 链路 elementId 即投影 elementId（`link:N`，位置序身份）
+  | { kind: 'sankey-node'; name: string }
+  | { kind: 'sankey-link'; elementId: string }
 
 export type ContextMenuItemId =
   | 'add-node'
@@ -155,6 +159,10 @@ export type ContextMenuItemId =
   // 边 = 在属性面板中编辑（选中 + 关菜单）/ 删除
   | 'add-block-node'
   | 'add-block-group'
+  // sankey（more-diagrams 工单 13）：空白 = 加链路（三列表单浮出，提交才落码）；
+  // 节点 = 重命名（选中 + 关菜单，在右侧属性表单改——节点不落码，改名即手术改写全部链路行）
+  | 'add-sankey-link'
+  | 'edit-sankey-name'
 
 /**
  * 画布选中 → 菜单目标（工单 03 起为 `canvas-selection/selection-codec.ts` 的
@@ -204,6 +212,9 @@ function blankMenuItems(diagramType: DiagramTypeId): ContextMenuItemId[] {
     case 'block':
       // block 的空白入口（more-diagrams 工单 09）：加块节点（创建 + 内联命名）与加嵌套块
       return ['add-block-node', 'add-block-group']
+    case 'sankey':
+      // sankey 的空白入口（more-diagrams 工单 13）：加链路（三列表单，提交才落码）
+      return ['add-sankey-link']
     // DiagramTypeId 是开放类型（more-diagrams 工单 01）：未接入画布能力包的图种
     // 没有空白右键入口（unsupported 态下画布右键整体停用，不会走到这里）
     default:
@@ -297,6 +308,12 @@ export function contextMenuItems(target: ContextMenuTarget): ContextMenuItemId[]
     case 'block-group':
       return ['add-block-node', 'delete']
     case 'block-edge':
+      return ['edit-label', 'delete']
+    // sankey（more-diagrams 工单 13）：节点 = 重命名（选中 + 关菜单，在右侧属性表单改）；
+    // 链路 = 在属性面板中编辑（改三列，选中 + 关菜单）/ 删除
+    case 'sankey-node':
+      return ['edit-sankey-name']
+    case 'sankey-link':
       return ['edit-label', 'delete']
   }
 }

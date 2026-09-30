@@ -13,6 +13,7 @@ import { requirementParser } from './pipeline/requirement'
 import { journeyParser } from './pipeline/journey'
 import { pieParser } from './pipeline/pie'
 import { blockParser } from './pipeline/block'
+import { sankeyParser } from './pipeline/sankey'
 import { frontmatterEnd } from './pipeline/frontmatter'
 import { buildFlowchartProjection, type FlowchartProjection } from './projection/flowchart-projection'
 import { buildSequenceProjection, type SequenceProjection } from './projection/sequence-projection'
@@ -30,6 +31,7 @@ import {
 import { buildJourneyProjection, type JourneyProjection } from './projection/journey-projection'
 import { buildPieProjection, type PieProjection } from './projection/pie-projection'
 import { buildBlockProjection, type BlockProjection } from './projection/block-projection'
+import { buildSankeyProjection, type SankeyProjection } from './projection/sankey-projection'
 import { flowchartCanvasCapabilities } from './canvas-selection/flowchart-adapter'
 import { sequenceCanvasCapabilities } from './canvas-selection/sequence-adapter'
 import { classCanvasCapabilities } from './canvas-selection/class-adapter'
@@ -43,6 +45,7 @@ import { requirementCanvasCapabilities } from './canvas-selection/requirement-ad
 import { journeyCanvasCapabilities } from './canvas-selection/journey-adapter'
 import { pieCanvasCapabilities } from './canvas-selection/pie-adapter'
 import { blockCanvasCapabilities } from './canvas-selection/block-adapter'
+import { sankeyCanvasCapabilities } from './canvas-selection/sankey-adapter'
 import type { CanvasCapabilities } from './canvas-selection/capabilities'
 import { treePartitions, type TreePartitions } from './structure-tree/partitions'
 import { DEFAULT_DIAGRAM_SOURCE } from './storage'
@@ -77,6 +80,7 @@ export interface ProjectionTypes {
   journey: JourneyProjection
   pie: PieProjection
   block: BlockProjection
+  sankey: SankeyProjection
 }
 
 /** 已注册图种的 id 集合（字面量联合，随 ProjectionTypes 增长） */
@@ -313,6 +317,20 @@ export const BLOCK_TEMPLATE = `block-beta
 `
 
 /**
+ * sankey 起步模板（more-diagrams 工单 13）：`sankey-beta` 声明 + 四条链路
+ * （两个 source 一个汇点 home）、一条带引号含逗号 source 的链路（CSV 引号包列示例）。
+ * 注意 mermaid sankey 词法：字段限可打印 ASCII——**中文节点名直接词法失败**，
+ * 模板节点名必须全 ASCII（工单 Comments 记录结论）；正文是 CSV 流（无表头行）。
+ */
+export const SANKEY_TEMPLATE = `sankey-beta
+
+electricity,grid,10
+electricity,"gas, natural",6
+grid,home,9
+"gas, natural",home,7
+`
+
+/**
  * 注册表：数组是唯一权威（more-diagrams 工单 01），DIAGRAM_TYPES 由它推导。
  * detectDiagramType 按数组顺序显式遍历——不再维护手写的 if 分发链，
  * 新图种挂一条即可参与识别，无法识别时不再默认 flowchart（见下）。
@@ -442,6 +460,18 @@ export const DIAGRAM_TYPE_LIST: DiagramTypeRegistration[] = [
     buildProjection: (doc) => ({ type: 'block', block: buildBlockProjection(doc) }),
     tree: treePartitions.block,
     canvas: blockCanvasCapabilities,
+  },
+  {
+    id: 'sankey',
+    parser: sankeyParser,
+    template: SANKEY_TEMPLATE,
+    // sankey 词法两个关键字都认（`sankey-beta` / `sankey`，均 case-insensitive，离线核对
+    // sankeyDiagram-IPEJSGJF.mjs 的 jison 规则）；声明行必须是裸关键字——正文是 CSV 流，
+    // 带尾随内容的行是数据行不是表头
+    detect: (source) => /^sankey(-beta)?[ \t\r]*$/i.test(firstStatementLine(source)),
+    buildProjection: (doc) => ({ type: 'sankey', sankey: buildSankeyProjection(doc) }),
+    tree: treePartitions.sankey,
+    canvas: sankeyCanvasCapabilities,
   },
 ]
 

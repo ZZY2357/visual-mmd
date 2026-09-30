@@ -233,6 +233,41 @@ export function annotateBlockEdgeIdentities(root: ParentNode, expected: number):
   }
 }
 
+/**
+ * sankey 节点与链路（more-diagrams 工单 13）：sankey 渲染器（sankeyDiagram chunk 的
+ * draw）把节点装进 `g.nodes`（子元素 `g.node`，DOM id 是 `Uid.next("node-")` 的
+ * **全局自增计数器**，跨渲染不稳定、不可内容寻址），链路装进 `g.links`（子元素
+ * `g.link`，**完全没有 id**）。但两处 d3 join 的 data 分别是 db.getGraph() 的
+ * graph.nodes / graph.links 数组——mermaid DB 按 findOrCreateNode / push 保序产出，
+ * d3-sankey 的排序只作用于 per-node 的 sourceLinks/targetLinks 与临时 columns，
+ * 不重排这两个数组（离线核对 sankeyDiagram-IPEJSGJF.mjs 692/725 行 + d3-sankey
+ * src/sankey.js），因此 **DOM 子元素序 = 解析序**，按位置序反注：
+ * - 节点：`g.nodes > g.node` 第 k 个 = 投影第 k 个节点的**名字**（名字即身份）；
+ * - 链路：`g.links > g.link` 第 k 条 = `link:(k+1)`（ADR-0012 位置序）。
+ * 两组各与投影条数不符时该组整体放弃（绝不误标）。作用域严格限定在这两个
+ * sankey 专属包裹组内，通用 annotateNodeDataIds 的四种 DOM id 形态都不会命中
+ * `node-N`（已核实），不会先误注。
+ */
+export function annotateSankeyIdentities(
+  root: ParentNode,
+  expected: { nodeNames: readonly string[]; links: number },
+): void {
+  const nodes = Array.from(root.querySelectorAll('g.nodes > g.node'))
+  if (expected.nodeNames.length > 0 && nodes.length === expected.nodeNames.length) {
+    nodes.forEach((g, ordinal) => {
+      const name = expected.nodeNames[ordinal]
+      if (name !== undefined && name !== '') g.setAttribute('data-id', name)
+    })
+  }
+  const links = Array.from(root.querySelectorAll('g.links > g.link'))
+  if (expected.links > 0 && links.length === expected.links) {
+    links.forEach((g, ordinal) => {
+      const elementId = edgeElementIdOf('link', ordinal)
+      if (elementId !== null) g.setAttribute('data-id', elementId)
+    })
+  }
+}
+
 /** 屏幕命中容差（CSS px）：sequence 消息 only 1.5px 描边，给一点余量但不足以吃到空白 */
 export const EDGE_HIT_TOLERANCE = 4
 

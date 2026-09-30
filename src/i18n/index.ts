@@ -104,6 +104,9 @@ export const zhDict = {
         'add-journey-section': '添加分组',
         // pie（more-diagrams 工单 10）：空白菜单（画布 DOM 无 data-id，无元素级菜单项）
         'add-pie-sector': '添加扇区',
+        // sankey（more-diagrams 工单 13）：空白加链路；节点重命名（选中 + 关菜单）
+        'add-sankey-link': '添加链路',
+        'edit-sankey-name': '重命名',
         delete: '删除',
         styleName: '样式名称',
         styleNameInvalid: '名称不能为空，且不能含空格或逗号',
@@ -139,6 +142,7 @@ export const zhDict = {
       journey: '用户旅程图',
       pie: '饼图',
       block: '块图',
+      sankey: '桑基图',
     },
     library: {
       title: '图表库',
@@ -510,6 +514,21 @@ export const zhDict = {
       invalidPieLabel: '标签不能为空，且不能含引号、反斜杠',
       invalidPieValue: '数值必须是大于 0 的数字',
       invalidPieTitle: '标题不能为空，且不能含 %%',
+      // ---- sankey（more-diagrams 工单 13） ----
+      sankeyNodes: '节点',
+      sankeyNodeName: '节点名',
+      sankeyNodeDegree: '{{count}} 条链路',
+      sankeyNameInvalidShort: '名称 {{name}}（无效）',
+      sankeyValueInvalidShort: '数值 {{value}}（无效）',
+      sankeyEndpointInvalid: '端点名无效',
+      sankeySource: 'source',
+      sankeyTarget: 'target',
+      sankeyValue: '数值（value）',
+      deleteSankeyLink: '删除链路',
+      invalidSankeyName: '名称不能为空，且只能使用 ASCII 可打印字符',
+      invalidSankeyValue: '数值必须是非负整数或小数',
+      sankeyRenameHint: '重命名会同步改写该节点参与的全部 {{count}} 条链路行',
+      sankeyDiagramHint: '桑基图：正文是 CSV 链路流（source,target,value）。选中链路按 Tab 加链路（source 预填同源）、Delete 删除；节点由链路行派生，重命名在属性表单。',
       // ---- block（more-diagrams 工单 09） ----
       blockNodes: '块',
       blockEdges: '连线',

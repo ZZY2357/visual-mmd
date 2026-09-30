@@ -137,6 +137,16 @@ function nodeFormForTarget(
     if (node === undefined) return null
     return { kind, anchorElementId: node.elementId ?? undefined, from: target.id, x, y }
   }
+  if (kind === 'sankey-link') {
+    // sankey 加链路表单（more-diagrams 工单 13）：空白右键 → 无锚点（管线回退文档末尾）；
+    // 链路上 Tab（经 formTargetOfSelection）→ 锚点为该链路行，source 预填同源
+    if (proj.type !== 'sankey') return null
+    if (target.kind === 'blank') return { kind, x, y }
+    if (target.kind !== 'sankey-link') return null
+    const link = proj.sankey.links.find((l) => l.elementId === target.elementId)
+    if (link === undefined) return null
+    return { kind, anchorElementId: link.elementId, from: link.source, x, y }
+  }
   if (kind === 'block') {
     // sequence 独有的添加逻辑块：参与者上右键 → 锚点为该参与者的声明；
     // 空白处右键 → 无锚点（管线回退到文档最后一个元素）
@@ -175,6 +185,8 @@ function formTargetOfSelection(selection: Selection): ContextMenuTarget | null {
   if (selection.kind === 'requirement-element') return { kind: 'requirement-element', name: selection.name }
   // block（more-diagrams 工单 09）：块节点 → 边表单（Enter 键）的锚点与预选起点
   if (selection.kind === 'block-node') return { kind: 'block-node', id: selection.id }
+  // sankey（more-diagrams 工单 13）：链路 → 加链路表单（Tab 键）的锚点与 source 预填
+  if (selection.kind === 'sankey-link') return { kind: 'sankey-link', elementId: selection.elementId }
   return null
 }
 
@@ -357,7 +369,8 @@ export function useCanvasContextMenu(
         | 'transition'
         | 'er-relation'
         | 'requirement-relation'
-        | 'block-edge',
+        | 'block-edge'
+        | 'sankey-link',
     ): void => {
       const proj = latest.current.projection
       const { selection } = useEditorStore.getState()

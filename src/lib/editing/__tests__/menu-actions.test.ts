@@ -164,6 +164,10 @@ describe('MENU_ACTIONS 穷尽性（工单 05 → 工单 01）', () => {
       { kind: 'block-node', id: 'a' },
       { kind: 'block-group', id: 'g1' },
       { kind: 'block-edge', elementId: 'edge:1' },
+      // sankey（more-diagrams 工单 13）：空白加链路 + 节点重命名 / 链路编辑
+      { kind: 'blank', diagramType: 'sankey' },
+      { kind: 'sankey-node', name: 'a' },
+      { kind: 'sankey-link', elementId: 'link:1' },
     ]
     const reachableIds = new Set(allTargets.flatMap((target) => contextMenuItems(target)))
     // apply-style 不经 onMenuItem 分发（CanvasPanel 渲染成子菜单开关，点样式名直接调

@@ -52,6 +52,8 @@ import { PieDiagramForm, PieSectorForm } from './pie-forms'
 import { type PieProjection } from '../lib/projection/pie-projection'
 import { BlockDiagramForm, BlockEdgeForm, BlockGroupForm, BlockNodeForm } from './block-forms'
 import { type BlockProjection } from '../lib/projection/block-projection'
+import { SankeyLinkForm, SankeyNodeForm } from './sankey-forms'
+import { type SankeyProjection } from '../lib/projection/sankey-projection'
 
 /**
  * 选中元素的属性表单，按投影图种分发（工单 04-bundle 自 PropertyPanel 迁出）：
@@ -626,6 +628,45 @@ function BlockSelectionForm({
   }
 }
 
+/**
+ * sankey 属性表单（more-diagrams 工单 13）：图表级 = 提示文案（无标题/direction 等图表级
+ * 可编辑项，config 不做编辑——工单定案）；节点 = 重命名（名字即身份）；链路 = 三列编辑。
+ */
+function SankeySelectionForm({
+  projection,
+  selection,
+}: {
+  projection: SankeyProjection
+  selection: Selection | null
+}) {
+  const { t } = useTranslation()
+  if (selection === null) {
+    return (
+      <Text size="sm" c="dimmed" px="xs">
+        {t('app:propertyPanel.nothingSelected')}
+      </Text>
+    )
+  }
+  switch (selection.kind) {
+    case 'diagram':
+      return (
+        <Text size="sm" c="dimmed" px="xs">
+          {t('app:propertyPanel.sankeyDiagramHint')}
+        </Text>
+      )
+    case 'sankey-node': {
+      const node = projection.nodes.find((n) => n.name === selection.name)
+      return node !== undefined ? <SankeyNodeForm node={node} /> : null
+    }
+    case 'sankey-link': {
+      const link = projection.links.find((l) => l.elementId === selection.elementId)
+      return link !== undefined ? <SankeyLinkForm link={link} /> : null
+    }
+    default:
+      return null
+  }
+}
+
 export function ProjectionSelectionForm({ projection, selection }: { projection: AnyProjection; selection: Selection | null }) {
   if (projection.type === 'flowchart') {
     return <FlowchartSelectionForm projection={projection.flowchart} selection={selection} />
@@ -662,6 +703,9 @@ export function ProjectionSelectionForm({ projection, selection }: { projection:
   }
   if (projection.type === 'block') {
     return <BlockSelectionForm projection={projection.block} selection={selection} />
+  }
+  if (projection.type === 'sankey') {
+    return <SankeySelectionForm projection={projection.sankey} selection={selection} />
   }
   return <ClassSelectionForm projection={projection.class} selection={selection} />
 }
