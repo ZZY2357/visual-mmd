@@ -6,6 +6,7 @@ import {
   KANBAN_TEMPLATE,
   MINDMAP_TEMPLATE,
   SANKEY_TEMPLATE,
+  XYCHART_TEMPLATE,
   SEQUENCE_TEMPLATE,
   type AnyProjection,
 } from '../../diagram-registry'
@@ -16,6 +17,7 @@ import { sequenceDataIdResolver } from '../sequence-adapter'
 import { kanbanDataIdResolver } from '../kanban-adapter'
 import { blockDataIdResolver } from '../block-adapter'
 import { sankeyDataIdResolver } from '../sankey-adapter'
+import { xychartDataIdResolver } from '../xychart-adapter'
 import type { Selection } from '../../projection/selection'
 
 /**
@@ -34,6 +36,7 @@ const SOURCES = {
   kanban: KANBAN_TEMPLATE,
   block: BLOCK_TEMPLATE,
   sankey: SANKEY_TEMPLATE,
+  xychart: XYCHART_TEMPLATE,
 } as const
 
 function projectionOf(type: keyof typeof SOURCES): AnyProjection {
@@ -43,9 +46,9 @@ function projectionOf(type: keyof typeof SOURCES): AnyProjection {
   return registration.buildProjection(parsed.doc)
 }
 
-const TYPES = ['flowchart', 'sequence', 'class', 'mindmap', 'kanban', 'block', 'sankey'] as const
+const TYPES = ['flowchart', 'sequence', 'class', 'mindmap', 'kanban', 'block', 'sankey', 'xychart'] as const
 
-describe('capabilitiesOf：7 图种 × 8 能力查表（工单 04 + architecture-deepening-2 工单 03 + 工单 09/13）', () => {
+describe('capabilitiesOf：8 图种 × 8 能力查表（工单 04 + architecture-deepening-2 工单 03 + 工单 09/13/14）', () => {
   for (const type of TYPES) {
     it(`${type}：八项能力齐备（edgeAnnotator 按图种有无位置序连线）`, () => {
       const projection = projectionOf(type)
@@ -66,7 +69,8 @@ describe('capabilitiesOf：7 图种 × 8 能力查表（工单 04 + architecture
       expect(typeof caps.resolveSelection).toBe('function')
       expect(typeof caps.deleteIntent).toBe('function')
 
-      const hasOrdinalEdges = type === 'class' || type === 'sequence' || type === 'block' || type === 'sankey'
+      const hasOrdinalEdges =
+        type === 'class' || type === 'sequence' || type === 'block' || type === 'sankey' || type === 'xychart'
       if (hasOrdinalEdges) {
         expect(typeof caps.edgeAnnotator).toBe('function')
         expect(typeof caps.edgeAnnotator?.(projection)).toBe('function')
@@ -172,6 +176,19 @@ describe('class/sequence adapter resolver 对照（与原 CanvasPanel.resolverOf
     expect(resolve(link.elementId)).toEqual({ kind: 'element', elementId: link.elementId })
     // 渲染器的全局计数器 id 形态（node-N）不是身份，安静拒绝
     expect(resolve('node-1')).toBeNull()
+    expect(resolve('__nope__')).toBeNull()
+  })
+
+  it('xychart（more-diagrams 工单 14）：系列位置序 / 标题与轴固定身份 → 节点选中，未知 → null', () => {
+    const projection = projectionOf('xychart') as Extract<AnyProjection, { type: 'xychart' }>
+    const resolve = xychartDataIdResolver(projection.xychart)
+    const series = projection.xychart.series[0]
+    expect(resolve(series.elementId)).toEqual({ kind: 'node', id: series.elementId })
+    expect(resolve('xychart-title')).toEqual({ kind: 'node', id: 'xychart-title' })
+    expect(resolve('xychart-x-axis')).toEqual({ kind: 'node', id: 'xychart-x-axis' })
+    expect(resolve('xychart-y-axis')).toEqual({ kind: 'node', id: 'xychart-y-axis' })
+    // 渲染器根本没有 data-id / id 写入——任何别形 id 安静拒绝
+    expect(resolve('line-plot-0')).toBeNull()
     expect(resolve('__nope__')).toBeNull()
   })
 })

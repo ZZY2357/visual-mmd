@@ -54,6 +54,8 @@ import { BlockDiagramForm, BlockEdgeForm, BlockGroupForm, BlockNodeForm } from '
 import { type BlockProjection } from '../lib/projection/block-projection'
 import { SankeyLinkForm, SankeyNodeForm } from './sankey-forms'
 import { type SankeyProjection } from '../lib/projection/sankey-projection'
+import { XychartAxisForm, XychartSeriesForm, XychartTitleForm } from './xychart-forms'
+import { type XychartProjection } from '../lib/projection/xychart-projection'
 
 /**
  * 选中元素的属性表单，按投影图种分发（工单 04-bundle 自 PropertyPanel 迁出）：
@@ -667,6 +669,45 @@ function SankeySelectionForm({
   }
 }
 
+/**
+ * xychart 属性表单（more-diagrams 工单 14）：图表级 = 提示文案（frontmatter config
+ * 不做编辑——工单定案）；标题 / 轴 = 文档级属性表单；系列 = 名字/类型/数值行编辑。
+ */
+function XychartSelectionForm({
+  projection,
+  selection,
+}: {
+  projection: XychartProjection
+  selection: Selection | null
+}) {
+  const { t } = useTranslation()
+  if (selection === null) {
+    return (
+      <Text size="sm" c="dimmed" px="xs">
+        {t('app:propertyPanel.nothingSelected')}
+      </Text>
+    )
+  }
+  switch (selection.kind) {
+    case 'diagram':
+      return (
+        <Text size="sm" c="dimmed" px="xs">
+          {t('app:propertyPanel.xychartDiagramHint')}
+        </Text>
+      )
+    case 'xychart-title':
+      return <XychartTitleForm title={projection.title} />
+    case 'xychart-axis':
+      return <XychartAxisForm axis={selection.axis === 'x' ? projection.xAxis : projection.yAxis} />
+    case 'xychart-series': {
+      const series = projection.series.find((s) => s.elementId === selection.elementId)
+      return series !== undefined ? <XychartSeriesForm series={series} /> : null
+    }
+    default:
+      return null
+  }
+}
+
 export function ProjectionSelectionForm({ projection, selection }: { projection: AnyProjection; selection: Selection | null }) {
   if (projection.type === 'flowchart') {
     return <FlowchartSelectionForm projection={projection.flowchart} selection={selection} />
@@ -706,6 +747,9 @@ export function ProjectionSelectionForm({ projection, selection }: { projection:
   }
   if (projection.type === 'sankey') {
     return <SankeySelectionForm projection={projection.sankey} selection={selection} />
+  }
+  if (projection.type === 'xychart') {
+    return <XychartSelectionForm projection={projection.xychart} selection={selection} />
   }
   return <ClassSelectionForm projection={projection.class} selection={selection} />
 }

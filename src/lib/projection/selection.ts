@@ -73,6 +73,11 @@ export type Selection =
   // 名字即身份；链路走位置序身份（`link:N`）。画布 DOM 经位置序反注可寻址。
   | { kind: 'sankey-node'; name: string }
   | { kind: 'sankey-link'; elementId: string }
+  // xychart（more-diagrams 工单 14）：系列 = 节点级元素（位置序身份 `series:N`）；
+  // 标题与轴 = 文档级属性元素（固定身份，画布经类名组反注可寻址）。
+  | { kind: 'xychart-series'; elementId: string }
+  | { kind: 'xychart-axis'; axis: 'x' | 'y' }
+  | { kind: 'xychart-title' }
 
 export const DIAGRAM_SELECTION: Selection = { kind: 'diagram' }
 
@@ -162,6 +167,12 @@ export function selectionKey(sel: Selection): string {
       return `sankey-node:${sel.name}`
     case 'sankey-link':
       return `sankey-link:${sel.elementId}`
+    case 'xychart-series':
+      return `xychart-series:${sel.elementId}`
+    case 'xychart-axis':
+      return `xychart-axis:${sel.axis}`
+    case 'xychart-title':
+      return 'xychart-title'
   }
 }
 

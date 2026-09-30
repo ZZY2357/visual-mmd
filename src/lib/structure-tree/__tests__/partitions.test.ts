@@ -233,6 +233,7 @@ describe('结构树分区描述（工单 06）', () => {
       pie: 'pie showData\n    title 预算\n    "研发" : 45\n    "市场" : 30',
       block: 'block-beta\n    columns 3\n    a["输入"]\n    b{"校验"}\n    a --> b',
       sankey: 'sankey-beta\n\nsrc,dst,3\n"n, ame",dst,1.5',
+      xychart: 'xychart-beta\n    title "T"\n    x-axis [a, b, c]\n    y-axis "v" 0 --> 10\n    bar [1, 2, 3]',
     }
     for (const id of Object.keys(DIAGRAM_TYPES) as (keyof typeof DIAGRAM_TYPES)[]) {
       const registration = DIAGRAM_TYPES[id]

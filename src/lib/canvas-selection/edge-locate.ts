@@ -268,6 +268,47 @@ export function annotateSankeyIdentities(
   }
 }
 
+/**
+ * xychart 系列与文档级元素（more-diagrams 工单 14）：xychart 渲染器（xychartDiagram
+ * chunk 的 draw）**完全无 data-id / Uid.next / attr("id") 写入**（离线核对
+ * xychartDiagram-PMCCYNJV.mjs，grep 计数 0），形状按 shape.groupTexts 类名组挂载：
+ *
+ * - **系列**：`g.plot > g`，类名 `line-plot-N` / `bar-plot-N`——N = plotIndex，即
+ *   `chartData.plots.entries()` 的源码声明序（chunk 1460/1540 行 + 1610-1633 的
+ *   `for (const [i, plot] of this.chartData.plots.entries())`）。组在 `g.plot` 下的
+ *   创建序 = plot 序（getGroup 首遇即建），因此**位置序反注** data-id = `series:N+1`；
+ *   逐组校验类名与序号一致，条数或类名不符整体放弃（绝不误标）。
+ * - **标题**：`g.chart-title`（chunk 1282 行）→ 固定身份 `xychart-title`。
+ * - **轴**：类名组由轴组件的 axisPosition 决定（chunk 1150-1161 分发；1704/1710 行
+ *   vertical：x→bottom、y→left；1770/1777 行 horizontal：x→left、y→top），按投影的
+ *   方向映射反注 `xychart-x-axis` / `xychart-y-axis`。
+ * - 点击解析走 selectionFromEventTarget 沿 DOM 上行找 data-id（形状 rect/path/text
+ *   直接命中组身份），不需要 edge 命中采样。
+ */
+export function annotateXychartIdentities(
+  root: ParentNode,
+  expected: { series: number; orientation: 'vertical' | 'horizontal' },
+): void {
+  const title = root.querySelector('g.chart-title')
+  if (title !== null) title.setAttribute('data-id', 'xychart-title')
+  const xSelector = expected.orientation === 'vertical' ? 'g.bottom-axis' : 'g.left-axis'
+  const ySelector = expected.orientation === 'vertical' ? 'g.left-axis' : 'g.top-axis'
+  const xAxis = root.querySelector(xSelector)
+  if (xAxis !== null) xAxis.setAttribute('data-id', 'xychart-x-axis')
+  const yAxis = root.querySelector(ySelector)
+  if (yAxis !== null) yAxis.setAttribute('data-id', 'xychart-y-axis')
+
+  if (expected.series <= 0) return
+  const plotGroups = Array.from(root.querySelectorAll('g.plot > g'))
+  if (plotGroups.length !== expected.series) return
+  plotGroups.forEach((g, ordinal) => {
+    const cls = g.getAttribute('class') ?? ''
+    // 组类名自带序号（line-plot-N / bar-plot-N），与 DOM 序双重校验
+    if (cls !== `line-plot-${ordinal}` && cls !== `bar-plot-${ordinal}`) return
+    g.setAttribute('data-id', `series:${ordinal + 1}`)
+  })
+}
+
 /** 屏幕命中容差（CSS px）：sequence 消息 only 1.5px 描边，给一点余量但不足以吃到空白 */
 export const EDGE_HIT_TOLERANCE = 4
 

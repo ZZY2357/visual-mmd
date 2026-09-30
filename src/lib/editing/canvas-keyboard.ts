@@ -34,6 +34,8 @@ import type { JourneyProjection } from '../projection/journey-projection'
 import type { PieProjection } from '../projection/pie-projection'
 import type { SankeyProjection } from '../projection/sankey-projection'
 import type { SankeyIntent } from '../pipeline/sankey'
+import type { XychartProjection } from '../projection/xychart-projection'
+import type { XychartIntent } from '../pipeline/xychart'
 import type { Selection } from '../projection/selection'
 import type { BlockProjection } from '../projection/block-projection'
 import type { CanvasInlineEditTarget, Rect } from './inline-edit'
@@ -74,6 +76,7 @@ export type CanvasKeyboardProjection =
   | { kind: 'pie'; projection: PieProjection }
   | { kind: 'block'; projection: BlockProjection }
   | { kind: 'sankey'; projection: SankeyProjection }
+  | { kind: 'xychart'; projection: XychartProjection }
 
 export type NodeKeyAction = 'delete' | 'add-child' | 'add-sibling'
 
@@ -194,6 +197,9 @@ export type KeyFormKind =
   | 'requirement-relation'
   | 'block-edge'
   | 'sankey-link'
+  // xychart（more-diagrams 工单 14）：加系列表单（line / bar 两形态分开，提交才落码）
+  | 'xychart-line'
+  | 'xychart-bar'
 
 /** 键事件的语义 plan：执行器（applyPlan）按字段决定提交 / 选中 / 内联编辑 / 表单 */
 export interface KeyPlan {
@@ -869,6 +875,54 @@ export function sankeyKeyPlan(projection: SankeyProjection, input: KeyInput): Ke
   if (selection === null || selection.kind !== 'sankey-link') return null
   if (!projection.links.some((l) => l.elementId === selection.elementId)) return null
   return { intents: [], form: 'sankey-link' }
+}
+
+// ---------- xychart 编辑键（more-diagrams 工单 14 / ADR-0013）：就近结构映射 ----------
+
+/**
+ * 选中元素 → 删除意图（xychart）：系列映射到既有 delete-series 意图。轴与标题是
+ * 文档级属性元素，没有「删除」的语法动作（只能改字段）→ null；已不在投影 / null /
+ * 图表级 / 别种选中 → null。
+ */
+export function xychartDeleteIntent(
+  projection: XychartProjection,
+  selection: Selection | null,
+): XychartIntent | null {
+  if (selection === null) return null
+  switch (selection.kind) {
+    case 'xychart-series':
+      return projection.series.some((s) => s.elementId === selection.elementId)
+        ? { type: 'delete-series', elementId: selection.elementId }
+        : null
+    default:
+      return null
+  }
+}
+
+/**
+ * 键 → plan（xychart，工单 14 / ADR-0013 就近类比，工单定案）：
+ * - Delete = 删除选中系列（查 xychartDeleteIntent 唯一映射）
+ * - 选中系列上 Tab = 加系列（落到 AddXychartSeriesInlineForm 表单浮层，锚点为该系列行
+ *   ——新系列落在其后；类型预取同款 bar↔bar / line↔line，不直接落码）；轴 / 标题上
+ *   Tab 无自然类比（文档级属性元素，编辑走属性表单）→ 不做并记录
+ * - Enter 无自然类比（系列名双击内联编辑承担，工单定案）→ 不做并记录
+ * 注：xychart 画布 DOM 经类名组 + 位置序反注可寻址（见 xychart-adapter），画布键盘对
+ * 画布选中的系列生效；结构树选中同样经画布键盘链路（读 store 选中）生效。
+ */
+export function xychartKeyPlan(projection: XychartProjection, input: KeyInput): KeyPlan | null {
+  if (input.key === 'Delete' || input.key === 'Backspace') {
+    const intent = xychartDeleteIntent(projection, input.selection)
+    return intent === null ? null : { intents: [intent], clearSelection: true }
+  }
+  // Enter 不接（改系列名走双击内联编辑，工单定案）；只接 Tab
+  if (input.key !== 'Tab') return null
+  if (input.mods?.shift === true) return null
+  const selection = input.selection
+  if (selection === null || selection.kind !== 'xychart-series') return null
+  const current = projection.series.find((s) => s.elementId === selection.elementId)
+  if (current === undefined) return null
+  // 类型预取同款：bar 上加 bar、line 上加 line（就近语义）
+  return { intents: [], form: current.seriesType === 'bar' ? 'xychart-bar' : 'xychart-line' }
 }
 
 /**

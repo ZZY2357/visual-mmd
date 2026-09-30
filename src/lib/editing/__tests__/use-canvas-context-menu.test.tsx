@@ -21,6 +21,7 @@ import { kanbanDataIdResolver } from '../../canvas-selection/kanban-adapter'
 import { requirementDataIdResolver } from '../../canvas-selection/requirement-adapter'
 import { blockDataIdResolver } from '../../canvas-selection/block-adapter'
 import { sankeyDataIdResolver } from '../../canvas-selection/sankey-adapter'
+import { xychartDataIdResolver } from '../../canvas-selection/xychart-adapter'
 import { nodeDataIdResolver, elementDataIdResolver } from '../../canvas-selection/data-id'
 import type { AnyProjection } from '../../diagram-registry'
 import { useCanvasContextMenu, type NodeFormState } from '../use-canvas-context-menu'
@@ -114,6 +115,8 @@ function resolverOf(projection: AnyProjection) {
   if (projection.type === 'block') return blockDataIdResolver(projection.block)
   // sankey（more-diagrams 工单 13）：节点按名字（位置序反注）、链路按位置序 elementId
   if (projection.type === 'sankey') return sankeyDataIdResolver(projection.sankey)
+  // xychart（more-diagrams 工单 14）：系列/标题/轴（类名组反注，node.id = elementId 或固定身份）
+  if (projection.type === 'xychart') return xychartDataIdResolver(projection.xychart)
   const nodes = nodeDataIdResolver(projection.class.classes.map((c) => c.name))
   const edges = elementDataIdResolver(projection.class.relations.map((r) => r.elementId))
   return (dataId: string) => nodes(dataId) ?? edges(dataId)
@@ -143,6 +146,8 @@ function createdIdOf(target: CanvasInlineEditTarget): string {
       return target.name
     case 'block-node':
       return target.id
+    case 'xychart-series':
+      return target.elementId
   }
 }
 
