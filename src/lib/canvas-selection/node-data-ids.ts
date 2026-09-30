@@ -39,7 +39,21 @@ const STATE_NODE_DOM_ID = /(?:^|-)state-(.+)-(\d+)$/
  * 含空格的实体名 mermaid 会原样放进 id（非法 DOM id），此类实体安静降级为不可寻址。 */
 const ER_ENTITY_DOM_ID = /(?:^)entity-(.+)-(\d+)$/
 
-/** DOM id → 节点 id（flowchart / class / state / er 四种形态）；不是节点 id 时返回 null */
+/**
+ * mermaid v12 requirementDiagram 节点寻址（more-diagrams 工单 07）：`annotateRequirementDataIds`
+ * 专责反注。DOM id 形态是**宽口径**的 `{svgId}-{名字}`（requirementDb.getData 直接以
+ * `node.id = requirement.name` / `element.name` 建节点，不追加 `-序号`；unified 渲染器
+ * 再拼上 `data4Layout.diagramId` = 预览 render id `mmd-preview-N` 前缀），**不能**进
+ * `nodeIdOfDomId` 的通用循环——kanban（工单 06）已用「孤立 g.node 不反注」钉住了
+ * 通用循环的收口约定，宽口径会误伤。故与 kanban 同款：按渲染器专属作用域限定
+ * （requirement 走 unified → dagre 布局器，`g.node` 落在 `g.root > g.nodes`；
+ * 证据：`chunk-GNY47TPC` render → `dagre-6A5THRUB` 的 createLayoutElementGroups）。
+ * mindmap 的 DOM id 也是 `{svgId}-` 前缀（`node_{N}`），显式让位（其身份由
+ * mindmap-adapter 的后缀匹配承担）：名字恰为 `node_<数字>` 的节点不被反注（安静降级）。
+ * 含空格的引号名 mermaid 原样放进 DOM id（非法 DOM id），同样安静降级为不可寻址。
+ */
+
+/** DOM id → 节点 id（flowchart / class / state / er 四种形态）；不是节点 id 时 null */
 function nodeIdOfDomId(domId: string): string | null {
   const flow = FLOWCHART_NODE_DOM_ID.exec(domId)
   if (flow !== null) return flow[1]
@@ -77,6 +91,24 @@ function annotateKanbanDataIds(root: ParentNode): void {
   }
 }
 
+/** requirement（more-diagrams 工单 07）：作用域限定在统一渲染器的 `g.root > g.nodes`，
+ * 以 svg 根 id 前缀剥离得回名字（与 kanban 的前缀剥离同法）。flowchart / class / state /
+ * er 在通用循环里由各自的专属形态先反注（此处跳过已标注者）；mindmap 的 `node_{N}`
+ * 身份显式让位（由 mindmap-adapter 的后缀匹配承担）。 */
+function annotateRequirementDataIds(root: ParentNode): void {
+  const svgId = root.querySelector('svg')?.getAttribute('id') ?? ''
+  if (svgId === '') return
+  const prefix = `${svgId}-`
+  for (const g of root.querySelectorAll('g.root g.nodes g.node')) {
+    if (g.getAttribute('data-id') !== null) continue
+    const domId = g.getAttribute('id')
+    if (domId === null || !domId.startsWith(prefix)) continue
+    const nodeId = domId.slice(prefix.length)
+    if (nodeId === '' || /^node_[0-9]+$/.test(nodeId)) continue
+    g.setAttribute('data-id', nodeId)
+  }
+}
+
 export function annotateNodeDataIds(root: ParentNode): void {
   for (const g of root.querySelectorAll('g.node')) {
     if (g.getAttribute('data-id') !== null) continue
@@ -87,4 +119,5 @@ export function annotateNodeDataIds(root: ParentNode): void {
     g.setAttribute('data-id', nodeId)
   }
   annotateKanbanDataIds(root)
+  annotateRequirementDataIds(root)
 }

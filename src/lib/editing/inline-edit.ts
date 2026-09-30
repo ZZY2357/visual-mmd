@@ -6,6 +6,8 @@ import { isValidStateId } from '../pipeline/state'
 import { isValidErName } from '../pipeline/er'
 import { isValidKanbanText } from '../pipeline/kanban'
 import { parseKanbanCardElementId, parseKanbanColumnElementId } from '../pipeline/element-id'
+import { isValidRequirementFieldValue } from '../pipeline/requirement'
+import { parseRequirementBlockElementId } from '../pipeline/element-id'
 import type { ProjectionMindmapNode } from '../projection/mindmap-projection'
 import { selectionFromEventTarget, type CanvasSelection, type DataIdResolver } from '../canvas-selection/data-id'
 
@@ -56,6 +58,10 @@ export type CanvasInlineEditTarget =
   | { kind: 'kanban-card'; elementId: string }
   /** kanban：双击列标题改标题（set-column-title）；键盘 / 空白新建后命名同此 */
   | { kind: 'kanban-column'; elementId: string }
+  /** requirement（more-diagrams 工单 07）：双击 requirement 节点改 `text` 字段
+   * （set-requirement-field 意图；名字是语法标识，不在此改。element 无双击编辑——
+   * 工单 07 明确：element 的 type/docref 是元数据，展示与编辑都在右侧表单） */
+  | { kind: 'requirement'; name: string }
 
 export type InlineEditCommit =
   | { action: 'commit'; intent: EditIntent }
@@ -111,7 +117,15 @@ function classTitleClicked(target: EventTarget | null, name: string): boolean {
 }
 
 /** 参与双击寻址的图种（各图种都用 data-id；mindmap 额外回落文本匹配） */
-export type InlineEditDiagramKind = 'flowchart' | 'mindmap' | 'class' | 'sequence' | 'state' | 'er' | 'kanban'
+export type InlineEditDiagramKind =
+  | 'flowchart'
+  | 'mindmap'
+  | 'class'
+  | 'sequence'
+  | 'state'
+  | 'er'
+  | 'kanban'
+  | 'requirement'
 
 /**
  * 双击目标 → 编辑对象；两边都匹配不上时返回 null（如点在空白处/边上），
@@ -142,6 +156,13 @@ export function inlineEditTargetFromEvent(
       if (parseKanbanCardElementId(byId.nodeId) !== null) return { kind: 'kanban-card', elementId: byId.nodeId }
       if (parseKanbanColumnElementId(byId.nodeId) !== null) return { kind: 'kanban-column', elementId: byId.nodeId }
       return null
+    }
+    // requirement（more-diagrams 工单 07）：data-id = 名字（渲染后处理反注），但节点
+    // elementId 带 `requirement:` / `requirement-element:` 前缀——只有 requirement 块
+    // 可双击（改 text 字段）；element 双击安静忽略（工单 07 明确不做）
+    if (kind === 'requirement') {
+      const requirement = parseRequirementBlockElementId(byId.nodeId)
+      return requirement !== null ? { kind: 'requirement', name: requirement.name } : null
     }
     return byId
   }
@@ -188,6 +209,15 @@ export function inlineEditCommitOf(target: CanvasInlineEditTarget, text: string,
   if (target.kind === 'kanban-column') {
     if (!isValidKanbanText(next)) return { action: 'invalid' }
     return { action: 'commit', intent: { type: 'set-column-title', elementId: target.elementId, title: next } }
+  }
+  if (target.kind === 'requirement') {
+    // requirement（more-diagrams 工单 07）：非空改动 = set text 字段（值含引号/换行非法；
+    // 清空字段 = 删字段行，走属性表单而非双击——顶部守卫已把清空按 unchanged 关闭）
+    if (!isValidRequirementFieldValue(next)) return { action: 'invalid' }
+    return {
+      action: 'commit',
+      intent: { type: 'set-requirement-field', requirement: target.name, field: 'text', value: next },
+    }
   }
   if (!isValidMindmapNodeText(next)) return { action: 'invalid' }
   return { action: 'commit', intent: { type: 'set-node-text', elementId: target.elementId, text: next } }

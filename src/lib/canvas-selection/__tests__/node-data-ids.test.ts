@@ -148,6 +148,45 @@ describe('kanban 节点寻址链路（more-diagrams 工单 06）', () => {
   })
 })
 
+describe('requirement 节点寻址链路（more-diagrams 工单 07）', () => {
+  /** mermaid v12 requirement 渲染产物：unified → dagre 布局器，g.node 落在 g.root > g.nodes，
+   * DOM id = `{svgId}-{名字}`（无词元、无序号后缀） */
+  function requirementSvg(): HTMLElement {
+    const root = document.createElement('div')
+    root.innerHTML =
+      '<svg id="mmd-preview-9">' +
+      '<g class="root">' +
+      '<g class="nodes">' +
+      '<g class="node" id="mmd-preview-9-login"><rect/></g>' +
+      '<g class="node" id="mmd-preview-9-loginUI"><rect/></g>' +
+      '<g class="node" id="mmd-preview-9-node_3"><rect/></g>' +
+      '</g>' +
+      '<g class="edgePaths"><path/></g>' +
+      '</g>' +
+      '</svg>'
+    annotateNodeDataIds(root)
+    return root
+  }
+
+  it('作用域内（g.root > g.nodes）以 svg 根 id 前缀剥离反注 data-id = 名字', () => {
+    const root = requirementSvg()
+    expect(root.querySelector('[id="mmd-preview-9-login"]')?.getAttribute('data-id')).toBe('login')
+    expect(root.querySelector('[id="mmd-preview-9-loginUI"]')?.getAttribute('data-id')).toBe('loginUI')
+  })
+
+  it('mindmap 身份（node_{N}）显式让位；作用域外的孤立 g.node 不反注（不误伤，工单 06 约定）', () => {
+    const root = requirementSvg()
+    expect(root.querySelector('[id="mmd-preview-9-node_3"]')?.getAttribute('data-id')).toBeNull()
+    const isolated = document.createElement('div')
+    isolated.innerHTML =
+      '<svg id="mmd-preview-10">' +
+      '<g class="node" id="mmd-preview-10-孤立"><rect/></g>' +
+      '</svg>'
+    annotateNodeDataIds(isolated)
+    expect(isolated.querySelector('g.node')?.getAttribute('data-id')).toBeNull()
+  })
+})
+
 describe('class 节点寻址链路（工单 09：反注 data-id 后四处复用同一链路）', () => {
   const CLASS_NAMES = ['BankAccount', '新类']
   /** mermaid v12 class 图渲染产物（类框 g.node 无 data-id，只有 classId- 形态的 DOM id） */

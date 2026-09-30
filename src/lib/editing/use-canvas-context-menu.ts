@@ -110,6 +110,24 @@ function nodeFormForTarget(
     }
     return kind === 'er-attribute' ? { kind, ...base, entity: target.name } : { kind, ...base, from: target.name }
   }
+  if (kind === 'requirement-node' || kind === 'requirement-element') {
+    // requirement / element 添加表单（more-diagrams 工单 07）：空白处右键 → 无锚点
+    //（管线回退到文档最后一个元素）；节点右键不给添加入口（contextMenuItems 定案）
+    if (proj.type !== 'requirement') return null
+    return target.kind === 'blank' ? { kind, x, y } : null
+  }
+  if (kind === 'requirement-relation') {
+    // requirement 关系表单（more-diagrams 工单 07）：requirement / element 节点右键或
+    // Enter 键 → 锚点为该块的闭合行（关系行插在它之后），预选起点该节点
+    if (proj.type !== 'requirement') return null
+    if (target.kind !== 'requirement-node' && target.kind !== 'requirement-element') return null
+    const block =
+      target.kind === 'requirement-node'
+        ? proj.requirement.requirements.find((r) => r.name === target.name)
+        : proj.requirement.elements.find((e) => e.name === target.name)
+    if (block === undefined) return null
+    return { kind, anchorElementId: block.tailElementId, from: target.name, x, y }
+  }
   if (kind === 'block') {
     // sequence 独有的添加逻辑块：参与者上右键 → 锚点为该参与者的声明；
     // 空白处右键 → 无锚点（管线回退到文档最后一个元素）
@@ -137,12 +155,15 @@ function nodeFormForTarget(
   return null
 }
 
-/** 编辑器选中 → 可打开添加表单的菜单目标形态（类 / 参与者 / 状态 / 实体四种；其余选中无该形态） */
+/** 编辑器选中 → 可打开添加表单的菜单目标形态（类 / 参与者 / 状态 / 实体 / requirement
+ * 两类节点；其余选中无该形态） */
 function formTargetOfSelection(selection: Selection): ContextMenuTarget | null {
   if (selection.kind === 'class') return { kind: 'class-node', name: selection.name }
   if (selection.kind === 'participant') return { kind: 'sequence-participant', actorId: selection.actorId }
   if (selection.kind === 'state') return { kind: 'state-node', id: selection.id }
   if (selection.kind === 'er-entity') return { kind: 'er-entity', name: selection.name }
+  if (selection.kind === 'requirement') return { kind: 'requirement-node', name: selection.name }
+  if (selection.kind === 'requirement-element') return { kind: 'requirement-element', name: selection.name }
   return null
 }
 
@@ -317,7 +338,7 @@ export function useCanvasContextMenu(
    * 与右键菜单共用 nodeFormForTarget，**不新造浮层**。选中不是类/参与者时安静地不打开。
    */
   const openFormForSelection = useCallback(
-    (kind: 'member' | 'relation' | 'message' | 'transition' | 'er-relation'): void => {
+    (kind: 'member' | 'relation' | 'message' | 'transition' | 'er-relation' | 'requirement-relation'): void => {
       const proj = latest.current.projection
       const { selection } = useEditorStore.getState()
       if (proj === null || selection === null) return

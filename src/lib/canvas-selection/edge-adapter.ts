@@ -30,5 +30,9 @@ export function edgeSelectionOf(diagramType: DiagramTypeId, elementId: string): 
     // er 关系与 class 共用 `relation:N` 位置序身份（图种先收窄，不会跨图种命中）
     return parsed.kind === 'relation' ? { kind: 'er-relation', elementId } : null
   }
+  if (diagramType === 'requirement') {
+    // requirement 关系同理共用 `relation:N`（more-diagrams 工单 07）
+    return parsed.kind === 'relation' ? { kind: 'requirement-relation', elementId } : null
+  }
   return null
 }

@@ -10,6 +10,7 @@ import { nextNodeId, mindmapActionIntents, applyPlan, type MindmapActionPlan, ty
 import { kanbanCardElementId, kanbanColumnElementId, nextFreeName } from '../pipeline/element-id'
 import { isValidStateId } from '../pipeline/state'
 import { isValidErName } from '../pipeline/er'
+import { REQUIREMENT_RELATION_KINDS } from '../pipeline/requirement'
 import { isValidGitgraphBranchName } from '../pipeline/gitgraph'
 import { isValidTimelineSectionName, type TimelineIntent } from '../pipeline/timeline'
 import { isValidKanbanId } from '../pipeline/kanban'
@@ -158,6 +159,12 @@ export function createElement(ctx: MenuActionContext, target: ContextMenuTarget 
           inlineEdit: { kind: 'kanban-column', elementId: kanbanColumnElementId(id) },
         },
       }
+    }
+    if (proj.type === 'requirement') {
+      // requirement（more-diagrams 工单 07）：添加入口是独立的 add-requirement /
+      // add-requirement-element 动作（type 在表单枚举里选，无「创建 + 内联命名」形态），
+      // 不走 createElement
+      return null
     }
     // mindmap：节点目标 = 挂为其子节点；空白 / 无目标 = 建根（空文档）或挂到根节点下
     const text = ctx.newNodeText
@@ -365,6 +372,35 @@ function addKanbanCard(ctx: MenuActionContext, target: ContextMenuTarget | undef
   }
 }
 
+/** requirement 关系边：循环切换关系类型（set-relation 的 relationKind，直接改，不弹表单）。
+ * 菜单保持打开，便于连点切到想要的那种；每次切换是一次独立快照（可撤销）。 */
+function cycleRequirementKind(ctx: MenuActionContext, target: ContextMenuTarget | undefined): void {
+  const proj = ctx.projection
+  if (target === undefined || target.kind !== 'requirement-relation' || proj === null || proj.type !== 'requirement') return
+  const relation = proj.requirement.relations.find((r) => r.elementId === target.elementId)
+  if (relation === undefined) return
+  const options = REQUIREMENT_RELATION_KINDS.map((value) => ({ value }))
+  ctx.commitIntent({
+    type: 'set-relation',
+    elementId: target.elementId,
+    changes: { relationKind: nextInCycle(options, relation.relationKind) },
+  })
+}
+
+/** requirement 关系边：反转方向（set-relation 的 reversed 取反，直接改）。
+ * 语义随之反转（from/to 交换），源码保留原书写方向以外的另一种写法。 */
+function invertRequirementRelation(ctx: MenuActionContext, target: ContextMenuTarget | undefined): void {
+  const proj = ctx.projection
+  if (target === undefined || target.kind !== 'requirement-relation' || proj === null || proj.type !== 'requirement') return
+  const relation = proj.requirement.relations.find((r) => r.elementId === target.elementId)
+  if (relation === undefined) return
+  ctx.commitIntent({
+    type: 'set-relation',
+    elementId: target.elementId,
+    changes: { reversed: !relation.reversed },
+  })
+}
+
 export const MENU_ACTIONS: Record<Exclude<ContextMenuItemId, 'apply-style'>, MenuAction> = {
   // 「创建 + 选中 + 内联命名」五个入口共用 createElement（工单 01 收敛）
   'add-node': createElement,
@@ -417,6 +453,14 @@ export const MENU_ACTIONS: Record<Exclude<ContextMenuItemId, 'apply-style'>, Men
   'cycle-er-line': cycleErLine,
   'edit-er-relation': selectMenuTargetAndClose,
   'edit-er-attribute': selectMenuTargetAndClose,
+  // requirement（more-diagrams 工单 07）：空白 = 加 requirement（type 在添加表单里选）/
+  // 加 element；节点 = 改字段（选中该节点在右侧 RequirementForm 里改）/ 从这里连线；
+  // 关系 = 循环切换关系类型（直接改，菜单保持打开）/ 反转方向（直接改）
+  'add-requirement': openFormOf('requirement-node'),
+  'add-requirement-element': openFormOf('requirement-element'),
+  'edit-requirement-field': selectMenuTargetAndClose,
+  'cycle-requirement-kind': cycleRequirementKind,
+  'invert-requirement-relation': invertRequirementRelation,
   // state（more-diagrams 工单 02）：add-state 走 createElement 的 state 分支（空白入口）
   'add-state-into': addStateIntoComposite,
   // kanban（more-diagrams 工单 06）：add-column 走 createElement 的 kanban 分支（空白入口）；

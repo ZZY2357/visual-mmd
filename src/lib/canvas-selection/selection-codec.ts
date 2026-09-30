@@ -5,6 +5,11 @@ import { toEditorSelection } from './flowchart-adapter'
 import { edgeSelectionOf } from './edge-adapter'
 import { mindmapDomIdOf } from './mindmap-adapter'
 import { parseKanbanCardElementId, parseKanbanColumnElementId } from '../pipeline/element-id'
+import { requirementSelectionOf } from './requirement-adapter'
+import {
+  parseRequirementBlockElementId,
+  parseRequirementElemBlockElementId,
+} from '../pipeline/element-id'
 import type { ContextMenuTarget } from '../editing/context-menu'
 
 /**
@@ -76,6 +81,12 @@ export function canvasIdOf(selection: Selection): string | null {
       return parseKanbanColumnElementId(selection.elementId)?.id ?? null
     case 'kanban-card':
       return parseKanbanCardElementId(selection.elementId)?.id ?? null
+    // requirement（more-diagrams 工单 07）：两类节点 data-id 都是名字；关系走位置序
+    case 'requirement':
+    case 'requirement-element':
+      return selection.name
+    case 'requirement-relation':
+      return selection.elementId
     default:
       return null
   }
@@ -111,6 +122,11 @@ export function fromCanvasId(diagramType: DiagramTypeId, canvas: CanvasSelection
     if (parseKanbanColumnElementId(canvas.id) !== null) return { kind: 'kanban-column', elementId: canvas.id }
     if (parseKanbanCardElementId(canvas.id) !== null) return { kind: 'kanban-card', elementId: canvas.id }
     return null
+  }
+  if (diagramType === 'requirement') {
+    // requirement（more-diagrams 工单 07）：节点 data-id 即**投影 elementId**
+    // （`requirement:<名>` / `requirement-element:<名>`，由 resolver 反注），关系走位置序
+    return requirementSelectionOf(canvas)
   }
   if (canvas.kind === 'element') return edgeSelectionOf(diagramType, canvas.elementId)
   if (canvas.kind === 'node') {
@@ -165,6 +181,12 @@ export function selectionOfMenuTarget(target: ContextMenuTarget): Selection | nu
       return { kind: 'kanban-column', elementId: target.elementId }
     case 'kanban-card':
       return { kind: 'kanban-card', elementId: target.elementId }
+    case 'requirement-node':
+      return { kind: 'requirement', name: target.name }
+    case 'requirement-element':
+      return { kind: 'requirement-element', name: target.name }
+    case 'requirement-relation':
+      return { kind: 'requirement-relation', elementId: target.elementId }
     case 'blank':
       return null
   }
@@ -199,6 +221,15 @@ export function menuTargetOfCanvas(
       if (parseKanbanCardElementId(canvas.id) !== null) return { kind: 'kanban-card', elementId: canvas.id }
       return null
     }
+    // requirement（more-diagrams 工单 07）：node.id = 投影 elementId（`requirement:<名>` /
+    // `requirement-element:<名>`），按前缀解回两类节点；都解不开（含空格的引号名在渲染
+    // DOM 上不可寻址，本就到不了这里）→ null
+    if (diagramType === 'requirement') {
+      const requirement = parseRequirementBlockElementId(canvas.id)
+      if (requirement !== null) return { kind: 'requirement-node', name: requirement.name }
+      const element = parseRequirementElemBlockElementId(canvas.id)
+      return element !== null ? { kind: 'requirement-element', name: element.name } : null
+    }
     return { kind: 'sequence-participant', actorId: canvas.id }
   }
   if (canvas.kind === 'element') {
@@ -218,6 +249,8 @@ export function menuTargetOfCanvas(
         return { kind: 'state-transition', elementId: editorSelection.elementId }
       case 'er-relation':
         return { kind: 'er-relation', elementId: editorSelection.elementId }
+      case 'requirement-relation':
+        return { kind: 'requirement-relation', elementId: editorSelection.elementId }
       default:
         return null
     }

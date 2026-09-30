@@ -50,6 +50,12 @@ export type Selection =
   // kanban（more-diagrams 工单 06）：列是分组元素、卡片是节点元素
   | { kind: 'kanban-column'; elementId: string }
   | { kind: 'kanban-card'; elementId: string }
+  // requirementDiagram（more-diagrams 工单 07）：requirement / element 是两类**名字即身份**
+  // 的节点（名字可重名于彼此，画布 data-id 都是名字，由 resolver 按投影消歧）；
+  // 关系走位置序身份（`relation:N`）。
+  | { kind: 'requirement'; name: string }
+  | { kind: 'requirement-element'; name: string }
+  | { kind: 'requirement-relation'; elementId: string }
 
 export const DIAGRAM_SELECTION: Selection = { kind: 'diagram' }
 
@@ -117,6 +123,12 @@ export function selectionKey(sel: Selection): string {
       return `kanban-column:${sel.elementId}`
     case 'kanban-card':
       return `kanban-card:${sel.elementId}`
+    case 'requirement':
+      return `requirement:${sel.name}`
+    case 'requirement-element':
+      return `requirement-element:${sel.name}`
+    case 'requirement-relation':
+      return `requirement-relation:${sel.elementId}`
   }
 }
 

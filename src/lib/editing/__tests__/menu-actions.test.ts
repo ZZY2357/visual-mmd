@@ -148,6 +148,11 @@ describe('MENU_ACTIONS 穷尽性（工单 05 → 工单 01）', () => {
       { kind: 'blank', diagramType: 'kanban' },
       { kind: 'kanban-column', elementId: 'kanban-column:Todo' },
       { kind: 'kanban-card', elementId: 'kanban-card:t1' },
+      // requirement（more-diagrams 工单 07）：空白添加入口 + 两类节点 + 关系边
+      { kind: 'blank', diagramType: 'requirement' },
+      { kind: 'requirement-node', name: 'login' },
+      { kind: 'requirement-element', name: 'ui' },
+      { kind: 'requirement-relation', elementId: 'relation:0' },
     ]
     const reachableIds = new Set(allTargets.flatMap((target) => contextMenuItems(target)))
     // apply-style 不经 onMenuItem 分发（CanvasPanel 渲染成子菜单开关，点样式名直接调

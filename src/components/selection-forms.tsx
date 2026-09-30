@@ -12,6 +12,7 @@ import { type ClassProjection } from '../lib/projection/class-projection'
 import { type MindmapProjection } from '../lib/projection/mindmap-projection'
 import { type StateProjection } from '../lib/projection/state-projection'
 import { type ErProjection } from '../lib/projection/er-projection'
+import { type RequirementProjection } from '../lib/projection/requirement-projection'
 import { type GitgraphProjection } from '../lib/projection/gitgraph-projection'
 import { type TimelineProjection } from '../lib/projection/timeline-projection'
 import { type KanbanProjection } from '../lib/projection/kanban-projection'
@@ -26,6 +27,11 @@ import { ClassForm, ClassNoteForm, MemberForm, NamespaceForm, RelationForm } fro
 import { MindmapNodeForm } from './mindmap-forms'
 import { StateForm, StateNoteForm, StateTransitionForm } from './state-forms'
 import { ErAttributeForm, ErEntityForm, ErRelationForm } from './er-forms'
+import {
+  RequirementElementForm,
+  RequirementNodeForm,
+  RequirementRelationForm,
+} from './requirement-forms'
 import {
   GitgraphBranchForm,
   GitgraphCherryPickForm,
@@ -465,6 +471,50 @@ function KanbanSelectionForm({
   }
 }
 
+/** requirement 属性表单（more-diagrams 工单 07）：图表级 direction（独立语句行，
+ * 没有「跟随 Mermaid 默认」形态）+ requirement / element / relation 三类元素 */
+function RequirementSelectionForm({
+  projection,
+  selection,
+}: {
+  projection: RequirementProjection
+  selection: Selection | null
+}) {
+  const { t } = useTranslation()
+  const commitIntent = useEditorStore((s) => s.commitIntent)
+  if (selection === null) {
+    return (
+      <Text size="sm" c="dimmed" px="xs">
+        {t('app:propertyPanel.nothingSelected')}
+      </Text>
+    )
+  }
+  switch (selection.kind) {
+    case 'diagram':
+      return (
+        <DiagramForm
+          direction={projection.direction}
+          allowFollowDefault
+          onSelect={(next) => commitIntent({ type: 'set-direction', direction: next })}
+        />
+      )
+    case 'requirement': {
+      const requirement = projection.requirements.find((r) => r.name === selection.name)
+      return requirement !== undefined ? <RequirementNodeForm requirement={requirement} /> : null
+    }
+    case 'requirement-element': {
+      const element = projection.elements.find((e) => e.name === selection.name)
+      return element !== undefined ? <RequirementElementForm element={element} /> : null
+    }
+    case 'requirement-relation': {
+      const relation = projection.relations.find((r) => r.elementId === selection.elementId)
+      return relation !== undefined ? <RequirementRelationForm relation={relation} /> : null
+    }
+    default:
+      return null
+  }
+}
+
 export function ProjectionSelectionForm({ projection, selection }: { projection: AnyProjection; selection: Selection | null }) {
   if (projection.type === 'flowchart') {
     return <FlowchartSelectionForm projection={projection.flowchart} selection={selection} />
@@ -489,6 +539,9 @@ export function ProjectionSelectionForm({ projection, selection }: { projection:
   }
   if (projection.type === 'kanban') {
     return <KanbanSelectionForm projection={projection.kanban} selection={selection} />
+  }
+  if (projection.type === 'requirement') {
+    return <RequirementSelectionForm projection={projection.requirement} selection={selection} />
   }
   return <ClassSelectionForm projection={projection.class} selection={selection} />
 }

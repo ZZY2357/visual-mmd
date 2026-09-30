@@ -211,6 +211,9 @@ export default function App() {
                 <Menu.Item onClick={() => newDiagram('kanban', t('newDiagram.kanban'))}>
                   {t('newDiagram.kanban')}
                 </Menu.Item>
+                <Menu.Item onClick={() => newDiagram('requirement', t('newDiagram.requirement'))}>
+                  {t('newDiagram.requirement')}
+                </Menu.Item>
               </Menu.Dropdown>
             </Menu>
             <Button
