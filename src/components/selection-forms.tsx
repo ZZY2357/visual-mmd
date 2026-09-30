@@ -50,6 +50,13 @@ import { JourneyDiagramForm, JourneySectionForm, JourneyTaskForm } from './journ
 import { type JourneyProjection } from '../lib/projection/journey-projection'
 import { PieDiagramForm, PieSectorForm } from './pie-forms'
 import { type PieProjection } from '../lib/projection/pie-projection'
+import {
+  QuadrantAxisForm,
+  QuadrantDiagramForm,
+  QuadrantPointForm,
+  QuadrantQuadrantForm,
+} from './quadrant-forms'
+import { type QuadrantProjection } from '../lib/projection/quadrant-projection'
 
 /**
  * 选中元素的属性表单，按投影图种分发（工单 04-bundle 自 PropertyPanel 迁出）：
@@ -585,6 +592,44 @@ function PieSelectionForm({
   }
 }
 
+/**
+ * quadrant（more-diagrams 工单 12）：选中点 / 轴 / 象限时渲染对应表单；图表级 = 标题。
+ */
+function QuadrantSelectionForm({
+  projection,
+  selection,
+}: {
+  projection: QuadrantProjection
+  selection: Selection | null
+}) {
+  const { t } = useTranslation()
+  if (selection === null) {
+    return (
+      <Text size="sm" c="dimmed" px="xs">
+        {t('app:propertyPanel.nothingSelected')}
+      </Text>
+    )
+  }
+  switch (selection.kind) {
+    case 'diagram':
+      return <QuadrantDiagramForm projection={projection} />
+    case 'quadrant-point': {
+      const point = projection.points.find((p) => p.elementId === selection.elementId)
+      return point !== undefined ? <QuadrantPointForm point={point} /> : null
+    }
+    case 'quadrant-axis': {
+      const axis = selection.elementId === 'x-axis' ? projection.xAxis : projection.yAxis
+      return axis !== null ? <QuadrantAxisForm axis={axis} /> : null
+    }
+    case 'quadrant-quadrant': {
+      const quadrant = projection.quadrants.find((q) => q.elementId === selection.elementId)
+      return quadrant !== undefined ? <QuadrantQuadrantForm quadrant={quadrant} /> : null
+    }
+    default:
+      return null
+  }
+}
+
 export function ProjectionSelectionForm({ projection, selection }: { projection: AnyProjection; selection: Selection | null }) {
   if (projection.type === 'flowchart') {
     return <FlowchartSelectionForm projection={projection.flowchart} selection={selection} />
@@ -618,6 +663,9 @@ export function ProjectionSelectionForm({ projection, selection }: { projection:
   }
   if (projection.type === 'pie') {
     return <PieSelectionForm projection={projection.pie} selection={selection} />
+  }
+  if (projection.type === 'quadrant') {
+    return <QuadrantSelectionForm projection={projection.quadrant} selection={selection} />
   }
   return <ClassSelectionForm projection={projection.class} selection={selection} />
 }

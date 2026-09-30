@@ -15,6 +15,7 @@ import { isValidGitgraphBranchName } from '../pipeline/gitgraph'
 import { isValidTimelineSectionName, type TimelineIntent } from '../pipeline/timeline'
 import { isValidJourneySectionName, isValidJourneyTaskName, type JourneyIntent } from '../pipeline/journey'
 import { isValidPieLabel, type PieIntent } from '../pipeline/pie'
+import { isValidQuadrantPointText, type QuadrantIntent } from '../pipeline/quadrant'
 import { isValidKanbanId } from '../pipeline/kanban'
 import { setRelationIntent, RELATION_KIND_OPTIONS } from './class-forms'
 import {
@@ -179,6 +180,11 @@ export function createElement(ctx: MenuActionContext, target: ContextMenuTarget 
       // （不做内联编辑——画布无 data-id，工单降级定案），不走 createElement
       return null
     }
+    if (proj.type === 'quadrant') {
+      // quadrant（more-diagrams 工单 12）：添加入口是独立的 add-quadrant-point 动作
+      //（坐标落 0.5, 0.5 + 内联命名文本），不走 createElement
+      return null
+    }
     // mindmap：节点目标 = 挂为其子节点；空白 / 无目标 = 建根（空文档）或挂到根节点下
     const text = ctx.newNodeText
     let mindPlan: MindmapActionPlan | null
@@ -273,6 +279,8 @@ function beginEditText(ctx: MenuActionContext, target: ContextMenuTarget | undef
   // kanban（more-diagrams 工单 06）：列 = 改标题、卡片 = 改描述（都是内联编辑显示文本）
   else if (target.kind === 'kanban-column') ctx.beginInlineEdit({ kind: 'kanban-column', elementId: target.elementId })
   else if (target.kind === 'kanban-card') ctx.beginInlineEdit({ kind: 'kanban-card', elementId: target.elementId })
+  // quadrant（more-diagrams 工单 12）：点 = 改文本（内联编辑显示文本）
+  else if (target.kind === 'quadrant-point') ctx.beginInlineEdit({ kind: 'quadrant-point', elementId: target.elementId })
   ctx.close()
 }
 
@@ -482,6 +490,37 @@ function addPieSector(ctx: MenuActionContext): void {
   if (applyPlan(plan, { commitIntent: ctx.commitIntent, select: ctx.select })) ctx.close()
 }
 
+// ---------- quadrant（more-diagrams 工单 12） ----------
+
+/**
+ * 空白处加点（quadrant）：落一行 `新点: [0.5, 0.5]` + 选中新点（文本避重，坐标取图正中
+ * 0.5, 0.5——可在右侧表单/画布拖改）。点有 data-id 寻址（工单 12 实测位置序反注可行），
+ * 落码成功后进入内联命名（与 kanban 同形态）。
+ */
+function addQuadrantPoint(ctx: MenuActionContext): void {
+  const proj = ctx.projection
+  if (proj === null || proj.type !== 'quadrant') return
+  const text = nextFreeName('新点', proj.quadrant.points.map((p) => p.text))
+  if (!isValidQuadrantPointText(text)) return
+  const elementId = `point:${proj.quadrant.nextPointOrdinal}`
+  const plan: KeyPlan = {
+    intents: [{ type: 'add-point', text, x: '0.5', y: '0.5' } satisfies QuadrantIntent],
+    newElementTarget: {
+      selection: { kind: 'quadrant-point', elementId },
+      inlineEdit: { kind: 'quadrant-point', elementId },
+    },
+  }
+  if (
+    applyPlan(plan, {
+      commitIntent: ctx.commitIntent,
+      select: ctx.select,
+      beginInlineEdit: ctx.beginInlineEdit,
+    })
+  ) {
+    ctx.close()
+  }
+}
+
 export const MENU_ACTIONS: Record<Exclude<ContextMenuItemId, 'apply-style'>, MenuAction> = {
   // 「创建 + 选中 + 内联命名」五个入口共用 createElement（工单 01 收敛）
   'add-node': createElement,
@@ -576,4 +615,10 @@ export const MENU_ACTIONS: Record<Exclude<ContextMenuItemId, 'apply-style'>, Men
   'add-journey-section': addJourneySection,
   // pie（more-diagrams 工单 10）：空白加扇区；元素级编辑降级到结构树 + 属性表单
   'add-pie-sector': addPieSector,
+  // quadrant（more-diagrams 工单 12）：空白加点（内联命名）；点 = 改文本 / 改坐标 /
+  // 改样式（D5）/ 删除（deleteTarget）；轴/象限 = 改文本（D5：选中 + 关菜单）
+  'add-quadrant-point': addQuadrantPoint,
+  'edit-quadrant-coords': selectMenuTargetAndClose,
+  'edit-quadrant-style': selectMenuTargetAndClose,
+  'edit-quadrant-text': selectMenuTargetAndClose,
 }

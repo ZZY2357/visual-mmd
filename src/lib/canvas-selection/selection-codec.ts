@@ -6,6 +6,7 @@ import { edgeSelectionOf } from './edge-adapter'
 import { mindmapDomIdOf } from './mindmap-adapter'
 import { parseKanbanCardElementId, parseKanbanColumnElementId } from '../pipeline/element-id'
 import { requirementSelectionOf } from './requirement-adapter'
+import { quadrantSelectionOf } from './quadrant-adapter'
 import {
   parseRequirementBlockElementId,
   parseRequirementElemBlockElementId,
@@ -87,6 +88,12 @@ export function canvasIdOf(selection: Selection): string | null {
       return selection.name
     case 'requirement-relation':
       return selection.elementId
+    // quadrant（more-diagrams 工单 12）：点/轴/象限的 data-id 即投影 elementId
+    // （渲染后按位置序反注，见 quadrant-adapter / node-data-ids）
+    case 'quadrant-point':
+    case 'quadrant-axis':
+    case 'quadrant-quadrant':
+      return selection.elementId
     default:
       return null
   }
@@ -123,6 +130,11 @@ export function fromCanvasId(diagramType: DiagramTypeId, canvas: CanvasSelection
   if (diagramType === 'pie') {
     // pie（more-diagrams 工单 10）：画布 DOM 无 data-id（实测降级），画布选中不产生
     return null
+  }
+  if (diagramType === 'quadrant') {
+    // quadrant（more-diagrams 工单 12）：node.id 即投影 elementId（`point:N` / `x-axis` /
+    // `y-axis` / `quadrant:N`，渲染后按位置序反注），按形态解回三类选中
+    return quadrantSelectionOf(canvas)
   }
   if (diagramType === 'kanban') {
     // resolver 返回的 node.id 即 elementId（`kanban-card:<id>` / `kanban-column:<id>`），按前缀判种类
@@ -195,6 +207,13 @@ export function selectionOfMenuTarget(target: ContextMenuTarget): Selection | nu
       return { kind: 'requirement-element', name: target.name }
     case 'requirement-relation':
       return { kind: 'requirement-relation', elementId: target.elementId }
+    // quadrant（more-diagrams 工单 12）：点/轴/象限菜单目标一一对应各自 Selection kind
+    case 'quadrant-point':
+      return { kind: 'quadrant-point', elementId: target.elementId }
+    case 'quadrant-axis':
+      return { kind: 'quadrant-axis', elementId: target.elementId }
+    case 'quadrant-quadrant':
+      return { kind: 'quadrant-quadrant', elementId: target.elementId }
     case 'blank':
       return null
   }
@@ -224,6 +243,22 @@ export function menuTargetOfCanvas(
     if (diagramType === 'gitgraph') return null // 无 data-id（实测降级），画布节点不可命中
     if (diagramType === 'journey') return null // 无 data-id（实测降级），画布节点不可命中
     if (diagramType === 'pie') return null // 无 data-id（实测降级），画布节点不可命中
+    // quadrant（more-diagrams 工单 12）：node.id = 投影 elementId（渲染后位置序反注），
+    // 三类元素都有画布菜单
+    if (diagramType === 'quadrant') {
+      const selection = quadrantSelectionOf(canvas)
+      if (selection === null) return null
+      switch (selection.kind) {
+        case 'quadrant-point':
+          return { kind: 'quadrant-point', elementId: selection.elementId }
+        case 'quadrant-axis':
+          return { kind: 'quadrant-axis', elementId: selection.elementId }
+        case 'quadrant-quadrant':
+          return { kind: 'quadrant-quadrant', elementId: selection.elementId }
+        default:
+          return null
+      }
+    }
     if (diagramType === 'kanban') {
       // 列 / 卡片都渲染成 `g.node` / `g.cluster`，反注后的 canvas.id 带 elementId 前缀，
       // 按前缀还原菜单目标种类；前缀不认识返回 null（安静地不弹菜单）。

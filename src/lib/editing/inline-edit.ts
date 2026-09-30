@@ -8,6 +8,7 @@ import { isValidKanbanText } from '../pipeline/kanban'
 import { parseKanbanCardElementId, parseKanbanColumnElementId } from '../pipeline/element-id'
 import { isValidRequirementFieldValue } from '../pipeline/requirement'
 import { parseRequirementBlockElementId } from '../pipeline/element-id'
+import { isValidQuadrantPointText } from '../pipeline/quadrant'
 import type { ProjectionMindmapNode } from '../projection/mindmap-projection'
 import { selectionFromEventTarget, type CanvasSelection, type DataIdResolver } from '../canvas-selection/data-id'
 
@@ -62,6 +63,9 @@ export type CanvasInlineEditTarget =
    * （set-requirement-field 意图；名字是语法标识，不在此改。element 无双击编辑——
    * 工单 07 明确：element 的 type/docref 是元数据，展示与编辑都在右侧表单） */
   | { kind: 'requirement'; name: string }
+  /** quadrant（more-diagrams 工单 12）：双击点改文本（set-point-text 意图）。
+   * 点有 data-id 寻址（渲染后位置序反注）；轴/象限标题不做双击（右侧表单改） */
+  | { kind: 'quadrant-point'; elementId: string }
 
 export type InlineEditCommit =
   | { action: 'commit'; intent: EditIntent }
@@ -126,6 +130,7 @@ export type InlineEditDiagramKind =
   | 'er'
   | 'kanban'
   | 'requirement'
+  | 'quadrant'
 
 /**
  * 双击目标 → 编辑对象；两边都匹配不上时返回 null（如点在空白处/边上），
@@ -163,6 +168,11 @@ export function inlineEditTargetFromEvent(
     if (kind === 'requirement') {
       const requirement = parseRequirementBlockElementId(byId.nodeId)
       return requirement !== null ? { kind: 'requirement', name: requirement.name } : null
+    }
+    // quadrant（more-diagrams 工单 12）：data-id = 投影 elementId（渲染后位置序反注），
+    // 只有点可双击（改文本）；轴/象限标题双击安静忽略（右侧表单改）
+    if (kind === 'quadrant') {
+      return byId.nodeId.startsWith('point:') ? { kind: 'quadrant-point', elementId: byId.nodeId } : null
     }
     return byId
   }
@@ -218,6 +228,12 @@ export function inlineEditCommitOf(target: CanvasInlineEditTarget, text: string,
       action: 'commit',
       intent: { type: 'set-requirement-field', requirement: target.name, field: 'text', value: next },
     }
+  }
+  if (target.kind === 'quadrant-point') {
+    // quadrant（more-diagrams 工单 12）：非空改动 = set-point-text（文本含冒号/引号/
+    // 关键字前缀等非法输入拒绝落码，见 isValidQuadrantPointText）
+    if (!isValidQuadrantPointText(next)) return { action: 'invalid' }
+    return { action: 'commit', intent: { type: 'set-point-text', elementId: target.elementId, text: next } }
   }
   if (!isValidMindmapNodeText(next)) return { action: 'invalid' }
   return { action: 'commit', intent: { type: 'set-node-text', elementId: target.elementId, text: next } }

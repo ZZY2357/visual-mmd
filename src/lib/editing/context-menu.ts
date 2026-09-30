@@ -67,6 +67,11 @@ export type ContextMenuTarget =
 // 空白菜单提供添加入口（任务/section 的编辑由结构树选中 + 属性表单承接）
 // pie（more-diagrams 工单 10）：画布 DOM 无 data-id（实测降级，见 pie-adapter），无元素级
 // 菜单目标；空白菜单提供添加入口（扇区的编辑由结构树选中 + 属性表单承接）
+// quadrant（more-diagrams 工单 12）：点/轴/象限经位置序反注可寻址（见 quadrant-adapter），
+// 三类元素都有画布菜单；轴/象限是文档级属性元素，无添加/删除入口
+  | { kind: 'quadrant-point'; elementId: string }
+  | { kind: 'quadrant-axis'; elementId: string }
+  | { kind: 'quadrant-quadrant'; elementId: string }
 
 export type ContextMenuItemId =
   | 'add-node'
@@ -145,6 +150,13 @@ export type ContextMenuItemId =
   // pie（more-diagrams 工单 10）：空白 = 加扇区（数值落 1，可在右侧表单改）。
   // 扇区的编辑不做元素级画布菜单（无 data-id 可命中），由结构树选中 + 属性表单承接。
   | 'add-pie-sector'
+  // quadrant（more-diagrams 工单 12）：空白 = 加点（坐标落 0.5, 0.5，可在右侧表单改）；
+  // 点 = 改文本（内联编辑）/ 改坐标 / 改样式（D5：选中 + 关菜单，右侧表单改）/ 删除；
+  // 轴/象限 = 改文本（D5：选中 + 关菜单，右侧表单改）。
+  | 'add-quadrant-point'
+  | 'edit-quadrant-coords'
+  | 'edit-quadrant-style'
+  | 'edit-quadrant-text'
 
 /**
  * 画布选中 → 菜单目标（工单 03 起为 `canvas-selection/selection-codec.ts` 的
@@ -191,6 +203,9 @@ function blankMenuItems(diagramType: DiagramTypeId): ContextMenuItemId[] {
     case 'pie':
       // pie 的空白入口（工单 10 定案）：加扇区（数值落 1，标签避重，右侧表单可改）
       return ['add-pie-sector']
+    case 'quadrant':
+      // quadrant 的空白入口（工单 12 定案）：加点（坐标落 0.5, 0.5，文本避重，右侧表单可改）
+      return ['add-quadrant-point']
     // DiagramTypeId 是开放类型（more-diagrams 工单 01）：未接入画布能力包的图种
     // 没有空白右键入口（unsupported 态下画布右键整体停用，不会走到这里）
     default:
@@ -277,5 +292,13 @@ export function contextMenuItems(target: ContextMenuTarget): ContextMenuItemId[]
       return ['edit-requirement-field', 'link-from-here', 'delete']
     case 'requirement-relation':
       return ['cycle-requirement-kind', 'invert-requirement-relation', 'delete']
+    // quadrant（more-diagrams 工单 12）：点 = 改文本（内联编辑）/ 改坐标 / 改样式（都是
+    // D5「选中 + 关菜单」，字段在右侧 QuadrantPointForm 改）/ 删除；
+    // 轴 / 象限标题 = 改文本（D5「选中 + 关菜单」，右侧表单改——文档级属性元素无删除）
+    case 'quadrant-point':
+      return ['edit-text', 'edit-quadrant-coords', 'edit-quadrant-style', 'delete']
+    case 'quadrant-axis':
+    case 'quadrant-quadrant':
+      return ['edit-quadrant-text']
   }
 }

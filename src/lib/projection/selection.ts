@@ -63,6 +63,12 @@ export type Selection =
   // pie（more-diagrams 工单 10）：扇区走位置序身份（`sector:N`，pie 语法无节点 id）。
   // 画布 DOM 无 data-id（实测降级），选中只来自结构树 / 表单 / 键盘。
   | { kind: 'pie-sector'; elementId: string }
+  // quadrantChart（more-diagrams 工单 12）：点走位置序身份（`point:N`，quadrant 语法无
+  // 节点 id）；轴（`x-axis` / `y-axis`）与象限标题（`quadrant:1..4`）是文档级属性元素。
+  // 画布 DOM 的 data-id 由渲染后处理按位置序反注（见 quadrant-adapter / node-data-ids）。
+  | { kind: 'quadrant-point'; elementId: string }
+  | { kind: 'quadrant-axis'; elementId: string }
+  | { kind: 'quadrant-quadrant'; elementId: string }
 
 export const DIAGRAM_SELECTION: Selection = { kind: 'diagram' }
 
@@ -142,6 +148,12 @@ export function selectionKey(sel: Selection): string {
       return `journey-section:${sel.elementId}`
     case 'pie-sector':
       return `pie-sector:${sel.elementId}`
+    case 'quadrant-point':
+      return `quadrant-point:${sel.elementId}`
+    case 'quadrant-axis':
+      return `quadrant-axis:${sel.elementId}`
+    case 'quadrant-quadrant':
+      return `quadrant-quadrant:${sel.elementId}`
   }
 }
 

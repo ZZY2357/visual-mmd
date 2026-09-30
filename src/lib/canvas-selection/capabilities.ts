@@ -41,6 +41,11 @@ export interface CanvasCapabilities<T extends AnyProjection = AnyProjection> {
   /** 连线位置序标注（工单 02，ADR-0012）；flowchart / mindmap 无 → 不实现（undefined）。
    * **可选项正是最容易漏的**：capabilities 查表测试专门断言前两者无此成员。 */
   edgeAnnotator?(projection: T): (root: ParentNode) => void
+  /** 渲染后把**节点级** data-id 写进 DOM（more-diagrams 工单 12 起）：quadrant 是第一个
+   * 渲染器不写任何 id/data-id、但包裹组结构可按位置序反注的图种——反注需要投影信息
+   * （点条数与轴标签预测做条数门卫），故与 edgeAnnotator 同形走专责可选成员，
+   * 不进 node-data-ids 的无参通用循环（工单 06 的收口约定）。无此需求的图种不实现。 */
+  nodeAnnotator?(projection: T): (root: ParentNode) => void
   /** 选中在投影中是否仍存在，不存在回落 null（原 PropertyPanel.resolveProjectionSelection 的
    * 四份 resolve*Selection 分发；工单 03 定案：归能力包，不归选中 codec） */
   resolveSelection(projection: T, selection: Selection | null): Selection | null
