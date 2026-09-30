@@ -60,6 +60,9 @@ export type Selection =
   // journey 语法无节点 id）。画布 DOM 无 data-id（实测降级），选中只来自结构树 / 表单 / 键盘。
   | { kind: 'journey-task'; elementId: string }
   | { kind: 'journey-section'; elementId: string }
+  // pie（more-diagrams 工单 10）：扇区走位置序身份（`sector:N`，pie 语法无节点 id）。
+  // 画布 DOM 无 data-id（实测降级），选中只来自结构树 / 表单 / 键盘。
+  | { kind: 'pie-sector'; elementId: string }
 
 export const DIAGRAM_SELECTION: Selection = { kind: 'diagram' }
 
@@ -137,6 +140,8 @@ export function selectionKey(sel: Selection): string {
       return `journey-task:${sel.elementId}`
     case 'journey-section':
       return `journey-section:${sel.elementId}`
+    case 'pie-sector':
+      return `pie-sector:${sel.elementId}`
   }
 }
 

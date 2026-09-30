@@ -17,8 +17,9 @@ import type {
 import type { TimelineProjection } from '../projection/timeline-projection'
 import type { KanbanProjection } from '../projection/kanban-projection'
 import type { JourneyProjection } from '../projection/journey-projection'
+import type { PieProjection } from '../projection/pie-projection'
 import { DIAGRAM_SELECTION, type Selection } from '../projection/selection'
-import { applyPlan, journeyKeyPlan, mindmapKeyPlan, timelineKeyPlan } from '../editing/canvas-keyboard'
+import { applyPlan, journeyKeyPlan, mindmapKeyPlan, pieKeyPlan, timelineKeyPlan } from '../editing/canvas-keyboard'
 import { useEditorStore } from '../../store/editor'
 
 /**
@@ -824,6 +825,57 @@ function journeyPartitions(projection: AnyProjection, { t }: TreePartitionsConte
   ]
 }
 
+// ---------- pie（more-diagrams 工单 10） ----------
+
+/**
+ * pie 扇区条目的键盘（工单 10 / ADR-0013）：焦点在扇区条目上时
+ * Tab = 加扇区 / Delete = 删除（preventDefault 压掉默认行为）；Enter 无自然类比，
+ * 工单定案不接。键 → plan 走能力包同一份 pieKeyPlan，执行交给唯一的 applyPlan。
+ * 与 timeline/journey 同理接 Delete：pie 画布无 data-id 寻址（见 pie-adapter），
+ * 画布键盘拿不到扇区选中，结构树是唯一的键盘入口。
+ */
+function pieSectorKeyDown(projection: PieProjection, elementId: string): (e: KeyboardEvent) => void {
+  return (e: KeyboardEvent) => {
+    if (e.shiftKey) return
+    if (e.key !== 'Tab' && e.key !== 'Delete' && e.key !== 'Backspace') return
+    const selection: Selection = { kind: 'pie-sector', elementId }
+    const plan = pieKeyPlan(projection, { key: e.key, mods: { shift: e.shiftKey }, selection })
+    if (plan === null) return
+    const { commitIntent, select } = useEditorStore.getState()
+    applyPlan(plan, { commitIntent, select, preventDefault: () => e.preventDefault() })
+  }
+}
+
+/**
+ * pie 结构树（工单 10）：单一「扇区」分区。扇区 detail 携带数值原文；
+ * **负数/零等非法数值原样展示并标注**（不静默改写，工单定案——负数是 mermaid
+ * 落码错误、零被渲染层静默过滤）。pie 画布无 data-id（见 pie-adapter），
+ * 结构树 + 属性表单是完整编辑入口。
+ */
+function piePartitions(projection: AnyProjection, { t }: TreePartitionsContext): TreeSection[] {
+  if (projection.type !== 'pie') return []
+  const p: PieProjection = projection.pie
+
+  return [
+    withDiagramLabel(diagramSection(p.title ?? undefined), t('app:propertyPanel.diagram')),
+    {
+      key: 'sectors',
+      heading: t('app:propertyPanel.pieSectors'),
+      count: p.sectors.length,
+      entries: p.sectors.map((s) => ({
+        key: s.elementId,
+        label: s.label,
+        detail: s.valuePositive
+          ? s.valueText
+          : t('app:propertyPanel.pieValueInvalidShort', { value: s.valueText }),
+        depth: 1,
+        selection: { kind: 'pie-sector', elementId: s.elementId },
+        onKeyDown: pieSectorKeyDown(p, s.elementId),
+      })),
+    },
+  ]
+}
+
 /** 图种 → 分区描述（注册表 `tree` 字段的实参，registry 只持引用） */
 export const treePartitions: Record<DiagramTypeId, TreePartitions> = {
   flowchart: flowchartPartitions,
@@ -837,4 +889,5 @@ export const treePartitions: Record<DiagramTypeId, TreePartitions> = {
   kanban: kanbanPartitions,
   requirement: requirementPartitions,
   journey: journeyPartitions,
+  pie: piePartitions,
 }

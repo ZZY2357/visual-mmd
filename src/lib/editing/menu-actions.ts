@@ -14,6 +14,7 @@ import { REQUIREMENT_RELATION_KINDS } from '../pipeline/requirement'
 import { isValidGitgraphBranchName } from '../pipeline/gitgraph'
 import { isValidTimelineSectionName, type TimelineIntent } from '../pipeline/timeline'
 import { isValidJourneySectionName, isValidJourneyTaskName, type JourneyIntent } from '../pipeline/journey'
+import { isValidPieLabel, type PieIntent } from '../pipeline/pie'
 import { isValidKanbanId } from '../pipeline/kanban'
 import { setRelationIntent, RELATION_KIND_OPTIONS } from './class-forms'
 import {
@@ -171,6 +172,11 @@ export function createElement(ctx: MenuActionContext, target: ContextMenuTarget 
       // journey（more-diagrams 工单 08）：添加入口是独立的 add-journey-task /
       // add-journey-section 动作（不做内联编辑——画布无 data-id，工单降级定案），
       // 不走 createElement
+      return null
+    }
+    if (proj.type === 'pie') {
+      // pie（more-diagrams 工单 10）：添加入口是独立的 add-pie-sector 动作
+      // （不做内联编辑——画布无 data-id，工单降级定案），不走 createElement
       return null
     }
     // mindmap：节点目标 = 挂为其子节点；空白 / 无目标 = 建根（空文档）或挂到根节点下
@@ -455,6 +461,27 @@ function addJourneySection(ctx: MenuActionContext): void {
   if (applyPlan(plan, { commitIntent: ctx.commitIntent, select: ctx.select })) ctx.close()
 }
 
+// ---------- pie（more-diagrams 工单 10） ----------
+
+/**
+ * 空白处加扇区（pie）：落一行 `"新扇区" : 1` + 选中新扇区（标签避重，数值取 1——
+ * 可在右侧表单改）。不做内联编辑（pie 画布无 data-id，工单降级定案）——
+ * 标签/数值在右侧表单改。
+ */
+function addPieSector(ctx: MenuActionContext): void {
+  const proj = ctx.projection
+  if (proj === null || proj.type !== 'pie') return
+  const label = nextFreeName('新扇区', proj.pie.sectors.map((s) => s.label))
+  if (!isValidPieLabel(label)) return
+  const plan: KeyPlan = {
+    intents: [{ type: 'add-sector', label, value: '1' } satisfies PieIntent],
+    newElementTarget: {
+      selection: { kind: 'pie-sector', elementId: `sector:${proj.pie.nextSectorOrdinal}` },
+    },
+  }
+  if (applyPlan(plan, { commitIntent: ctx.commitIntent, select: ctx.select })) ctx.close()
+}
+
 export const MENU_ACTIONS: Record<Exclude<ContextMenuItemId, 'apply-style'>, MenuAction> = {
   // 「创建 + 选中 + 内联命名」五个入口共用 createElement（工单 01 收敛）
   'add-node': createElement,
@@ -547,4 +574,6 @@ export const MENU_ACTIONS: Record<Exclude<ContextMenuItemId, 'apply-style'>, Men
   // journey（more-diagrams 工单 08）：空白加任务 / 加分组；元素级编辑降级到结构树 + 属性表单
   'add-journey-task': addJourneyTask,
   'add-journey-section': addJourneySection,
+  // pie（more-diagrams 工单 10）：空白加扇区；元素级编辑降级到结构树 + 属性表单
+  'add-pie-sector': addPieSector,
 }

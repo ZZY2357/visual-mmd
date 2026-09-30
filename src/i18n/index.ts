@@ -102,6 +102,8 @@ export const zhDict = {
         // journey（more-diagrams 工单 08）：空白菜单（画布 DOM 无 data-id，无元素级菜单项）
         'add-journey-task': '添加任务',
         'add-journey-section': '添加分组',
+        // pie（more-diagrams 工单 10）：空白菜单（画布 DOM 无 data-id，无元素级菜单项）
+        'add-pie-sector': '添加扇区',
         delete: '删除',
         styleName: '样式名称',
         styleNameInvalid: '名称不能为空，且不能含空格或逗号',
@@ -135,6 +137,7 @@ export const zhDict = {
       kanban: '看板',
       requirement: '需求图',
       journey: '用户旅程图',
+      pie: '饼图',
     },
     library: {
       title: '图表库',
@@ -495,6 +498,17 @@ export const zhDict = {
       invalidJourneySectionName: '分组名称不能为空，且不能含冒号、#、分号',
       invalidJourneyTitle: '标题不能为空，且不能含冒号、#、分号',
       invalidJourneyActors: 'actor 不能为空，且不能含逗号、冒号、#、分号',
+      // ---- pie（more-diagrams 工单 10） ----
+      pieSectors: '扇区',
+      pieTitle: '标题',
+      pieLabel: '扇区标签',
+      pieValue: '数值（必须大于 0）',
+      pieValueInvalidShort: '数值 {{value}}（无效）',
+      deletePieSector: '删除扇区',
+      pieDiagramHint: '饼图：在结构树中选中扇区编辑标签与数值；选中扇区后按 Tab 加扇区、Delete 删除。',
+      invalidPieLabel: '标签不能为空，且不能含引号、反斜杠',
+      invalidPieValue: '数值必须是大于 0 的数字',
+      invalidPieTitle: '标题不能为空，且不能含 %%',
     },
     shapes: {
       rectangle: '矩形',
