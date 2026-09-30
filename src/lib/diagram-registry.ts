@@ -16,6 +16,7 @@ import { blockParser } from './pipeline/block'
 import { sankeyParser } from './pipeline/sankey'
 import { ganttParser } from './pipeline/gantt'
 import { quadrantParser } from './pipeline/quadrant'
+import { xychartParser } from './pipeline/xychart'
 import { frontmatterEnd } from './pipeline/frontmatter'
 import { buildFlowchartProjection, type FlowchartProjection } from './projection/flowchart-projection'
 import { buildSequenceProjection, type SequenceProjection } from './projection/sequence-projection'
@@ -39,6 +40,7 @@ import {
   buildQuadrantProjection,
   type QuadrantProjection,
 } from './projection/quadrant-projection'
+import { buildXychartProjection, type XychartProjection } from './projection/xychart-projection'
 import { flowchartCanvasCapabilities } from './canvas-selection/flowchart-adapter'
 import { sequenceCanvasCapabilities } from './canvas-selection/sequence-adapter'
 import { classCanvasCapabilities } from './canvas-selection/class-adapter'
@@ -55,6 +57,7 @@ import { blockCanvasCapabilities } from './canvas-selection/block-adapter'
 import { sankeyCanvasCapabilities } from './canvas-selection/sankey-adapter'
 import { ganttCanvasCapabilities } from './canvas-selection/gantt-adapter'
 import { quadrantCanvasCapabilities } from './canvas-selection/quadrant-adapter'
+import { xychartCanvasCapabilities } from './canvas-selection/xychart-adapter'
 import type { CanvasCapabilities } from './canvas-selection/capabilities'
 import { treePartitions, type TreePartitions } from './structure-tree/partitions'
 import { DEFAULT_DIAGRAM_SOURCE } from './storage'
@@ -92,6 +95,7 @@ export interface ProjectionTypes {
   sankey: SankeyProjection
   gantt: GanttProjection
   quadrant: QuadrantProjection
+  xychart: XychartProjection
 }
 
 /** 已注册图种的 id 集合（字面量联合，随 ProjectionTypes 增长） */
@@ -379,6 +383,20 @@ export const QUADRANT_TEMPLATE = `quadrantChart
 `
 
 /**
+ * xychart 起步模板（more-diagrams 工单 14）：`xychart-beta` 声明 + title、类别 x 轴
+ * （3 类）、y 轴 range、一条 bar 与一条带名 line 系列（工单定案构成）。
+ * 注意 mermaid xychart 词法：裸文本限 ASCII 词形——**中文标题/类别/系列名必须引号
+ * 包裹**（STR token 无转义，内部不能有 `"`）；引号内的中文合法（模板即示例）。
+ */
+export const XYCHART_TEMPLATE = `xychart-beta
+    title "季度销售趋势"
+    x-axis ["一季度", "二季度", "三季度"]
+    y-axis "销售额" 0 --> 400
+    bar [200, 350, 150]
+    line "均线" [150, 250, 300]
+`
+
+/**
  * 注册表：数组是唯一权威（more-diagrams 工单 01），DIAGRAM_TYPES 由它推导。
  * detectDiagramType 按数组顺序显式遍历——不再维护手写的 if 分发链，
  * 新图种挂一条即可参与识别，无法识别时不再默认 flowchart（见下）。
@@ -540,6 +558,18 @@ export const DIAGRAM_TYPE_LIST: DiagramTypeRegistration[] = [
     buildProjection: (doc) => ({ type: 'quadrant', quadrant: buildQuadrantProjection(doc) }),
     tree: treePartitions.quadrant,
     canvas: quadrantCanvasCapabilities,
+  },
+  {
+    id: 'xychart',
+    parser: xychartParser,
+    template: XYCHART_TEMPLATE,
+    // xychart 词法两个关键字都认（`xychart-beta` / `xychart`，均 case-insensitive，离线核对
+    // xychartDiagram-PMCCYNJV.mjs 的 jison 规则）；声明行可带方向修饰符 `horizontal` /
+    // `vertical`（独立词、空格分隔）——`xychart` 后跟别的内容不认领
+    detect: (source) => /^xychart(-beta)?(?:[ \t]+(?:horizontal|vertical))?[ \t\r]*$/i.test(firstStatementLine(source)),
+    buildProjection: (doc) => ({ type: 'xychart', xychart: buildXychartProjection(doc) }),
+    tree: treePartitions.xychart,
+    canvas: xychartCanvasCapabilities,
   },
 ]
 

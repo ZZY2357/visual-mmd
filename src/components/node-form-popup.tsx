@@ -13,6 +13,7 @@ import {
 } from './requirement-forms'
 import { AddBlockEdgeInlineForm } from './block-forms'
 import { AddSankeyLinkInlineForm } from './sankey-forms'
+import { AddXychartSeriesInlineForm } from './xychart-forms'
 
 /**
  * class/sequence 节点菜单的表单浮层（工单 06/04；工单 04-canvas-bundle 自 CanvasPanel 迁出）：
@@ -129,6 +130,13 @@ export function NodeFormPopup(props: { state: NodeFormState; projection: AnyProj
           <AddSankeyLinkInlineForm
             nodeNames={projection.sankey.nodes.map((n) => n.name)}
             initialSource={state.from}
+            afterElementId={state.anchorElementId}
+            onDone={props.onClose}
+          />
+        )}
+        {(state.kind === 'xychart-line' || state.kind === 'xychart-bar') && projection.type === 'xychart' && (
+          <AddXychartSeriesInlineForm
+            seriesType={state.kind === 'xychart-line' ? 'line' : 'bar'}
             afterElementId={state.anchorElementId}
             onDone={props.onClose}
           />

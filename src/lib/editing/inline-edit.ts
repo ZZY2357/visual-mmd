@@ -12,6 +12,7 @@ import { isValidBlockLabel } from '../pipeline/block'
 import { parseBlockNodeElementId } from '../pipeline/element-id'
 import { isValidGanttTaskName } from '../pipeline/gantt'
 import { isValidQuadrantPointText } from '../pipeline/quadrant'
+import { isValidXychartText } from '../pipeline/xychart'
 import type { ProjectionMindmapNode } from '../projection/mindmap-projection'
 import { selectionFromEventTarget, type CanvasSelection, type DataIdResolver } from '../canvas-selection/data-id'
 
@@ -76,6 +77,9 @@ export type CanvasInlineEditTarget =
   /** quadrant（more-diagrams 工单 12）：双击点改文本（set-point-text 意图）。
    * 点有 data-id 寻址（渲染后位置序反注）；轴/象限标题不做双击（右侧表单改） */
   | { kind: 'quadrant-point'; elementId: string }
+  /** xychart（more-diagrams 工单 14）：双击系列改名字（set-series-name 意图；位置序
+   * elementId 寻址。轴/标题无双击——文档级属性元素，走右侧属性表单） */
+  | { kind: 'xychart-series'; elementId: string }
 
 export type InlineEditCommit =
   | { action: 'commit'; intent: EditIntent }
@@ -160,6 +164,7 @@ export type InlineEditDiagramKind =
   | 'block'
   | 'gantt'
   | 'quadrant'
+  | 'xychart'
 
 /**
  * 双击目标 → 编辑对象；两边都匹配不上时返回 null（如点在空白处/边上），
@@ -215,6 +220,13 @@ export function inlineEditTargetFromEvent(
     // 只有点可双击（改文本）；轴/象限标题双击安静忽略（右侧表单改）
     if (kind === 'quadrant') {
       return byId.nodeId.startsWith('point:') ? { kind: 'quadrant-point', elementId: byId.nodeId } : null
+    }
+    // xychart（more-diagrams 工单 14）：resolver 返回 node.id = `series:N` / 固定身份；
+    // 只有系列可双击（改名字），轴/标题双击安静忽略（文档级属性，走右侧表单）
+    if (kind === 'xychart') {
+      return /^series:[1-9][0-9]*$/.test(byId.nodeId)
+        ? { kind: 'xychart-series', elementId: byId.nodeId }
+        : null
     }
     return byId
   }
@@ -288,6 +300,13 @@ export function inlineEditCommitOf(target: CanvasInlineEditTarget, text: string,
     // 关键字前缀等非法输入拒绝落码，见 isValidQuadrantPointText）
     if (!isValidQuadrantPointText(next)) return { action: 'invalid' }
     return { action: 'commit', intent: { type: 'set-point-text', elementId: target.elementId, text: next } }
+  }
+  if (target.kind === 'xychart-series') {
+    // xychart（more-diagrams 工单 14）：非空改动 = set-series-name（名字含引号/换行非法；
+    // 清空 = 去名字变未命名系列——commit 为 set-series-name null，走属性表单而非双击——
+    // 顶部守卫已把清空按 unchanged 关闭）
+    if (!isValidXychartText(next)) return { action: 'invalid' }
+    return { action: 'commit', intent: { type: 'set-series-name', elementId: target.elementId, name: next } }
   }
   if (!isValidMindmapNodeText(next)) return { action: 'invalid' }
   return { action: 'commit', intent: { type: 'set-node-text', elementId: target.elementId, text: next } }

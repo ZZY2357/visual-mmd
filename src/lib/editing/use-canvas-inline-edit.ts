@@ -93,6 +93,10 @@ export function inlineEditTextOf(projection: AnyProjection | null, target: Canva
     // quadrant 双击编辑的是点文本（more-diagrams 工单 12）
     return projection.quadrant.points.find((p) => p.elementId === target.elementId)?.text ?? ''
   }
+  if (projection.type === 'xychart' && target.kind === 'xychart-series') {
+    // xychart 双击编辑的是系列名（more-diagrams 工单 14）：未命名系列预填空串（输入即命名）
+    return projection.xychart.series.find((s) => s.elementId === target.elementId)?.name ?? ''
+  }
   return ''
 }
 
@@ -197,6 +201,13 @@ function findTargetElement(root: Element, target: CanvasInlineEditTarget, text: 
     }
     return null
   }
+  if (target.kind === 'xychart-series') {
+    // xychart 的系列 data-id 即位置序 elementId（渲染后处理从 `g.plot` 内类名序号反注，工单 14）
+    for (const el of root.querySelectorAll('[data-id]')) {
+      if (el.getAttribute('data-id') === target.elementId) return el
+    }
+    return null
+  }
   return findMindmapElement(root, target.elementId, text)
 }
 
@@ -276,7 +287,9 @@ export function useCanvasInlineEdit({ projection, resolver, svg, containerRef, v
                           ? 'gantt'
                           : type === 'quadrant'
                             ? 'quadrant'
-                            : 'flowchart'
+                            : type === 'xychart'
+                              ? 'xychart'
+                              : 'flowchart'
       const target = inlineEditTargetFromEvent(e.target, resolver, mindmapNodes, kind)
       if (target === null) return
       e.preventDefault()

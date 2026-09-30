@@ -187,6 +187,11 @@ export function createElement(ctx: MenuActionContext, target: ContextMenuTarget 
       // （三列表单浮出，提交才落码；链路才有落码语法，无「创建节点」形态），不走 createElement
       return null
     }
+    if (proj.type === 'xychart') {
+      // xychart（more-diagrams 工单 14）：添加入口是独立的 add-xychart-line / add-xychart-bar
+      // 动作（表单浮出，提交才落码；系列才有「创建」形态，轴/标题是文档级属性），不走 createElement
+      return null
+    }
     if (proj.type === 'block') {
       // block（more-diagrams 工单 09）：空白 = 新建顶层块节点 + 内联编辑标签；
       // 嵌套块上 = 新建块节点落进该组（锚点 = 组声明行）。id 全局避重（节点与
@@ -525,6 +530,24 @@ function addPieSector(ctx: MenuActionContext): void {
   if (applyPlan(plan, { commitIntent: ctx.commitIntent, select: ctx.select })) ctx.close()
 }
 
+// ---------- xychart（more-diagrams 工单 14） ----------
+
+/**
+ * 系列：切换类型 line↔bar（set-series-type，直接改关键字，不弹表单）。
+ * 菜单保持打开，便于连点来回切；每次切换是一次独立快照（可撤销）。
+ */
+function toggleXychartSeriesType(ctx: MenuActionContext, target: ContextMenuTarget | undefined): void {
+  const proj = ctx.projection
+  if (target === undefined || target.kind !== 'xychart-series' || proj === null || proj.type !== 'xychart') return
+  const series = proj.xychart.series.find((s) => s.elementId === target.elementId)
+  if (series === undefined) return
+  ctx.commitIntent({
+    type: 'set-series-type',
+    elementId: target.elementId,
+    seriesType: series.seriesType === 'bar' ? 'line' : 'bar',
+  })
+}
+
 /** block 空白加嵌套块（more-diagrams 工单 09）：落 `block:gid` + `end` 两行，
  * 选中新组（组无标签，不做内联命名——宽度/列数在右侧属性表单改）。id 全局避重。 */
 function addBlockGroup(ctx: MenuActionContext): void {
@@ -727,4 +750,12 @@ export const MENU_ACTIONS: Record<Exclude<ContextMenuItemId, 'apply-style'>, Men
   'edit-quadrant-coords': selectMenuTargetAndClose,
   'edit-quadrant-style': selectMenuTargetAndClose,
   'edit-quadrant-text': selectMenuTargetAndClose,
+  // xychart（more-diagrams 工单 14）：空白 = 加 line / 加 bar（表单浮出，提交才落码）；
+  // 系列 = 改名（选中 + 关菜单）/ 改类型（直接落码切换）/ 编辑数值（选中 + 关菜单，
+  // 数组行编辑在属性表单）/ 删除；轴 = 改形态/字段（选中 + 关菜单，属性表单承接）
+  'add-xychart-line': openFormOf('xychart-line'),
+  'add-xychart-bar': openFormOf('xychart-bar'),
+  'xychart-toggle-type': toggleXychartSeriesType,
+  'xychart-edit-values': selectMenuTargetAndClose,
+  'edit-xychart-axis': selectMenuTargetAndClose,
 }

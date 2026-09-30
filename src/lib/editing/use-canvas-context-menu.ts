@@ -147,6 +147,16 @@ function nodeFormForTarget(
     if (link === undefined) return null
     return { kind, anchorElementId: link.elementId, from: link.source, x, y }
   }
+  if (kind === 'xychart-line' || kind === 'xychart-bar') {
+    // xychart 加系列表单（more-diagrams 工单 14）：空白右键 → 无锚点（管线回退文档末尾）；
+    // 系列上 Tab（经 formTargetOfSelection）→ 锚点为该系列行（新系列落在其后）
+    if (proj.type !== 'xychart') return null
+    if (target.kind === 'blank') return { kind, x, y }
+    if (target.kind !== 'xychart-series') return null
+    const series = proj.xychart.series.find((s) => s.elementId === target.elementId)
+    if (series === undefined) return null
+    return { kind, anchorElementId: series.elementId, x, y }
+  }
   if (kind === 'block') {
     // sequence 独有的添加逻辑块：参与者上右键 → 锚点为该参与者的声明；
     // 空白处右键 → 无锚点（管线回退到文档最后一个元素）
@@ -187,6 +197,8 @@ function formTargetOfSelection(selection: Selection): ContextMenuTarget | null {
   if (selection.kind === 'block-node') return { kind: 'block-node', id: selection.id }
   // sankey（more-diagrams 工单 13）：链路 → 加链路表单（Tab 键）的锚点与 source 预填
   if (selection.kind === 'sankey-link') return { kind: 'sankey-link', elementId: selection.elementId }
+  // xychart（more-diagrams 工单 14）：系列 → 加系列表单（Tab 键）的锚点
+  if (selection.kind === 'xychart-series') return { kind: 'xychart-series', elementId: selection.elementId }
   return null
 }
 
@@ -370,7 +382,9 @@ export function useCanvasContextMenu(
         | 'er-relation'
         | 'requirement-relation'
         | 'block-edge'
-        | 'sankey-link',
+        | 'sankey-link'
+        | 'xychart-line'
+        | 'xychart-bar',
     ): void => {
       const proj = latest.current.projection
       const { selection } = useEditorStore.getState()

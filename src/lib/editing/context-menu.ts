@@ -81,6 +81,11 @@ export type ContextMenuTarget =
   | { kind: 'quadrant-point'; elementId: string }
   | { kind: 'quadrant-axis'; elementId: string }
   | { kind: 'quadrant-quadrant'; elementId: string }
+// xychart（more-diagrams 工单 14）：系列 elementId 即投影位置序身份 `series:N`（经类名组
+// 位置序反注可寻址）；轴与标题是文档级属性元素（固定身份，经类名组反注可寻址）
+  | { kind: 'xychart-series'; elementId: string }
+  | { kind: 'xychart-axis'; axis: 'x' | 'y' }
+  | { kind: 'xychart-title' }
 
 export type ContextMenuItemId =
   | 'add-node'
@@ -180,6 +185,14 @@ export type ContextMenuItemId =
   | 'edit-quadrant-coords'
   | 'edit-quadrant-style'
   | 'edit-quadrant-text'
+  // xychart（more-diagrams 工单 14）：空白 = 加 line / 加 bar（表单浮出，提交才落码）；
+  // 系列 = 改名（选中 + 关菜单，属性表单）/ 改类型（直接落码切换 line↔bar）/
+  // 编辑数值（选中 + 关菜单，数组行编辑在属性表单）/ 删除；轴 = 改形态/字段（选中 + 关菜单）
+  | 'add-xychart-line'
+  | 'add-xychart-bar'
+  | 'xychart-toggle-type'
+  | 'xychart-edit-values'
+  | 'edit-xychart-axis'
 
 /**
  * 画布选中 → 菜单目标（工单 03 起为 `canvas-selection/selection-codec.ts` 的
@@ -238,6 +251,9 @@ function blankMenuItems(diagramType: DiagramTypeId): ContextMenuItemId[] {
     case 'quadrant':
       // quadrant 的空白入口（工单 12 定案）：加点（坐标落 0.5, 0.5，文本避重，右侧表单可改）
       return ['add-quadrant-point']
+    case 'xychart':
+      // xychart 的空白入口（more-diagrams 工单 14）：加 line / 加 bar（表单，提交才落码）
+      return ['add-xychart-line', 'add-xychart-bar']
     // DiagramTypeId 是开放类型（more-diagrams 工单 01）：未接入画布能力包的图种
     // 没有空白右键入口（unsupported 态下画布右键整体停用，不会走到这里）
     default:
@@ -346,5 +362,14 @@ export function contextMenuItems(target: ContextMenuTarget): ContextMenuItemId[]
     case 'quadrant-axis':
     case 'quadrant-quadrant':
       return ['edit-quadrant-text']
+    // xychart（more-diagrams 工单 14）：系列 = 改名（选中 + 关菜单，属性表单）/
+    // 改类型（直接落码切换 line↔bar）/ 编辑数值（选中 + 关菜单，数组行编辑在属性表单）/
+    // 删除；轴 = 改形态/字段（选中 + 关菜单，属性表单承接）；标题 = 改标题（选中 + 关菜单）
+    case 'xychart-series':
+      return ['edit-label', 'xychart-toggle-type', 'xychart-edit-values', 'delete']
+    case 'xychart-axis':
+      return ['edit-xychart-axis']
+    case 'xychart-title':
+      return ['edit-label']
   }
 }

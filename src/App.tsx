@@ -232,6 +232,9 @@ export default function App() {
                 <Menu.Item onClick={() => newDiagram('quadrant', t('newDiagram.quadrant'))}>
                   {t('newDiagram.quadrant')}
                 </Menu.Item>
+                <Menu.Item onClick={() => newDiagram('xychart', t('newDiagram.xychart'))}>
+                  {t('newDiagram.xychart')}
+                </Menu.Item>
               </Menu.Dropdown>
             </Menu>
             <Button

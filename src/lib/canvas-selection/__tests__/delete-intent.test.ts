@@ -8,6 +8,7 @@ import {
   SANKEY_TEMPLATE,
   SEQUENCE_TEMPLATE,
   TIMELINE_TEMPLATE,
+  XYCHART_TEMPLATE,
   type AnyProjection,
 } from '../../diagram-registry'
 import type { EditIntent } from '../../pipeline/parser'
@@ -20,6 +21,7 @@ import { kanbanParser } from '../../pipeline/kanban'
 import { blockParser } from '../../pipeline/block'
 import { sankeyParser } from '../../pipeline/sankey'
 import { ganttParser } from '../../pipeline/gantt'
+import { xychartParser } from '../../pipeline/xychart'
 import { buildClassProjection } from '../../projection/class-projection'
 import { buildFlowchartProjection } from '../../projection/flowchart-projection'
 import { buildMindmapProjection } from '../../projection/mindmap-projection'
@@ -29,6 +31,7 @@ import { buildKanbanProjection } from '../../projection/kanban-projection'
 import { buildBlockProjection } from '../../projection/block-projection'
 import { buildSankeyProjection } from '../../projection/sankey-projection'
 import { buildGanttProjection } from '../../projection/gantt-projection'
+import { buildXychartProjection } from '../../projection/xychart-projection'
 import type { Selection } from '../../projection/selection'
 import {
   blockDeleteIntent,
@@ -40,6 +43,7 @@ import {
   sankeyDeleteIntent,
   sequenceDeleteIntent,
   timelineDeleteIntent,
+  xychartDeleteIntent,
 } from '../../editing/canvas-keyboard'
 import {
   deleteClassDefIntent,
@@ -354,6 +358,29 @@ function ganttCases(p: ReturnType<typeof ganttProjection>): DeleteCase[] {
   ]
 }
 
+/** xychartProjection：xychart 投影（工单 14） */
+function xychartProjection(): Extract<AnyProjection, { type: 'xychart' }> {
+  const parsed = xychartParser.parse(XYCHART_TEMPLATE)
+  if (!parsed.ok) throw new Error(parsed.error.message)
+  return { type: 'xychart', xychart: buildXychartProjection(parsed.doc) }
+}
+
+/** xychart（more-diagrams 工单 14）：系列一条删除入口。轴与标题是文档级属性元素，
+ * 没有「删除」的语法动作，不进 DeleteCase（能力包对 xychart-axis / xychart-title 恒返回
+ * null，由「存在性重校验」用例的 foreign / gone 分支覆盖） */
+function xychartCases(p: ReturnType<typeof xychartProjection>): DeleteCase[] {
+  const series = p.xychart.series[0]
+  return [
+    {
+      name: 'xychart-series',
+      selection: { kind: 'xychart-series', elementId: series.elementId },
+      panelIntent: { type: 'delete-series', elementId: series.elementId },
+      menuTarget: { kind: 'xychart-series', elementId: series.elementId },
+      menuItemId: 'delete',
+    },
+  ]
+}
+
 const SUITES = [
   { type: 'flowchart' as const, projection: flowProjection, cases: flowchartCases },
   { type: 'class' as const, projection: classProjection, cases: classCases },
@@ -364,6 +391,7 @@ const SUITES = [
   { type: 'block' as const, projection: blockProjection, cases: blockCases },
   { type: 'sankey' as const, projection: sankeyProjection, cases: sankeyCases },
   { type: 'gantt' as const, projection: ganttProjection, cases: ganttCases },
+  { type: 'xychart' as const, projection: xychartProjection, cases: xychartCases },
 ]
 
 describe('deleteIntent 等价性：三个删除入口对同一 selection 产出同一意图（工单 03）', () => {
@@ -408,6 +436,8 @@ describe('deleteIntent 等价性：三个删除入口对同一 selection 产出�
                 return sankeyDeleteIntent(projection.sankey, sel)
               case 'gantt':
                 return ganttDeleteIntent(projection.gantt, sel)
+              case 'xychart':
+                return xychartDeleteIntent(projection.xychart, sel)
             }
           })()
           // 键盘按选中种类设门（flowchart/mindmap 只删节点）；门内的种类必须与能力包等价
@@ -420,7 +450,8 @@ describe('deleteIntent 等价性：三个删除入口对同一 selection 产出�
             suite.type === 'kanban' ||
             suite.type === 'block' ||
             suite.type === 'sankey' ||
-            suite.type === 'gantt'
+            suite.type === 'gantt' ||
+            suite.type === 'xychart'
           if (!keyboardHandles) {
             expect(viaKeyboard).toBeNull() // 门外：键盘安静地不产出意图（零变化护栏）
             return
@@ -478,6 +509,7 @@ describe('deleteIntent 等价性：三个删除入口对同一 selection 产出�
           block: { kind: 'block-node', id: '__不存在__' },
           sankey: { kind: 'sankey-link', elementId: 'link:999' },
           gantt: { kind: 'gantt-task', elementId: 'task:999' },
+          xychart: { kind: 'xychart-series', elementId: 'series:999' },
         }
         expect(caps.deleteIntent(projection, gone[suite.type])).toBeNull()
 
