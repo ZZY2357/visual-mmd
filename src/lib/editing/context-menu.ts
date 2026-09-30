@@ -39,6 +39,10 @@ export type ContextMenuTarget =
   | { kind: 'sequence-message'; elementId: string }
   | { kind: 'sequence-note'; elementId: string }
   | { kind: 'sequence-block'; elementId: string }
+  // state（more-diagrams 工单 02）：状态节点选中 id 即状态 id（composite 由调用方按投影补齐）；
+  // 转移边 elementId 即投影 elementId（`transition:N`，位置序身份）
+  | { kind: 'state-node'; id: string; composite?: boolean }
+  | { kind: 'state-transition'; elementId: string }
 
 export type ContextMenuItemId =
   | 'add-node'
@@ -74,6 +78,10 @@ export type ContextMenuItemId =
   | 'delete-message'
   | 'delete-note'
   | 'delete-block'
+  // state（more-diagrams 工单 02）
+  | 'add-state'
+  | 'add-state-into'
+  | 'edit-state-desc'
 
 /**
  * 画布选中 → 菜单目标（工单 03 起为 `canvas-selection/selection-codec.ts` 的
@@ -100,6 +108,8 @@ function blankMenuItems(diagramType: DiagramTypeId): ContextMenuItemId[] {
       return ['add-participant', 'add-note', 'add-block']
     case 'mindmap':
       return ['add-root']
+    case 'state':
+      return ['add-state', 'link-mode']
     // DiagramTypeId 是开放类型（more-diagrams 工单 01）：未接入画布能力包的图种
     // 没有空白右键入口（unsupported 态下画布右键整体停用，不会走到这里）
     default:
@@ -151,5 +161,12 @@ export function contextMenuItems(target: ContextMenuTarget): ContextMenuItemId[]
       return ['delete-note']
     case 'sequence-block':
       return ['delete-block']
+    case 'state-node':
+      // 复合状态多一项「添加状态（复合内部）」；普通状态 = 改描述 / 连线模式 / 删除
+      return target.composite === true
+        ? ['add-state-into', 'edit-state-desc', 'link-from-here', 'delete']
+        : ['edit-state-desc', 'link-from-here', 'delete']
+    case 'state-transition':
+      return ['edit-label', 'delete']
   }
 }

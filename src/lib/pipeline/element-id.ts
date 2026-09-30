@@ -124,6 +124,18 @@ export function parseMindmapNodeElementId(id: string): number | null {
   return m === null ? null : Number(m[1])
 }
 
+// ---------- state（more-diagrams 工单 02） ----------
+
+/** 状态声明（`state:Idle` / `state:Idle#2`）；仅被转移引用的隐式状态没有声明元素 */
+export function stateElementId(name: string, occurrence = 1): string {
+  return keyed('state', name, occurrence)
+}
+
+/** 状态描述行（`state-desc:Idle`）：`Idle : 描述` 那一行的元素 id */
+export function stateDescElementId(name: string, occurrence = 1): string {
+  return keyed('state-desc', name, occurrence)
+}
+
 // ---------- 下一个可用名/ID（architecture-deepening-2 工单 04） ----------
 
 export interface NextFreeNameOptions {

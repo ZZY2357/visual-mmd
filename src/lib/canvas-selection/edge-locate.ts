@@ -175,6 +175,19 @@ export function annotateSequenceIdentities(
   annotateHostAnchors(hostGroupsOf(Array.from(root.querySelectorAll(SEQUENCE_BLOCK_LINE))), 'block', counts.blocks)
 }
 
+/** state 转移边：与 class 同构——`.edgePaths > path` 相邻去重分组，第 k 组 = `transition:(k+1)`；
+ * 条数与投影不符时整体放弃（绝不误标，more-diagrams 工单 02） */
+export function annotateStateTransitionIdentities(root: ParentNode, expected: number): void {
+  if (expected <= 0) return
+  const groups = groupRepeats(Array.from(root.querySelectorAll(CLASS_RELATION_PATH)))
+  if (groups.length !== expected) return
+  groups.forEach((group, ordinal) => {
+    const elementId = edgeElementIdOf('transition', ordinal)
+    if (elementId === null) return
+    for (const path of group) path.setAttribute('data-id', elementId)
+  })
+}
+
 /** 屏幕命中容差（CSS px）：sequence 消息 only 1.5px 描边，给一点余量但不足以吃到空白 */
 export const EDGE_HIT_TOLERANCE = 4
 

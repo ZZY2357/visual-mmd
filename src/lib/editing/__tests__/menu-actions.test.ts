@@ -117,6 +117,10 @@ describe('MENU_ACTIONS 穷尽性（工单 05 → 工单 01）', () => {
       { kind: 'sequence-message', elementId: 'message:1' },
       { kind: 'sequence-note', elementId: 'note:1' },
       { kind: 'sequence-block', elementId: 'block:1' },
+      { kind: 'blank', diagramType: 'state' },
+      { kind: 'state-node', id: 's1', composite: false },
+      { kind: 'state-node', id: 'comp', composite: true },
+      { kind: 'state-transition', elementId: 'transition:1' },
     ]
     const reachableIds = new Set(allTargets.flatMap((target) => contextMenuItems(target)))
     // apply-style 不经 onMenuItem 分发（CanvasPanel 渲染成子菜单开关，点样式名直接调

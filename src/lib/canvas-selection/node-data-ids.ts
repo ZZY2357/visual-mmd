@@ -26,12 +26,19 @@ const FLOWCHART_NODE_DOM_ID = /(?:^|-)flowchart-(.+)-(\d+)$/
  * 类名自身可含 `-`，同样以尾部 `-数字` 切分 */
 const CLASS_NODE_DOM_ID = /(?:^|-)classId-(.+)-(\d+)$/
 
-/** DOM id → 节点 id（flowchart / class 两种形态）；不是节点 id 时返回 null */
+/** mermaid v12 state 状态节点 DOM id 形态：`{svgId}-state-{状态id}-{序号}`（stateDomId）；
+ * note 块的 id 形如 `{svgId}-state-{目标}----note-{n}`，解析出的 `目标----note` 不是
+ * 已知状态 id，被 resolver 安静拒绝（more-diagrams 工单 02） */
+const STATE_NODE_DOM_ID = /(?:^|-)state-(.+)-(\d+)$/
+
+/** DOM id → 节点 id（flowchart / class / state 三种形态）；不是节点 id 时返回 null */
 function nodeIdOfDomId(domId: string): string | null {
   const flow = FLOWCHART_NODE_DOM_ID.exec(domId)
   if (flow !== null) return flow[1]
   const cls = CLASS_NODE_DOM_ID.exec(domId)
-  return cls !== null ? cls[1] : null
+  if (cls !== null) return cls[1]
+  const state = STATE_NODE_DOM_ID.exec(domId)
+  return state !== null ? state[1] : null
 }
 
 export function annotateNodeDataIds(root: ParentNode): void {

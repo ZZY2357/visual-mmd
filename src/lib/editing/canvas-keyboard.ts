@@ -5,10 +5,12 @@ import { mindmapNodeElementId, nextFreeName } from '../pipeline/element-id'
 import type { MindmapIntent } from '../pipeline/mindmap'
 import type { EditIntent } from '../pipeline/parser'
 import type { SequenceIntent } from '../pipeline/sequence'
+import type { StateIntent } from '../pipeline/state'
 import type { ClassProjection } from '../projection/class-projection'
 import type { FlowchartProjection } from '../projection/flowchart-projection'
 import type { MindmapProjection } from '../projection/mindmap-projection'
 import type { SequenceProjection } from '../projection/sequence-projection'
+import type { StateProjection } from '../projection/state-projection'
 import type { Selection } from '../projection/selection'
 import type { CanvasInlineEditTarget, Rect } from './inline-edit'
 
@@ -38,6 +40,7 @@ export type CanvasKeyboardProjection =
   | { kind: 'mindmap'; projection: MindmapProjection }
   | { kind: 'class'; projection: ClassProjection }
   | { kind: 'sequence'; projection: SequenceProjection }
+  | { kind: 'state'; projection: StateProjection }
 
 export type NodeKeyAction = 'delete' | 'add-child' | 'add-sibling'
 
@@ -148,7 +151,7 @@ export function mindmapActionIntents(
 
 /** 编辑键请求打开的添加表单种类：member / relation / message 落到已有表单浮层
  * （锚点/预选由右键菜单 hook 从选中推出），participant 走既有创建路径（内联命名） */
-export type KeyFormKind = 'member' | 'relation' | 'message' | 'participant'
+export type KeyFormKind = 'member' | 'relation' | 'message' | 'participant' | 'transition'
 
 /** 键事件的语义 plan：执行器（applyPlan）按字段决定提交 / 选中 / 内联编辑 / 表单 */
 export interface KeyPlan {
@@ -306,6 +309,70 @@ export function sequenceKeyPlan(projection: SequenceProjection, input: KeyInput)
   if (selection === null || selection.kind !== 'participant') return null
   if (!projection.participants.some((p) => p.actorId === selection.actorId)) return null
   return { intents: [], form: 'message' }
+}
+
+// ---------- state 编辑键（more-diagrams 工单 02 / ADR-0013）：就近结构映射 ----------
+
+/**
+ * 选中元素 → 删除意图（state）：状态（级联删描述/复合块/触及转移与 note，由管线负责）、
+ * 转移、note 三类各映射到既有 delete-* 意图；已不在投影 / null / 别种选中 → null。
+ */
+export function stateDeleteIntent(projection: StateProjection, selection: Selection | null): StateIntent | null {
+  if (selection === null) return null
+  switch (selection.kind) {
+    case 'state':
+      return projection.states.some((s) => s.id === selection.id)
+        ? { type: 'delete-state', id: selection.id }
+        : null
+    case 'state-transition':
+      return projection.transitions.some((t) => t.elementId === selection.elementId)
+        ? { type: 'delete-transition', elementId: selection.elementId }
+        : null
+    case 'state-note':
+      return projection.notes.some((n) => n.elementId === selection.elementId)
+        ? { type: 'delete-note', elementId: selection.elementId }
+        : null
+    default:
+      return null
+  }
+}
+
+/**
+ * 键 → plan（state，more-diagrams 工单 02 / ADR-0013 就近类比）：
+ * - Delete = 删除选中元素（查 stateDeleteIntent 唯一映射）
+ * - Tab = 加同级状态（落码 + 选中 + 内联编辑描述）；复合状态内部的状态，新状态
+ *   落在同一复合里（parentElementId），锚点为该状态的最后一个归属元素
+ * - Enter = 从该状态拉一条转移（落到已有 AddTransitionInlineForm 表单浮层，不新造）
+ */
+export function stateKeyPlan(projection: StateProjection, input: KeyInput): KeyPlan | null {
+  if (input.key === 'Delete' || input.key === 'Backspace') {
+    const intent = stateDeleteIntent(projection, input.selection)
+    return intent === null ? null : { intents: [intent], clearSelection: true }
+  }
+  if (input.key !== 'Tab' && input.key !== 'Enter') return null
+  if (input.mods?.shift === true) return null
+  const selection = input.selection
+  if (selection === null || selection.kind !== 'state') return null
+  const state = projection.states.find((s) => s.id === selection.id)
+  if (state === undefined) return null
+  if (input.key === 'Enter') return { intents: [], form: 'transition' }
+  const id = nextFreeName('s', projection.states.map((s) => s.id))
+  const intent: StateIntent = {
+    type: 'add-state',
+    id,
+    afterElementId: state.tailElementId ?? undefined,
+    parentElementId:
+      state.parentId !== null
+        ? (projection.states.find((s) => s.id === state.parentId)?.elementId ?? undefined)
+        : undefined,
+  }
+  return {
+    intents: [intent],
+    newElementTarget: {
+      selection: { kind: 'state', id },
+      inlineEdit: { kind: 'state', id },
+    },
+  }
 }
 
 /**

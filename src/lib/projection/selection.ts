@@ -29,6 +29,10 @@ export type Selection =
   | { kind: 'class-namespace'; elementId: string }
   // mindmap（工单 08）
   | { kind: 'mindmap-node'; elementId: string }
+  // state（more-diagrams 工单 02）
+  | { kind: 'state'; id: string }
+  | { kind: 'state-transition'; elementId: string }
+  | { kind: 'state-note'; elementId: string }
 
 export const DIAGRAM_SELECTION: Selection = { kind: 'diagram' }
 
@@ -66,6 +70,12 @@ export function selectionKey(sel: Selection): string {
       return `class-namespace:${sel.elementId}`
     case 'mindmap-node':
       return `mindmap-node:${sel.elementId}`
+    case 'state':
+      return `state:${sel.id}`
+    case 'state-transition':
+      return `state-transition:${sel.elementId}`
+    case 'state-note':
+      return `state-note:${sel.elementId}`
   }
 }
 

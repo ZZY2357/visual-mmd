@@ -11,6 +11,11 @@ describe('金样合法性：默认图表模板能被 mermaid 渲染', () => {
     await expect(mermaid.parse(DEFAULT_DIAGRAM_SOURCE)).resolves.toBeTruthy()
   })
 
+  it('state 起步模板 parse 通过', async () => {
+    const { STATE_TEMPLATE } = await import('../diagram-registry')
+    await expect(mermaid.parse(STATE_TEMPLATE)).resolves.toBeTruthy()
+  })
+
   it('sequence 源码 parse 通过', async () => {
     const src = `sequenceDiagram
     Alice->>Bob: 你好
