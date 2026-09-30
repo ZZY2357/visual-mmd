@@ -74,7 +74,7 @@ export const quadrantCanvasCapabilities: CanvasCapabilities<ProjectionOf<'quadra
   dataIdResolver: (projection) => quadrantDataIdResolver(projection.quadrant),
   toSelection: (canvas) => quadrantSelectionOf(canvas),
   // data-id 即投影 elementId（渲染后按位置序反注）
-  canvasIdOf: (selection) => {
+  canvasIdOf: (_projection, selection) => {
     if (
       selection.kind === 'quadrant-point' ||
       selection.kind === 'quadrant-axis' ||
