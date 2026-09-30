@@ -142,7 +142,6 @@ interface ContextMenuApi {
   /** flowchart 连线菜单的编辑类菜单项（工单 06：与 editRelation / editMessage 同语义） */
   beginEditLabel: () => void
   submitStyleForm: (name: string, color: string) => boolean
-  openStyleForm: () => void
   closeStyleForm: () => void
   cycleRelationKind: () => void
   editRelation: () => void
@@ -191,7 +190,6 @@ function Harness(props: {
     enterLinkMode: ctx.enterLinkMode,
     applyStyle: ctx.applyStyle,
     submitStyleForm: ctx.submitStyleForm,
-    openStyleForm: ctx.openStyleForm,
     closeStyleForm: ctx.closeStyleForm,
     openFormForSelection: ctx.openFormForSelection,
   }

@@ -38,16 +38,6 @@ function clearSelection() {
   useEditorStore.getState().select(null)
 }
 
-function visibilityLabel(t: (k: string) => string, vis: Visibility): string {
-  const option = VISIBILITY_OPTIONS.find((o) => o.value === vis)
-  return t(option !== undefined ? option.labelKey : vis)
-}
-
-function relationKindLabel(t: (k: string) => string, kind: RelationKind): string {
-  const option = RELATION_KIND_OPTIONS.find((o) => o.value === kind)
-  return t(option !== undefined ? option.labelKey : kind)
-}
-
 // ---------- 类 ----------
 
 export function ClassForm({ cls }: { cls: ProjectionClass }) {

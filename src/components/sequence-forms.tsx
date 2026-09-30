@@ -53,11 +53,6 @@ function clearSelection() {
   useEditorStore.getState().select(null)
 }
 
-function messageArrowLabel(t: (k: string) => string, arrow: MessageArrow): string {
-  const option = MESSAGE_ARROW_OPTIONS.find((o) => o.value === arrow)
-  return t(option !== undefined ? option.labelKey : arrow)
-}
-
 // ---------- 图表（autonumber） ----------
 
 /** 起始值 / 步长的合法性：空串 = 清空该参数，其余必须是非负整数（mermaid 要求） */
