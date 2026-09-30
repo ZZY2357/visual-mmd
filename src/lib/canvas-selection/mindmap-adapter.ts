@@ -49,7 +49,7 @@ export function mindmapDomIdOf(elementId: string): string | null {
 export const mindmapCanvasCapabilities: CanvasCapabilities<ProjectionOf<'mindmap'>> = {
   dataIdResolver: (projection) => mindmapDataIdResolver(projection.mindmap),
   toSelection: (canvas) => (canvas.kind === 'node' ? { kind: 'mindmap-node', elementId: canvas.id } : null),
-  canvasIdOf: (selection) => (selection.kind === 'mindmap-node' ? mindmapDomIdOf(selection.elementId) : null),
+  canvasIdOf: (_projection, selection) => (selection.kind === 'mindmap-node' ? mindmapDomIdOf(selection.elementId) : null),
   // 非 mindmap-node 形态的 elementId 不入列表（不参与导航，与原 nodeDataIdsOf 同口径）
   navigationIds: (projection) => {
     const ids: string[] = []

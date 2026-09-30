@@ -51,7 +51,7 @@ export const kanbanCanvasCapabilities: CanvasCapabilities<ProjectionOf<'kanban'>
   dataIdResolver: (projection) => kanbanDataIdResolver(projection.kanban),
   toSelection: (canvas) => (canvas.kind === 'node' ? selectionOfElementId(canvas.id) : null),
   // 节点 id 即 data-id（渲染后处理反注，见 node-data-ids.annotateKanbanDataIds）
-  canvasIdOf: (selection) =>
+  canvasIdOf: (_projection, selection) =>
     selection.kind === 'kanban-column' || selection.kind === 'kanban-card'
       ? nodeIdOfElementId(selection.elementId)
       : null,

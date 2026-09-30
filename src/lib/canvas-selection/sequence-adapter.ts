@@ -49,7 +49,7 @@ export const sequenceCanvasCapabilities: CanvasCapabilities<ProjectionOf<'sequen
     return null
   },
   // 参与者与消息/注释/块可寻址；seq-region 无 data-id（安静地不高亮）
-  canvasIdOf: (selection) => {
+  canvasIdOf: (_projection, selection) => {
     if (selection.kind === 'participant') return selection.actorId
     if (selection.kind === 'message' || selection.kind === 'note' || selection.kind === 'block') {
       return selection.elementId

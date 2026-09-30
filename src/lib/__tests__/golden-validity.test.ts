@@ -41,6 +41,11 @@ describe('金样合法性：默认图表模板能被 mermaid 渲染', () => {
     await expect(mermaid.parse(PIE_TEMPLATE)).resolves.toBeTruthy()
   })
 
+  it('gantt 起步模板 parse 通过（more-diagrams 工单 11）', async () => {
+    const { GANTT_TEMPLATE } = await import('../diagram-registry')
+    await expect(mermaid.parse(GANTT_TEMPLATE)).resolves.toBeTruthy()
+  })
+
   it('sequence 源码 parse 通过', async () => {
     const src = `sequenceDiagram
     Alice->>Bob: 你好

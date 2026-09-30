@@ -109,6 +109,32 @@ function annotateRequirementDataIds(root: ParentNode): void {
   }
 }
 
+/**
+ * mermaid v12 gantt（more-diagrams 工单 11）：任务条 `rect` 与任务文本 `text` 的 DOM id
+ * 是 `${svgId}-${taskId}` / `${svgId}-${taskId}-text`（ganttDiagram 渲染函数 1616–1617 /
+ * 1688–1689 行，工单 Comments 记录证据）；taskId = 显式 id 或自动 `taskN`（parseId
+ * 口径见 gantt-projection）。作用域严格限定在**带 svgId 前缀 id 的 rect / text**——
+ * 注册图种中只有 gantt 给这两类元素挂 svgId 前缀 id（journey/timeline 的前缀 id 在
+ * `line` 上、sequence 在 `line`/defs 上、gitGraph 在 defs 上），不会误伤其它图种。
+ * `-text` 后缀只在 text 元素上剥离（rect 的显式 id 可能合法地以 `-text` 结尾，
+ * 不能按后缀猜测）。幂等（已有 data-id 不动）；剥离后为空安静跳过。
+ */
+function annotateGanttDataIds(root: ParentNode): void {
+  const svgId = root.querySelector('svg')?.getAttribute('id') ?? ''
+  if (svgId === '') return
+  const prefix = `${svgId}-`
+  for (const el of root.querySelectorAll('svg rect[id], svg text[id]')) {
+    if (el.getAttribute('data-id') !== null) continue
+    const domId = el.getAttribute('id')
+    if (domId === null || !domId.startsWith(prefix)) continue
+    let taskId = domId.slice(prefix.length)
+    if (el.tagName.toLowerCase() === 'text' && taskId.endsWith('-text')) {
+      taskId = taskId.slice(0, -'-text'.length)
+    }
+    if (taskId !== '') el.setAttribute('data-id', taskId)
+  }
+}
+
 export function annotateNodeDataIds(root: ParentNode): void {
   for (const g of root.querySelectorAll('g.node')) {
     if (g.getAttribute('data-id') !== null) continue
@@ -120,4 +146,5 @@ export function annotateNodeDataIds(root: ParentNode): void {
   }
   annotateKanbanDataIds(root)
   annotateRequirementDataIds(root)
+  annotateGanttDataIds(root)
 }

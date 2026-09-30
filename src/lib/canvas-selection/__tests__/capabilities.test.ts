@@ -81,7 +81,7 @@ describe('capabilitiesOf：5 图种 × 8 能力查表（工单 04 + architecture
       if (canvas === null) throw new Error('首元素必须可解析')
       const editorSelection = caps.toSelection(canvas)
       if (editorSelection === null) throw new Error('画布选中必须可映射为编辑器选中')
-      expect(caps.canvasIdOf(editorSelection)).toBe(ids[0])
+      expect(caps.canvasIdOf(projection, editorSelection)).toBe(ids[0])
 
       // 选中回落：存在的选中原样返回，不存在的落 null，null 进 null 出
       expect(caps.resolveSelection(projection, editorSelection)).toEqual(editorSelection)

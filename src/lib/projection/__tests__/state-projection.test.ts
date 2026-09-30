@@ -85,9 +85,9 @@ describe('state 选中回落 / 删除意图 / 键盘（能力包口径）', () =
   })
 
   it('canvasIdOf / toSelection 互逆；note 不寻址', () => {
-    expect(caps.canvasIdOf({ kind: 'state', id: 'idle' })).toBe('idle')
-    expect(caps.canvasIdOf({ kind: 'state-transition', elementId: 'transition:1' })).toBe('transition:1')
-    expect(caps.canvasIdOf({ kind: 'state-note', elementId: 'note:1' })).toBeNull()
+    expect(caps.canvasIdOf(wrapper, { kind: 'state', id: 'idle' })).toBe('idle')
+    expect(caps.canvasIdOf(wrapper, { kind: 'state-transition', elementId: 'transition:1' })).toBe('transition:1')
+    expect(caps.canvasIdOf(wrapper, { kind: 'state-note', elementId: 'note:1' })).toBeNull()
     expect(caps.toSelection({ kind: 'node', id: 'idle' })).toEqual({ kind: 'state', id: 'idle' })
     expect(caps.toSelection({ kind: 'element', elementId: 'transition:1' })).toEqual({
       kind: 'state-transition',

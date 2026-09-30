@@ -148,7 +148,7 @@ describe('kanban 画布能力包（ADR-0015）', () => {
     expect(canvas).toEqual({ kind: 'node', id: 'kanban-column:Todo' })
     const selection = caps.toSelection(canvas!)
     expect(selection).toEqual({ kind: 'kanban-column', elementId: 'kanban-column:Todo' })
-    expect(caps.canvasIdOf(selection!)).toBe('Todo')
+    expect(caps.canvasIdOf(projection, selection!)).toBe('Todo')
     expect(resolver('t1')).toEqual({ kind: 'node', id: 'kanban-card:t1' })
     expect(resolver('__无__')).toBeNull()
   })

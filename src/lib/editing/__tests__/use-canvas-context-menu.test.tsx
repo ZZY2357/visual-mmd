@@ -19,6 +19,7 @@ import { stateDataIdResolver } from '../../canvas-selection/state-adapter'
 import { erDataIdResolver } from '../../canvas-selection/er-adapter'
 import { kanbanDataIdResolver } from '../../canvas-selection/kanban-adapter'
 import { requirementDataIdResolver } from '../../canvas-selection/requirement-adapter'
+import { ganttDataIdResolver } from '../../canvas-selection/gantt-adapter'
 import { nodeDataIdResolver, elementDataIdResolver } from '../../canvas-selection/data-id'
 import type { AnyProjection } from '../../diagram-registry'
 import { useCanvasContextMenu, type NodeFormState } from '../use-canvas-context-menu'
@@ -109,6 +110,8 @@ function resolverOf(projection: AnyProjection) {
   if (projection.type === 'journey') return () => null
   // pie：无 data-id 寻址（more-diagrams 工单 10），resolver 永不命中
   if (projection.type === 'pie') return () => null
+  // gantt（more-diagrams 工单 11）：任务条 data-id = mermaid 渲染 id，由能力包 resolver 承担
+  if (projection.type === 'gantt') return ganttDataIdResolver(projection.gantt)
   const nodes = nodeDataIdResolver(projection.class.classes.map((c) => c.name))
   const edges = elementDataIdResolver(projection.class.relations.map((r) => r.elementId))
   return (dataId: string) => nodes(dataId) ?? edges(dataId)
@@ -136,6 +139,9 @@ function createdIdOf(target: CanvasInlineEditTarget): string {
       return target.elementId
     case 'requirement':
       return target.name
+    // gantt（more-diagrams 工单 11）：菜单添加路径不进内联编辑，此函数不会收到该目标
+    case 'gantt-task':
+      return target.elementId
   }
 }
 

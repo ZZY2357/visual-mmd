@@ -12,6 +12,7 @@ import { kanbanParser } from './pipeline/kanban'
 import { requirementParser } from './pipeline/requirement'
 import { journeyParser } from './pipeline/journey'
 import { pieParser } from './pipeline/pie'
+import { ganttParser } from './pipeline/gantt'
 import { frontmatterEnd } from './pipeline/frontmatter'
 import { buildFlowchartProjection, type FlowchartProjection } from './projection/flowchart-projection'
 import { buildSequenceProjection, type SequenceProjection } from './projection/sequence-projection'
@@ -28,6 +29,7 @@ import {
 } from './projection/requirement-projection'
 import { buildJourneyProjection, type JourneyProjection } from './projection/journey-projection'
 import { buildPieProjection, type PieProjection } from './projection/pie-projection'
+import { buildGanttProjection, type GanttProjection } from './projection/gantt-projection'
 import { flowchartCanvasCapabilities } from './canvas-selection/flowchart-adapter'
 import { sequenceCanvasCapabilities } from './canvas-selection/sequence-adapter'
 import { classCanvasCapabilities } from './canvas-selection/class-adapter'
@@ -40,6 +42,7 @@ import { kanbanCanvasCapabilities } from './canvas-selection/kanban-adapter'
 import { requirementCanvasCapabilities } from './canvas-selection/requirement-adapter'
 import { journeyCanvasCapabilities } from './canvas-selection/journey-adapter'
 import { pieCanvasCapabilities } from './canvas-selection/pie-adapter'
+import { ganttCanvasCapabilities } from './canvas-selection/gantt-adapter'
 import type { CanvasCapabilities } from './canvas-selection/capabilities'
 import { treePartitions, type TreePartitions } from './structure-tree/partitions'
 import { DEFAULT_DIAGRAM_SOURCE } from './storage'
@@ -73,6 +76,7 @@ export interface ProjectionTypes {
   requirement: RequirementProjection
   journey: JourneyProjection
   pie: PieProjection
+  gantt: GanttProjection
 }
 
 /** 已注册图种的 id 集合（字面量联合，随 ProjectionTypes 增长） */
@@ -286,6 +290,23 @@ export const PIE_TEMPLATE = `pie showData
 `
 
 /**
+ * gantt 起步模板（more-diagrams 工单 11）：dateFormat / axisFormat 两条指令、title、
+ * 两个 section、三个任务——覆盖 done / active 标签、起止日期形态与 `after` 依赖形态
+ * 各一例。日期按字符串书写（verbatim：编辑不换格式，见 pipeline/gantt.ts）。
+ */
+export const GANTT_TEMPLATE = `gantt
+    dateFormat YYYY-MM-DD
+    axisFormat %m-%d
+    title 项目排期示例
+
+    section 调研
+        需求梳理 :done, a1, 2026-01-05, 3d
+        方案设计 :active, a2, after a1, 5d
+    section 开发
+        编码实现 :after a2, 4d
+`
+
+/**
  * 注册表：数组是唯一权威（more-diagrams 工单 01），DIAGRAM_TYPES 由它推导。
  * detectDiagramType 按数组顺序显式遍历——不再维护手写的 if 分发链，
  * 新图种挂一条即可参与识别，无法识别时不再默认 flowchart（见下）。
@@ -403,6 +424,16 @@ export const DIAGRAM_TYPE_LIST: DiagramTypeRegistration[] = [
     buildProjection: (doc) => ({ type: 'pie', pie: buildPieProjection(doc) }),
     tree: treePartitions.pie,
     canvas: pieCanvasCapabilities,
+  },
+  {
+    id: 'gantt',
+    parser: ganttParser,
+    template: GANTT_TEMPLATE,
+    // `\b` 让关键字不被 `ganttXxx` 之类的更长词误认
+    detect: (source) => /^gantt\b/i.test(firstStatementLine(source)),
+    buildProjection: (doc) => ({ type: 'gantt', gantt: buildGanttProjection(doc) }),
+    tree: treePartitions.gantt,
+    canvas: ganttCanvasCapabilities,
   },
 ]
 

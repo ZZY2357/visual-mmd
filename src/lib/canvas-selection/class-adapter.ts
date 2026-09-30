@@ -32,7 +32,7 @@ export const classCanvasCapabilities: CanvasCapabilities<ProjectionOf<'class'>> 
     return null
   },
   // class 的成员/注释未纳入画布寻址：只有类节点与关系边可寻址（安静地不高亮）
-  canvasIdOf: (selection) => {
+  canvasIdOf: (_projection, selection) => {
     if (selection.kind === 'class') return selection.name
     if (selection.kind === 'class-relation') return selection.elementId
     return null

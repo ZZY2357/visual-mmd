@@ -33,7 +33,7 @@ export const erCanvasCapabilities: CanvasCapabilities<ProjectionOf<'er'>> = {
     return null
   },
   // 属性行未纳入画布寻址：只有实体节点与关系边可寻址（安静地不高亮）
-  canvasIdOf: (selection) => {
+  canvasIdOf: (_projection, selection) => {
     if (selection.kind === 'er-entity') return selection.name
     if (selection.kind === 'er-relation') return selection.elementId
     return null

@@ -145,6 +145,11 @@ export type ContextMenuItemId =
   // pie（more-diagrams 工单 10）：空白 = 加扇区（数值落 1，可在右侧表单改）。
   // 扇区的编辑不做元素级画布菜单（无 data-id 可命中），由结构树选中 + 属性表单承接。
   | 'add-pie-sector'
+  // gantt（more-diagrams 工单 11）：空白 = 加任务（缺省时长 1d，归属最后一个分组）/
+  // 加分组。任务条虽可寻址，但元素级编辑不做画布菜单（与 journey/pie 同口径），
+  // 由结构树选中 + 属性表单承接；section 与指令行不可寻址。
+  | 'add-gantt-task'
+  | 'add-gantt-section'
 
 /**
  * 画布选中 → 菜单目标（工单 03 起为 `canvas-selection/selection-codec.ts` 的
@@ -191,6 +196,9 @@ function blankMenuItems(diagramType: DiagramTypeId): ContextMenuItemId[] {
     case 'pie':
       // pie 的空白入口（工单 10 定案）：加扇区（数值落 1，标签避重，右侧表单可改）
       return ['add-pie-sector']
+    case 'gantt':
+      // gantt 的空白入口（工单 11 定案）：加任务（缺省时长 1d，归属最后一个分组）与加分组
+      return ['add-gantt-task', 'add-gantt-section']
     // DiagramTypeId 是开放类型（more-diagrams 工单 01）：未接入画布能力包的图种
     // 没有空白右键入口（unsupported 态下画布右键整体停用，不会走到这里）
     default:

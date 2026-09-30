@@ -63,6 +63,12 @@ export type Selection =
   // pie（more-diagrams 工单 10）：扇区走位置序身份（`sector:N`，pie 语法无节点 id）。
   // 画布 DOM 无 data-id（实测降级），选中只来自结构树 / 表单 / 键盘。
   | { kind: 'pie-sector'; elementId: string }
+  // gantt（more-diagrams 工单 11）：任务走位置序身份（`task:N`——显式 id 可重复/省略，
+  // 位置序是唯一稳定身份；mermaid 渲染 id 由投影预计算作画布 data-id，见 gantt-projection）。
+  // section 与指令行无画布 DOM id（实测降级），选中只来自结构树 / 表单 / 键盘。
+  | { kind: 'gantt-task'; elementId: string }
+  | { kind: 'gantt-section'; elementId: string }
+  | { kind: 'gantt-directive'; elementId: string }
 
 export const DIAGRAM_SELECTION: Selection = { kind: 'diagram' }
 
@@ -142,6 +148,12 @@ export function selectionKey(sel: Selection): string {
       return `journey-section:${sel.elementId}`
     case 'pie-sector':
       return `pie-sector:${sel.elementId}`
+    case 'gantt-task':
+      return `gantt-task:${sel.elementId}`
+    case 'gantt-section':
+      return `gantt-section:${sel.elementId}`
+    case 'gantt-directive':
+      return `gantt-directive:${sel.elementId}`
   }
 }
 

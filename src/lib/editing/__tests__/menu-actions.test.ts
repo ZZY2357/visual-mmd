@@ -159,6 +159,9 @@ describe('MENU_ACTIONS 穷尽性（工单 05 → 工单 01）', () => {
       { kind: 'blank', diagramType: 'journey' },
       // pie（more-diagrams 工单 10）：画布 DOM 无 data-id（实测降级），只有空白添加入口
       { kind: 'blank', diagramType: 'pie' },
+      // gantt（more-diagrams 工单 11）：任务条可寻址但元素级菜单不做（与 journey/pie 同口径），
+      // 只有空白添加入口
+      { kind: 'blank', diagramType: 'gantt' },
     ]
     const reachableIds = new Set(allTargets.flatMap((target) => contextMenuItems(target)))
     // apply-style 不经 onMenuItem 分发（CanvasPanel 渲染成子菜单开关，点样式名直接调

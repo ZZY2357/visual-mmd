@@ -6,9 +6,12 @@ import { DEFAULT_DIAGRAM_SOURCE } from '../../../lib/storage'
 import { flowchartParser } from '../../pipeline/flowchart'
 import { classParser } from '../../pipeline/class'
 import { sequenceParser } from '../../pipeline/sequence'
+import { ganttParser } from '../../pipeline/gantt'
 import { buildFlowchartProjection } from '../../projection/flowchart-projection'
 import { buildClassProjection } from '../../projection/class-projection'
 import { buildSequenceProjection } from '../../projection/sequence-projection'
+import { buildGanttProjection } from '../../projection/gantt-projection'
+import { ganttDataIdResolver } from '../../canvas-selection/gantt-adapter'
 import { nodeDataIdResolver } from '../../canvas-selection/data-id'
 import { annotateNodeDataIds } from '../../canvas-selection/node-data-ids'
 import type { CanvasInlineEditTarget } from '../inline-edit'
@@ -496,6 +499,92 @@ describe('useCanvasInlineEdit（工单 05：class / sequence 双击内联编辑�
     act(() => {
       container.querySelector('line[data-id="message:1"]')!.dispatchEvent(new MouseEvent('dblclick', { bubbles: true }))
     })
+    expect(snapshots.at(-1)).toBeNull()
+  })
+})
+
+// ---------- more-diagrams 工单 11：gantt 双击任务条/任务文本改任务名 ----------
+
+const GANTT_DBL_SAMPLE = `gantt
+    dateFormat YYYY-MM-DD
+    section 调研
+    需求梳理 :done, a1, 2026-01-05, 3d
+    方案设计 :after a1, 5d
+`
+// 模拟 mermaid 渲染产物：任务条 rect / 任务文本 text 的 DOM id 带 svgId 前缀
+// （`<svgId>-<taskId>` / `<svgId>-<taskId>-text`，ganttDiagram 渲染函数 1616–1617 /
+// 1688–1689 行口径），data-id 由渲染后处理 annotateNodeDataIds 反注
+const GANTT_DBL_SVG =
+  '<svg id="g-1"><rect id="g-1-a1"/><text id="g-1-a1-text">需求梳理</text>' +
+  '<rect id="g-1-task1"/><text id="g-1-task1-text">方案设计</text></svg>'
+
+const GANTT_DBL_PROJECTION = (() => {
+  const parsed = ganttParser.parse(GANTT_DBL_SAMPLE)
+  if (!parsed.ok) throw new Error(`样例源码必须可解析：${parsed.error.message}`)
+  return { type: 'gantt' as const, gantt: buildGanttProjection(parsed.doc) }
+})()
+
+describe('useCanvasInlineEdit（more-diagrams 工单 11：gantt 双击改任务名）', () => {
+  let host: HTMLDivElement
+  let root: ReturnType<typeof createRoot>
+  let snapshots: unknown[]
+  let api: { current: InlineEditApi | null }
+
+  beforeEach(() => {
+    host = document.createElement('div')
+    document.body.appendChild(host)
+    root = createRoot(host)
+    snapshots = []
+    api = { current: null }
+  })
+  afterEach(() => {
+    act(() => root.unmount())
+    host.remove()
+    resetEditorHistory(DEFAULT_DIAGRAM_SOURCE)
+    useEditorStore.getState().select(null)
+  })
+
+  function mount() {
+    resetEditorHistory(GANTT_DBL_SAMPLE)
+    act(() => {
+      root.render(
+        <DblHarness
+          projection={GANTT_DBL_PROJECTION}
+          resolver={ganttDataIdResolver(GANTT_DBL_PROJECTION.gantt)}
+          svg={GANTT_DBL_SVG}
+          onEditing={(e) => snapshots.push(e)}
+          apiRef={api}
+        />,
+      )
+    })
+    return host.firstElementChild as HTMLDivElement
+  }
+
+  it('双击任务条（反注 data-id 后）→ {kind:gantt-task}，提交落 set-task-name（verbatim 保留元数据）', () => {
+    const container = mount()
+    annotateNodeDataIds(container) // 渲染后处理：DOM id `<svgId>-<taskId>` → data-id 反注
+    act(() => {
+      container.querySelector('rect#g-1-a1')!.dispatchEvent(new MouseEvent('dblclick', { bubbles: true }))
+    })
+    expect(snapshots.at(-1)).toMatchObject({
+      target: { kind: 'gantt-task', elementId: 'task:1', taskId: 'a1' },
+    })
+    act(() => api.current!.commit('需求评审'))
+    expect(useEditorStore.getState().source).toContain('需求评审 :done, a1, 2026-01-05, 3d')
+    expect(snapshots.at(-1)).toBeNull()
+  })
+
+  it('双击任务文本同样命中（-text 后缀剥离后同一 data-id）；非法任务名（含冒号）不落码', () => {
+    const container = mount()
+    annotateNodeDataIds(container)
+    act(() => {
+      container.querySelector('text#g-1-task1-text')!.dispatchEvent(new MouseEvent('dblclick', { bubbles: true }))
+    })
+    expect(snapshots.at(-1)).toMatchObject({
+      target: { kind: 'gantt-task', elementId: 'task:2', taskId: 'task1' },
+    })
+    act(() => api.current!.commit('方案:设计')) // 冒号终止 taskTxt 词法，任务名非法
+    expect(useEditorStore.getState().source).toContain('方案设计 :after a1, 5d')
     expect(snapshots.at(-1)).toBeNull()
   })
 })

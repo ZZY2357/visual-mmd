@@ -32,7 +32,7 @@ export const stateCanvasCapabilities: CanvasCapabilities<ProjectionOf<'state'>> 
     return null
   },
   // note 块未纳入画布寻址：只有状态节点与转移边可寻址（安静地不高亮）
-  canvasIdOf: (selection) => {
+  canvasIdOf: (_projection, selection) => {
     if (selection.kind === 'state') return selection.id
     if (selection.kind === 'state-transition') return selection.elementId
     return null

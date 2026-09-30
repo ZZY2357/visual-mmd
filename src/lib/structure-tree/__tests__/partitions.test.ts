@@ -231,6 +231,8 @@ describe('结构树分区描述（工单 06）', () => {
       journey:
         'journey\n    title 旅程\n    section 发现\n        访问首页: 5: 用户\n        浏览商品: 3\n    section 决策\n        对比价格: 2: 用户, 客服',
       pie: 'pie showData\n    title 预算\n    "研发" : 45\n    "市场" : 30',
+      gantt:
+        'gantt\n    dateFormat YYYY-MM-DD\n    section 调研\n        需求梳理 :done, 2026-01-05, 3d',
     }
     for (const id of Object.keys(DIAGRAM_TYPES) as (keyof typeof DIAGRAM_TYPES)[]) {
       const registration = DIAGRAM_TYPES[id]

@@ -15,6 +15,7 @@ import { isValidGitgraphBranchName } from '../pipeline/gitgraph'
 import { isValidTimelineSectionName, type TimelineIntent } from '../pipeline/timeline'
 import { isValidJourneySectionName, isValidJourneyTaskName, type JourneyIntent } from '../pipeline/journey'
 import { isValidPieLabel, type PieIntent } from '../pipeline/pie'
+import { isValidGanttSectionName, isValidGanttTaskName, type GanttIntent } from '../pipeline/gantt'
 import { isValidKanbanId } from '../pipeline/kanban'
 import { setRelationIntent, RELATION_KIND_OPTIONS } from './class-forms'
 import {
@@ -177,6 +178,11 @@ export function createElement(ctx: MenuActionContext, target: ContextMenuTarget 
     if (proj.type === 'pie') {
       // pie（more-diagrams 工单 10）：添加入口是独立的 add-pie-sector 动作
       // （不做内联编辑——画布无 data-id，工单降级定案），不走 createElement
+      return null
+    }
+    if (proj.type === 'gantt') {
+      // gantt（more-diagrams 工单 11）：添加入口是独立的 add-gantt-task /
+      // add-gantt-section 动作（添加路径不做内联命名；改名走双击内联编辑/表单），不走 createElement
       return null
     }
     // mindmap：节点目标 = 挂为其子节点；空白 / 无目标 = 建根（空文档）或挂到根节点下
@@ -482,6 +488,51 @@ function addPieSector(ctx: MenuActionContext): void {
   if (applyPlan(plan, { commitIntent: ctx.commitIntent, select: ctx.select })) ctx.close()
 }
 
+// ---------- gantt（more-diagrams 工单 11） ----------
+
+/**
+ * 空白处加任务（gantt，与 addJourneyTask 同构）：落一行「新任务: 1d」（时长缺省，
+ * 起点继承上一任务）+ 选中新任务。锚点 = 最后一个 section 的末尾（其最后一个任务 ??
+ * section 行）——mermaid 按书写位置归组，锚到「文档最后一个元素」会落进倒数第二个
+ * section；无 section 时无锚点（回退文档末尾，归属空分组）。添加路径不做内联命名——
+ * 改名走双击内联编辑 / 右侧表单。
+ */
+function addGanttTask(ctx: MenuActionContext): void {
+  const proj = ctx.projection
+  if (proj === null || proj.type !== 'gantt') return
+  const name = nextFreeName('新任务', proj.gantt.tasks.map((t) => t.name))
+  if (!isValidGanttTaskName(name)) return
+  const lastSection = proj.gantt.sections[proj.gantt.sections.length - 1]
+  const plan: KeyPlan = {
+    intents: [
+      {
+        type: 'add-task',
+        name,
+        sectionElementId: lastSection?.elementId,
+      } satisfies GanttIntent,
+    ],
+    newElementTarget: {
+      selection: { kind: 'gantt-task', elementId: `task:${proj.gantt.nextTaskOrdinal}` },
+    },
+  }
+  if (applyPlan(plan, { commitIntent: ctx.commitIntent, select: ctx.select })) ctx.close()
+}
+
+/** 空白处加分组 section（gantt）：落一行 `section 名称` + 选中新分组 */
+function addGanttSection(ctx: MenuActionContext): void {
+  const proj = ctx.projection
+  if (proj === null || proj.type !== 'gantt') return
+  const name = nextFreeName('新分组', proj.gantt.sections.map((s) => s.name))
+  if (!isValidGanttSectionName(name)) return
+  const plan: KeyPlan = {
+    intents: [{ type: 'add-section', name } satisfies GanttIntent],
+    newElementTarget: {
+      selection: { kind: 'gantt-section', elementId: `section:${proj.gantt.nextSectionOrdinal}` },
+    },
+  }
+  if (applyPlan(plan, { commitIntent: ctx.commitIntent, select: ctx.select })) ctx.close()
+}
+
 export const MENU_ACTIONS: Record<Exclude<ContextMenuItemId, 'apply-style'>, MenuAction> = {
   // 「创建 + 选中 + 内联命名」五个入口共用 createElement（工单 01 收敛）
   'add-node': createElement,
@@ -576,4 +627,7 @@ export const MENU_ACTIONS: Record<Exclude<ContextMenuItemId, 'apply-style'>, Men
   'add-journey-section': addJourneySection,
   // pie（more-diagrams 工单 10）：空白加扇区；元素级编辑降级到结构树 + 属性表单
   'add-pie-sector': addPieSector,
+  // gantt（more-diagrams 工单 11）：空白加任务 / 加分组；元素级编辑降级到结构树 + 属性表单
+  'add-gantt-task': addGanttTask,
+  'add-gantt-section': addGanttSection,
 }
