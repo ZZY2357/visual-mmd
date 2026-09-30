@@ -26,5 +26,9 @@ export function edgeSelectionOf(diagramType: DiagramTypeId, elementId: string): 
   if (diagramType === 'state') {
     return parsed.kind === 'transition' ? { kind: 'state-transition', elementId } : null
   }
+  if (diagramType === 'er') {
+    // er 关系与 class 共用 `relation:N` 位置序身份（图种先收窄，不会跨图种命中）
+    return parsed.kind === 'relation' ? { kind: 'er-relation', elementId } : null
+  }
   return null
 }

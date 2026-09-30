@@ -5,6 +5,7 @@ import type { SequenceProjection } from '../projection/sequence-projection'
 import type { ClassProjection } from '../projection/class-projection'
 import type { MindmapProjection } from '../projection/mindmap-projection'
 import type { StateProjection } from '../projection/state-projection'
+import type { ErProjection } from '../projection/er-projection'
 import { DIAGRAM_SELECTION, type Selection } from '../projection/selection'
 import { applyPlan, mindmapKeyPlan } from '../editing/canvas-keyboard'
 import { useEditorStore } from '../../store/editor'
@@ -451,6 +452,53 @@ function statePartitions(projection: AnyProjection, { t }: TreePartitionsContext
   ]
 }
 
+// ---------- er（more-diagrams 工单 03） ----------
+
+function erPartitions(projection: AnyProjection, { t }: TreePartitionsContext): TreeSection[] {
+  if (projection.type !== 'er') return []
+  const p: ErProjection = projection.er
+  return [
+    withDiagramLabel(diagramSection(p.direction ?? undefined), t('app:propertyPanel.diagram')),
+    {
+      key: 'entities',
+      heading: t('app:propertyPanel.erEntities'),
+      count: p.entities.length,
+      entries: p.entities.map((entity) => ({
+        key: entity.elementId ?? `implicit:${entity.name}`,
+        label: entity.alias ?? entity.name,
+        detail: entity.alias !== null ? entity.name : undefined,
+        depth: 1,
+        selection: { kind: 'er-entity', name: entity.name },
+      })),
+    },
+    {
+      key: 'attributes',
+      heading: t('app:propertyPanel.erAttributes'),
+      count: p.attributes.length,
+      entries: p.attributes.map((attr) => ({
+        key: attr.elementId,
+        label:
+          `${attr.keys.length > 0 ? attr.keys.join(', ') + ' ' : ''}${attr.type}${attr.nullable ? '?' : ''} ${attr.name}`,
+        detail: attr.entity,
+        depth: 2,
+        selection: { kind: 'er-attribute', elementId: attr.elementId },
+      })),
+    },
+    {
+      key: 'relations',
+      heading: t('app:propertyPanel.erRelations'),
+      count: p.relations.length,
+      entries: p.relations.map((rel) => ({
+        key: rel.elementId,
+        label: `${rel.from} ${rel.cardLeft}${rel.line}${rel.cardRight} ${rel.to}`,
+        detail: rel.label ?? undefined,
+        depth: 1,
+        selection: { kind: 'er-relation', elementId: rel.elementId },
+      })),
+    },
+  ]
+}
+
 /** 图种 → 分区描述（注册表 `tree` 字段的实参，registry 只持引用） */
 export const treePartitions: Record<DiagramTypeId, TreePartitions> = {
   flowchart: flowchartPartitions,
@@ -458,4 +506,5 @@ export const treePartitions: Record<DiagramTypeId, TreePartitions> = {
   class: classPartitions,
   mindmap: mindmapPartitions,
   state: statePartitions,
+  er: erPartitions,
 }

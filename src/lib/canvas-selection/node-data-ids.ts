@@ -31,14 +31,22 @@ const CLASS_NODE_DOM_ID = /(?:^|-)classId-(.+)-(\d+)$/
  * 已知状态 id，被 resolver 安静拒绝（more-diagrams 工单 02） */
 const STATE_NODE_DOM_ID = /(?:^|-)state-(.+)-(\d+)$/
 
-/** DOM id → 节点 id（flowchart / class / state 三种形态）；不是节点 id 时返回 null */
+/** mermaid v12 er 实体 DOM id 形态：`entity-{实体名}-{序号}`（erDb.addEntity 的
+ * `entity-${name}-${n}`，unified 渲染器以 `node.domId ?? node.id` 落 DOM id，无 svgId 前缀；
+ * more-diagrams 工单 03）。handDrawn look 的 `-background` 副本不以数字结尾，不命中。
+ * 含空格的实体名 mermaid 会原样放进 id（非法 DOM id），此类实体安静降级为不可寻址。 */
+const ER_ENTITY_DOM_ID = /(?:^)entity-(.+)-(\d+)$/
+
+/** DOM id → 节点 id（flowchart / class / state / er 四种形态）；不是节点 id 时返回 null */
 function nodeIdOfDomId(domId: string): string | null {
   const flow = FLOWCHART_NODE_DOM_ID.exec(domId)
   if (flow !== null) return flow[1]
   const cls = CLASS_NODE_DOM_ID.exec(domId)
   if (cls !== null) return cls[1]
   const state = STATE_NODE_DOM_ID.exec(domId)
-  return state !== null ? state[1] : null
+  if (state !== null) return state[1]
+  const er = ER_ENTITY_DOM_ID.exec(domId)
+  return er !== null ? er[1] : null
 }
 
 export function annotateNodeDataIds(root: ParentNode): void {

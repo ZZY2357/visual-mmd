@@ -9,6 +9,7 @@ import type { NodeFormKind } from './use-canvas-context-menu'
 import { nextNodeId, mindmapActionIntents, applyPlan, type MindmapActionPlan, type KeyPlan } from './canvas-keyboard'
 import { nextFreeName } from '../pipeline/element-id'
 import { isValidStateId } from '../pipeline/state'
+import { isValidErName } from '../pipeline/er'
 import { setRelationIntent, RELATION_KIND_OPTIONS } from './class-forms'
 import {
   setMessageIntent,
@@ -123,6 +124,15 @@ export function createElement(ctx: MenuActionContext, target: ContextMenuTarget 
         newElementTarget: { selection: { kind: 'state', id }, inlineEdit: { kind: 'state', id } },
       }
     }
+    if (proj.type === 'er') {
+      // er 空白：新建实体 + 内联编辑别名（more-diagrams 工单 03）
+      const name = nextFreeName('新实体', proj.er.entities.map((e) => e.name))
+      if (!isValidErName(name)) return null
+      return {
+        intents: [{ type: 'add-entity', name }],
+        newElementTarget: { selection: { kind: 'er-entity', name }, inlineEdit: { kind: 'er', name } },
+      }
+    }
     // mindmap：节点目标 = 挂为其子节点；空白 / 无目标 = 建根（空文档）或挂到根节点下
     const text = ctx.newNodeText
     let mindPlan: MindmapActionPlan | null
@@ -213,6 +223,7 @@ function beginEditText(ctx: MenuActionContext, target: ContextMenuTarget | undef
   if (target.kind === 'flowchart-node') ctx.beginInlineEdit({ kind: 'flowchart', nodeId: target.nodeId })
   else if (target.kind === 'mindmap-node') ctx.beginInlineEdit({ kind: 'mindmap', elementId: target.elementId })
   else if (target.kind === 'state-node') ctx.beginInlineEdit({ kind: 'state', id: target.id })
+  else if (target.kind === 'er-entity') ctx.beginInlineEdit({ kind: 'er', name: target.name })
   ctx.close()
 }
 
@@ -234,6 +245,18 @@ function addStateIntoComposite(ctx: MenuActionContext, target: ContextMenuTarget
   if (applyPlan(plan, { commitIntent: ctx.commitIntent, select: ctx.select, beginInlineEdit: ctx.beginInlineEdit })) ctx.close()
 }
 
+/** er 关系边：循环切换线型（set-relation 的 line：实线 ↔ 虚线，直接改，不弹表单）。
+ * 菜单保持打开，便于连点切换；每次切换是一次独立快照（可撤销）。
+ * 基数与标签走「在属性面板中编辑」（枚举选择 + 文本输入，工单 03 定案）。 */
+function cycleErLine(ctx: MenuActionContext, target: ContextMenuTarget | undefined): void {
+  const proj = ctx.projection
+  if (target === undefined || target.kind !== 'er-relation' || proj === null || proj.type !== 'er') return
+  const relation = proj.er.relations.find((r) => r.elementId === target.elementId)
+  if (relation === undefined) return
+  const next = relation.line === 'identifying' ? '..' : '--'
+  ctx.commitIntent({ type: 'set-relation', elementId: target.elementId, changes: { line: next } })
+}
+
 /** 添加型表单项共用：在菜单位置浮出对应小表单（锚点 / 预选值由 Hook 的 openForm 按目标算出） */
 function openFormOf(kind: NodeFormKind): MenuAction {
   return (ctx) => ctx.openForm(kind)
@@ -252,9 +275,10 @@ export const MENU_ACTIONS: Record<Exclude<ContextMenuItemId, 'apply-style'>, Men
   // add-style（空白菜单项）= 打开「添加样式」小表单；apply-style（节点子菜单）才不经分发
   'add-style': (ctx) => ctx.openStyleForm(),
   'link-from-here': (ctx, target) => {
-    // narrow 到 flowchart / state 节点才能带预选起点进入连线模式
+    // narrow 到 flowchart / state / er 节点才能带预选起点进入连线模式
     if (target !== undefined && target.kind === 'flowchart-node') ctx.enterLinkMode(target.nodeId)
     else if (target !== undefined && target.kind === 'state-node') ctx.enterLinkMode(target.id)
+    else if (target !== undefined && target.kind === 'er-entity') ctx.enterLinkMode(target.name)
   },
   'add-subgraph': addSubgraph,
   'add-member': openFormOf('member'),
@@ -262,6 +286,13 @@ export const MENU_ACTIONS: Record<Exclude<ContextMenuItemId, 'apply-style'>, Men
   'add-message': openFormOf('message'),
   'add-note': openFormOf('note'),
   'add-block': openFormOf('block'),
+  // er（more-diagrams 工单 03）：add-entity 走 createElement 的 er 分支（空白入口）
+  'add-entity': createElement,
+  'add-attribute': openFormOf('er-attribute'),
+  'edit-er-alias': beginEditText,
+  'cycle-er-line': cycleErLine,
+  'edit-er-relation': selectMenuTargetAndClose,
+  'edit-er-attribute': selectMenuTargetAndClose,
   // state（more-diagrams 工单 02）：add-state 走 createElement 的 state 分支（空白入口）
   'add-state-into': addStateIntoComposite,
   // 删除组 6 项共用 deleteTarget——直接写 6 行，不引入二级查表

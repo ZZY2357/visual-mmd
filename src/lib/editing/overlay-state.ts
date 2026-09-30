@@ -39,9 +39,10 @@ export interface StyleFormState {
   y: number
 }
 
-/** 菜单上浮出的添加型小表单种类（工单 06 三项 + 工单 04 补三项 + state 转移）：
- * 'note' 同时服务 sequence（注释）与 class（浮动 / note for X），由投影图种决定渲染哪个表单。 */
-export type NodeFormKind = 'member' | 'relation' | 'message' | 'note' | 'block' | 'transition'
+/** 菜单上浮出的添加型小表单种类（工单 06 三项 + 工单 04 补三项 + state 转移 +
+ * er 工单 03 补属性 / 关系）：'note' 同时服务 sequence（注释）与 class（浮动 / note for X），
+ * 由投影图种决定渲染哪个表单。 */
+export type NodeFormKind = 'member' | 'relation' | 'message' | 'note' | 'block' | 'transition' | 'er-attribute' | 'er-relation'
 
 export interface NodeFormState {
   kind: NodeFormKind
@@ -50,8 +51,10 @@ export interface NodeFormState {
   anchorElementId?: string
   /** class 表单：预选类名（右键的那个类）；class 的 note 表单用它预选 `note for` 目标 */
   className?: string
-  /** sequence 消息表单：预选起点参与者（右键的那个参与者） */
+  /** sequence 消息 / state 转移 / er 关系表单：预选起点（右键的那个元素） */
   from?: string
+  /** er 属性表单：目标实体名（右键的那个实体） */
+  entity?: string
   /** 表单相对画布容器的位置（在菜单打开处浮出） */
   x: number
   y: number

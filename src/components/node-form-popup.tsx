@@ -5,6 +5,7 @@ import type { NodeFormState } from '../lib/editing/use-canvas-context-menu'
 import { AddMemberInlineForm, AddRelationInlineForm, AddClassNoteInlineForm } from './class-forms'
 import { AddMessageInlineForm, AddNoteInlineForm, AddBlockInlineForm } from './sequence-forms'
 import { AddTransitionInlineForm } from './state-forms'
+import { AddErAttributeInlineForm, AddErRelationInlineForm } from './er-forms'
 
 /**
  * class/sequence 节点菜单的表单浮层（工单 06/04；工单 04-canvas-bundle 自 CanvasPanel 迁出）：
@@ -73,6 +74,21 @@ export function NodeFormPopup(props: { state: NodeFormState; projection: AnyProj
         {state.kind === 'transition' && projection.type === 'state' && (
           <AddTransitionInlineForm
             states={projection.state.states}
+            initialFrom={state.from}
+            afterElementId={state.anchorElementId}
+            onDone={props.onClose}
+          />
+        )}
+        {state.kind === 'er-attribute' && projection.type === 'er' && state.entity !== undefined && (
+          <AddErAttributeInlineForm
+            entity={state.entity}
+            afterElementId={state.anchorElementId}
+            onDone={props.onClose}
+          />
+        )}
+        {state.kind === 'er-relation' && projection.type === 'er' && (
+          <AddErRelationInlineForm
+            entities={projection.er.entities}
             initialFrom={state.from}
             afterElementId={state.anchorElementId}
             onDone={props.onClose}

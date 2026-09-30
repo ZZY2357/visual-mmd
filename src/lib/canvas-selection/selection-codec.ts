@@ -62,6 +62,13 @@ export function canvasIdOf(selection: Selection): string | null {
       return selection.id
     case 'state-transition':
       return selection.elementId
+    // er（more-diagrams 工单 03）：实体 data-id 即实体名（渲染后从 DOM id `entity-{名}-{n}`
+    // 反注）；关系走位置序身份 `relation:N`。属性未纳入画布寻址（属性行在实体框内部，
+    // 无独立 DOM 元素），安静地不高亮——结构树与表单仍是完整编辑入口。
+    case 'er-entity':
+      return selection.name
+    case 'er-relation':
+      return selection.elementId
     default:
       return null
   }
@@ -82,6 +89,10 @@ export function fromCanvasId(diagramType: DiagramTypeId, canvas: CanvasSelection
   if (diagramType === 'state') {
     if (canvas.kind === 'element') return edgeSelectionOf(diagramType, canvas.elementId)
     return canvas.kind === 'node' ? { kind: 'state', id: canvas.id } : null
+  }
+  if (diagramType === 'er') {
+    if (canvas.kind === 'element') return edgeSelectionOf(diagramType, canvas.elementId)
+    return canvas.kind === 'node' ? { kind: 'er-entity', name: canvas.id } : null
   }
   if (canvas.kind === 'element') return edgeSelectionOf(diagramType, canvas.elementId)
   if (canvas.kind === 'node') {
@@ -121,6 +132,12 @@ export function selectionOfMenuTarget(target: ContextMenuTarget): Selection | nu
       return { kind: 'state', id: target.id }
     case 'state-transition':
       return { kind: 'state-transition', elementId: target.elementId }
+    case 'er-entity':
+      return { kind: 'er-entity', name: target.name }
+    case 'er-relation':
+      return { kind: 'er-relation', elementId: target.elementId }
+    case 'er-attribute':
+      return { kind: 'er-attribute', elementId: target.elementId }
     case 'blank':
       return null
   }
@@ -146,6 +163,7 @@ export function menuTargetOfCanvas(
       // composite 标志由调用方按投影补齐（menuTargetOfCanvas 不查投影，保持纯映射）
       return { kind: 'state-node', id: canvas.id }
     }
+    if (diagramType === 'er') return { kind: 'er-entity', name: canvas.id }
     return { kind: 'sequence-participant', actorId: canvas.id }
   }
   if (canvas.kind === 'element') {
@@ -163,6 +181,8 @@ export function menuTargetOfCanvas(
         return { kind: 'sequence-block', elementId: editorSelection.elementId }
       case 'state-transition':
         return { kind: 'state-transition', elementId: editorSelection.elementId }
+      case 'er-relation':
+        return { kind: 'er-relation', elementId: editorSelection.elementId }
       default:
         return null
     }

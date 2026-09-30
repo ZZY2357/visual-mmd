@@ -33,6 +33,10 @@ export type Selection =
   | { kind: 'state'; id: string }
   | { kind: 'state-transition'; elementId: string }
   | { kind: 'state-note'; elementId: string }
+  // er（more-diagrams 工单 03）
+  | { kind: 'er-entity'; name: string }
+  | { kind: 'er-attribute'; elementId: string }
+  | { kind: 'er-relation'; elementId: string }
 
 export const DIAGRAM_SELECTION: Selection = { kind: 'diagram' }
 
@@ -76,6 +80,12 @@ export function selectionKey(sel: Selection): string {
       return `state-transition:${sel.elementId}`
     case 'state-note':
       return `state-note:${sel.elementId}`
+    case 'er-entity':
+      return `er-entity:${sel.name}`
+    case 'er-attribute':
+      return `er-attribute:${sel.elementId}`
+    case 'er-relation':
+      return `er-relation:${sel.elementId}`
   }
 }
 

@@ -136,6 +136,13 @@ export function stateDescElementId(name: string, occurrence = 1): string {
   return keyed('state-desc', name, occurrence)
 }
 
+// ---------- er（more-diagrams 工单 03） ----------
+
+/** 实体声明（`entity:Car` / `entity:Car#2`）；仅被关系引用的隐式实体没有声明元素 */
+export function erEntityElementId(name: string, occurrence = 1): string {
+  return keyed('entity', name, occurrence)
+}
+
 // ---------- 下一个可用名/ID（architecture-deepening-2 工单 04） ----------
 
 export interface NextFreeNameOptions {
