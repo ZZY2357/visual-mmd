@@ -55,7 +55,8 @@ function Harness(props: {
     resolver: flowchartDataIdResolver(props.projection.flowchart),
     containerRef: ref,
   })
-  props.apiRef.current = { beginEditLabel: ctx.beginEditLabel }
+  // 工单 01：菜单动作经 ctx.onMenuItem 查 MENU_ACTIONS 表分发
+  props.apiRef.current = { beginEditLabel: () => ctx.onMenuItem('edit-label') }
   useEffect(() => {
     props.onState(ctx.menu !== null)
   })

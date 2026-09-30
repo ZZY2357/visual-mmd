@@ -16,7 +16,6 @@ import { useCanvasInlineEdit, inlineEditTextOf } from '../lib/editing/use-canvas
 import type { InlineEditCloseOptions } from '../lib/editing/use-canvas-inline-edit'
 import type { Rect } from '../lib/editing/inline-edit'
 import { useCanvasContextMenu } from '../lib/editing/use-canvas-context-menu'
-import { MENU_ACTIONS } from '../lib/editing/menu-actions'
 import type { ContextMenuItemId } from '../lib/editing/context-menu'
 import { NodeFormPopup } from './node-form-popup'
 import { useCanvasView } from '../lib/canvas-view/use-canvas-view'
@@ -382,18 +381,16 @@ export function CanvasPanel({ preview, projection }: CanvasPanelProps) {
     navigation,
     // 工单 05：class/sequence 的 Tab/Enter 落到已有表单或既有创建路径
     onEditKey: (request: EditKeyRequest) => {
-      if (request.form === 'participant') ctx.addParticipant()
+      // 「创建 + 选中 + 内联命名」走菜单动作表的 createElement（工单 01 收敛后的唯一实现）
+      if (request.form === 'participant') ctx.onMenuItem('add-participant')
       else ctx.openFormForSelection(request.form)
     },
   })
   const classDefNames = projection?.type === 'flowchart' ? projection.flowchart.classDefs.map((c) => c.name) : []
 
-  // 菜单项 → 动作分发（标签 / 基数 / 文本：菜单项本身负责选中该连线，右侧表单承接编辑）。
-  // 动作表在 src/lib/editing/menu-actions.ts（工单 05）：Record<ContextMenuItemId, MenuAction>
-  // 在类型层保证穷尽——漏一项是编译错误，而不是这里的静默无反应。
-  const onMenuItem = (id: ContextMenuItemId): void => {
-    MENU_ACTIONS[id](ctx, ctx.menu?.target)
-  }
+  // 菜单项 → 动作分发在 Hook 内完成（architecture-deepening-2 工单 01）：ctx.onMenuItem
+  // 现场组装 MenuActionContext 语境后查 menu-actions.ts 的 MENU_ACTIONS 表——
+  // Record 穷尽性在类型层保证漏一项是编译错误，而不是静默无反应。
 
   // 结构树键盘（工单 06）添加节点后的内联命名请求：画布侧消费（gotoLine 同款 nonce 模式）
   const pendingInlineEdit = useEditorStore((s) => s.pendingInlineEdit)
@@ -527,7 +524,7 @@ export function CanvasPanel({ preview, projection }: CanvasPanelProps) {
             y={ctx.menu.y}
             items={ctx.menu.items}
             classDefNames={classDefNames}
-            onItem={onMenuItem}
+            onItem={ctx.onMenuItem}
             onApplyStyle={ctx.applyStyle}
           />
         )}

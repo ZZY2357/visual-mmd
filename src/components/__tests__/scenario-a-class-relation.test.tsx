@@ -146,10 +146,11 @@ function Harness(props: {
     },
   })
   props.apiRef.current = {
-    addClass: ctx.addClass,
-    addMember: ctx.addMember,
-    addRelation: ctx.addRelation,
-    editRelation: ctx.editRelation,
+    // 工单 01：菜单动作经 ctx.onMenuItem 查 MENU_ACTIONS 表分发
+    addClass: () => ctx.onMenuItem('add-class'),
+    addMember: () => ctx.onMenuItem('add-member'),
+    addRelation: () => ctx.onMenuItem('add-relation'),
+    editRelation: () => ctx.onMenuItem('edit-relation'),
   }
   useEffect(() => {
     props.onState({ nodeForm: ctx.nodeForm, menuOpen: ctx.menu !== null })

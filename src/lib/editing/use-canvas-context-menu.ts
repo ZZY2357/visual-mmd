@@ -2,23 +2,6 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import type { AnyProjection } from '../diagram-registry'
 import type { DataIdResolver } from '../canvas-selection/data-id'
 import { selectionFromEventTarget } from '../canvas-selection/data-id'
-import { mindmapActionIntents, nextNodeId, type MindmapActionPlan } from './canvas-keyboard'
-import { nextFreeName } from '../pipeline/element-id'
-import { addClassDefIntent } from './flowchart-forms'
-import {
-  deleteClassIntent,
-  deleteRelationIntent,
-  setRelationIntent,
-  RELATION_KIND_OPTIONS,
-} from './class-forms'
-import {
-  deleteBlockIntent,
-  deleteMessageIntent,
-  deleteNoteIntent,
-  deleteParticipantIntent,
-  setMessageIntent,
-  MESSAGE_ARROW_OPTIONS,
-} from './sequence-forms'
 import type { CanvasInlineEditTarget } from './inline-edit'
 import type { Selection } from '../projection/selection'
 import { selectionOfMenuTarget } from '../canvas-selection/selection-codec'
@@ -29,6 +12,8 @@ import {
   type ContextMenuTarget,
 } from './context-menu'
 import { linkModeTransition, type LinkModeState } from './link-mode'
+import { addClassDefIntent } from './flowchart-forms'
+import { MENU_ACTIONS, type MenuActionContext } from './menu-actions'
 import { useEditorStore } from '../../store/editor'
 
 /**
@@ -53,20 +38,18 @@ import { useEditorStore } from '../../store/editor'
  *   **直接改**（set-relation 的 kind / set-message 的 arrow，菜单不关可连着点）；其余是
  *   「在属性面板中编辑」——菜单项自己选中该连线并关闭菜单（工单 05 定案 D5），字段在右侧
  *   RelationForm / MessageForm 改；flowchart 连线的 edit-label 由工单 06 一并统一到该语义
- *   （字段在右侧 EdgeForm 改）；
- *   删除走 delete-relation / delete-message。sequence 注释与逻辑块**顺带接上删除**
- *   （delete-note / delete-block 意图早已存在，接线成本≈0），不为其新造编辑动作。
- *   本票不新建任何表单浮层（spec 决策：画布上应是「这元素能做什么」而非又一个表单）。
- * - 添加入口补全（工单 04）：add-note / add-block 在菜单位置浮出添加型小表单——
- *   sequence 空白（注释 / 逻辑块）、sequence 参与者（逻辑块，锚点为该参与者的声明）、
- *   class 空白（浮动 note，无需目标类）、class 类节点（`note for X`，锚点为该类声明）。
- *   落码位置：有右键元素时以其声明为锚点（`afterElementId`），空白处不传锚点由管线回退到
- *   文档最后一个元素——顺序即语义，块插在用户右键的那个位置。
+ *   （字段在右侧 EdgeForm 改）；删除走 delete-relation / delete-message。
+ *   sequence 注释与逻辑块**顺带接上删除**（工单 03），不为其新造编辑动作。
+ * - 添加入口补全（工单 04）：add-note / add-block 在菜单位置浮出添加型小表单。
  * - 画布键盘编辑键（工单 05）：class 的 Tab/Enter（加成员/加关系）、sequence 的 Enter
- *   （加消息）经 openFormForSelection 打开**同一份**添加型表单（无右键菜单，浮层在画布内
- *   浮出）；锚点/预选取自当前选中。与右键菜单共用 nodeFormForTarget，不新造浮层。
- * - 所有动作复用编辑意图管线（commitIntent，可撤销）；编辑文本/新建节点经
- *   onNodeCreated 进入内联编辑（工单 05 beginEdit）。
+ *   （加消息）经 openFormForSelection 打开**同一份**添加型表单；与右键菜单共用
+ *   nodeFormForTarget，不新造浮层。
+ *
+ * 菜单项动作的分发（architecture-deepening-2 工单 01）：Hook 不再为每个菜单项返回一个
+ * 方法，而是现场组装窄的 MenuActionContext 语境对象，`onMenuItem(id)` 查 MENU_ACTIONS 表
+ * 分发——动作实现与语义都住在 `menu-actions.ts`，可脱离本 Hook 单测。本 Hook 只保留
+ * 覆盖层状态（菜单 / 两个表单 / 连线模式）与两条非菜单入口（applyStyle 子菜单提交、
+ * openFormForSelection 键盘编辑键）。
  */
 
 interface MenuState {
@@ -98,17 +81,6 @@ export interface NodeFormState {
   /** 表单相对画布容器的位置（在菜单打开处浮出） */
   x: number
   y: number
-}
-
-/** 生成未冲突的默认名：base、base2、base3……（跳过已占用的名字）。
- * 编号口径收在 pipeline 的 nextFreeName（architecture-deepening-2 工单 04），
- * 这里以可引用名语义调用（referential 缺省）。 */
-
-/** 循环取值（工单 03）：取 options 中 current 的下一项；current 不在表中时取第一项。
- * 用于连线菜单「直接改」的字段（关系类型 / 消息箭头）——不新增表单浮层就能切换取值。 */
-function nextInCycle<V>(options: ReadonlyArray<{ value: V }>, current: V): V {
-  const i = options.findIndex((o) => o.value === current)
-  return options[(i + 1) % options.length].value
 }
 
 /**
@@ -275,71 +247,8 @@ export function useCanvasContextMenu(
     return () => container.removeEventListener('keydown', onKeyDown)
   }, [containerRef])
 
-  // ---------- 菜单动作（复用编辑意图管线，落码可撤销） ----------
-
-  /** 添加节点：新 id 落码后选中之并进入内联命名 */
-  const addNode = useCallback((): void => {
-    const proj = latest.current.projection
-    if (proj === null || proj.type !== 'flowchart') return
-    const nodeId = nextNodeId(proj.flowchart.nodes.map((n) => n.nodeId))
-    if (!useEditorStore.getState().commitIntent({ type: 'add-node', nodeId, text: nodeId, shape: 'rectangle' })) return
-    useEditorStore.getState().select({ kind: 'node', nodeId })
-    latest.current.onNodeCreated?.({ kind: 'flowchart', nodeId })
-    closeMenu()
-  }, [closeMenu])
-
-  /** class 空白处：新建类（默认名「新类」）→ 选中并进入内联命名（类名）。
-   * 空 classDiagram（画布停在解析错误态）同样可用：管线在表头后落一行 `class 新类`，
-   * 源码随之合法。不传 afterElementId → 回退到文档最后一个元素（只有表头时即表头）。 */
-  const addClass = useCallback((): void => {
-    const proj = latest.current.projection
-    if (proj === null || proj.type !== 'class') return
-    const name = nextFreeName('新类', proj.class.classes.map((c) => c.name))
-    if (!useEditorStore.getState().commitIntent({ type: 'add-class', name })) return
-    useEditorStore.getState().select({ kind: 'class', name })
-    latest.current.onNodeCreated?.({ kind: 'class', name })
-    closeMenu()
-  }, [closeMenu])
-
-  /** sequence 空白处：新建参与者（默认名「新参与者」，不生成 alias）→ 选中并进入
-   * 内联命名（参与者 id）。不传 afterElementId → 回退到文档最后一个元素。 */
-  const addParticipant = useCallback((): void => {
-    const proj = latest.current.projection
-    if (proj === null || proj.type !== 'sequence') return
-    const actorId = nextFreeName('新参与者', proj.sequence.participants.map((p) => p.actorId))
-    if (!useEditorStore.getState().commitIntent({ type: 'add-participant', actorId })) return
-    useEditorStore.getState().select({ kind: 'participant', actorId })
-    latest.current.onNodeCreated?.({ kind: 'sequence', actorId })
-    closeMenu()
-  }, [closeMenu])
-
-  /** mindmap 空白处：新建根节点（空文档即是第一个根）→ 选中并进入内联命名（显示文本）。
-   * 空文档走 add-child（无父）→ 管线在表头后建根，elementId 必为 mindmap-node:1；
-   * 非空时挂到根节点下（与「缺省父节点」的管线语义一致），末节点序号 + 2。 */
-  const addMindmapRoot = useCallback((): void => {
-    const proj = latest.current.projection
-    if (proj === null || proj.type !== 'mindmap') return
-    const text = latest.current.newNodeText
-    const roots = proj.mindmap.nodes
-    let plan: MindmapActionPlan | null
-    if (roots.length === 0) {
-      plan = { intents: [{ type: 'add-child', text }], newElementId: 'mindmap-node:1' }
-    } else {
-      plan = mindmapActionIntents(proj.mindmap, roots[0].elementId, 'add-child', text)
-    }
-    if (plan === null) return
-    const { commitIntent, select } = useEditorStore.getState()
-    for (const intent of plan.intents) {
-      if (!commitIntent(intent)) return
-    }
-    if (plan.newElementId !== null) {
-      select({ kind: 'mindmap-node', elementId: plan.newElementId })
-      latest.current.onNodeCreated?.({ kind: 'mindmap', elementId: plan.newElementId })
-    }
-    closeMenu()
-  }, [closeMenu])
-
-  /** 进入连线模式（preselectedFrom = 「从这里连线」的预选起点） */
+  /** 进入连线模式（preselectedFrom = 「从这里连线」的预选起点）。
+   * 收起菜单与两个表单浮层；动作表经 MenuActionContext.enterLinkMode 调到这里。 */
   const enterLinkMode = useCallback(
     (preselectedFrom?: string): void => {
       setMenu(null)
@@ -350,13 +259,8 @@ export function useCanvasContextMenu(
     [],
   )
 
-  /** 添加子图（flowchart）：空标题落码 `subgraph` + `end` 两行 */
-  const addSubgraph = useCallback((): void => {
-    useEditorStore.getState().commitIntent({ type: 'add-subgraph' })
-    closeMenu()
-  }, [closeMenu])
-
-  /** 应用样式到右键节点：apply-class 落码为独立 class 语句（工单 02 管线） */
+  /** 应用样式到右键节点：apply-class 落码为独立 class 语句（工单 02 管线）。
+   * 不经 MENU_ACTIONS 分发：CanvasPanel 把 apply-style 渲染成子菜单开关，点样式名直接调这里。 */
   const applyStyle = useCallback(
     (className: string): void => {
       const target = menu?.target
@@ -387,6 +291,13 @@ export function useCanvasContextMenu(
     [menu],
   )
 
+  /** 打开「添加样式」小表单（在菜单位置浮出，提交才落码） */
+  const openStyleForm = useCallback((): void => {
+    if (menu === null) return
+    setStyleForm({ x: menu.x, y: menu.y })
+    setMenu(null)
+  }, [menu])
+
   /**
    * 画布键盘编辑键（工单 05）：对**当前选中**元素打开添加表单（无右键菜单，浮层在画布内浮出）。
    * Tab/Enter 的「就近结构」在此落成具体表单——class 的加成员/加关系、sequence 的加消息，
@@ -412,108 +323,6 @@ export function useCanvasContextMenu(
     [containerRef],
   )
 
-  const addMember = useCallback(() => openNodeForm('member'), [openNodeForm])
-  const addRelation = useCallback(() => openNodeForm('relation'), [openNodeForm])
-  const addMessage = useCallback(() => openNodeForm('message'), [openNodeForm])
-  const addNote = useCallback(() => openNodeForm('note'), [openNodeForm])
-  const addBlock = useCallback(() => openNodeForm('block'), [openNodeForm])
-
-  /** 删除右键目标（节点/连线/mindmap 节点/类/参与者/位置序连线与块级元素） */
-  const deleteTarget = useCallback((): void => {
-    const target = menu?.target
-    if (target === undefined) return
-    const { commitIntent, select } = useEditorStore.getState()
-    if (target.kind === 'flowchart-node') commitIntent({ type: 'delete-node', nodeId: target.nodeId })
-    else if (target.kind === 'flowchart-edge')
-      commitIntent({ type: 'delete-edge', from: target.from, to: target.to, occurrence: target.occurrence })
-    else if (target.kind === 'mindmap-node') commitIntent({ type: 'delete-node', elementId: target.elementId })
-    else if (target.kind === 'class-node') commitIntent(deleteClassIntent(target.name))
-    else if (target.kind === 'sequence-participant') commitIntent(deleteParticipantIntent(target.actorId))
-    else if (target.kind === 'class-relation') commitIntent(deleteRelationIntent(target.elementId))
-    else if (target.kind === 'sequence-message') commitIntent(deleteMessageIntent(target.elementId))
-    else if (target.kind === 'sequence-note') commitIntent(deleteNoteIntent(target.elementId))
-    else if (target.kind === 'sequence-block') commitIntent(deleteBlockIntent(target.elementId))
-    select(null)
-    closeMenu()
-  }, [menu, closeMenu])
-
-  /** class 关系边：循环切换关系类型（set-relation 的 kind，直接改，不弹表单）。
-   * 菜单保持打开，便于连点切到想要的那种；每次切换是一次独立快照（可撤销）。 */
-  const cycleRelationKind = useCallback((): void => {
-    const target = menu?.target
-    const proj = latest.current.projection
-    if (target === undefined || target.kind !== 'class-relation' || proj === null || proj.type !== 'class') return
-    const relation = proj.class.relations.find((r) => r.elementId === target.elementId)
-    if (relation === undefined) return
-    useEditorStore
-      .getState()
-      .commitIntent(setRelationIntent(target.elementId, { kind: nextInCycle(RELATION_KIND_OPTIONS, relation.kind) }))
-  }, [menu])
-
-  /**
-   * 编辑类菜单项的语义（工单 05 定案 D5，工单 06 补上 flowchart 连线）：**选中该连线 + 关闭菜单**，
-   * 字段编辑在右侧属性面板完成（ADR-0001 表单驱动编辑 + CONTEXT.md：属性面板是选中元素属性
-   * 表单的入口）。
-   *
-   * 改动前 `editRelation` / `editMessage` / `beginEditLabel` 的函数体都只有 `closeMenu()`
-   * ——菜单项自身是个空动作，选中靠右键时的联动隐式成立（U1 的 Middle Man 气味，也是
-   * 「点了没反应」错觉的来源）。现在选中由菜单项自己确认：属性面板拿到哪条连线不依赖
-   * 「右键顺带选中过」这一隐式前提。三个菜单项 id 各自存在是因为目标种类不同
-   * （见 `contextMenuItems`），语义则共用这一份。
-   */
-  const selectMenuTargetAndClose = useCallback((): void => {
-    const target = menu?.target
-    if (target !== undefined) selectTarget(target)
-    closeMenu()
-  }, [menu, selectTarget, closeMenu])
-
-  /** sequence 消息：循环切换箭头（set-message 的 arrow，直接改，不弹表单）。菜单保持打开。 */
-  const cycleMessageArrow = useCallback((): void => {
-    const target = menu?.target
-    const proj = latest.current.projection
-    if (target === undefined || target.kind !== 'sequence-message' || proj === null || proj.type !== 'sequence') return
-    const message = proj.sequence.messages.find((m) => m.elementId === target.elementId)
-    if (message === undefined) return
-    useEditorStore
-      .getState()
-      .commitIntent(setMessageIntent(target.elementId, { arrow: nextInCycle(MESSAGE_ARROW_OPTIONS, message.arrow) }))
-  }, [menu])
-
-  /** mindmap 添加子节点：落码后选中新节点并进入内联命名 */
-  const addChildToMindmap = useCallback((): void => {
-    const target = menu?.target
-    const proj = latest.current.projection
-    if (target === undefined || target.kind !== 'mindmap-node' || proj === null || proj.type !== 'mindmap') return
-    const plan = mindmapActionIntents(proj.mindmap, target.elementId, 'add-child', latest.current.newNodeText)
-    if (plan === null) return
-    const { commitIntent, select } = useEditorStore.getState()
-    for (const intent of plan.intents) {
-      if (!commitIntent(intent)) return
-    }
-    if (plan.newElementId !== null) {
-      select({ kind: 'mindmap-node', elementId: plan.newElementId })
-      latest.current.onNodeCreated?.({ kind: 'mindmap', elementId: plan.newElementId })
-    }
-    closeMenu()
-  }, [menu, closeMenu])
-
-  /** 编辑文本（菜单项）：进入内联编辑（预填当前显示文本） */
-  const beginEditText = useCallback((): void => {
-    const target = menu?.target
-    if (target === undefined) return
-    if (target.kind === 'flowchart-node') latest.current.onNodeCreated?.({ kind: 'flowchart', nodeId: target.nodeId })
-    else if (target.kind === 'mindmap-node')
-      latest.current.onNodeCreated?.({ kind: 'mindmap', elementId: target.elementId })
-    closeMenu()
-  }, [menu, closeMenu])
-
-  /** 打开「添加样式」小表单（在菜单位置浮出，提交才落码） */
-  const openStyleForm = useCallback((): void => {
-    if (menu === null) return
-    setStyleForm({ x: menu.x, y: menu.y })
-    setMenu(null)
-  }, [menu])
-
   /** 提交样式表单：名称非法（空 / 含空白逗号）返回 false 不落码 */
   const submitStyleForm = useCallback((name: string, color: string): boolean => {
     const intent = addClassDefIntent({ name: name.trim(), fill: color, stroke: '', dashStyle: 'solid', color: '' })
@@ -522,6 +331,32 @@ export function useCanvasContextMenu(
     setStyleForm(null)
     return true
   }, [])
+
+  /**
+   * 菜单项 → 动作分发（architecture-deepening-2 工单 01）：现场组装 MenuActionContext，
+   * 查 MENU_ACTIONS 表分发（Record 穷尽性在类型层保证——漏一项是编译错误）。
+   * 动作实现与语义住在 menu-actions.ts，本 Hook 只供给覆盖层状态与 store 接线。
+   */
+  const onMenuItem = useCallback(
+    (id: ContextMenuItemId): void => {
+      // apply-style 不经分发：CanvasPanel 把它渲染成子菜单开关，点具体样式名直接调 applyStyle(name)
+      if (id === 'apply-style') return
+      const actionCtx: MenuActionContext = {
+        projection: latest.current.projection,
+        selection: useEditorStore.getState().selection,
+        commitIntent: (intent) => useEditorStore.getState().commitIntent(intent),
+        select: (selection) => useEditorStore.getState().select(selection),
+        openForm: openNodeForm,
+        openStyleForm,
+        beginInlineEdit: (target) => latest.current.onNodeCreated?.(target),
+        enterLinkMode,
+        newNodeText: latest.current.newNodeText,
+        close: closeMenu,
+      }
+      MENU_ACTIONS[id](actionCtx, menu?.target)
+    },
+    [menu, openNodeForm, openStyleForm, enterLinkMode, closeMenu],
+  )
 
   // 可用菜单项（空白菜单按图种给添加动作；其余图种未定义的目标不弹）
   const items: ContextMenuItemId[] = menu !== null ? contextMenuItems(menu.target) : []
@@ -536,30 +371,12 @@ export function useCanvasContextMenu(
     closeMenu,
     closeStyleForm,
     closeNodeForm,
+    /** 菜单项动作分发（MenuActionContext 语境 + MENU_ACTIONS 查表） */
+    onMenuItem,
     openFormForSelection,
     submitStyleForm,
-    addNode,
-    addClass,
-    addParticipant,
-    addMindmapRoot,
-    addMember,
-    addRelation,
-    addMessage,
-    addNote,
-    addBlock,
     enterLinkMode,
-    addSubgraph,
+    /** apply-style 子菜单的提交入口（不经 MENU_ACTIONS，见 applyStyle 注释） */
     applyStyle,
-    deleteTarget,
-    addChildToMindmap,
-    beginEditText,
-    openStyleForm,
-    cycleRelationKind,
-    // D5（工单 05，工单 06 补 flowchart 连线）：三个编辑类菜单项共用「选中该连线 + 关闭菜单」
-    // 这一个语义（id 不同是因为目标种类不同：flowchart 连线 / class 关系 / sequence 消息）
-    beginEditLabel: selectMenuTargetAndClose,
-    editRelation: selectMenuTargetAndClose,
-    cycleMessageArrow,
-    editMessage: selectMenuTargetAndClose,
   }
 }
