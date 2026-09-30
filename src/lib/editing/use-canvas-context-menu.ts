@@ -11,14 +11,26 @@ import {
   type ContextMenuItemId,
   type ContextMenuTarget,
 } from './context-menu'
-import { linkModeTransition, type LinkModeState } from './link-mode'
+import type { LinkModeState } from './link-mode'
+import {
+  IDLE_OPEN,
+  overlayTransition,
+  type MenuState,
+  type NodeFormKind,
+  type NodeFormState,
+  type OverlayOpen,
+  type StyleFormState,
+} from './overlay-state'
 import { addClassDefIntent } from './flowchart-forms'
 import { MENU_ACTIONS, type MenuActionContext } from './menu-actions'
 import { useEditorStore } from '../../store/editor'
 
 /**
  * 画布右键菜单 Hook（工单 07/04）：右键弹出单一菜单（随目标变化），并托管连线模式
- * 与「添加样式」小表单两个派生状态。
+ * 与「添加样式」小表单两个派生状态。architecture-deepening-2 工单 05 起，menu /
+ * styleForm / nodeForm / linkMode 四个互斥浮层收进 overlay-state.ts 的纯状态机
+ * （单个 open + 独立的内联编辑位），迁移、点击 / 拖拽裁定与 Escape 全关都在那里定义，
+ * 本 Hook 只做 store 接线与事件解析（右键目标、连线单击的节点 / 空白判定）。
  *
  * - onContextMenu：阻止浏览器默认菜单（只挂在画布容器上，代码面板不受影响），
  *   经 data-id 解析右键目标；无菜单可弹（目标不可映射，或该目标本轮没有动作）安静关闭。
@@ -52,36 +64,7 @@ import { useEditorStore } from '../../store/editor'
  * openFormForSelection 键盘编辑键）。
  */
 
-interface MenuState {
-  target: ContextMenuTarget
-  /** 菜单相对画布容器的位置 */
-  x: number
-  y: number
-}
-
-export interface StyleFormState {
-  /** 表单相对画布容器的位置（在菜单打开处浮出） */
-  x: number
-  y: number
-}
-
-/** 菜单上浮出的添加型小表单种类（工单 06 三项 + 工单 04 补三项）：
- * 'note' 同时服务 sequence（注释）与 class（浮动 / note for X），由投影图种决定渲染哪个表单。 */
-export type NodeFormKind = 'member' | 'relation' | 'message' | 'note' | 'block'
-
-export interface NodeFormState {
-  kind: NodeFormKind
-  /** 落码锚点：右键元素的声明 elementId（新元素插到它之后）。
-   * 缺省 = 空白处右键，由各管线回退到文档最后一个元素。 */
-  anchorElementId?: string
-  /** class 表单：预选类名（右键的那个类）；class 的 note 表单用它预选 `note for` 目标 */
-  className?: string
-  /** sequence 消息表单：预选起点参与者（右键的那个参与者） */
-  from?: string
-  /** 表单相对画布容器的位置（在菜单打开处浮出） */
-  x: number
-  y: number
-}
+export type { NodeFormKind, NodeFormState, StyleFormState } from './overlay-state'
 
 /**
  * 菜单目标 + 表单种类 + 投影 → 添加型表单状态（工单 06/04/05）：算出锚点、预选值与位置；
@@ -156,17 +139,22 @@ export interface CanvasContextMenuOptions {
 export function useCanvasContextMenu(
   { projection, resolver, containerRef, onNodeCreated, newNodeText = '新节点' }: CanvasContextMenuOptions,
 ) {
-  const [menu, setMenu] = useState<MenuState | null>(null)
-  const [styleForm, setStyleForm] = useState<StyleFormState | null>(null)
-  const [nodeForm, setNodeForm] = useState<NodeFormState | null>(null)
-  const [linkMode, setLinkMode] = useState<LinkModeState>({ stage: 'idle' })
+  // 覆盖层状态机（architecture-deepening-2 工单 05）：menu / styleForm / nodeForm /
+  // linkMode 四个互斥浮层收进单个 open（负载随行），迁移与点击 / 拖拽 / Escape 的裁定
+  // 全在 overlay-state.ts 的纯函数里，本 Hook 只做 store 接线与事件解析。
+  const [open, setOpen] = useState<OverlayOpen>(IDLE_OPEN)
   // 事件回调里读最新值：ref 兜住
   const latest = useRef({ projection, resolver, onNodeCreated, newNodeText })
   latest.current = { projection, resolver, onNodeCreated, newNodeText }
 
-  const closeMenu = useCallback(() => setMenu(null), [])
-  const closeStyleForm = useCallback(() => setStyleForm(null), [])
-  const closeNodeForm = useCallback(() => setNodeForm(null), [])
+  const menu: MenuState | null = open.kind === 'menu' ? { target: open.target, x: open.x, y: open.y } : null
+  const styleForm: StyleFormState | null = open.kind === 'styleForm' ? { x: open.x, y: open.y } : null
+  const nodeForm: NodeFormState | null = open.kind === 'nodeForm' ? open.form : null
+  const linkMode: LinkModeState = open.kind === 'linkMode' ? open.link : { stage: 'idle' }
+
+  const closeMenu = useCallback(() => setOpen(IDLE_OPEN), [])
+  const closeStyleForm = closeMenu
+  const closeNodeForm = closeMenu
 
   /** 右键目标 → 编辑器选中（属性面板联动：连线的字段编辑依赖该选中）。
    * 映射本体在 canvas-selection/selection-codec.ts（工单 03）；blank 目标不 select。 */
@@ -186,62 +174,54 @@ export function useCanvasContextMenu(
       const selection = selectionFromEventTarget(e.target, r)
       const target = contextMenuTargetFromSelection(selection, proj.type)
       if (target === null || contextMenuItems(target).length === 0) {
-        closeMenu()
+        // 无可弹项只收菜单（现状：不动已打开的表单浮层）
+        setOpen((cur) => (cur.kind === 'menu' ? IDLE_OPEN : cur))
         return
       }
       selectTarget(target)
       const rect = container.getBoundingClientRect()
-      closeStyleForm()
-      closeNodeForm()
-      setMenu({ target, x: e.clientX - rect.left, y: e.clientY - rect.top })
+      // 开菜单即收起两个表单浮层（互斥浮层的 open-menu 迁移，overlay-state 裁定）
+      setOpen({ kind: 'menu', target, x: e.clientX - rect.left, y: e.clientY - rect.top })
     },
-    [containerRef, closeMenu, closeStyleForm, closeNodeForm, selectTarget],
+    [containerRef, selectTarget],
   )
 
   /** 画布单击：连线模式下消费（节点 = 推进状态机，其它 = 取消）。
-   * 返回 true = 事件已被连线模式吃掉，使用方应跳过选中链路 */
+   * 返回 true = 事件已被连线模式吃掉，使用方应跳过选中链路。
+   * 谁消费点击由 overlay-state 的 canvasClickRuling 裁定（工单 05），这里只做连线分支的事件解析。 */
   const onCanvasClick = useCallback(
     (e: React.MouseEvent): boolean => {
-      if (linkMode.stage === 'idle') return false
+      if (open.kind !== 'linkMode') return false
       const { projection: proj, resolver: r } = latest.current
       const selection = proj !== null ? selectionFromEventTarget(e.target, r) : null
-      if (selection !== null && selection.kind === 'node') {
+      const t = overlayTransition(
+        { open, inlineEdit: false },
+        selection !== null && selection.kind === 'node'
+          ? { type: 'link-click-node', nodeId: selection.id }
+          : { type: 'link-click-blank' },
+      )
+      setOpen(t.state.open)
+      if (t.completedLink !== null) {
+        // 两步完成：落码默认实线箭头连线并选中它
         const { commitIntent, select } = useEditorStore.getState()
-        const { state, completed } = linkModeTransition(linkMode, { type: 'click-node', nodeId: selection.id })
-        setLinkMode(state)
-        if (completed !== null) {
-          // 两步完成：落码默认实线箭头连线并选中它
-          if (
-            commitIntent({
-              type: 'add-edge',
-              from: completed.from,
-              to: completed.to,
-              lineStyle: 'solid',
-              head: 'arrow',
-            })
-          ) {
-            select({ kind: 'edge', from: completed.from, to: completed.to, occurrence: 1 })
-          }
+        const { from, to } = t.completedLink
+        if (commitIntent({ type: 'add-edge', from, to, lineStyle: 'solid', head: 'arrow' })) {
+          select({ kind: 'edge', from, to, occurrence: 1 })
         }
-        return true
       }
-      // 点击空白/其它元素：取消连线模式
-      setLinkMode(linkModeTransition(linkMode, { type: 'click-blank' }).state)
       return true
     },
-    [linkMode],
+    [open],
   )
 
-  // Esc：取消连线模式 / 关闭菜单与样式表单（监听挂容器上，画布聚焦时才触发）
+  // Esc：全关（唯一一份定义在 overlay-state 的 escape 迁移：四个互斥浮层清空，
+  // 内联编辑不动——它的 Esc 是输入框自己的取消路径）。监听挂容器上，画布聚焦时才触发。
   useEffect(() => {
     const container = containerRef.current
     if (container === null) return
     const onKeyDown = (e: KeyboardEvent) => {
       if (e.key !== 'Escape') return
-      setMenu(null)
-      setStyleForm(null)
-      setNodeForm(null)
-      setLinkMode((cur) => (cur.stage !== 'idle' ? linkModeTransition(cur, { type: 'cancel' }).state : cur))
+      setOpen((cur) => overlayTransition({ open: cur, inlineEdit: false }, { type: 'escape' }).state.open)
     }
     container.addEventListener('keydown', onKeyDown)
     return () => container.removeEventListener('keydown', onKeyDown)
@@ -251,10 +231,7 @@ export function useCanvasContextMenu(
    * 收起菜单与两个表单浮层；动作表经 MenuActionContext.enterLinkMode 调到这里。 */
   const enterLinkMode = useCallback(
     (preselectedFrom?: string): void => {
-      setMenu(null)
-      setStyleForm(null)
-      setNodeForm(null)
-      setLinkMode(linkModeTransition({ stage: 'idle' }, { type: 'enter', preselectedFrom }).state)
+      setOpen(overlayTransition({ open: IDLE_OPEN, inlineEdit: false }, { type: 'enter-link-mode', preselectedFrom }).state.open)
     },
     [],
   )
@@ -285,8 +262,8 @@ export function useCanvasContextMenu(
       if (target === undefined || menu === null || proj === null) return
       const form = nodeFormForTarget(target, kind, proj, menu.x, menu.y)
       if (form === null) return
-      setNodeForm(form)
-      setMenu(null)
+      // 打开表单并收起菜单（互斥浮层的 open-node-form 迁移）
+      setOpen({ kind: 'nodeForm', form })
     },
     [menu],
   )
@@ -294,8 +271,7 @@ export function useCanvasContextMenu(
   /** 打开「添加样式」小表单（在菜单位置浮出，提交才落码） */
   const openStyleForm = useCallback((): void => {
     if (menu === null) return
-    setStyleForm({ x: menu.x, y: menu.y })
-    setMenu(null)
+    setOpen({ kind: 'styleForm', x: menu.x, y: menu.y })
   }, [menu])
 
   /**
@@ -316,9 +292,7 @@ export function useCanvasContextMenu(
       const y = rect !== undefined ? Math.max(8, rect.height / 3) : 8
       const form = nodeFormForTarget(target, kind, proj, x, y)
       if (form === null) return
-      setMenu(null)
-      setStyleForm(null)
-      setNodeForm(form)
+      setOpen({ kind: 'nodeForm', form })
     },
     [containerRef],
   )
@@ -328,7 +302,8 @@ export function useCanvasContextMenu(
     const intent = addClassDefIntent({ name: name.trim(), fill: color, stroke: '', dashStyle: 'solid', color: '' })
     if (intent === null) return false
     if (!useEditorStore.getState().commitIntent(intent)) return false
-    setStyleForm(null)
+    // commit 迁移：提交成功收起表单
+    setOpen(IDLE_OPEN)
     return true
   }, [])
 
@@ -362,6 +337,8 @@ export function useCanvasContextMenu(
   const items: ContextMenuItemId[] = menu !== null ? contextMenuItems(menu.target) : []
 
   return {
+    /** 覆盖层状态机的互斥浮层（工单 05）：CanvasPanel 的点击 / 拖拽裁定表消费它 */
+    open,
     menu: menu !== null ? { ...menu, items } : null,
     styleForm,
     nodeForm,
@@ -369,6 +346,8 @@ export function useCanvasContextMenu(
     onContextMenu,
     onCanvasClick,
     closeMenu,
+    /** 关闭当前互斥浮层（画布点击裁定的 close-float 落点） */
+    closeFloat: closeMenu,
     closeStyleForm,
     closeNodeForm,
     /** 菜单项动作分发（MenuActionContext 语境 + MENU_ACTIONS 查表） */

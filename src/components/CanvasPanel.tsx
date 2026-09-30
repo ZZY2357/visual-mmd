@@ -15,6 +15,7 @@ import { useCanvasInlineEdit, inlineEditTextOf } from '../lib/editing/use-canvas
 import type { InlineEditCloseOptions } from '../lib/editing/use-canvas-inline-edit'
 import type { Rect } from '../lib/editing/inline-edit'
 import { useCanvasContextMenu } from '../lib/editing/use-canvas-context-menu'
+import { canvasClickRuling, pointerDownBlocksDrag } from '../lib/editing/overlay-state'
 import type { ContextMenuItemId } from '../lib/editing/context-menu'
 import { NodeFormPopup } from './node-form-popup'
 import { useCanvasView } from '../lib/canvas-view/use-canvas-view'
@@ -452,40 +453,44 @@ export function CanvasPanel({ preview, projection }: CanvasPanelProps) {
           background: 'var(--mantine-color-gray-0)',
           borderRadius: 'var(--mantine-radius-sm)',
           // 连线模式光标十字（工单 07），其余保持背景拖拽的抓手
-          cursor: ctx.linkMode.stage !== 'idle' ? 'crosshair' : 'grab',
+          cursor: ctx.open.kind === 'linkMode' ? 'crosshair' : 'grab',
           outline: 'none', // 画布聚焦即键盘生效，不要浏览器默认焦点圈
         }}
         onClick={(e) => {
           // 只在点击画布背景/节点时把焦点收进容器：Tab/Enter/Del 随即可用。
           // 点击内联编辑浮层（含其根元素的留白）时不抢焦点——否则输入框立刻失焦并
           // 触发 onBlur 提交，表现为「输入框点不进去」（工单 02 修复的死守卫：
-          // 原来这个 if 后面还跟着一句无条件 focus()，守卫形同虚设）
+          // 原来这个 if 后面还跟着一句无条件 focus()，守卫形同虚设）。
+          // 这是焦点守卫，不是覆盖层裁定——覆盖层只裁「谁消费这次点击」。
           const clickedControl =
             (e.target as Element).closest('input, textarea, .cm-editor, .canvas-inline-edit') !== null
           if (!clickedControl) selectionRef.current?.focus()
-          // 打开的菜单先收起（点击画布任意处关闭菜单）
-          if (ctx.menu !== null) {
-            ctx.closeMenu()
+          // 谁消费这次点击由覆盖层状态机的裁定表驱动（architecture-deepening-2 工单 05，
+          // overlay-state.ts 的 canvasClickRuling，脱离 DOM 可测）：
+          // 菜单 / 节点表单打开 → 关浮层；连线模式 → 推进连线（节点）/ 取消（空白）；
+          // 样式表单与无浮层 → 落到选中链路（样式表单不被画布点击关闭，现状逐字保持）。
+          const overlay = { open: ctx.open, inlineEdit: editing !== null }
+          const ruling = canvasClickRuling(overlay)
+          if (ruling === 'close-float') {
+            ctx.closeFloat()
             return
           }
-          // class/sequence 的节点菜单表单浮层：点击画布空白处取消（浮层内部已 stopPropagation）
-          if (ctx.nodeForm !== null) {
-            ctx.closeNodeForm()
+          if (ruling === 'link-mode') {
+            ctx.onCanvasClick(e)
             return
           }
-          // 连线模式优先消费单击（工单 07）：节点 = 推进，空白 = 取消
-          if (ctx.onCanvasClick(e)) return
           onClick(e)
         }}
         onContextMenu={ctx.onContextMenu}
         onDoubleClick={onDoubleClick}
         onPointerDown={(e) => {
-          // 内联编辑期间不让背景拖拽抢走指针（输入框上的按下要留给文本选择）
-          if (editing !== null) return
-          // 右键菜单 / 添加样式表单 / 节点表单打开时也不启动背景拖拽：拖拽的 setPointerCapture
-          // 会把后续指针事件（含派生的 click）劫持到容器，菜单项/表单按钮将永远
-          // 收不到点击（工单 08 浏览器实测发现）
-          if (ctx.menu !== null || ctx.styleForm !== null || ctx.nodeForm !== null) return
+          // 背景拖拽让位由覆盖层状态机的裁定表驱动（architecture-deepening-2 工单 05，
+          // overlay-state.ts 的 pointerDownBlocksDrag）：内联编辑期间不让拖拽抢走指针
+          // （输入框上的按下要留给文本选择）；右键菜单 / 添加样式表单 / 节点表单打开时
+          // 也不启动拖拽——拖拽的 setPointerCapture 会把后续指针事件（含派生的 click）
+          // 劫持到容器，菜单项/表单按钮将永远收不到点击（工单 08 浏览器实测发现）。
+          // 连线模式不挡拖拽（现状如此）。
+          if (pointerDownBlocksDrag({ open: ctx.open, inlineEdit: editing !== null })) return
           onPointerDown(e)
         }}
         onPointerMove={onPointerMove}
