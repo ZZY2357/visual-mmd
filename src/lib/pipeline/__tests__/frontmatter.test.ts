@@ -267,10 +267,10 @@ describe('frontmatter 被各图种解析器 verbatim 保留', () => {
 
   it('带 frontmatter 的 mindmap 源码类型识别不受影响', async () => {
     const { detectDiagramType } = await import('../../diagram-registry')
-    expect(detectDiagramType(MINDMAP_SRC).id).toBe('mindmap')
-    expect(detectDiagramType(SEQ_SRC).id).toBe('sequence')
-    expect(detectDiagramType(CLASS_SRC).id).toBe('class')
-    expect(detectDiagramType(FM + FLOWCHART_SRC).id).toBe('flowchart')
+    expect(detectDiagramType(MINDMAP_SRC)?.id).toBe('mindmap')
+    expect(detectDiagramType(SEQ_SRC)?.id).toBe('sequence')
+    expect(detectDiagramType(CLASS_SRC)?.id).toBe('class')
+    expect(detectDiagramType(FM + FLOWCHART_SRC)?.id).toBe('flowchart')
   })
 })
 

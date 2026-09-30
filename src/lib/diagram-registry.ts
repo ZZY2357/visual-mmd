@@ -23,16 +23,36 @@ import { DEFAULT_DIAGRAM_SOURCE } from './storage'
  * store 的 commitIntent 与 App 的投影派生都经此分发，新图种接入只需在此注册。
  */
 
-export type DiagramTypeId = 'flowchart' | 'sequence' | 'class' | 'mindmap'
+/**
+ * 图种 id（more-diagrams 工单 01）：**开放类型**（string），不再是封闭字面量联合——
+ * 加一种图只改注册表（ProjectionTypes 加一行 + DIAGRAM_TYPE_LIST 挂一条），不牵动
+ * selection-codec / capabilities / partitions 等地基文件的类型。封闭性由
+ * ProjectionTypes（id → 投影类型的穷尽映射）承担，见下。
+ */
+export type DiagramTypeId = string
 
-export type AnyProjection =
-  | { type: 'flowchart'; flowchart: FlowchartProjection }
-  | { type: 'sequence'; sequence: SequenceProjection }
-  | { type: 'class'; class: ClassProjection }
-  | { type: 'mindmap'; mindmap: MindmapProjection }
+/** 已注册图种 id → 投影类型的穷尽映射。加一种图在此加一行；
+ * AnyProjection 与 DIAGRAM_TYPES 的键都由它推导，漏注册是编译错误。 */
+export interface ProjectionTypes {
+  flowchart: FlowchartProjection
+  sequence: SequenceProjection
+  class: ClassProjection
+  mindmap: MindmapProjection
+}
+
+/** 已注册图种的 id 集合（字面量联合，随 ProjectionTypes 增长） */
+export type RegisteredDiagramTypeId = keyof ProjectionTypes & string
+
+/** 投影包装：type 与承载投影的同名字段（如 `{ type: 'flowchart', flowchart }`） */
+export type ProjectionWrapper<K extends RegisteredDiagramTypeId> = { type: K } & { [p in K]: ProjectionTypes[K] }
+
+/** 全部已注册图种的投影包装并集（由 ProjectionTypes 推导，加图种自动扩展） */
+export type AnyProjection = {
+  [K in RegisteredDiagramTypeId]: ProjectionWrapper<K>
+}[RegisteredDiagramTypeId]
 
 export interface DiagramTypeRegistration {
-  id: DiagramTypeId
+  id: RegisteredDiagramTypeId
   parser: DiagramParser
   /** 新建图表时的起步模板（spec 用户故事 1） */
   template: string
@@ -109,8 +129,13 @@ export const MINDMAP_TEMPLATE = `mindmap
       导出 mmd / svg / png
 `
 
-export const DIAGRAM_TYPES: Record<DiagramTypeId, DiagramTypeRegistration> = {
-  flowchart: {
+/**
+ * 注册表：数组是唯一权威（more-diagrams 工单 01），DIAGRAM_TYPES 由它推导。
+ * detectDiagramType 按数组顺序显式遍历——不再维护手写的 if 分发链，
+ * 新图种挂一条即可参与识别，无法识别时不再默认 flowchart（见下）。
+ */
+export const DIAGRAM_TYPE_LIST: DiagramTypeRegistration[] = [
+  {
     id: 'flowchart',
     parser: flowchartParser,
     template: FLOWCHART_TEMPLATE,
@@ -119,7 +144,7 @@ export const DIAGRAM_TYPES: Record<DiagramTypeId, DiagramTypeRegistration> = {
     tree: treePartitions.flowchart,
     canvas: flowchartCanvasCapabilities,
   },
-  sequence: {
+  {
     id: 'sequence',
     parser: sequenceParser,
     template: SEQUENCE_TEMPLATE,
@@ -128,7 +153,7 @@ export const DIAGRAM_TYPES: Record<DiagramTypeId, DiagramTypeRegistration> = {
     tree: treePartitions.sequence,
     canvas: sequenceCanvasCapabilities,
   },
-  class: {
+  {
     id: 'class',
     parser: classParser,
     template: CLASS_TEMPLATE,
@@ -137,7 +162,7 @@ export const DIAGRAM_TYPES: Record<DiagramTypeId, DiagramTypeRegistration> = {
     tree: treePartitions.class,
     canvas: classCanvasCapabilities,
   },
-  mindmap: {
+  {
     id: 'mindmap',
     parser: mindmapParser,
     template: MINDMAP_TEMPLATE,
@@ -146,19 +171,18 @@ export const DIAGRAM_TYPES: Record<DiagramTypeId, DiagramTypeRegistration> = {
     tree: treePartitions.mindmap,
     canvas: mindmapCanvasCapabilities,
   },
-}
-
-/** 识别当前源码的图表类型；无法识别时默认 flowchart（保持工单 04 行为） */
-export function detectDiagramType(source: string): DiagramTypeRegistration {
-  if (DIAGRAM_TYPES.sequence.detect(source)) return DIAGRAM_TYPES.sequence
-  if (DIAGRAM_TYPES.class.detect(source)) return DIAGRAM_TYPES.class
-  if (DIAGRAM_TYPES.mindmap.detect(source)) return DIAGRAM_TYPES.mindmap
-  return DIAGRAM_TYPES.flowchart
-}
-
-export const DIAGRAM_TYPE_LIST: DiagramTypeRegistration[] = [
-  DIAGRAM_TYPES.flowchart,
-  DIAGRAM_TYPES.sequence,
-  DIAGRAM_TYPES.class,
-  DIAGRAM_TYPES.mindmap,
 ]
+
+export const DIAGRAM_TYPES = Object.fromEntries(
+  DIAGRAM_TYPE_LIST.map((registration) => [registration.id, registration]),
+) as Record<RegisteredDiagramTypeId, DiagramTypeRegistration>
+
+/**
+ * 识别当前源码的图表类型：按注册顺序遍历，返回第一个认领的图种。
+ * **没有任何注册认领时返回 null（unsupported 态，more-diagrams 工单 01）**——
+ * 修复原「无法识别默认 flowchart」缺陷：冷门图种（如 venn-beta）不再被 flowchart
+ * 解析器误吞成空投影，改为只读降级（预览与代码面板照常，画布表单显示占位提示）。
+ */
+export function detectDiagramType(source: string): DiagramTypeRegistration | null {
+  return DIAGRAM_TYPE_LIST.find((registration) => registration.detect(source)) ?? null
+}

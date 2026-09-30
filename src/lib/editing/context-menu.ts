@@ -100,6 +100,10 @@ function blankMenuItems(diagramType: DiagramTypeId): ContextMenuItemId[] {
       return ['add-participant', 'add-note', 'add-block']
     case 'mindmap':
       return ['add-root']
+    // DiagramTypeId 是开放类型（more-diagrams 工单 01）：未接入画布能力包的图种
+    // 没有空白右键入口（unsupported 态下画布右键整体停用，不会走到这里）
+    default:
+      return []
   }
 }
 

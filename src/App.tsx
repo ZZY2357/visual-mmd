@@ -75,11 +75,21 @@ export default function App() {
     downloadBlob(blob, withExtension(exportBaseName, 'png'))
   }
 
-  // 投影：源码 → 图种注册表分发解析器 → 只读结构视图（属性面板，工单 06 起）
+  // 投影：源码 → 图表注册表分发解析器 → 只读结构视图（属性面板，工单 06 起）。
+  // detect 失败 = unsupported 态（more-diagrams 工单 01）：mermaid 预览与代码面板照常，
+  // 投影为空、无选中、无右键动作，画布/属性面板显示「暂不支持可视化编辑」占位提示——
+  // 禁止把未识别源码喂给 flowchart 解析器（原默认 flowchart 的缺陷已移除）。
   const diagramType = useMemo(() => detectDiagramType(source), [source])
-  const parseResult = useMemo(() => diagramType.parser.parse(source), [diagramType, source])
+  const unsupported = diagramType === null
+  const parseResult = useMemo(
+    () => (diagramType === null ? null : diagramType.parser.parse(source)),
+    [diagramType, source],
+  )
   const projection = useMemo(
-    () => (parseResult.ok ? diagramType.buildProjection(parseResult.doc) : null),
+    () =>
+      diagramType !== null && parseResult !== null && parseResult.ok
+        ? diagramType.buildProjection(parseResult.doc)
+        : null,
     [diagramType, parseResult],
   )
 
@@ -213,11 +223,12 @@ export default function App() {
         <div style={{ height: 'calc(100vh - 56px - var(--mantine-spacing-md) * 2)' }}>
           <ThreePaneLayout
             code={<CodePanel error={preview.error} />}
-            canvas={<CanvasPanel preview={preview} projection={projection} />}
+            canvas={<CanvasPanel preview={preview} projection={projection} unsupported={unsupported} />}
             properties={
               <PropertyPanel
                 projection={projection}
-                parseError={parseResult.ok ? null : parseResult.error}
+                parseError={parseResult !== null && !parseResult.ok ? parseResult.error : null}
+                unsupported={unsupported}
               />
             }
           />

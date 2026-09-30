@@ -50,6 +50,9 @@ import { useEditorStore } from '../store/editor'
 interface CanvasPanelProps {
   preview: MermaidPreview
   projection: AnyProjection | null
+  /** unsupported 态（more-diagrams 工单 01）：源码不属于任何已注册图种——
+   * mermaid 预览照常渲染，画布选中/键盘/右键全部停用并显示占位提示 */
+  unsupported?: boolean
 }
 
 // 图种分发（工单 04，ADR-0015）：data-id resolver / 选中映射 / 导航 id 列表 / 键盘投影 /
@@ -284,7 +287,7 @@ function AddStyleForm(props: {
   )
 }
 
-export function CanvasPanel({ preview, projection }: CanvasPanelProps) {
+export function CanvasPanel({ preview, projection, unsupported = false }: CanvasPanelProps) {
   const { t } = useTranslation()
   const select = useEditorStore((s) => s.select)
   const selection = useEditorStore((s) => s.selection)
@@ -439,6 +442,11 @@ export function CanvasPanel({ preview, projection }: CanvasPanelProps) {
       {error !== null && (
         <Alert color="red" title={t('canvas.errorTitle')}>
           <Text size="sm">{error.message}</Text>
+        </Alert>
+      )}
+      {unsupported && (
+        <Alert color="yellow" title={t('canvas.unsupportedTitle')}>
+          <Text size="sm">{t('canvas.unsupportedHint')}</Text>
         </Alert>
       )}
       <Box
