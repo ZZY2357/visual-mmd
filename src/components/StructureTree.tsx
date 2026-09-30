@@ -1,19 +1,20 @@
 import { Stack, Text, UnstyledButton } from '@mantine/core'
-import type { ReactNode } from 'react'
+import { Fragment, type ReactNode } from 'react'
 import { useTranslation } from 'react-i18next'
-import { DIAGRAM_SELECTION, type Selection, sameSelection } from '../lib/projection/selection'
+import { type Selection, sameSelection } from '../lib/projection/selection'
 import type { AnyProjection } from '../lib/diagram-registry'
-import type { FlowchartProjection } from '../lib/projection/flowchart-projection'
-import type { MindmapProjection, ProjectionMindmapNode } from '../lib/projection/mindmap-projection'
-import { mindmapActionIntents, applyPlan, type KeyPlan } from '../lib/editing/canvas-keyboard'
+import { DIAGRAM_TYPES } from '../lib/diagram-registry'
+import type { TreeEntry } from '../lib/structure-tree/partitions'
 import { useEditorStore } from '../store/editor'
 
 /**
  * 结构树（工单 04）：属性面板上半区，展示图中全部元素，
  * 点击选中并定位到下半区的属性表单。
- * sequence 分支（工单 06）：参与者 / 消息 / note / 逻辑块 / rect-box 区域按嵌套深度展示。
- * class 分支（工单 06）：类 / 命名空间 / 成员 / 关系 / note / 样式。
- * mindmap 分支（工单 08）：树形缩进即主编辑界面——层级节点直接在树中增删。
+ *
+ * architecture-deepening-2 工单 06：四个图种各自的树分区收敛为注册表 `tree` 字段上的
+ * 声明式描述（src/lib/structure-tree/partitions.ts，独立字段不进画布能力包——守 ADR-0015），
+ * 本组件只保留**一份渲染 JSX**：图表级行 + 各分区「标题（计数）+ 条目」，
+ * mindmap 的树形缩进由条目 children 递归展开，键盘经描述里的 onKeyDown 消费 applyPlan。
  */
 
 function TreeItem({
@@ -58,374 +59,56 @@ function TreeItem({
   )
 }
 
-/** 图种无关的结构树入口（工单 06）：按投影类型分发到各图种分支 */
+/** 图种无关的结构树入口（工单 06）：按注册表的分区描述渲染，渲染 JSX 只有一份 */
 export function StructureTree({ projection }: { projection: AnyProjection }) {
-  if (projection.type === 'flowchart') return <FlowchartTree projection={projection.flowchart} />
-  if (projection.type === 'sequence') return <SequenceTree projection={projection.sequence} />
-  if (projection.type === 'mindmap') return <MindmapTree projection={projection.mindmap} />
-  return <ClassTree projection={projection.class} />
-}
-
-function FlowchartTree({ projection }: { projection: FlowchartProjection }) {
   const { t } = useTranslation()
   const selection = useEditorStore((s) => s.selection)
   const select = useEditorStore((s) => s.select)
   const is = (sel: Selection) => selection !== null && sameSelection(selection, sel)
 
-  return (
-    <Stack gap={4} aria-label={t('app:propertyPanel.structureTree')}>
+  const sections = DIAGRAM_TYPES[projection.type].tree(projection, { t })
+
+  const renderEntry = (entry: TreeEntry): ReactNode => {
+    const item = (
       <TreeItem
-        label={t('app:propertyPanel.diagram')}
-        detail={projection.direction ?? 'TB'}
-        active={is(DIAGRAM_SELECTION)}
-        depth={0}
-        onSelect={() => select(DIAGRAM_SELECTION)}
+        label={entry.label}
+        detail={entry.detail}
+        active={is(entry.selection)}
+        depth={entry.depth}
+        onSelect={() => select(entry.selection)}
+        onKeyDown={entry.onKeyDown}
       />
-
-      <Text size="xs" c="dimmed" mt={4} px="xs">
-        {t('app:propertyPanel.nodes')}（{projection.nodes.length}）
-      </Text>
-      {projection.nodes.map((node) => (
-        <TreeItem
-          key={node.nodeId}
-          label={node.text ?? node.nodeId}
-          detail={node.text !== null ? node.nodeId : undefined}
-          active={is({ kind: 'node', nodeId: node.nodeId })}
-          depth={1}
-          onSelect={() => select({ kind: 'node', nodeId: node.nodeId })}
-        />
-      ))}
-
-      <Text size="xs" c="dimmed" mt={4} px="xs">
-        {t('app:propertyPanel.edges')}（{projection.edges.length}）
-      </Text>
-      {projection.edges.map((edge) => (
-        <TreeItem
-          key={`${edge.from}->${edge.to}#${edge.occurrence}`}
-          label={t('app:propertyPanel.edgeLabel', { from: edge.from, to: edge.to })}
-          detail={edge.label ?? undefined}
-          active={is({ kind: 'edge', from: edge.from, to: edge.to, occurrence: edge.occurrence })}
-          depth={1}
-          onSelect={() => select({ kind: 'edge', from: edge.from, to: edge.to, occurrence: edge.occurrence })}
-        />
-      ))}
-
-      <Text size="xs" c="dimmed" mt={4} px="xs">
-        {t('app:propertyPanel.subgraphs')}（{projection.subgraphs.length}）
-      </Text>
-      {projection.subgraphs.map((sg) => (
-        <TreeItem
-          key={sg.elementId}
-          label={sg.title ?? sg.id ?? t('app:propertyPanel.unnamedSubgraph')}
-          active={is({ kind: 'subgraph', elementId: sg.elementId })}
-          depth={1}
-          onSelect={() => select({ kind: 'subgraph', elementId: sg.elementId })}
-        />
-      ))}
-
-      <Text size="xs" c="dimmed" mt={4} px="xs">
-        {t('app:propertyPanel.classDefs')}（{projection.classDefs.length}）
-      </Text>
-      {projection.classDefs.map((cd) => (
-        <TreeItem
-          key={cd.name}
-          label={cd.name}
-          detail={cd.props.fill}
-          active={is({ kind: 'classdef', name: cd.name })}
-          depth={1}
-          onSelect={() => select({ kind: 'classdef', name: cd.name })}
-        />
-      ))}
-    </Stack>
-  )
-}
-
-function SequenceTree({ projection }: { projection: Extract<AnyProjection, { type: 'sequence' }>['sequence'] }) {
-  const { t } = useTranslation()
-  const selection = useEditorStore((s) => s.selection)
-  const select = useEditorStore((s) => s.select)
-  const is = (sel: Selection) => selection !== null && sameSelection(selection, sel)
-
-  return (
-    <Stack gap={4} aria-label={t('app:propertyPanel.structureTree')}>
-      <TreeItem
-        label={t('app:propertyPanel.diagram')}
-        detail={projection.autonumber ? 'autonumber' : undefined}
-        active={is(DIAGRAM_SELECTION)}
-        depth={0}
-        onSelect={() => select(DIAGRAM_SELECTION)}
-      />
-
-      <Text size="xs" c="dimmed" mt={4} px="xs">
-        {t('app:propertyPanel.participants')}（{projection.participants.length}）
-      </Text>
-      {projection.participants.map((p) => (
-        <TreeItem
-          key={p.actorId}
-          label={p.alias ?? p.actorId}
-          detail={
-            [
-              p.alias !== null ? p.actorId : p.active ? 'activate' : undefined,
-              p.created === true ? t('app:propertyPanel.createdByCreate') : undefined,
-            ]
-              .filter((x) => x !== undefined)
-              .join(' · ') || undefined
-          }
-          active={is({ kind: 'participant', actorId: p.actorId })}
-          depth={1}
-          onSelect={() => select({ kind: 'participant', actorId: p.actorId })}
-        />
-      ))}
-
-      <Text size="xs" c="dimmed" mt={4} px="xs">
-        {t('app:propertyPanel.messages')}（{projection.messages.length}）
-      </Text>
-      {projection.messages.map((m) => (
-        <TreeItem
-          key={m.elementId}
-          label={`${m.from} → ${m.to}`}
-          detail={m.text || undefined}
-          active={is({ kind: 'message', elementId: m.elementId })}
-          depth={1}
-          onSelect={() => select({ kind: 'message', elementId: m.elementId })}
-        />
-      ))}
-
-      <Text size="xs" c="dimmed" mt={4} px="xs">
-        {t('app:propertyPanel.notes')}（{projection.notes.length}）
-      </Text>
-      {projection.notes.map((n) => (
-        <TreeItem
-          key={n.elementId}
-          label={t(`app:notePos.${n.pos}`)}
-          detail={n.text || undefined}
-          active={is({ kind: 'note', elementId: n.elementId })}
-          depth={1}
-          onSelect={() => select({ kind: 'note', elementId: n.elementId })}
-        />
-      ))}
-
-      <Text size="xs" c="dimmed" mt={4} px="xs">
-        {t('app:propertyPanel.blocks')}（{projection.blocks.length}）
-      </Text>
-      {projection.blocks.map((b) => (
-        <TreeItem
-          key={b.elementId}
-          label={
-            b.keyword === 'else' || b.keyword === 'and'
-              ? t(`app:elseKeywords.${b.keyword}`)
-              : t(`app:blockKeywords.${b.keyword}`)
-          }
-          detail={b.label ?? undefined}
-          active={is({ kind: 'block', elementId: b.elementId })}
-          depth={b.depth}
-          onSelect={() => select({ kind: 'block', elementId: b.elementId })}
-        />
-      ))}
-
-      <Text size="xs" c="dimmed" mt={4} px="xs">
-        {t('app:propertyPanel.regions')}（{projection.regions.length}）
-      </Text>
-      {projection.regions.map((r) => (
-        <TreeItem
-          key={r.elementId}
-          label={r.kind === 'box' ? (r.label ?? t('app:propertyPanel.boxRegion')) : t('app:propertyPanel.rectRegion')}
-          detail={r.kind === 'box' ? (r.color ?? undefined) : r.color}
-          active={is({ kind: 'seq-region', elementId: r.elementId })}
-          depth={1}
-          onSelect={() => select({ kind: 'seq-region', elementId: r.elementId })}
-        />
-      ))}
-    </Stack>
-  )
-}
-
-function ClassTree({ projection }: { projection: Extract<AnyProjection, { type: 'class' }>['class'] }) {
-  const { t } = useTranslation()
-  const selection = useEditorStore((s) => s.selection)
-  const select = useEditorStore((s) => s.select)
-  const is = (sel: Selection) => selection !== null && sameSelection(selection, sel)
-
-  return (
-    <Stack gap={4} aria-label={t('app:propertyPanel.structureTree')}>
-      <TreeItem
-        label={t('app:propertyPanel.diagram')}
-        detail="classDiagram"
-        active={is(DIAGRAM_SELECTION)}
-        depth={0}
-        onSelect={() => select(DIAGRAM_SELECTION)}
-      />
-
-      <Text size="xs" c="dimmed" mt={4} px="xs">
-        {t('app:propertyPanel.classes')}（{projection.classes.length}）
-      </Text>
-      {projection.classes.map((c) => (
-        <TreeItem
-          key={c.elementId}
-          label={c.generic !== null ? `${c.name}~${c.generic}~` : c.name}
-          detail={c.hasBlock ? '{}' : undefined}
-          active={is({ kind: 'class', name: c.name })}
-          depth={1}
-          onSelect={() => select({ kind: 'class', name: c.name })}
-        />
-      ))}
-
-      <Text size="xs" c="dimmed" mt={4} px="xs">
-        {t('app:propertyPanel.namespaces')}（{projection.namespaces.length}）
-      </Text>
-      {projection.namespaces.map((ns) => (
-        <TreeItem
-          key={ns.elementId}
-          label={ns.name}
-          active={is({ kind: 'class-namespace', elementId: ns.elementId })}
-          depth={1}
-          onSelect={() => select({ kind: 'class-namespace', elementId: ns.elementId })}
-        />
-      ))}
-
-      <Text size="xs" c="dimmed" mt={4} px="xs">
-        {t('app:propertyPanel.members')}（{projection.members.length}）
-      </Text>
-      {projection.members.map((m) => (
-        <TreeItem
-          key={m.elementId}
-          label={`${m.vis === '' ? '' : m.vis + ' '}${m.text}`}
-          detail={m.owner ?? undefined}
-          active={is({ kind: 'class-member', elementId: m.elementId })}
-          depth={2}
-          onSelect={() => select({ kind: 'class-member', elementId: m.elementId })}
-        />
-      ))}
-
-      <Text size="xs" c="dimmed" mt={4} px="xs">
-        {t('app:propertyPanel.relations')}（{projection.relations.length}）
-      </Text>
-      {projection.relations.map((r) => (
-        <TreeItem
-          key={r.elementId}
-          label={`${r.from} ${r.kind} ${r.to}`}
-          detail={r.label ?? undefined}
-          active={is({ kind: 'class-relation', elementId: r.elementId })}
-          depth={1}
-          onSelect={() => select({ kind: 'class-relation', elementId: r.elementId })}
-        />
-      ))}
-
-      <Text size="xs" c="dimmed" mt={4} px="xs">
-        {t('app:propertyPanel.notes')}（{projection.notes.length}）
-      </Text>
-      {projection.notes.map((n) => (
-        <TreeItem
-          key={n.elementId}
-          label={n.forClass !== null ? t('app:propertyPanel.noteFor', { cls: n.forClass }) : t('app:propertyPanel.floatingNote')}
-          detail={n.text || undefined}
-          active={is({ kind: 'class-note', elementId: n.elementId })}
-          depth={1}
-          onSelect={() => select({ kind: 'class-note', elementId: n.elementId })}
-        />
-      ))}
-
-      <Text size="xs" c="dimmed" mt={4} px="xs">
-        {t('app:propertyPanel.classDefs')}（{projection.classDefs.length}）
-      </Text>
-      {projection.classDefs.map((cd) => (
-        <TreeItem
-          key={cd.name}
-          label={cd.name}
-          detail={cd.props.fill}
-          active={is({ kind: 'classdef', name: cd.name })}
-          depth={1}
-          onSelect={() => select({ kind: 'classdef', name: cd.name })}
-        />
-      ))}
-    </Stack>
-  )
-}
-
-// ---------- mindmap（工单 08）：树形缩进即主编辑界面 ----------
-
-function MindmapTree({ projection }: { projection: MindmapProjection }) {
-  const { t } = useTranslation()
-  const selection = useEditorStore((s) => s.selection)
-  const select = useEditorStore((s) => s.select)
-  const is = (sel: Selection) => selection !== null && sameSelection(selection, sel)
-
-  const childrenOf = new Map<string | null, ProjectionMindmapNode[]>()
-  for (const node of projection.nodes) {
-    const list = childrenOf.get(node.parentId) ?? []
-    list.push(node)
-    childrenOf.set(node.parentId, list)
-  }
-
-  // 结构树键盘（工单 06）：焦点在树节点上时 Tab 加子节点 / Enter 加同级节点
-  // （preventDefault 压掉焦点切换），落码按 mindmap 缩进层级；plan 的执行统一交给
-  // canvas-keyboard.applyPlan（architecture-deepening-2 工单 02：与画布键盘 / 右键菜单
-  // 共用同一份「提交 → 选中 → 请求内联命名」编排；画布侧经 pendingInlineEdit 消费请求）
-  const onItemKeyDown = (node: ProjectionMindmapNode) => (e: React.KeyboardEvent) => {
-    const action =
-      e.key === 'Tab' && !e.shiftKey ? 'add-child' : e.key === 'Enter' && !e.shiftKey ? 'add-sibling' : null
-    if (action === null) return
-    const plan = mindmapActionIntents(projection, node.elementId, action, t('app:propertyPanel.mindmapNewNode'))
-    if (plan === null) return
-    const keyPlan: KeyPlan = { intents: plan.intents }
-    if (plan.newElementId !== null) {
-      keyPlan.newElementTarget = {
-        selection: { kind: 'mindmap-node', elementId: plan.newElementId },
-        inlineEdit: { kind: 'mindmap', elementId: plan.newElementId },
-      }
+    )
+    if (entry.children === undefined || entry.children.length === 0) {
+      return <Fragment key={entry.key}>{item}</Fragment>
     }
-    const { commitIntent, select: selectInStore, requestInlineEdit: request } = useEditorStore.getState()
-    applyPlan(keyPlan, {
-      commitIntent,
-      select: selectInStore,
-      // 本图种（mindmap）的 plan 只产 mindmap 目标：经 store 请求，画布侧消费（工单 06）
-      beginInlineEdit: (target) => {
-        if (target.kind === 'mindmap') request(target)
-      },
-      preventDefault: () => e.preventDefault(),
-    })
-  }
-
-  const renderNode = (node: ProjectionMindmapNode): ReactNode => {
-    const children = childrenOf.get(node.elementId) ?? []
-    const shapeLabel =
-      node.shapeType !== null ? t(`app:mindmapShapes.${node.shapeType}`) : undefined
+    // 树形分区（mindmap）：条目与其子树收进无间距的 Stack，缩进由 depth 决定
     return (
-      <Stack key={node.elementId} gap={0}>
-        <TreeItem
-          label={node.text}
-          detail={[shapeLabel, node.icon !== null ? `::icon(${node.icon})` : undefined]
-            .filter((x) => x !== undefined)
-            .join(' · ') || undefined}
-          active={is({ kind: 'mindmap-node', elementId: node.elementId })}
-          depth={node.depth}
-          onSelect={() => select({ kind: 'mindmap-node', elementId: node.elementId })}
-          onKeyDown={onItemKeyDown(node)}
-        />
-        {children.map(renderNode)}
+      <Stack key={entry.key} gap={0}>
+        {item}
+        {entry.children.map(renderEntry)}
       </Stack>
     )
   }
 
   return (
     <Stack gap={4} aria-label={t('app:propertyPanel.structureTree')}>
-      <TreeItem
-        label={t('app:propertyPanel.diagram')}
-        detail="mindmap"
-        active={is(DIAGRAM_SELECTION)}
-        depth={0}
-        onSelect={() => select(DIAGRAM_SELECTION)}
-      />
-      <Text size="xs" c="dimmed" px="xs">
-        {t('app:propertyPanel.mindmapHint')}
-      </Text>
-      {projection.nodes.length === 0 ? (
-        <Text size="xs" c="dimmed" px="xs">
-          {t('app:propertyPanel.mindmapEmpty')}
-        </Text>
-      ) : (
-        (childrenOf.get(null) ?? []).map(renderNode)
-      )}
+      {sections.map((section) => (
+        <Fragment key={section.key}>
+          {section.heading !== undefined && (
+            <Text size="xs" c="dimmed" mt={section.count !== undefined ? 4 : undefined} px="xs">
+              {section.count !== undefined ? `${section.heading}（${section.count}）` : section.heading}
+            </Text>
+          )}
+          {section.entries.length === 0 && section.emptyText !== undefined ? (
+            <Text size="xs" c="dimmed" px="xs">
+              {section.emptyText}
+            </Text>
+          ) : (
+            section.entries.map(renderEntry)
+          )}
+        </Fragment>
+      ))}
     </Stack>
   )
 }

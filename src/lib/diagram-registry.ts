@@ -14,6 +14,7 @@ import { sequenceCanvasCapabilities } from './canvas-selection/sequence-adapter'
 import { classCanvasCapabilities } from './canvas-selection/class-adapter'
 import { mindmapCanvasCapabilities } from './canvas-selection/mindmap-adapter'
 import type { CanvasCapabilities } from './canvas-selection/capabilities'
+import { treePartitions, type TreePartitions } from './structure-tree/partitions'
 import { DEFAULT_DIAGRAM_SOURCE } from './storage'
 
 /**
@@ -38,6 +39,10 @@ export interface DiagramTypeRegistration {
   /** 源码识别：首个语句行是否为该图种的声明 */
   detect(source: string): boolean
   buildProjection(doc: SourceDocument): AnyProjection
+  /** 结构树分区描述（architecture-deepening-2 工单 06）：该图种的结构树由哪些分区组成、
+   * 每个元素如何显示与选中。**独立字段，不进画布能力包**（守 ADR-0015 的范围——
+   * 结构树展示分区不是画布知识）。registry 只持引用、不含实现。 */
+  tree: TreePartitions
   /** 画布能力包（工单 04，ADR-0015）：该图种接入画布所需的全部静态图种知识。
    * registry 只持引用、不含实现——「加一种图」= 新建一个 adapter + 在这里挂一行。 */
   canvas: CanvasCapabilities
@@ -111,6 +116,7 @@ export const DIAGRAM_TYPES: Record<DiagramTypeId, DiagramTypeRegistration> = {
     template: FLOWCHART_TEMPLATE,
     detect: (source) => /^(flowchart|graph)\b/i.test(firstStatementLine(source)),
     buildProjection: (doc) => ({ type: 'flowchart', flowchart: buildFlowchartProjection(doc) }),
+    tree: treePartitions.flowchart,
     canvas: flowchartCanvasCapabilities,
   },
   sequence: {
@@ -119,6 +125,7 @@ export const DIAGRAM_TYPES: Record<DiagramTypeId, DiagramTypeRegistration> = {
     template: SEQUENCE_TEMPLATE,
     detect: (source) => /^sequenceDiagram\b/i.test(firstStatementLine(source)),
     buildProjection: (doc) => ({ type: 'sequence', sequence: buildSequenceProjection(doc) }),
+    tree: treePartitions.sequence,
     canvas: sequenceCanvasCapabilities,
   },
   class: {
@@ -127,6 +134,7 @@ export const DIAGRAM_TYPES: Record<DiagramTypeId, DiagramTypeRegistration> = {
     template: CLASS_TEMPLATE,
     detect: (source) => /^classDiagram\b/i.test(firstStatementLine(source)),
     buildProjection: (doc) => ({ type: 'class', class: buildClassProjection(doc) }),
+    tree: treePartitions.class,
     canvas: classCanvasCapabilities,
   },
   mindmap: {
@@ -135,6 +143,7 @@ export const DIAGRAM_TYPES: Record<DiagramTypeId, DiagramTypeRegistration> = {
     template: MINDMAP_TEMPLATE,
     detect: (source) => /^mindmap\b/i.test(firstStatementLine(source)),
     buildProjection: (doc) => ({ type: 'mindmap', mindmap: buildMindmapProjection(doc) }),
+    tree: treePartitions.mindmap,
     canvas: mindmapCanvasCapabilities,
   },
 }
