@@ -201,6 +201,20 @@ describe('结构树分区描述（工单 06）', () => {
     expect(sections[2].count).toBe(0)
   })
 
+  it('pie：图表级 + 扇区两个分区，扇区带键盘；非法数值走「无效」标注键', () => {
+    const source = 'pie showData\n    title 预算\n    "研发" : 45\n    "异常" : -1\n'
+    const parsed = DIAGRAM_TYPES.pie.parser.parse(source)
+    if (!parsed.ok) throw new Error('解析失败')
+    const sections = DIAGRAM_TYPES.pie.tree(DIAGRAM_TYPES.pie.buildProjection(parsed.doc), { t })
+    expect(sections.map((s) => s.key)).toEqual(['diagram', 'sectors'])
+    expect(sections[0].entries[0]).toMatchObject({ depth: 0, selection: { kind: 'diagram' }, detail: '预算' })
+    const [ok, bad] = sections[1].entries
+    expect(ok).toMatchObject({ depth: 1, selection: { kind: 'pie-sector', elementId: 'sector:1' }, detail: '45' })
+    expect(ok?.onKeyDown).toBeTypeOf('function')
+    // 负数数值走「无效」标注键（t 替身直返键名；原文在 opts 里透传）
+    expect(bad?.detail).toContain('app:propertyPanel.pieValueInvalidShort')
+  })
+
   it('每个图种注册表的 tree 字段都能对自身的投影求值（穷尽性）', () => {
     const sources: Record<keyof typeof DIAGRAM_TYPES, string> = {
       flowchart: 'flowchart TB\nn1[甲]',
@@ -216,6 +230,7 @@ describe('结构树分区描述（工单 06）', () => {
         'requirementDiagram\n    functionalRequirement login {\n        id: "REQ-1"\n        text: "登录"\n        risk: Medium\n        verifymethod: Test\n    }\n\n    element loginUI {\n        type: "界面"\n    }\n\n    loginUI - satisfies -> login',
       journey:
         'journey\n    title 旅程\n    section 发现\n        访问首页: 5: 用户\n        浏览商品: 3\n    section 决策\n        对比价格: 2: 用户, 客服',
+      pie: 'pie showData\n    title 预算\n    "研发" : 45\n    "市场" : 30',
     }
     for (const id of Object.keys(DIAGRAM_TYPES) as (keyof typeof DIAGRAM_TYPES)[]) {
       const registration = DIAGRAM_TYPES[id]

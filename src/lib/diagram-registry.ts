@@ -11,6 +11,7 @@ import { timelineParser } from './pipeline/timeline'
 import { kanbanParser } from './pipeline/kanban'
 import { requirementParser } from './pipeline/requirement'
 import { journeyParser } from './pipeline/journey'
+import { pieParser } from './pipeline/pie'
 import { frontmatterEnd } from './pipeline/frontmatter'
 import { buildFlowchartProjection, type FlowchartProjection } from './projection/flowchart-projection'
 import { buildSequenceProjection, type SequenceProjection } from './projection/sequence-projection'
@@ -26,6 +27,7 @@ import {
   type RequirementProjection,
 } from './projection/requirement-projection'
 import { buildJourneyProjection, type JourneyProjection } from './projection/journey-projection'
+import { buildPieProjection, type PieProjection } from './projection/pie-projection'
 import { flowchartCanvasCapabilities } from './canvas-selection/flowchart-adapter'
 import { sequenceCanvasCapabilities } from './canvas-selection/sequence-adapter'
 import { classCanvasCapabilities } from './canvas-selection/class-adapter'
@@ -37,6 +39,7 @@ import { timelineCanvasCapabilities } from './canvas-selection/timeline-adapter'
 import { kanbanCanvasCapabilities } from './canvas-selection/kanban-adapter'
 import { requirementCanvasCapabilities } from './canvas-selection/requirement-adapter'
 import { journeyCanvasCapabilities } from './canvas-selection/journey-adapter'
+import { pieCanvasCapabilities } from './canvas-selection/pie-adapter'
 import type { CanvasCapabilities } from './canvas-selection/capabilities'
 import { treePartitions, type TreePartitions } from './structure-tree/partitions'
 import { DEFAULT_DIAGRAM_SOURCE } from './storage'
@@ -69,6 +72,7 @@ export interface ProjectionTypes {
   kanban: KanbanProjection
   requirement: RequirementProjection
   journey: JourneyProjection
+  pie: PieProjection
 }
 
 /** 已注册图种的 id 集合（字面量联合，随 ProjectionTypes 增长） */
@@ -270,6 +274,18 @@ export const JOURNEY_TEMPLATE = `journey
 `
 
 /**
+ * pie 起步模板（more-diagrams 工单 10）：`pie showData` 声明、title、三个扇区。
+ * 注：mermaid 12 的 pie 词法里 label 是 STRING token——引号必需（实测裸 label 直接
+ * lexer 报错，见 pipeline/pie.ts）；数值落码保留原小数风格。
+ */
+export const PIE_TEMPLATE = `pie showData
+    title 预算分配
+    "研发" : 45
+    "市场" : 30
+    "运营" : 25
+`
+
+/**
  * 注册表：数组是唯一权威（more-diagrams 工单 01），DIAGRAM_TYPES 由它推导。
  * detectDiagramType 按数组顺序显式遍历——不再维护手写的 if 分发链，
  * 新图种挂一条即可参与识别，无法识别时不再默认 flowchart（见下）。
@@ -377,6 +393,16 @@ export const DIAGRAM_TYPE_LIST: DiagramTypeRegistration[] = [
     buildProjection: (doc) => ({ type: 'journey', journey: buildJourneyProjection(doc) }),
     tree: treePartitions.journey,
     canvas: journeyCanvasCapabilities,
+  },
+  {
+    id: 'pie',
+    parser: pieParser,
+    template: PIE_TEMPLATE,
+    // `\b` 让关键字不被 `pieXxx` 之类的更长词误认
+    detect: (source) => /^pie\b/i.test(firstStatementLine(source)),
+    buildProjection: (doc) => ({ type: 'pie', pie: buildPieProjection(doc) }),
+    tree: treePartitions.pie,
+    canvas: pieCanvasCapabilities,
   },
 ]
 

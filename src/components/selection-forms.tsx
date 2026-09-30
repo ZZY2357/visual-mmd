@@ -48,6 +48,8 @@ import {
 import { KanbanCardForm, KanbanColumnForm } from './kanban-forms'
 import { JourneyDiagramForm, JourneySectionForm, JourneyTaskForm } from './journey-forms'
 import { type JourneyProjection } from '../lib/projection/journey-projection'
+import { PieDiagramForm, PieSectorForm } from './pie-forms'
+import { type PieProjection } from '../lib/projection/pie-projection'
 
 /**
  * 选中元素的属性表单，按投影图种分发（工单 04-bundle 自 PropertyPanel 迁出）：
@@ -552,6 +554,37 @@ function JourneySelectionForm({
   }
 }
 
+/**
+ * pie（more-diagrams 工单 10）：选中扇区时渲染对应表单；图表级 = 标题。
+ * pie 画布无 data-id 寻址（见 pie-adapter），这两张表单是唯一文本编辑入口。
+ */
+function PieSelectionForm({
+  projection,
+  selection,
+}: {
+  projection: PieProjection
+  selection: Selection | null
+}) {
+  const { t } = useTranslation()
+  if (selection === null) {
+    return (
+      <Text size="sm" c="dimmed" px="xs">
+        {t('app:propertyPanel.nothingSelected')}
+      </Text>
+    )
+  }
+  switch (selection.kind) {
+    case 'diagram':
+      return <PieDiagramForm projection={projection} />
+    case 'pie-sector': {
+      const sector = projection.sectors.find((s) => s.elementId === selection.elementId)
+      return sector !== undefined ? <PieSectorForm sector={sector} /> : null
+    }
+    default:
+      return null
+  }
+}
+
 export function ProjectionSelectionForm({ projection, selection }: { projection: AnyProjection; selection: Selection | null }) {
   if (projection.type === 'flowchart') {
     return <FlowchartSelectionForm projection={projection.flowchart} selection={selection} />
@@ -582,6 +615,9 @@ export function ProjectionSelectionForm({ projection, selection }: { projection:
   }
   if (projection.type === 'journey') {
     return <JourneySelectionForm projection={projection.journey} selection={selection} />
+  }
+  if (projection.type === 'pie') {
+    return <PieSelectionForm projection={projection.pie} selection={selection} />
   }
   return <ClassSelectionForm projection={projection.class} selection={selection} />
 }
