@@ -205,6 +205,9 @@ export default function App() {
                 <Menu.Item onClick={() => newDiagram('gitgraph', t('newDiagram.gitgraph'))}>
                   {t('newDiagram.gitgraph')}
                 </Menu.Item>
+                <Menu.Item onClick={() => newDiagram('timeline', t('newDiagram.timeline'))}>
+                  {t('newDiagram.timeline')}
+                </Menu.Item>
               </Menu.Dropdown>
             </Menu>
             <Button

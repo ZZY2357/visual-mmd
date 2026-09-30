@@ -82,6 +82,12 @@ export const zhDict = {
         // gitGraph（more-diagrams 工单 04）：空白菜单（画布 DOM 无 data-id，无元素级菜单项）
         'add-commit': '添加提交',
         'add-branch': '添加分支',
+        // timeline（more-diagrams 工单 05）
+        'add-period': '添加时期',
+        'add-section': '添加分组',
+        'add-event': '添加事件',
+        'edit-period-text': '编辑时期文本',
+        'edit-event-text': '在属性面板中编辑',
         delete: '删除',
         styleName: '样式名称',
         styleNameInvalid: '名称不能为空，且不能含空格或逗号',
@@ -111,6 +117,7 @@ export const zhDict = {
       state: '状态图',
       er: 'ER 图',
       gitgraph: 'Git 图',
+      timeline: '时间线图',
     },
     library: {
       title: '图表库',
@@ -393,6 +400,26 @@ export const zhDict = {
       deleteGitBranch: '删除分支（连带 checkout 与 merge）',
       deleteGitMerge: '删除合并',
       deleteGitCherryPick: '删除 cherry-pick',
+      // ---- timeline（more-diagrams 工单 05） ----
+      timelinePeriods: '时期',
+      timelineSections: '分组',
+      timelineContinuationEvent: '续行',
+      timelineTitle: '标题',
+      timelineDirection: '方向',
+      timelinePeriodText: '时期文本',
+      timelineEventsCount: '事件数：{{count}}',
+      timelinePeriodOwner: '所属分组 {{section}}',
+      deleteTimelinePeriod: '删除时期（含其事件）',
+      timelineEventText: '事件文本',
+      timelineEventOwner: '所属时期 {{period}}',
+      deleteTimelineEvent: '删除事件',
+      timelineSectionName: '分组名称',
+      deleteTimelineSection: '删除分组',
+      timelineDiagramHint: '时间线图：在结构树中选中时期/事件/分组编辑属性；选中时期后按 Tab 加事件、Enter 加下一时期、Delete 删除。',
+      invalidTimelinePeriodText: '时期文本不能为空，且不能含冒号或 #',
+      invalidTimelineEventText: '事件文本不能为空',
+      invalidTimelineSectionName: '分组名称不能为空，且不能含冒号',
+      invalidTimelineDirection: '方向只能是 LR 或 TD',
     },
     shapes: {
       rectangle: '矩形',
@@ -458,6 +485,11 @@ export const zhDict = {
     erLines: {
       identifying: '实线（identifying）',
       'non-identifying': '虚线（non-identifying）',
+    },
+    timelineDirections: {
+      LR: '从左到右（LR）',
+      TD: '从上到下（TD）',
+      followDefault: '跟随 Mermaid 默认（从左到右）',
     },
   },
 } as const

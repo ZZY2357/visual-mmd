@@ -43,6 +43,10 @@ export type Selection =
   | { kind: 'gitgraph-branch'; name: string }
   | { kind: 'gitgraph-merge'; elementId: string }
   | { kind: 'gitgraph-cherry-pick'; elementId: string }
+  // timeline（more-diagrams 工单 05）
+  | { kind: 'timeline-period'; elementId: string }
+  | { kind: 'timeline-event'; elementId: string }
+  | { kind: 'timeline-section'; elementId: string }
 
 export const DIAGRAM_SELECTION: Selection = { kind: 'diagram' }
 
@@ -100,6 +104,12 @@ export function selectionKey(sel: Selection): string {
       return `gitgraph-merge:${sel.elementId}`
     case 'gitgraph-cherry-pick':
       return `gitgraph-cherry-pick:${sel.elementId}`
+    case 'timeline-period':
+      return `timeline-period:${sel.elementId}`
+    case 'timeline-event':
+      return `timeline-event:${sel.elementId}`
+    case 'timeline-section':
+      return `timeline-section:${sel.elementId}`
   }
 }
 

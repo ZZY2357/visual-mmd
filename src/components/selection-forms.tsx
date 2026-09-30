@@ -13,6 +13,7 @@ import { type MindmapProjection } from '../lib/projection/mindmap-projection'
 import { type StateProjection } from '../lib/projection/state-projection'
 import { type ErProjection } from '../lib/projection/er-projection'
 import { type GitgraphProjection } from '../lib/projection/gitgraph-projection'
+import { type TimelineProjection } from '../lib/projection/timeline-projection'
 import { DIRECTIONS } from '../lib/pipeline/flowchart'
 import { setDirectionIntent } from '../lib/editing/flowchart-forms'
 import { setClassDirectionIntent } from '../lib/editing/class-forms'
@@ -31,6 +32,12 @@ import {
   GitgraphMergeForm,
 } from './gitgraph-forms'
 import { GITGRAPH_DIRECTIONS, type GitgraphIntent } from '../lib/pipeline/gitgraph'
+import {
+  TimelineDiagramForm,
+  TimelineEventForm,
+  TimelinePeriodForm,
+  TimelineSectionForm,
+} from './timeline-forms'
 
 /**
  * 选中元素的属性表单，按投影图种分发（工单 04-bundle 自 PropertyPanel 迁出）：
@@ -327,7 +334,6 @@ function ErSelectionForm({
   }
 }
 
-
 function GitgraphSelectionForm({
   projection,
   selection,
@@ -381,6 +387,41 @@ function GitgraphSelectionForm({
   }
 }
 
+function TimelineSelectionForm({
+  projection,
+  selection,
+}: {
+  projection: TimelineProjection
+  selection: Selection | null
+}) {
+  const { t } = useTranslation()
+  if (selection === null) {
+    return (
+      <Text size="sm" c="dimmed" px="xs">
+        {t('app:propertyPanel.nothingSelected')}
+      </Text>
+    )
+  }
+  switch (selection.kind) {
+    case 'diagram':
+      return <TimelineDiagramForm projection={projection} />
+    case 'timeline-section': {
+      const section = projection.sections.find((s) => s.elementId === selection.elementId)
+      return section !== undefined ? <TimelineSectionForm section={section} /> : null
+    }
+    case 'timeline-period': {
+      const period = projection.periods.find((p) => p.elementId === selection.elementId)
+      return period !== undefined ? <TimelinePeriodForm period={period} /> : null
+    }
+    case 'timeline-event': {
+      const event = projection.events.find((e) => e.elementId === selection.elementId)
+      return event !== undefined ? <TimelineEventForm event={event} /> : null
+    }
+    default:
+      return null
+  }
+}
+
 export function ProjectionSelectionForm({ projection, selection }: { projection: AnyProjection; selection: Selection | null }) {
   if (projection.type === 'flowchart') {
     return <FlowchartSelectionForm projection={projection.flowchart} selection={selection} />
@@ -399,6 +440,9 @@ export function ProjectionSelectionForm({ projection, selection }: { projection:
   }
   if (projection.type === 'gitgraph') {
     return <GitgraphSelectionForm projection={projection.gitgraph} selection={selection} />
+  }
+  if (projection.type === 'timeline') {
+    return <TimelineSelectionForm projection={projection.timeline} selection={selection} />
   }
   return <ClassSelectionForm projection={projection.class} selection={selection} />
 }

@@ -7,6 +7,7 @@ import { mindmapParser } from './pipeline/mindmap'
 import { stateParser } from './pipeline/state'
 import { erParser } from './pipeline/er'
 import { gitgraphParser } from './pipeline/gitgraph'
+import { timelineParser } from './pipeline/timeline'
 import { frontmatterEnd } from './pipeline/frontmatter'
 import { buildFlowchartProjection, type FlowchartProjection } from './projection/flowchart-projection'
 import { buildSequenceProjection, type SequenceProjection } from './projection/sequence-projection'
@@ -15,6 +16,7 @@ import { buildMindmapProjection, type MindmapProjection } from './projection/min
 import { buildStateProjection, type StateProjection } from './projection/state-projection'
 import { buildErProjection, type ErProjection } from './projection/er-projection'
 import { buildGitgraphProjection, type GitgraphProjection } from './projection/gitgraph-projection'
+import { buildTimelineProjection, type TimelineProjection } from './projection/timeline-projection'
 import { flowchartCanvasCapabilities } from './canvas-selection/flowchart-adapter'
 import { sequenceCanvasCapabilities } from './canvas-selection/sequence-adapter'
 import { classCanvasCapabilities } from './canvas-selection/class-adapter'
@@ -22,6 +24,7 @@ import { mindmapCanvasCapabilities } from './canvas-selection/mindmap-adapter'
 import { stateCanvasCapabilities } from './canvas-selection/state-adapter'
 import { erCanvasCapabilities } from './canvas-selection/er-adapter'
 import { gitgraphCanvasCapabilities } from './canvas-selection/gitgraph-adapter'
+import { timelineCanvasCapabilities } from './canvas-selection/timeline-adapter'
 import type { CanvasCapabilities } from './canvas-selection/capabilities'
 import { treePartitions, type TreePartitions } from './structure-tree/partitions'
 import { DEFAULT_DIAGRAM_SOURCE } from './storage'
@@ -50,6 +53,7 @@ export interface ProjectionTypes {
   state: StateProjection
   er: ErProjection
   gitgraph: GitgraphProjection
+  timeline: TimelineProjection
 }
 
 /** 已注册图种的 id 集合（字面量联合，随 ProjectionTypes 增长） */
@@ -187,6 +191,16 @@ export const GITGRAPH_TEMPLATE = `gitGraph
     checkout main
     merge feature tag: "v1.0"
 `
+/** timeline 起步模板（more-diagrams 工单 05）：一个 title、一个 section、两个时期；
+ * 第一个时期含两个事件，两种写法各示一例（单行冒号串联 `: 调研` + 续行 `: 评审`） */
+export const TIMELINE_TEMPLATE = `timeline
+    title 产品演进路线
+
+    section 第一阶段
+        需求分析 : 调研
+            : 评审
+        设计发布
+`
 
 /**
  * 注册表：数组是唯一权威（more-diagrams 工单 01），DIAGRAM_TYPES 由它推导。
@@ -258,6 +272,15 @@ export const DIAGRAM_TYPE_LIST: DiagramTypeRegistration[] = [
     buildProjection: (doc) => ({ type: 'gitgraph', gitgraph: buildGitgraphProjection(doc) }),
     tree: treePartitions.gitgraph,
     canvas: gitgraphCanvasCapabilities,
+  },
+  {
+    id: 'timeline',
+    parser: timelineParser,
+    template: TIMELINE_TEMPLATE,
+    detect: (source) => /^timeline\b/i.test(firstStatementLine(source)),
+    buildProjection: (doc) => ({ type: 'timeline', timeline: buildTimelineProjection(doc) }),
+    tree: treePartitions.timeline,
+    canvas: timelineCanvasCapabilities,
   },
 ]
 

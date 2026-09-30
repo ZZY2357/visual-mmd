@@ -99,6 +99,8 @@ function resolverOf(projection: AnyProjection) {
   if (projection.type === 'state') return stateDataIdResolver(projection.state)
   if (projection.type === 'er') return erDataIdResolver(projection.er)
   if (projection.type === 'gitgraph') return () => null // 画布 DOM 无 data-id（工单 04 实测降级）
+  // timeline：无 data-id 寻址（more-diagrams 工单 05），resolver 永不命中
+  if (projection.type === 'timeline') return () => null
   const nodes = nodeDataIdResolver(projection.class.classes.map((c) => c.name))
   const edges = elementDataIdResolver(projection.class.relations.map((r) => r.elementId))
   return (dataId: string) => nodes(dataId) ?? edges(dataId)
