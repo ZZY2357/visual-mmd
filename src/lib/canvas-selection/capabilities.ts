@@ -1,5 +1,5 @@
 import { DIAGRAM_TYPES, type AnyProjection, type DiagramTypeId } from '../diagram-registry'
-import type { CanvasKeyboardProjection } from '../editing/canvas-keyboard'
+import type { CanvasKeyboardProjection, KeyHandler } from '../editing/canvas-keyboard'
 import type { EditIntent } from '../pipeline/parser'
 import type { Selection } from '../projection/selection'
 import type { CanvasSelection, DataIdResolver } from './data-id'
@@ -49,6 +49,10 @@ export interface CanvasCapabilities<T extends AnyProjection = AnyProjection> {
    * 键盘 Delete、右键菜单 deleteTarget、属性面板删除三个入口共用，等价性由
    * `__tests__/delete-intent.test.ts` 的性质测试钉住。 */
   deleteIntent(projection: T, selection: Selection | null): EditIntent | null
+  /** 键事件 → KeyPlan（architecture-deepening-2 工单 02）：「一个键在该图种上是什么意思」
+   * 的唯一映射（纯函数，`keyHandler(projection)` 绑定投影后每个键事件求值一次），
+   * 执行统一交给 canvas-keyboard.applyPlan；键盘 Hook 是唯一消费者。 */
+  keyHandler(projection: T): KeyHandler
 }
 
 /** 键盘 Hook 的 tagged union（`{ kind, projection }`）→ 包装投影。

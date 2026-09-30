@@ -6,7 +6,7 @@ import { capabilitiesOf } from '../canvas-selection/capabilities'
 import type { ContextMenuItemId, ContextMenuTarget } from './context-menu'
 import type { CanvasInlineEditTarget } from './inline-edit'
 import type { NodeFormKind } from './use-canvas-context-menu'
-import { nextNodeId, mindmapActionIntents, type MindmapActionPlan } from './canvas-keyboard'
+import { nextNodeId, mindmapActionIntents, applyPlan, type MindmapActionPlan, type KeyPlan } from './canvas-keyboard'
 import { nextFreeName } from '../pipeline/element-id'
 import { setRelationIntent, RELATION_KIND_OPTIONS } from './class-forms'
 import {
@@ -82,51 +82,61 @@ function nextInCycle<V>(options: ReadonlyArray<{ value: V }>, current: V): V {
 export function createElement(ctx: MenuActionContext, target: ContextMenuTarget | undefined): void {
   const proj = ctx.projection
   if (proj === null) return
-  if (proj.type === 'flowchart') {
-    const nodeId = nextNodeId(proj.flowchart.nodes.map((n) => n.nodeId))
-    if (!ctx.commitIntent({ type: 'add-node', nodeId, text: nodeId, shape: 'rectangle' })) return
-    ctx.select({ kind: 'node', nodeId })
-    ctx.beginInlineEdit({ kind: 'flowchart', nodeId })
-    ctx.close()
-    return
-  }
-  if (proj.type === 'class') {
-    // 空 classDiagram（画布停在解析错误态）同样可用：管线在表头后落一行 `class 新类`，源码随之合法
-    const name = nextFreeName('新类', proj.class.classes.map((c) => c.name))
-    if (!ctx.commitIntent({ type: 'add-class', name })) return
-    ctx.select({ kind: 'class', name })
-    ctx.beginInlineEdit({ kind: 'class', name })
-    ctx.close()
-    return
-  }
-  if (proj.type === 'sequence') {
-    const actorId = nextFreeName('新参与者', proj.sequence.participants.map((p) => p.actorId))
-    if (!ctx.commitIntent({ type: 'add-participant', actorId })) return
-    ctx.select({ kind: 'participant', actorId })
-    ctx.beginInlineEdit({ kind: 'sequence', actorId })
-    ctx.close()
-    return
-  }
-  // mindmap：节点目标 = 挂为其子节点；空白 / 无目标 = 建根（空文档）或挂到根节点下
-  const text = ctx.newNodeText
-  let plan: MindmapActionPlan | null
-  if (target !== undefined && target.kind === 'mindmap-node') {
-    plan = mindmapActionIntents(proj.mindmap, target.elementId, 'add-child', text)
-  } else {
-    const roots = proj.mindmap.nodes
-    plan =
-      roots.length === 0
-        ? { intents: [{ type: 'add-child', text }], newElementId: 'mindmap-node:1' }
-        : mindmapActionIntents(proj.mindmap, roots[0].elementId, 'add-child', text)
-  }
+  // 按图种算出 KeyPlan，执行统一交给 applyPlan（architecture-deepening-2 工单 02）：
+  // 「落码 → 选中 → 内联命名」的编排放策略只在执行器一处定义；菜单关闭在 plan 完整执行后。
+  const plan: KeyPlan | null = (() => {
+    if (proj.type === 'flowchart') {
+      const nodeId = nextNodeId(proj.flowchart.nodes.map((n) => n.nodeId))
+      return {
+        intents: [{ type: 'add-node', nodeId, text: nodeId, shape: 'rectangle' }],
+        newElementTarget: {
+          selection: { kind: 'node', nodeId },
+          inlineEdit: { kind: 'flowchart', nodeId },
+        },
+      }
+    }
+    if (proj.type === 'class') {
+      // 空 classDiagram（画布停在解析错误态）同样可用：管线在表头后落一行 `class 新类`，源码随之合法
+      const name = nextFreeName('新类', proj.class.classes.map((c) => c.name))
+      return {
+        intents: [{ type: 'add-class', name }],
+        newElementTarget: { selection: { kind: 'class', name }, inlineEdit: { kind: 'class', name } },
+      }
+    }
+    if (proj.type === 'sequence') {
+      const actorId = nextFreeName('新参与者', proj.sequence.participants.map((p) => p.actorId))
+      return {
+        intents: [{ type: 'add-participant', actorId }],
+        newElementTarget: {
+          selection: { kind: 'participant', actorId },
+          inlineEdit: { kind: 'sequence', actorId },
+        },
+      }
+    }
+    // mindmap：节点目标 = 挂为其子节点；空白 / 无目标 = 建根（空文档）或挂到根节点下
+    const text = ctx.newNodeText
+    let mindPlan: MindmapActionPlan | null
+    if (target !== undefined && target.kind === 'mindmap-node') {
+      mindPlan = mindmapActionIntents(proj.mindmap, target.elementId, 'add-child', text)
+    } else {
+      const roots = proj.mindmap.nodes
+      mindPlan =
+        roots.length === 0
+          ? { intents: [{ type: 'add-child', text }], newElementId: 'mindmap-node:1' }
+          : mindmapActionIntents(proj.mindmap, roots[0].elementId, 'add-child', text)
+    }
+    if (mindPlan === null) return null
+    const keyPlan: KeyPlan = { intents: mindPlan.intents }
+    if (mindPlan.newElementId !== null) {
+      keyPlan.newElementTarget = {
+        selection: { kind: 'mindmap-node', elementId: mindPlan.newElementId },
+        inlineEdit: { kind: 'mindmap', elementId: mindPlan.newElementId },
+      }
+    }
+    return keyPlan
+  })()
   if (plan === null) return
-  for (const intent of plan.intents) {
-    if (!ctx.commitIntent(intent)) return
-  }
-  if (plan.newElementId !== null) {
-    ctx.select({ kind: 'mindmap-node', elementId: plan.newElementId })
-    ctx.beginInlineEdit({ kind: 'mindmap', elementId: plan.newElementId })
-  }
+  if (!applyPlan(plan, { commitIntent: ctx.commitIntent, select: ctx.select, beginInlineEdit: ctx.beginInlineEdit })) return
   ctx.close()
 }
 

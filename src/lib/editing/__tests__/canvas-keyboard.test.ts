@@ -5,16 +5,21 @@ import { mindmapParser } from '../../pipeline/mindmap'
 import { classParser } from '../../pipeline/class'
 import { sequenceParser } from '../../pipeline/sequence'
 import {
+  applyPlan,
   classDeleteIntent,
+  classKeyPlan,
+  flowchartKeyPlan,
   isNavigationKey,
-  keyToClassAction,
   keyToNodeAction,
-  keyToSequenceAction,
   mindmapActionIntents,
+  mindmapKeyPlan,
   nextNodeId,
   nodeActionIntents,
   sequenceDeleteIntent,
+  sequenceKeyPlan,
 } from '../canvas-keyboard'
+import type { KeyPlan } from '../canvas-keyboard'
+import type { Selection } from '../../projection/selection'
 import { buildFlowchartProjection, type FlowchartProjection } from '../../projection/flowchart-projection'
 import { buildMindmapProjection, type MindmapProjection } from '../../projection/mindmap-projection'
 import { buildClassProjection, type ClassProjection } from '../../projection/class-projection'
@@ -253,30 +258,7 @@ describe('方向键键位判定（工单 14）', () => {
   })
 })
 
-// ---------- class / sequence 编辑键（工单 05 / ADR-0013） ----------
-
-describe('class / sequence 键位映射（工单 05）', () => {
-  it('class：Tab 加成员、Enter 加关系、Del 删除；Shift 组合不处理', () => {
-    expect(keyToClassAction('Tab')).toBe('add-member')
-    expect(keyToClassAction('Enter')).toBe('add-relation')
-    expect(keyToClassAction('Delete')).toBe('delete')
-    expect(keyToClassAction('Backspace')).toBe('delete')
-    expect(keyToClassAction('Tab', { shift: true })).toBeNull()
-    expect(keyToClassAction('Enter', { shift: true })).toBeNull()
-    expect(keyToClassAction('ArrowUp')).toBeNull()
-    expect(keyToClassAction('a')).toBeNull()
-  })
-
-  it('sequence：Tab 加参与者、Enter 加消息、Del 删除；Shift 组合不处理', () => {
-    expect(keyToSequenceAction('Tab')).toBe('add-participant')
-    expect(keyToSequenceAction('Enter')).toBe('add-message')
-    expect(keyToSequenceAction('Delete')).toBe('delete')
-    expect(keyToSequenceAction('Backspace')).toBe('delete')
-    expect(keyToSequenceAction('Tab', { shift: true })).toBeNull()
-    expect(keyToSequenceAction('Enter', { shift: true })).toBeNull()
-    expect(keyToSequenceAction('ArrowDown')).toBeNull()
-  })
-})
+// ---------- class / sequence 编辑键（工单 05 / ADR-0013）：键 → KeyPlan 见文末全图种覆盖 ----------
 
 const CLASS_EDIT_SAMPLE = `classDiagram
     class Foo {
@@ -382,5 +364,261 @@ describe('选中元素 → 删除意图（工单 05）', () => {
     expect(result.source).not.toContain('-->')
     // 未触及的类保留
     expect(result.source).toContain('class Bar')
+  })
+})
+
+// ---------- 键 → KeyPlan（architecture-deepening-2 工单 02）：全图种覆盖 ----------
+// 现有 keyToClassAction / keyToSequenceAction 键位映射测试迁移至此：映射收敛为
+// *KeyPlan 纯函数（能力包 keyHandler 委托它们）后，按「键 → 完整 plan」断言。
+
+const FLOW_SELECTION = { kind: 'node' as const, nodeId: 'B' }
+const MIND_SELECTION = { kind: 'mindmap-node' as const, elementId: 'mindmap-node:2' }
+const CLASS_SELECTION = { kind: 'class' as const, name: 'Foo' }
+const SEQ_SELECTION = { kind: 'participant' as const, actorId: '甲' }
+
+describe('键 → KeyPlan：flowchart（工单 04 键位表 + 意图映射）', () => {
+  const projection = projectionOf(SAMPLE)
+
+  it('Tab → add-node + add-edge，newElementTarget 指向新节点（选中 + 内联编辑）', () => {
+    expect(flowchartKeyPlan(projection, { key: 'Tab', selection: FLOW_SELECTION })).toEqual({
+      intents: [
+        { type: 'add-node', nodeId: 'n1', text: 'n1', shape: 'rectangle', afterElementId: 'node:B' },
+        { type: 'add-edge', from: 'B', to: 'n1', afterElementId: 'node:B' },
+      ],
+      newElementTarget: {
+        selection: { kind: 'node', nodeId: 'n1' },
+        inlineEdit: { kind: 'flowchart', nodeId: 'n1' },
+      },
+    })
+  })
+
+  it('Enter → 加同级（经入边推断父节点）；Delete → delete-node（无 newElementTarget、不清选中）', () => {
+    const enterPlan = flowchartKeyPlan(projection, { key: 'Enter', selection: FLOW_SELECTION })
+    expect(enterPlan!.intents[1]).toMatchObject({ type: 'add-edge', from: 'A', to: 'n1' })
+    expect(flowchartKeyPlan(projection, { key: 'Delete', selection: FLOW_SELECTION })).toEqual({
+      intents: [{ type: 'delete-node', nodeId: 'B' }],
+    })
+    expect(flowchartKeyPlan(projection, { key: 'Backspace', selection: FLOW_SELECTION })).toEqual({
+      intents: [{ type: 'delete-node', nodeId: 'B' }],
+    })
+  })
+
+  it('Shift 组合与其它键不处理；无选中 / 选中别种元素 / 已不在投影 → null', () => {
+    for (const key of ['Tab', 'Enter']) {
+      expect(flowchartKeyPlan(projection, { key, mods: { shift: true }, selection: FLOW_SELECTION })).toBeNull()
+      expect(flowchartKeyPlan(projection, { key, selection: null })).toBeNull()
+      expect(flowchartKeyPlan(projection, { key, selection: { kind: 'class', name: 'Foo' } })).toBeNull()
+    }
+    expect(flowchartKeyPlan(projection, { key: 'a', selection: FLOW_SELECTION })).toBeNull()
+    expect(flowchartKeyPlan(projection, { key: 'Escape', selection: FLOW_SELECTION })).toBeNull()
+    expect(flowchartKeyPlan(projection, { key: 'Tab', selection: { kind: 'node', nodeId: 'X' } })).toBeNull()
+  })
+})
+
+describe('键 → KeyPlan：mindmap（工单 06 键位表 + 缩进层级意图）', () => {
+  const projection = mindmapProjectionOf(MINDMAP_SAMPLE)
+
+  it('Tab → add-child，newElementTarget 指向预计算的新节点（选中 + 内联编辑）', () => {
+    expect(
+      mindmapKeyPlan(projection, { key: 'Tab', selection: MIND_SELECTION, newNodeText: '新节点' }),
+    ).toEqual({
+      intents: [{ type: 'add-child', parentElementId: 'mindmap-node:2', text: '新节点' }],
+      newElementTarget: {
+        selection: { kind: 'mindmap-node', elementId: 'mindmap-node:4' },
+        inlineEdit: { kind: 'mindmap', elementId: 'mindmap-node:4' },
+      },
+    })
+  })
+
+  it('Enter → add-sibling；Delete/Backspace → delete-node（不清选中）', () => {
+    expect(
+      mindmapKeyPlan(projection, { key: 'Enter', selection: MIND_SELECTION, newNodeText: '新节点' })!.intents[0],
+    ).toMatchObject({ type: 'add-sibling', elementId: 'mindmap-node:2' })
+    for (const key of ['Delete', 'Backspace']) {
+      expect(mindmapKeyPlan(projection, { key, selection: MIND_SELECTION })).toEqual({
+        intents: [{ type: 'delete-node', elementId: 'mindmap-node:2' }],
+      })
+    }
+  })
+
+  it('Shift 组合不处理；无选中 / 已不在投影 → null', () => {
+    expect(mindmapKeyPlan(projection, { key: 'Tab', mods: { shift: true }, selection: MIND_SELECTION })).toBeNull()
+    expect(mindmapKeyPlan(projection, { key: 'Tab', selection: null })).toBeNull()
+    expect(
+      mindmapKeyPlan(projection, {
+        key: 'Tab',
+        selection: { kind: 'mindmap-node', elementId: 'mindmap-node:99' },
+      }),
+    ).toBeNull()
+  })
+})
+
+describe('键 → KeyPlan：class（工单 05 / ADR-0013，迁移自 keyToClassAction）', () => {
+  const projection = classProjectionOf(CLASS_EDIT_SAMPLE)
+
+  it('Tab → form「member」、Enter → form「relation」（落到已有表单，不直接落码）', () => {
+    expect(classKeyPlan(projection, { key: 'Tab', selection: CLASS_SELECTION })).toEqual({
+      intents: [],
+      form: 'member',
+    })
+    expect(classKeyPlan(projection, { key: 'Enter', selection: CLASS_SELECTION })).toEqual({
+      intents: [],
+      form: 'relation',
+    })
+  })
+
+  it('Delete/Backspace → delete-class（能力包唯一映射），并清空选中', () => {
+    for (const key of ['Delete', 'Backspace']) {
+      expect(classKeyPlan(projection, { key, selection: CLASS_SELECTION })).toEqual({
+        intents: [{ type: 'delete-class', name: 'Foo' }],
+        clearSelection: true,
+      })
+    }
+  })
+
+  it('Shift 组合与其它键不处理；无选中 / 选中别种 / 类已不在投影 → null（不 preventDefault）', () => {
+    for (const key of ['Tab', 'Enter']) {
+      expect(classKeyPlan(projection, { key, mods: { shift: true }, selection: CLASS_SELECTION })).toBeNull()
+      expect(classKeyPlan(projection, { key, selection: null })).toBeNull()
+      expect(classKeyPlan(projection, { key, selection: { kind: 'node', nodeId: 'Foo' } })).toBeNull()
+    }
+    expect(classKeyPlan(projection, { key: 'ArrowUp', selection: CLASS_SELECTION })).toBeNull()
+    expect(classKeyPlan(projection, { key: 'a', selection: CLASS_SELECTION })).toBeNull()
+    expect(classKeyPlan(projection, { key: 'Tab', selection: { kind: 'class', name: '不存在' } })).toBeNull()
+  })
+})
+
+describe('键 → KeyPlan：sequence（工单 05 / ADR-0013，迁移自 keyToSequenceAction）', () => {
+  const projection = sequenceProjectionOf(SEQ_EDIT_SAMPLE)
+
+  it('Tab → form「participant」（不依赖选中——参与者是列、没有锚点）', () => {
+    expect(sequenceKeyPlan(projection, { key: 'Tab', selection: SEQ_SELECTION })).toEqual({
+      intents: [],
+      form: 'participant',
+    })
+    expect(sequenceKeyPlan(projection, { key: 'Tab', selection: null })).toEqual({
+      intents: [],
+      form: 'participant',
+    })
+  })
+
+  it('选中参与者时 Enter → form「message」；Delete/Backspace → delete-participant 并清空选中', () => {
+    expect(sequenceKeyPlan(projection, { key: 'Enter', selection: SEQ_SELECTION })).toEqual({
+      intents: [],
+      form: 'message',
+    })
+    for (const key of ['Delete', 'Backspace']) {
+      expect(sequenceKeyPlan(projection, { key, selection: SEQ_SELECTION })).toEqual({
+        intents: [{ type: 'delete-participant', actorId: '甲' }],
+        clearSelection: true,
+      })
+    }
+  })
+
+  it('Shift 组合不处理；未选中参与者时 Enter → null；参与者已不在投影 → null', () => {
+    expect(sequenceKeyPlan(projection, { key: 'Enter', mods: { shift: true }, selection: SEQ_SELECTION })).toBeNull()
+    expect(sequenceKeyPlan(projection, { key: 'Tab', mods: { shift: true }, selection: SEQ_SELECTION })).toBeNull()
+    expect(sequenceKeyPlan(projection, { key: 'ArrowDown', selection: SEQ_SELECTION })).toBeNull()
+    expect(sequenceKeyPlan(projection, { key: 'Enter', selection: null })).toBeNull()
+    expect(sequenceKeyPlan(projection, { key: 'Enter', selection: { kind: 'class', name: 'Foo' } })).toBeNull()
+    expect(sequenceKeyPlan(projection, { key: 'Enter', selection: { kind: 'participant', actorId: '不存在' } })).toBeNull()
+  })
+})
+
+// ---------- applyPlan（architecture-deepening-2 工单 02）：plan 的唯一执行器 ----------
+
+/** 执行器替身：记录调用序（preventDefault / intents / select / inlineEdit） */
+function fakeExec(overrides: { commitResult?: boolean } = {}) {
+  const calls: string[] = []
+  const intents: unknown[] = []
+  const selections: (Selection | null)[] = []
+  const inlineEdits: unknown[] = []
+  const forms: string[] = []
+  return {
+    calls,
+    intents,
+    selections,
+    inlineEdits,
+    forms,
+    exec: {
+      commitIntent: (intent: Parameters<typeof applyPlan>[0]['intents'][number]) => {
+        intents.push(intent)
+        calls.push(`commit:${intent.type}`)
+        return overrides.commitResult ?? true
+      },
+      select: (selection: Selection | null) => {
+        selections.push(selection)
+        calls.push('select')
+      },
+      beginInlineEdit: (target: unknown) => {
+        inlineEdits.push(target)
+        calls.push('inline')
+      },
+      openForm: (kind: string) => {
+        forms.push(kind)
+        calls.push(`form:${kind}`)
+      },
+      preventDefault: () => {
+        calls.push('preventDefault')
+      },
+    },
+  }
+}
+
+describe('applyPlan（工单 02：preventDefault / 提交 / 选中 / 内联编辑 / 表单的编排放策略只此一处）', () => {
+  it('意图类 plan：先 preventDefault，再依次提交，全部成功后选中新元素并进入内联编辑', () => {
+    const { exec, calls } = fakeExec()
+    const plan: KeyPlan = {
+      intents: [{ type: 'add-node', nodeId: 'n1' }, { type: 'add-edge', from: 'A', to: 'n1' }],
+      newElementTarget: {
+        selection: { kind: 'node', nodeId: 'n1' },
+        inlineEdit: { kind: 'flowchart', nodeId: 'n1' },
+      },
+    }
+
+    expect(applyPlan(plan, exec)).toBe(true)
+    // 编排顺序固定：preventDefault → 两个意图 → 选中 → 内联编辑
+    expect(calls).toEqual(['preventDefault', 'commit:add-node', 'commit:add-edge', 'select', 'inline'])
+  })
+
+  it('第一个意图被拒绝即中止：后续意图不提交、不选中、不内联编辑（返回 false）', () => {
+    const { exec, calls, selections, inlineEdits } = fakeExec({ commitResult: false })
+    const plan: KeyPlan = {
+      intents: [{ type: 'add-node', nodeId: 'n1' }, { type: 'add-edge', from: 'A', to: 'n1' }],
+      newElementTarget: {
+        selection: { kind: 'node', nodeId: 'n1' },
+        inlineEdit: { kind: 'flowchart', nodeId: 'n1' },
+      },
+    }
+
+    expect(applyPlan(plan, exec)).toBe(false)
+    expect(calls).toEqual(['preventDefault', 'commit:add-node'])
+    expect(selections).toEqual([])
+    expect(inlineEdits).toEqual([])
+  })
+
+  it('clearSelection plan（class/sequence 删除）：提交成功后清空选中；无 newElementTarget 不误内联', () => {
+    const { exec, calls, selections } = fakeExec()
+
+    expect(applyPlan({ intents: [{ type: 'delete-class', name: 'Foo' }], clearSelection: true }, exec)).toBe(true)
+    expect(calls).toEqual(['preventDefault', 'commit:delete-class', 'select'])
+    expect(selections).toEqual([null])
+  })
+
+  it('表单类 plan（class/sequence 的 Tab/Enter）：preventDefault + openForm，不提交任何意图', () => {
+    const { exec, calls, intents } = fakeExec()
+
+    expect(applyPlan({ intents: [], form: 'member' }, exec)).toBe(true)
+    expect(calls).toEqual(['preventDefault', 'form:member'])
+    expect(intents).toEqual([])
+  })
+
+  it('无 beginInlineEdit / openForm / preventDefault（结构树等间接路径）也不抛错', () => {
+    expect(
+      applyPlan(
+        { intents: [{ type: 'add-child', text: '新节点' }] },
+        { commitIntent: () => true, select: () => {} },
+      ),
+    ).toBe(true)
   })
 })

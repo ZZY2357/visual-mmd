@@ -5,7 +5,7 @@ import { DIAGRAM_SELECTION, type Selection, sameSelection } from '../lib/project
 import type { AnyProjection } from '../lib/diagram-registry'
 import type { FlowchartProjection } from '../lib/projection/flowchart-projection'
 import type { MindmapProjection, ProjectionMindmapNode } from '../lib/projection/mindmap-projection'
-import { mindmapActionIntents } from '../lib/editing/canvas-keyboard'
+import { mindmapActionIntents, applyPlan, type KeyPlan } from '../lib/editing/canvas-keyboard'
 import { useEditorStore } from '../store/editor'
 
 /**
@@ -358,23 +358,32 @@ function MindmapTree({ projection }: { projection: MindmapProjection }) {
   }
 
   // 结构树键盘（工单 06）：焦点在树节点上时 Tab 加子节点 / Enter 加同级节点
-  // （preventDefault 压掉焦点切换），落码按 mindmap 缩进层级；新节点落码后选中
-  // 并请求画布内联命名（pendingInlineEdit → CanvasPanel 的 beginEdit）
+  // （preventDefault 压掉焦点切换），落码按 mindmap 缩进层级；plan 的执行统一交给
+  // canvas-keyboard.applyPlan（architecture-deepening-2 工单 02：与画布键盘 / 右键菜单
+  // 共用同一份「提交 → 选中 → 请求内联命名」编排；画布侧经 pendingInlineEdit 消费请求）
   const onItemKeyDown = (node: ProjectionMindmapNode) => (e: React.KeyboardEvent) => {
     const action =
       e.key === 'Tab' && !e.shiftKey ? 'add-child' : e.key === 'Enter' && !e.shiftKey ? 'add-sibling' : null
     if (action === null) return
-    e.preventDefault()
     const plan = mindmapActionIntents(projection, node.elementId, action, t('app:propertyPanel.mindmapNewNode'))
     if (plan === null) return
-    const { commitIntent, select: selectInStore, requestInlineEdit: request } = useEditorStore.getState()
-    for (const intent of plan.intents) {
-      if (!commitIntent(intent)) return
-    }
+    const keyPlan: KeyPlan = { intents: plan.intents }
     if (plan.newElementId !== null) {
-      selectInStore({ kind: 'mindmap-node', elementId: plan.newElementId })
-      request({ kind: 'mindmap', elementId: plan.newElementId })
+      keyPlan.newElementTarget = {
+        selection: { kind: 'mindmap-node', elementId: plan.newElementId },
+        inlineEdit: { kind: 'mindmap', elementId: plan.newElementId },
+      }
     }
+    const { commitIntent, select: selectInStore, requestInlineEdit: request } = useEditorStore.getState()
+    applyPlan(keyPlan, {
+      commitIntent,
+      select: selectInStore,
+      // 本图种（mindmap）的 plan 只产 mindmap 目标：经 store 请求，画布侧消费（工单 06）
+      beginInlineEdit: (target) => {
+        if (target.kind === 'mindmap') request(target)
+      },
+      preventDefault: () => e.preventDefault(),
+    })
   }
 
   const renderNode = (node: ProjectionMindmapNode): ReactNode => {

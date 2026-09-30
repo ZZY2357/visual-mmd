@@ -31,6 +31,7 @@ const fake = vi.hoisted(() => {
     keyboardProjection: () => ({ kind: 'flowchart', projection: null as never }),
     resolveSelection: () => null,
     deleteIntent: () => null,
+    keyHandler: () => () => null,
   }
   return { fakeCaps }
 })

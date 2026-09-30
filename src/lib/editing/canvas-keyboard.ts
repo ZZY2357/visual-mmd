@@ -3,13 +3,14 @@ import type { FlowchartIntent } from '../pipeline/flowchart'
 import { nodeElementId } from '../pipeline/flowchart'
 import { mindmapNodeElementId, nextFreeName } from '../pipeline/element-id'
 import type { MindmapIntent } from '../pipeline/mindmap'
+import type { EditIntent } from '../pipeline/parser'
 import type { SequenceIntent } from '../pipeline/sequence'
 import type { ClassProjection } from '../projection/class-projection'
 import type { FlowchartProjection } from '../projection/flowchart-projection'
 import type { MindmapProjection } from '../projection/mindmap-projection'
 import type { SequenceProjection } from '../projection/sequence-projection'
 import type { Selection } from '../projection/selection'
-import type { Rect } from './inline-edit'
+import type { CanvasInlineEditTarget, Rect } from './inline-edit'
 
 /**
  * 画布键盘的纯逻辑（工单 05 编辑动作 / 工单 14 方向键方位导航）：
@@ -25,6 +26,10 @@ import type { Rect } from './inline-edit'
  * 编辑键（工单 05 / ADR-0013）：class / sequence 的 Tab/Enter/Delete 按「就近结构」映射
  * （class：加成员 / 加关系 / 删除；sequence：加参与者 / 加消息 / 删除），同样只在本模块
  * 产出动作与意图，表单浮层由 use-canvas-context-menu 复用（不新造浮层）。
+ *
+ * architecture-deepening-2 工单 02：四图种的键语义统一收敛为 KeyPlan 纯函数
+ * （*KeyPlan，能力包 keyHandler 委托它们），plan 的执行收敛为唯一的 applyPlan——
+ * 键盘、右键菜单、结构树三处的「循环执行 intents」共用同一份编排放策略。
  */
 
 /** 参与画布键盘的图种投影（tagged union，keydown 时按图种分支） */
@@ -132,20 +137,129 @@ export function mindmapActionIntents(
   return { intents: [{ type: 'add-sibling', elementId, text: defaultText }], newElementId }
 }
 
+// ---------- KeyPlan（architecture-deepening-2 工单 02）：键在该图种上是什么意思 ----------
+
+/**
+ * 「一个键在某图种上是什么意思」收敛为能力包上的纯函数 `keyHandler(projection): KeyPlan`
+ * （键事件 → `{ intents, newElementTarget, form? } | null`），取代散落五处的映射链
+ * （键盘纯函数 → hook 分支 → CanvasPanel onEditKey lambda → openFormForSelection →
+ * nodeFormForTarget）。plan 的执行收敛为下方唯一的 `applyPlan`。
+ */
+
+/** 编辑键请求打开的添加表单种类：member / relation / message 落到已有表单浮层
+ * （锚点/预选由右键菜单 hook 从选中推出），participant 走既有创建路径（内联命名） */
+export type KeyFormKind = 'member' | 'relation' | 'message' | 'participant'
+
+/** 键事件的语义 plan：执行器（applyPlan）按字段决定提交 / 选中 / 内联编辑 / 表单 */
+export interface KeyPlan {
+  /** 依次经管线落码的编辑意图序列（表单类 plan 为空——提交才落码） */
+  intents: EditIntent[]
+  /** 全部意图落码成功后：选中新元素并进入内联编辑（删除类 plan 无此字段） */
+  newElementTarget?: { selection: Selection; inlineEdit: CanvasInlineEditTarget }
+  /** 编辑键要求打开的添加表单（class/sequence 的 Tab/Enter 落到已有表单，不直接落码） */
+  form?: KeyFormKind
+  /** 落码成功后清空选中（class/sequence 的删除，与右键菜单/属性面板删除一致；
+   * flowchart/mindmap 的键盘删除保留原选中，由属性面板的 resolveSelection 回落） */
+  clearSelection?: boolean
+}
+
+/** 键事件的纯描述（keydown 的 key / 修饰键 / 当前选中 / mindmap 占位文本） */
+export interface KeyInput {
+  key: string
+  mods?: { shift?: boolean }
+  selection: Selection | null
+  /** mindmap 新节点占位文本（确认前落码用，内联命名确认后改写） */
+  newNodeText?: string
+}
+
+/** 能力包上的键位处理器：`keyHandler(projection)` 一次绑定投影，之后每个键事件纯函数求值 */
+export type KeyHandler = (input: KeyInput) => KeyPlan | null
+
+/** plan 执行器消费的语境：提交 / 选中 / 内联编辑 / 表单 / preventDefault。
+ * 键盘（hook）、右键菜单（menu-actions）、结构树三处共用同一份执行策略。 */
+export interface PlanExecutor {
+  /** 提交编辑意图（可撤销）；false = 被拒绝，中止后续步骤（含选中与内联编辑） */
+  commitIntent: (intent: EditIntent) => boolean
+  /** 更新编辑器选中 */
+  select: (selection: Selection | null) => void
+  /** 进入内联编辑（新建元素的命名）；结构树路径经由 pendingInlineEdit 请求间接接入 */
+  beginInlineEdit?: (target: CanvasInlineEditTarget) => void
+  /** 打开添加表单（键盘路径 = 画布中位浮出，菜单路径 = 菜单位置浮出） */
+  openForm?: (kind: KeyFormKind) => void
+  /** preventDefault 的时机由 applyPlan 定义：plan 确定要处理（非 null）即调用一次 */
+  preventDefault?: () => void
+}
+
+/**
+ * plan 的唯一执行器（architecture-deepening-2 工单 02）：preventDefault 时机、
+ * 依次提交意图（第一个失败即中止）、更新选中、进入内联编辑、清空选中、打开表单——
+ * 这些编排放策略只在这一处定义。返回 false = 某个意图被拒绝（中止且未完成）。
+ */
+export function applyPlan(plan: KeyPlan, exec: PlanExecutor): boolean {
+  exec.preventDefault?.()
+  if (plan.form !== undefined) {
+    exec.openForm?.(plan.form)
+    return true
+  }
+  for (const intent of plan.intents) {
+    if (!exec.commitIntent(intent)) return false
+  }
+  if (plan.newElementTarget !== undefined) {
+    exec.select(plan.newElementTarget.selection)
+    exec.beginInlineEdit?.(plan.newElementTarget.inlineEdit)
+  } else if (plan.clearSelection === true) {
+    exec.select(null)
+  }
+  return true
+}
+
+/** 键 → plan（flowchart，工单 04）：keyToNodeAction 的键位表 + nodeActionIntents 的意图映射。
+ * 无选中 / 选中不是节点 / 已不在投影 → null（不 preventDefault、不落码）。 */
+export function flowchartKeyPlan(projection: FlowchartProjection, input: KeyInput): KeyPlan | null {
+  const action = keyToNodeAction(input.key, input.mods)
+  if (action === null || input.selection === null || input.selection.kind !== 'node') return null
+  const plan = nodeActionIntents(projection, input.selection.nodeId, action)
+  if (plan === null) return null
+  const keyPlan: KeyPlan = { intents: plan.intents }
+  if (plan.newNodeId !== null) {
+    keyPlan.newElementTarget = {
+      selection: { kind: 'node', nodeId: plan.newNodeId },
+      inlineEdit: { kind: 'flowchart', nodeId: plan.newNodeId },
+    }
+  }
+  return keyPlan
+}
+
+/** 键 → plan（mindmap，工单 06）：键位表同 flowchart，意图映射按 mindmap 缩进层级。 */
+export function mindmapKeyPlan(projection: MindmapProjection, input: KeyInput): KeyPlan | null {
+  const action = keyToNodeAction(input.key, input.mods)
+  if (action === null || input.selection === null || input.selection.kind !== 'mindmap-node') return null
+  const plan = mindmapActionIntents(projection, input.selection.elementId, action, input.newNodeText ?? '新节点')
+  if (plan === null) return null
+  const keyPlan: KeyPlan = { intents: plan.intents }
+  if (plan.newElementId !== null) {
+    keyPlan.newElementTarget = {
+      selection: { kind: 'mindmap-node', elementId: plan.newElementId },
+      inlineEdit: { kind: 'mindmap', elementId: plan.newElementId },
+    }
+  }
+  return keyPlan
+}
+
 // ---------- class / sequence 编辑键（工单 05 / ADR-0013）：就近结构映射 ----------
 
 /** class 编辑键动作：Tab = 加成员、Enter = 加关系、Delete = 删除选中元素 */
-export type ClassKeyAction = 'delete' | 'add-member' | 'add-relation'
+type ClassKeyAction = 'delete' | 'add-member' | 'add-relation'
 
 /** sequence 编辑键动作：Tab = 加参与者、Enter = 加消息、Delete = 删除选中元素 */
-export type SequenceKeyAction = 'delete' | 'add-participant' | 'add-message'
+type SequenceKeyAction = 'delete' | 'add-participant' | 'add-message'
 
 /**
  * 键位 → 动作（class）。这是**就近类比**而非严格语义：class 是有向图，没有 flowchart
  * 的"子/同级"，当前元素附近最近的结构是成员（Tab）与关系（Enter）。带修饰键（Shift-Tab
  * 等）不处理，交给原有行为。
  */
-export function keyToClassAction(key: string, mods: { shift?: boolean } = {}): ClassKeyAction | null {
+function classKeyAction(key: string, mods: { shift?: boolean } = {}): ClassKeyAction | null {
   if (key === 'Delete' || key === 'Backspace') return 'delete'
   if (key === 'Tab') return mods.shift === true ? null : 'add-member'
   if (key === 'Enter') return mods.shift === true ? null : 'add-relation'
@@ -156,11 +270,42 @@ export function keyToClassAction(key: string, mods: { shift?: boolean } = {}): C
  * 键位 → 动作（sequence）：参与者是列、消息是行，最近的"结构"是参与者（Tab）与消息（Enter）。
  * 带修饰键不处理。方向键语义不受影响（ADR-0011：仍是方位导航）。
  */
-export function keyToSequenceAction(key: string, mods: { shift?: boolean } = {}): SequenceKeyAction | null {
+function sequenceKeyAction(key: string, mods: { shift?: boolean } = {}): SequenceKeyAction | null {
   if (key === 'Delete' || key === 'Backspace') return 'delete'
   if (key === 'Tab') return mods.shift === true ? null : 'add-participant'
   if (key === 'Enter') return mods.shift === true ? null : 'add-message'
   return null
+}
+
+/** 键 → plan（class，工单 05 / ADR-0013）：删除查能力包唯一映射（工单 03），
+ * Tab/Enter 落到已有表单浮层（无选中 / 选中不是现存类 → null，不 preventDefault）。 */
+export function classKeyPlan(projection: ClassProjection, input: KeyInput): KeyPlan | null {
+  const action = classKeyAction(input.key, input.mods)
+  if (action === null) return null
+  if (action === 'delete') {
+    const intent = classDeleteIntent(projection, input.selection)
+    return intent === null ? null : { intents: [intent], clearSelection: true }
+  }
+  const selection = input.selection
+  if (selection === null || selection.kind !== 'class') return null
+  if (!projection.classes.some((c) => c.name === selection.name)) return null
+  return { intents: [], form: action === 'add-member' ? 'member' : 'relation' }
+}
+
+/** 键 → plan（sequence，工单 05 / ADR-0013）：Tab 加参与者不依赖选中（参与者是列、
+ * 没有锚点，走既有创建路径）；加消息需要选中一个现存参与者作为起点与锚点。 */
+export function sequenceKeyPlan(projection: SequenceProjection, input: KeyInput): KeyPlan | null {
+  const action = sequenceKeyAction(input.key, input.mods)
+  if (action === null) return null
+  if (action === 'delete') {
+    const intent = sequenceDeleteIntent(projection, input.selection)
+    return intent === null ? null : { intents: [intent], clearSelection: true }
+  }
+  if (action === 'add-participant') return { intents: [], form: 'participant' }
+  const selection = input.selection
+  if (selection === null || selection.kind !== 'participant') return null
+  if (!projection.participants.some((p) => p.actorId === selection.actorId)) return null
+  return { intents: [], form: 'message' }
 }
 
 /**

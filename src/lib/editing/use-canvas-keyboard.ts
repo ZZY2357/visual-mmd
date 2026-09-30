@@ -3,16 +3,13 @@ import { useEditorStore } from '../../store/editor'
 import type { Selection } from '../projection/selection'
 import { capabilitiesOf, projectionOfKeyboardTarget } from '../canvas-selection/capabilities'
 import { pickDirectionalTarget } from './directional-navigation'
-import type { InlineEditTarget } from './inline-edit'
+import type { CanvasInlineEditTarget } from './inline-edit'
 import {
+  applyPlan,
   isNavigationKey,
-  keyToClassAction,
-  keyToNodeAction,
-  keyToSequenceAction,
-  mindmapActionIntents,
-  nodeActionIntents,
   type CanvasKeyboardProjection,
   type CanvasNavigation,
+  type KeyFormKind,
   type NodeExtent,
 } from './canvas-keyboard'
 
@@ -30,11 +27,12 @@ import {
  * preventDefault（不回绕、不滚动页面）。任何修饰键按住都不导航，但方向键仍 preventDefault
  * （修掉 Alt/Ctrl/Cmd+方向键触发浏览器前进后退、Shift+方向键静默改选中）。
  *
- * 编辑键（工单 05 / ADR-0013）覆盖四个图种：
+ * 编辑键（工单 05 / ADR-0013）覆盖四个图种，键语义查能力包的 keyHandler（每图种一份
+ * KeyPlan 纯函数，architecture-deepening-2 工单 02），执行统一交给 applyPlan：
  * - flowchart（工单 04）：Tab = 选中 --> 新；Enter = 父 --> 新（无入边退化为连出）
  * - mindmap（工单 06）：Tab = 加子节点；Enter = 加同级（根退化为加子）；落码按缩进层级
  * - class（工单 05）：Tab = 加成员、Enter = 加关系——两者**落到已有表单浮层**
- *   （AddMemberInlineForm / AddRelationInlineForm，经 onEditKey 请求），不新造浮层
+ *   （AddMemberInlineForm / AddRelationInlineForm，经 openForm 请求），不新造浮层
  * - sequence（工单 05）：Tab = 加参与者（复用空白菜单的创建 + 内联命名路径）、
  *   Enter = 加消息（落到已有 AddMessageInlineForm）
  * - 四图种 Delete = 删除选中元素（class/sequence 的删除经能力包 deleteIntent——
@@ -51,16 +49,6 @@ import {
 /** 参与画布键盘的图种投影（tagged union，keydown 时按图种分支） */
 export type { CanvasKeyboardProjection }
 
-/**
- * class / sequence 编辑键（Tab/Enter）的浮层请求（工单 05 / ADR-0013）：
- * 一律落到已有表单或既有创建路径，不新造浮层；锚点与预选值由右键菜单 hook 从
- * 当前选中推出（与右键菜单共用同一份 NodeFormState）。
- */
-export interface EditKeyRequest {
-  /** member / relation（class）、message（sequence）：打开对应添加表单 */
-  form: 'member' | 'relation' | 'message' | 'participant'
-}
-
 /** 容器内焦点落在这类控件上时不触发画布键盘操作（button 不可少：否则按钮上的
  * Enter 会冒泡到容器被当作画布动作，既误改源码又压掉按钮自身的 Enter→click，工单 12） */
 const FOCUS_EXCLUDE_SELECTOR =
@@ -70,22 +58,23 @@ export interface CanvasKeyboardOptions {
   /** 画布容器（tabindex=0、点击后持有焦点的元素）；keydown 监听就挂在其上 */
   containerRef: React.RefObject<HTMLElement | null>
   /** 新节点落码成功并选中后回调，参数即内联编辑目标（工单 05/06：进入内联命名输入框） */
-  onNodeCreated?: (target: InlineEditTarget) => void
+  onNodeCreated?: (target: CanvasInlineEditTarget) => void
   /** mindmap 新节点占位文本（flowchart 用节点 id 作占位，不需要此参数） */
   newNodeText?: string
   /** 方向键方位导航的适配对象（工单 14）；未接线时方向键只 preventDefault、不移动选中 */
   navigation?: CanvasNavigation
-  /** class / sequence 编辑键（Tab/Enter）的浮层请求（工单 05）：落到已有表单/创建路径 */
-  onEditKey?: (request: EditKeyRequest) => void
+  /** class / sequence 编辑键（Tab/Enter）请求打开的表单（工单 05，architecture-deepening-2
+   * 工单 02 经 applyPlan 调用）：落到已有表单/既有创建路径 */
+  openForm?: (kind: KeyFormKind) => void
 }
 
 export function useCanvasKeyboard(
   target: CanvasKeyboardProjection | null,
-  { containerRef, onNodeCreated, newNodeText = '新节点', navigation, onEditKey }: CanvasKeyboardOptions,
+  { containerRef, onNodeCreated, newNodeText = '新节点', navigation, openForm }: CanvasKeyboardOptions,
 ): void {
   // 事件回调里读最新值：ref 兜住
-  const latest = useRef({ onNodeCreated, newNodeText, navigation, onEditKey })
-  latest.current = { onNodeCreated, newNodeText, navigation, onEditKey }
+  const latest = useRef({ onNodeCreated, newNodeText, navigation, openForm })
+  latest.current = { onNodeCreated, newNodeText, navigation, openForm }
 
   useEffect(() => {
     const container = containerRef.current
@@ -139,93 +128,21 @@ export function useCanvasKeyboard(
       // ② 非方向键：带修饰键不处理（交给原有行为）
       if (e.ctrlKey || e.metaKey || e.altKey) return
 
-      // ③ class（工单 05 / ADR-0013）：Tab = 加成员、Enter = 加关系（落到已有表单浮层）、
-      //    Delete = 删除选中元素。无选中（无可编辑锚点）时不处理、不 preventDefault。
-      if (target.kind === 'class') {
-        const classAction = keyToClassAction(e.key, { shift: e.shiftKey })
-        if (classAction === null) return
-        if (classAction === 'delete') {
-          // 删除意图（architecture-deepening-2 工单 03）：查能力包的唯一映射，
-          // 与右键菜单 / 属性面板删除共用；存在性校验（→ null）也在能力包里
-          const wrapper = projectionOfKeyboardTarget(target)
-          const intent = capabilitiesOf(wrapper).deleteIntent(wrapper, selection)
-          if (intent === null) return
-          e.preventDefault()
-          if (commitIntent(intent)) select(null)
-          return
-        }
-        if (selection === null || selection.kind !== 'class') return
-        if (!target.projection.classes.some((c) => c.name === selection.name)) return
-        e.preventDefault() // 已确定要处理：压掉 Tab 焦点切换 / 页面滚动等默认行为
-        latest.current.onEditKey?.({ form: classAction === 'add-member' ? 'member' : 'relation' })
-        return
-      }
-
-      // ④ sequence（工单 05 / ADR-0013）：Tab = 加参与者（既有创建路径）、
-      //    Enter = 加消息（落到已有表单浮层）、Delete = 删除选中元素。
-      if (target.kind === 'sequence') {
-        const seqAction = keyToSequenceAction(e.key, { shift: e.shiftKey })
-        if (seqAction === null) return
-        if (seqAction === 'delete') {
-          // 同 ③：删除意图查能力包的唯一映射（工单 03）
-          const wrapper = projectionOfKeyboardTarget(target)
-          const intent = capabilitiesOf(wrapper).deleteIntent(wrapper, selection)
-          if (intent === null) return
-          e.preventDefault()
-          if (commitIntent(intent)) select(null)
-          return
-        }
-        if (seqAction === 'add-participant') {
-          // 参与者是列、没有锚点：直接走空白菜单的创建路径（默认名 + 内联命名）
-          e.preventDefault()
-          latest.current.onEditKey?.({ form: 'participant' })
-          return
-        }
-        // 加消息需要选中一个参与者作为起点与锚点
-        if (selection === null || selection.kind !== 'participant') return
-        if (!target.projection.participants.some((p) => p.actorId === selection.actorId)) return
-        e.preventDefault()
-        latest.current.onEditKey?.({ form: 'message' })
-        return
-      }
-
-      // ⑤ flowchart / mindmap（工单 04/06）：Tab 加子/同级、Delete 删除，落码后进入内联命名
-      const action = keyToNodeAction(e.key, { shift: e.shiftKey })
-      if (action === null) return
-
-      // 落码成功后：选中 + 进入内联命名的目标（两类图种各按其选中种类）
-      let newTarget: InlineEditTarget | null = null
-      if (target.kind === 'flowchart') {
-        if (selection === null || selection.kind !== 'node') return
-        const plan = nodeActionIntents(target.projection, selection.nodeId, action)
-        if (plan === null) return
-        e.preventDefault() // 已确定要处理：压掉 Tab 焦点切换 / 页面滚动等默认行为
-        for (const intent of plan.intents) {
-          if (!commitIntent(intent)) return // 第一个意图失败（选中已过期等）：放弃本次操作
-        }
-        if (plan.newNodeId !== null) {
-          select({ kind: 'node', nodeId: plan.newNodeId })
-          newTarget = { kind: 'flowchart', nodeId: plan.newNodeId }
-        }
-      } else {
-        if (selection === null || selection.kind !== 'mindmap-node') return
-        const plan = mindmapActionIntents(
-          target.projection,
-          selection.elementId,
-          action,
-          latest.current.newNodeText,
-        )
-        if (plan === null) return
-        e.preventDefault()
-        for (const intent of plan.intents) {
-          if (!commitIntent(intent)) return
-        }
-        if (plan.newElementId !== null) {
-          select({ kind: 'mindmap-node', elementId: plan.newElementId })
-          newTarget = { kind: 'mindmap', elementId: plan.newElementId }
-        }
-      }
-      if (newTarget !== null) latest.current.onNodeCreated?.(newTarget)
+      // ③ 编辑键（工单 04/05/06 / ADR-0013）：键 → KeyPlan 查能力包（每图种一份纯函数，
+      //    architecture-deepening-2 工单 02；存在性校验 → null 也在映射里，此时不
+      //    preventDefault），执行统一交给 applyPlan——preventDefault 时机、依次提交意图、
+      //    更新选中、进入内联命名、打开表单的编排放策略只在执行器一处定义。
+      const wrapper = projectionOfKeyboardTarget(target)
+      const plan = capabilitiesOf(wrapper)
+        .keyHandler(wrapper)({ key: e.key, mods: { shift: e.shiftKey }, selection, newNodeText: latest.current.newNodeText })
+      if (plan === null) return
+      applyPlan(plan, {
+        commitIntent,
+        select,
+        beginInlineEdit: (inlineTarget) => latest.current.onNodeCreated?.(inlineTarget),
+        openForm: (kind) => latest.current.openForm?.(kind),
+        preventDefault: () => e.preventDefault(),
+      })
     }
 
     container.addEventListener('keydown', onKeyDown)

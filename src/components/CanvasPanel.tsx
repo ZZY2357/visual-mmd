@@ -9,7 +9,6 @@ import { capabilitiesOf } from '../lib/canvas-selection/capabilities'
 import type { Selection } from '../lib/projection/selection'
 import { useCanvasSelection } from '../lib/canvas-selection/use-canvas-selection'
 import { useCanvasKeyboard } from '../lib/editing/use-canvas-keyboard'
-import type { EditKeyRequest } from '../lib/editing/use-canvas-keyboard'
 import type { CanvasNavigation, NodeExtent } from '../lib/editing/canvas-keyboard'
 import { measureNodeExtents } from '../lib/editing/canvas-measure'
 import { useCanvasInlineEdit, inlineEditTextOf } from '../lib/editing/use-canvas-inline-edit'
@@ -380,10 +379,10 @@ export function CanvasPanel({ preview, projection }: CanvasPanelProps) {
     // 工单 14：方向键方位导航 + 自动平移
     navigation,
     // 工单 05：class/sequence 的 Tab/Enter 落到已有表单或既有创建路径
-    onEditKey: (request: EditKeyRequest) => {
+    openForm: (kind) => {
       // 「创建 + 选中 + 内联命名」走菜单动作表的 createElement（工单 01 收敛后的唯一实现）
-      if (request.form === 'participant') ctx.onMenuItem('add-participant')
-      else ctx.openFormForSelection(request.form)
+      if (kind === 'participant') ctx.onMenuItem('add-participant')
+      else ctx.openFormForSelection(kind)
     },
   })
   const classDefNames = projection?.type === 'flowchart' ? projection.flowchart.classDefs.map((c) => c.name) : []

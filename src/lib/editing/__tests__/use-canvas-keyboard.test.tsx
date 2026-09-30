@@ -16,8 +16,8 @@ import type { SequenceProjection } from '../../projection/sequence-projection'
 import type { Selection } from '../../projection/selection'
 import { nodeDataIdResolver } from '../../canvas-selection/data-id'
 import { useCanvasInlineEdit } from '../use-canvas-inline-edit'
-import { useCanvasKeyboard, type CanvasKeyboardProjection, type EditKeyRequest } from '../use-canvas-keyboard'
-import type { CanvasNavigation } from '../canvas-keyboard'
+import { useCanvasKeyboard, type CanvasKeyboardProjection } from '../use-canvas-keyboard'
+import type { CanvasNavigation, KeyFormKind } from '../canvas-keyboard'
 
 /**
  * 工单 04 焦点体系：keydown 挂在画布容器上——
@@ -60,16 +60,22 @@ function Harness(props: {
   onNodeCreated?: (id: string) => void
   newNodeText?: string
   navigation?: CanvasNavigation
-  onEditKey?: (request: EditKeyRequest) => void
+  openForm?: (kind: KeyFormKind) => void
   children?: React.ReactNode
 }) {
   const ref = useRef<HTMLDivElement | null>(null)
   useCanvasKeyboard(props.target, {
     containerRef: ref,
-    onNodeCreated: props.onNodeCreated !== undefined ? (target) => props.onNodeCreated?.(target.kind === 'flowchart' ? target.nodeId : target.elementId) : undefined,
+    onNodeCreated:
+      props.onNodeCreated !== undefined
+        ? (target) =>
+            props.onNodeCreated?.(
+              target.kind === 'flowchart' ? target.nodeId : target.kind === 'mindmap' ? target.elementId : '',
+            )
+        : undefined,
     newNodeText: props.newNodeText,
     navigation: props.navigation,
-    onEditKey: props.onEditKey,
+    openForm: props.openForm,
   })
   return (
     <div ref={ref} tabIndex={0}>
@@ -526,40 +532,40 @@ describe('useCanvasKeyboard（工单 05：class / sequence 编辑键，复用已
 
   function mountClass(
     selection: Selection | null,
-    onEditKey?: (r: EditKeyRequest) => void,
+    openForm?: (kind: KeyFormKind) => void,
     navigation?: CanvasNavigation,
   ) {
     resetEditorHistory(CLASS_SAMPLE)
     useEditorStore.getState().select(selection)
     const projection = classProjectionOf(CLASS_SAMPLE)
     act(() => {
-      root.render(<Harness target={{ kind: 'class', projection }} onEditKey={onEditKey} navigation={navigation} />)
+      root.render(<Harness target={{ kind: 'class', projection }} openForm={openForm} navigation={navigation} />)
     })
     return host.firstElementChild as HTMLDivElement
   }
 
   function mountSeq(
     selection: Selection | null,
-    onEditKey?: (r: EditKeyRequest) => void,
+    openForm?: (kind: KeyFormKind) => void,
     navigation?: CanvasNavigation,
   ) {
     resetEditorHistory(SEQ_SAMPLE)
     useEditorStore.getState().select(selection)
     const projection = sequenceProjectionOf(SEQ_SAMPLE)
     act(() => {
-      root.render(<Harness target={{ kind: 'sequence', projection }} onEditKey={onEditKey} navigation={navigation} />)
+      root.render(<Harness target={{ kind: 'sequence', projection }} openForm={openForm} navigation={navigation} />)
     })
     return host.firstElementChild as HTMLDivElement
   }
 
   it('class：Tab 请求「加成员」、Enter 请求「加关系」；都 preventDefault，源码不变（表单提交才落码）', () => {
-    const requests: EditKeyRequest[] = []
+    const requests: KeyFormKind[] = []
     const container = mountClass({ kind: 'class', name: 'Customer' }, (r) => requests.push(r))
 
     expect(keyOn(container, 'Tab')).toBe(true)
     expect(keyOn(container, 'Enter')).toBe(true)
 
-    expect(requests).toEqual([{ form: 'member' }, { form: 'relation' }])
+    expect(requests).toEqual(['member', 'relation'])
     expect(useEditorStore.getState().source).toBe(CLASS_SAMPLE)
   })
 
@@ -576,7 +582,7 @@ describe('useCanvasKeyboard（工单 05：class / sequence 编辑键，复用已
   })
 
   it('class：未选中时不落码、不 preventDefault（Tab 交给浏览器默认行为）', () => {
-    const requests: EditKeyRequest[] = []
+    const requests: KeyFormKind[] = []
     const container = mountClass(null, (r) => requests.push(r))
 
     for (const key of ['Tab', 'Enter', 'Delete']) expect(keyOn(container, key)).toBe(false)
@@ -585,24 +591,24 @@ describe('useCanvasKeyboard（工单 05：class / sequence 编辑键，复用已
   })
 
   it('sequence：Tab 请求「加参与者」、选中参与者后 Enter 请求「加消息」；都 preventDefault', () => {
-    const requests: EditKeyRequest[] = []
+    const requests: KeyFormKind[] = []
     const container = mountSeq({ kind: 'participant', actorId: '使用者' }, (r) => requests.push(r))
 
     expect(keyOn(container, 'Tab')).toBe(true)
     expect(keyOn(container, 'Enter')).toBe(true)
 
-    expect(requests).toEqual([{ form: 'participant' }, { form: 'message' }])
+    expect(requests).toEqual(['participant', 'message'])
     expect(useEditorStore.getState().source).toBe(SEQ_SAMPLE)
   })
 
   it('sequence：未选中参与者时 Enter 无动作（不 preventDefault）；Tab（加参与者）不依赖选中仍生效', () => {
-    const requests: EditKeyRequest[] = []
+    const requests: KeyFormKind[] = []
     const container = mountSeq(null, (r) => requests.push(r))
 
     expect(keyOn(container, 'Enter')).toBe(false)
     expect(keyOn(container, 'Tab')).toBe(true)
 
-    expect(requests).toEqual([{ form: 'participant' }])
+    expect(requests).toEqual(['participant'])
   })
 
   it('sequence：Delete 删除选中参与者（级联删引用它的消息）并清空选中', () => {
