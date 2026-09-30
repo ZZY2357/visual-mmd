@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest'
 import {
   CLASS_TEMPLATE,
   DIAGRAM_TYPES,
+  KANBAN_TEMPLATE,
   MINDMAP_TEMPLATE,
   SEQUENCE_TEMPLATE,
   type AnyProjection,
@@ -10,13 +11,13 @@ import { DEFAULT_DIAGRAM_SOURCE } from '../../storage'
 import { capabilitiesOf } from '../capabilities'
 import { classDataIdResolver } from '../class-adapter'
 import { sequenceDataIdResolver } from '../sequence-adapter'
+import { kanbanDataIdResolver } from '../kanban-adapter'
 import type { Selection } from '../../projection/selection'
 
 /**
- * 画布能力包查表测试（工单 04）：4 个图种 × 8 项能力，断言无 undefined 遗漏；
- * 尤其是可选成员 edgeAnnotator——flowchart / mindmap 必须没有（无位置序连线），
- * class / sequence 必须有。另含 class / sequence adapter 的 resolver 对照行为
- * （与迁出前的 CanvasPanel.resolverOf 逐分支同约定）。
+ * 画布能力包查表测试（工单 04）：图种 × 能力，断言无 undefined 遗漏；
+ * 尤其是可选成员 edgeAnnotator——无位置序连线的图种（含 kanban）必须没有。
+ * 另含 class / sequence / kanban adapter 的 resolver 对照行为。
  */
 
 ;(globalThis as Record<string, unknown>).IS_REACT_ACT_ENVIRONMENT = true
@@ -26,6 +27,7 @@ const SOURCES = {
   sequence: SEQUENCE_TEMPLATE,
   class: CLASS_TEMPLATE,
   mindmap: MINDMAP_TEMPLATE,
+  kanban: KANBAN_TEMPLATE,
 } as const
 
 function projectionOf(type: keyof typeof SOURCES): AnyProjection {
@@ -35,9 +37,9 @@ function projectionOf(type: keyof typeof SOURCES): AnyProjection {
   return registration.buildProjection(parsed.doc)
 }
 
-const TYPES = ['flowchart', 'sequence', 'class', 'mindmap'] as const
+const TYPES = ['flowchart', 'sequence', 'class', 'mindmap', 'kanban'] as const
 
-describe('capabilitiesOf：4 图种 × 8 能力查表（工单 04 + architecture-deepening-2 工单 03）', () => {
+describe('capabilitiesOf：5 图种 × 8 能力查表（工单 04 + architecture-deepening-2 工单 03）', () => {
   for (const type of TYPES) {
     it(`${type}：八项能力齐备（edgeAnnotator 按图种有无位置序连线）`, () => {
       const projection = projectionOf(type)
@@ -130,6 +132,16 @@ describe('class/sequence adapter resolver 对照（与原 CanvasPanel.resolverOf
     const block = projection.sequence.blocks.find((b) => b.keyword !== 'else' && b.keyword !== 'and')
     if (block === undefined) throw new Error('模板必须含 block-open')
     expect(resolve(block.elementId)).toEqual({ kind: 'element', elementId: block.elementId })
+    expect(resolve('__nope__')).toBeNull()
+  })
+
+  it('kanban：列 / 卡片的节点 id → 节点选中（带 elementId 前缀），未知 → null', () => {
+    const projection = projectionOf('kanban') as Extract<AnyProjection, { type: 'kanban' }>
+    const resolve = kanbanDataIdResolver(projection.kanban)
+    const column = projection.kanban.columns[0]
+    expect(resolve(column.id)).toEqual({ kind: 'node', id: column.elementId })
+    const card = projection.kanban.cards[0]
+    expect(resolve(card.id)).toEqual({ kind: 'node', id: card.elementId })
     expect(resolve('__nope__')).toBeNull()
   })
 })

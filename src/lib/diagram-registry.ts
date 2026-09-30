@@ -8,6 +8,7 @@ import { stateParser } from './pipeline/state'
 import { erParser } from './pipeline/er'
 import { gitgraphParser } from './pipeline/gitgraph'
 import { timelineParser } from './pipeline/timeline'
+import { kanbanParser } from './pipeline/kanban'
 import { frontmatterEnd } from './pipeline/frontmatter'
 import { buildFlowchartProjection, type FlowchartProjection } from './projection/flowchart-projection'
 import { buildSequenceProjection, type SequenceProjection } from './projection/sequence-projection'
@@ -17,6 +18,7 @@ import { buildStateProjection, type StateProjection } from './projection/state-p
 import { buildErProjection, type ErProjection } from './projection/er-projection'
 import { buildGitgraphProjection, type GitgraphProjection } from './projection/gitgraph-projection'
 import { buildTimelineProjection, type TimelineProjection } from './projection/timeline-projection'
+import { buildKanbanProjection, type KanbanProjection } from './projection/kanban-projection'
 import { flowchartCanvasCapabilities } from './canvas-selection/flowchart-adapter'
 import { sequenceCanvasCapabilities } from './canvas-selection/sequence-adapter'
 import { classCanvasCapabilities } from './canvas-selection/class-adapter'
@@ -25,6 +27,7 @@ import { stateCanvasCapabilities } from './canvas-selection/state-adapter'
 import { erCanvasCapabilities } from './canvas-selection/er-adapter'
 import { gitgraphCanvasCapabilities } from './canvas-selection/gitgraph-adapter'
 import { timelineCanvasCapabilities } from './canvas-selection/timeline-adapter'
+import { kanbanCanvasCapabilities } from './canvas-selection/kanban-adapter'
 import type { CanvasCapabilities } from './canvas-selection/capabilities'
 import { treePartitions, type TreePartitions } from './structure-tree/partitions'
 import { DEFAULT_DIAGRAM_SOURCE } from './storage'
@@ -54,6 +57,7 @@ export interface ProjectionTypes {
   er: ErProjection
   gitgraph: GitgraphProjection
   timeline: TimelineProjection
+  kanban: KanbanProjection
 }
 
 /** 已注册图种的 id 集合（字面量联合，随 ProjectionTypes 增长） */
@@ -203,6 +207,22 @@ export const TIMELINE_TEMPLATE = `timeline
 `
 
 /**
+ * kanban 起步模板（more-diagrams 工单 06）：三列（待办 / 进行中 / 已完成），
+ * 待办两卡（其一携带完整 `@{ assigned / ticket / priority }` 元数据）、其余各一卡。
+ * 缩进即语法：列与单元格同宽，卡片深一档。
+ * 注意 mermaid 词法：`@{` 必须**紧跟** `]`（`] @{` 是 `SPACELIST`，解析报错）。
+ */
+export const KANBAN_TEMPLATE = `kanban
+  Todo[待办]
+    t1[接入 kanban 解析器]@{ assigned: '张三', ticket: 'VMMD-101', priority: 'High' }
+    t2[补充单元测试]
+  Doing[进行中]
+    t3[接入画布能力包]
+  Done[已完成]
+    t4[搭建图种注册表]
+`
+
+/**
  * 注册表：数组是唯一权威（more-diagrams 工单 01），DIAGRAM_TYPES 由它推导。
  * detectDiagramType 按数组顺序显式遍历——不再维护手写的 if 分发链，
  * 新图种挂一条即可参与识别，无法识别时不再默认 flowchart（见下）。
@@ -281,6 +301,15 @@ export const DIAGRAM_TYPE_LIST: DiagramTypeRegistration[] = [
     buildProjection: (doc) => ({ type: 'timeline', timeline: buildTimelineProjection(doc) }),
     tree: treePartitions.timeline,
     canvas: timelineCanvasCapabilities,
+  },
+  {
+    id: 'kanban',
+    parser: kanbanParser,
+    template: KANBAN_TEMPLATE,
+    detect: (source) => /^kanban\b/i.test(firstStatementLine(source)),
+    buildProjection: (doc) => ({ type: 'kanban', kanban: buildKanbanProjection(doc) }),
+    tree: treePartitions.kanban,
+    canvas: kanbanCanvasCapabilities,
   },
 ]
 

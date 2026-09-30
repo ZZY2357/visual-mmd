@@ -4,6 +4,8 @@ import { isValidClassName } from '../pipeline/class'
 import { isValidParticipantId } from '../pipeline/sequence'
 import { isValidStateId } from '../pipeline/state'
 import { isValidErName } from '../pipeline/er'
+import { isValidKanbanText } from '../pipeline/kanban'
+import { parseKanbanCardElementId, parseKanbanColumnElementId } from '../pipeline/element-id'
 import type { ProjectionMindmapNode } from '../projection/mindmap-projection'
 import { selectionFromEventTarget, type CanvasSelection, type DataIdResolver } from '../canvas-selection/data-id'
 
@@ -50,6 +52,10 @@ export type CanvasInlineEditTarget =
   /** er（more-diagrams 工单 03）：双击实体改别名（set-alias 意图；实体名是语法标识，
    * 不在此改。属性不做双击——工单 03 明确） */
   | { kind: 'er'; name: string }
+  /** kanban（more-diagrams 工单 06）：双击卡片改描述（set-description）；键盘 / 空白新建后命名同此 */
+  | { kind: 'kanban-card'; elementId: string }
+  /** kanban：双击列标题改标题（set-column-title）；键盘 / 空白新建后命名同此 */
+  | { kind: 'kanban-column'; elementId: string }
 
 export type InlineEditCommit =
   | { action: 'commit'; intent: EditIntent }
@@ -105,7 +111,7 @@ function classTitleClicked(target: EventTarget | null, name: string): boolean {
 }
 
 /** 参与双击寻址的图种（各图种都用 data-id；mindmap 额外回落文本匹配） */
-export type InlineEditDiagramKind = 'flowchart' | 'mindmap' | 'class' | 'sequence' | 'state' | 'er'
+export type InlineEditDiagramKind = 'flowchart' | 'mindmap' | 'class' | 'sequence' | 'state' | 'er' | 'kanban'
 
 /**
  * 双击目标 → 编辑对象；两边都匹配不上时返回 null（如点在空白处/边上），
@@ -131,6 +137,12 @@ export function inlineEditTargetFromEvent(
     if (kind === 'state') return isValidStateId(byId.nodeId) ? { kind: 'state', id: byId.nodeId } : null
     // er：双击实体 = 编辑别名（set-alias；实体名是语法标识，不在此改）
     if (kind === 'er') return isValidErName(byId.nodeId) ? { kind: 'er', name: byId.nodeId } : null
+    // kanban：resolver 返回 elementId（`kanban-card:<id>` / `kanban-column:<id>`），按前缀判种类
+    if (kind === 'kanban') {
+      if (parseKanbanCardElementId(byId.nodeId) !== null) return { kind: 'kanban-card', elementId: byId.nodeId }
+      if (parseKanbanColumnElementId(byId.nodeId) !== null) return { kind: 'kanban-column', elementId: byId.nodeId }
+      return null
+    }
     return byId
   }
   return kind === 'mindmap' ? targetFromMindmapText(target, mindmapNodes) : null
@@ -168,6 +180,14 @@ export function inlineEditCommitOf(target: CanvasInlineEditTarget, text: string,
     if (!isValidErName(target.name)) return { action: 'invalid' }
     // 空白/未改动已被顶部守卫短路（unchanged）；到这里的非空改动 = set-alias
     return { action: 'commit', intent: { type: 'set-alias', name: target.name, alias: next } }
+  }
+  if (target.kind === 'kanban-card') {
+    if (!isValidKanbanText(next)) return { action: 'invalid' }
+    return { action: 'commit', intent: { type: 'set-description', elementId: target.elementId, description: next } }
+  }
+  if (target.kind === 'kanban-column') {
+    if (!isValidKanbanText(next)) return { action: 'invalid' }
+    return { action: 'commit', intent: { type: 'set-column-title', elementId: target.elementId, title: next } }
   }
   if (!isValidMindmapNodeText(next)) return { action: 'invalid' }
   return { action: 'commit', intent: { type: 'set-node-text', elementId: target.elementId, text: next } }

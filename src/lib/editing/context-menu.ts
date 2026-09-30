@@ -55,6 +55,9 @@ export type ContextMenuTarget =
   // （见 timeline-adapter），这两个目标目前只能由测试/程序构造，画布右键实际只产出 blank。
   | { kind: 'timeline-period'; elementId: string }
   | { kind: 'timeline-event'; elementId: string }
+  // kanban（more-diagrams 工单 06）：列 elementId `kanban-column:<id>`、卡片 `kanban-card:<id>`
+  | { kind: 'kanban-column'; elementId: string }
+  | { kind: 'kanban-card'; elementId: string }
 
 export type ContextMenuItemId =
   | 'add-node'
@@ -113,6 +116,11 @@ export type ContextMenuItemId =
   | 'add-event'
   | 'edit-period-text'
   | 'edit-event-text'
+  // kanban（more-diagrams 工单 06）：空白加列、列上加卡片、卡片改元数据（D5：选中 + 关菜单，
+  // 字段在右侧属性面板改）；改标题 / 改描述复用既有 edit-text（进入内联编辑），删除复用 delete。
+  | 'add-column'
+  | 'add-card'
+  | 'edit-kanban-metadata'
 
 /**
  * 画布选中 → 菜单目标（工单 03 起为 `canvas-selection/selection-codec.ts` 的
@@ -147,6 +155,8 @@ function blankMenuItems(diagramType: DiagramTypeId): ContextMenuItemId[] {
       return ['add-commit', 'add-branch']
     case 'timeline':
       return ['add-period', 'add-section']
+    case 'kanban':
+      return ['add-column']
     // DiagramTypeId 是开放类型（more-diagrams 工单 01）：未接入画布能力包的图种
     // 没有空白右键入口（unsupported 态下画布右键整体停用，不会走到这里）
     default:
@@ -219,5 +229,11 @@ export function contextMenuItems(target: ContextMenuTarget): ContextMenuItemId[]
       return ['edit-period-text', 'add-event', 'delete']
     case 'timeline-event':
       return ['edit-event-text', 'delete']
+    // kanban（more-diagrams 工单 06）：列 = 改标题 / 加卡片 / 删除；卡片 = 改描述 / 改元数据 / 删除。
+    // 改标题与改描述复用 edit-text（内联编辑，见 menu-actions.beginEditText）。
+    case 'kanban-column':
+      return ['edit-text', 'add-card', 'delete']
+    case 'kanban-card':
+      return ['edit-text', 'edit-kanban-metadata', 'delete']
   }
 }

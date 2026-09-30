@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import {
   CLASS_TEMPLATE,
+  KANBAN_TEMPLATE,
   MINDMAP_TEMPLATE,
   SEQUENCE_TEMPLATE,
   TIMELINE_TEMPLATE,
@@ -12,14 +13,17 @@ import { flowchartParser } from '../../pipeline/flowchart'
 import { mindmapParser } from '../../pipeline/mindmap'
 import { sequenceParser } from '../../pipeline/sequence'
 import { timelineParser } from '../../pipeline/timeline'
+import { kanbanParser } from '../../pipeline/kanban'
 import { buildClassProjection } from '../../projection/class-projection'
 import { buildFlowchartProjection } from '../../projection/flowchart-projection'
 import { buildMindmapProjection } from '../../projection/mindmap-projection'
 import { buildSequenceProjection } from '../../projection/sequence-projection'
 import { buildTimelineProjection } from '../../projection/timeline-projection'
+import { buildKanbanProjection } from '../../projection/kanban-projection'
 import type { Selection } from '../../projection/selection'
 import {
   classDeleteIntent,
+  kanbanDeleteIntent,
   mindmapActionIntents,
   nodeActionIntents,
   sequenceDeleteIntent,
@@ -96,6 +100,11 @@ function timelineProjection(): Extract<AnyProjection, { type: 'timeline' }> {
   const parsed = timelineParser.parse(TIMELINE_TEMPLATE)
   if (!parsed.ok) throw new Error(parsed.error.message)
   return { type: 'timeline', timeline: buildTimelineProjection(parsed.doc) }
+}
+function kanbanProjection(): Extract<AnyProjection, { type: 'kanban' }> {
+  const parsed = kanbanParser.parse(KANBAN_TEMPLATE)
+  if (!parsed.ok) throw new Error(parsed.error.message)
+  return { type: 'kanban', kanban: buildKanbanProjection(parsed.doc) }
 }
 
 /** 每个图种的一组「selection → 属性面板删除按钮会提交的意图」用例 */
@@ -231,12 +240,35 @@ function timelineCases(p: ReturnType<typeof timelineProjection>): DeleteCase[] {
   ]
 }
 
+/** kanban（more-diagrams 工单 06）：列（级联卡片）与卡片各一条删除入口 */
+function kanbanCases(p: ReturnType<typeof kanbanProjection>): DeleteCase[] {
+  const column = p.kanban.columns[0]
+  const card = p.kanban.cards[0]
+  return [
+    {
+      name: 'kanban-column',
+      selection: { kind: 'kanban-column', elementId: column.elementId },
+      panelIntent: { type: 'delete-column', elementId: column.elementId },
+      menuTarget: { kind: 'kanban-column', elementId: column.elementId },
+      menuItemId: 'delete',
+    },
+    {
+      name: 'kanban-card',
+      selection: { kind: 'kanban-card', elementId: card.elementId },
+      panelIntent: { type: 'delete-card', elementId: card.elementId },
+      menuTarget: { kind: 'kanban-card', elementId: card.elementId },
+      menuItemId: 'delete',
+    },
+  ]
+}
+
 const SUITES = [
   { type: 'flowchart' as const, projection: flowProjection, cases: flowchartCases },
   { type: 'class' as const, projection: classProjection, cases: classCases },
   { type: 'sequence' as const, projection: seqProjection, cases: sequenceCases },
   { type: 'mindmap' as const, projection: mindProjection, cases: mindmapCases },
   { type: 'timeline' as const, projection: timelineProjection, cases: timelineCases },
+  { type: 'kanban' as const, projection: kanbanProjection, cases: kanbanCases },
 ]
 
 describe('deleteIntent 等价性：三个删除入口对同一 selection 产出同一意图（工单 03）', () => {
@@ -273,6 +305,8 @@ describe('deleteIntent 等价性：三个删除入口对同一 selection 产出�
                 return sequenceDeleteIntent(projection.sequence, sel)
               case 'timeline':
                 return timelineDeleteIntent(projection.timeline, sel)
+              case 'kanban':
+                return kanbanDeleteIntent(projection.kanban, sel)
             }
           })()
           // 键盘按选中种类设门（flowchart/mindmap 只删节点）；门内的种类必须与能力包等价
@@ -281,7 +315,8 @@ describe('deleteIntent 等价性：三个删除入口对同一 selection 产出�
             (suite.type === 'mindmap' && sel.kind === 'mindmap-node') ||
             suite.type === 'class' ||
             suite.type === 'sequence' ||
-            suite.type === 'timeline'
+            suite.type === 'timeline' ||
+            suite.type === 'kanban'
           if (!keyboardHandles) {
             expect(viaKeyboard).toBeNull() // 门外：键盘安静地不产出意图（零变化护栏）
             return
@@ -335,6 +370,7 @@ describe('deleteIntent 等价性：三个删除入口对同一 selection 产出�
           sequence: { kind: 'participant', actorId: '__不存在__' },
           mindmap: { kind: 'mindmap-node', elementId: 'mindmap-node:999' },
           timeline: { kind: 'timeline-period', elementId: 'period:999' },
+          kanban: { kind: 'kanban-card', elementId: 'kanban-card:__不存在__' },
         }
         expect(caps.deleteIntent(projection, gone[suite.type])).toBeNull()
 

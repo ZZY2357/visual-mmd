@@ -26,6 +26,11 @@ describe('金样合法性：默认图表模板能被 mermaid 渲染', () => {
     await expect(mermaid.parse(TIMELINE_TEMPLATE)).resolves.toBeTruthy()
   })
 
+  it('kanban 起步模板 parse 通过（more-diagrams 工单 06）', async () => {
+    const { KANBAN_TEMPLATE } = await import('../diagram-registry')
+    await expect(mermaid.parse(KANBAN_TEMPLATE)).resolves.toBeTruthy()
+  })
+
   it('sequence 源码 parse 通过', async () => {
     const src = `sequenceDiagram
     Alice->>Bob: 你好

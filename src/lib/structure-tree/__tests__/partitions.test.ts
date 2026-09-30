@@ -159,6 +159,27 @@ describe('结构树分区描述（工单 06）', () => {
     ])
   })
 
+  it('kanban：列作为分组条目，卡片作为 children；卡片 detail 拼出元数据', () => {
+    const source =
+      "kanban\n  Todo[待办]\n    t1[写代码]@{ assigned: '张三', ticket: 'VMMD-1', priority: 'High' }\n  Done[已完成]\n"
+    const parsed = DIAGRAM_TYPES.kanban.parser.parse(source)
+    if (!parsed.ok) throw new Error('解析失败')
+    const sections = DIAGRAM_TYPES.kanban.tree(DIAGRAM_TYPES.kanban.buildProjection(parsed.doc), { t })
+    expect(sections.map((s) => s.key)).toEqual(['diagram', 'columns'])
+    expect(sections[1].heading).toBe('app:propertyPanel.kanbanColumns')
+    expect(sections[1].count).toBe(2)
+    const [todo, done] = sections[1].entries
+    expect(todo).toMatchObject({ depth: 1, selection: { kind: 'kanban-column', elementId: 'kanban-column:Todo' } })
+    expect(todo?.children?.[0]).toMatchObject({
+      depth: 2,
+      selection: { kind: 'kanban-card', elementId: 'kanban-card:t1' },
+    })
+    // 元数据拼进 detail 用的是 t 透传键
+    expect(todo?.children?.[0]?.detail).toContain('#VMMD-1')
+    expect(todo?.children?.[0]?.detail).toContain('app:kanbanPriorities.High')
+    expect(done?.children).toBeUndefined()
+  })
+
   it('每个图种注册表的 tree 字段都能对自身的投影求值（穷尽性）', () => {
     const sources: Record<keyof typeof DIAGRAM_TYPES, string> = {
       flowchart: 'flowchart TB\nn1[甲]',
@@ -169,6 +190,7 @@ describe('结构树分区描述（工单 06）', () => {
       er: 'erDiagram\nCAR ||--o{ DRIVER : uses',
       gitgraph: 'gitGraph\n    commit id: "a"\n    branch dev\n    commit',
       timeline: 'timeline\n    section S\n        A : a1 : a2\n            : a3',
+      kanban: 'kanban\n  Todo[待办]\n    t1[写代码]',
     }
     for (const id of Object.keys(DIAGRAM_TYPES) as (keyof typeof DIAGRAM_TYPES)[]) {
       const registration = DIAGRAM_TYPES[id]

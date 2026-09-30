@@ -13,6 +13,8 @@
  * 工单 09：class 图复用同一条链路（反注而非各自打补丁），于是「左键点选 / 高亮 /
  * 内联编辑定位 / 右键节点菜单」四处无需分别适配；mindmap 无法反注（其 DOM id 是
  * 位置序 `node_N`，不是源码 id），仍走 mindmap-adapter 的映射。
+ * more-diagrams 工单 06：kanban 的卡片 / 列 DOM id 是 `${svgId}-${节点id}`（无词元），
+ * 走 `annotateKanbanDataIds`，以 svg 根 id 前缀剥离（作用域限定在 `.sections` / `.items`）。
  *
  * 尽力而为：解析不出节点 id 的 g.node 安静跳过（保持"退化为仅结构树可选中"
  * 的既有约定）；反注错误的 id 也不可能凭空造出选中——resolver 只认投影已知节点。
@@ -49,6 +51,32 @@ function nodeIdOfDomId(domId: string): string | null {
   return er !== null ? er[1] : null
 }
 
+/**
+ * mermaid v12 kanban（more-diagrams 工单 06）：渲染器把列放进 `<g class="sections">`、
+ * 卡片放进 `<g class="items">`（kanban-definition 的 `draw`），两者的 DOM id 都是
+ * `${svgId}-${节点id}`——**没有词元、没有序号后缀**，故 `nodeIdOfDomId` 无法反解。
+ * 这里换一条路：以 **svg 根 id 为前缀**剥离（svgId 就在渲染产物里，取得到）。
+ * 作用域严格限定在这两个 kanban 专属包裹组内，不会误伤其它图种的 g.node/g.cluster。
+ *
+ * DOM id 形态证据（离线核查 `kanban-definition-PNTS6WVX.mjs`）：
+ * `draw` 里 `node.domId = \`${id}-${node.id}\``；列经 `insertCluster` 落 `<g class="cluster">`、
+ * 卡片经 `insertNode`/`labelHelper` 落 `<g class="node">`，二者皆以 domId 为 DOM id。
+ */
+function annotateKanbanDataIds(root: ParentNode): void {
+  const svgId = root.querySelector('svg')?.getAttribute('id') ?? ''
+  if (svgId === '') return
+  const prefix = `${svgId}-`
+  for (const wrapper of root.querySelectorAll('g.sections, g.items')) {
+    for (const g of wrapper.querySelectorAll('g.cluster, g.node')) {
+      if (g.getAttribute('data-id') !== null) continue
+      const domId = g.getAttribute('id')
+      if (domId === null || !domId.startsWith(prefix)) continue
+      const nodeId = domId.slice(prefix.length)
+      if (nodeId !== '') g.setAttribute('data-id', nodeId)
+    }
+  }
+}
+
 export function annotateNodeDataIds(root: ParentNode): void {
   for (const g of root.querySelectorAll('g.node')) {
     if (g.getAttribute('data-id') !== null) continue
@@ -58,4 +86,5 @@ export function annotateNodeDataIds(root: ParentNode): void {
     if (nodeId === null) continue
     g.setAttribute('data-id', nodeId)
   }
+  annotateKanbanDataIds(root)
 }

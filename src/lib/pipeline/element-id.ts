@@ -143,6 +143,31 @@ export function erEntityElementId(name: string, occurrence = 1): string {
   return keyed('entity', name, occurrence)
 }
 
+// ---------- kanban（more-diagrams 工单 06） ----------
+
+/**
+ * 列（`kanban-column:<列id>` / `#2`）：列在 mermaid kanban 里是分组元素。
+ * 列 id 语法上全局唯一（research 已核查）；occurrence 只是解析器对重复 id 的兜底。
+ */
+export function kanbanColumnElementId(id: string, occurrence = 1): string {
+  return keyed('kanban-column', id, occurrence)
+}
+
+export function parseKanbanColumnElementId(elementId: string): { id: string; occurrence: number } | null {
+  const parsed = parseKeyed('kanban-column', elementId)
+  return parsed === null ? null : { id: parsed.key, occurrence: parsed.occurrence }
+}
+
+/** 卡片（`kanban-card:<卡片id>` / `#2`）：卡片是缩进于列下的节点元素（缩进即归属，见 kanban.ts） */
+export function kanbanCardElementId(id: string, occurrence = 1): string {
+  return keyed('kanban-card', id, occurrence)
+}
+
+export function parseKanbanCardElementId(elementId: string): { id: string; occurrence: number } | null {
+  const parsed = parseKeyed('kanban-card', elementId)
+  return parsed === null ? null : { id: parsed.key, occurrence: parsed.occurrence }
+}
+
 // ---------- 下一个可用名/ID（architecture-deepening-2 工单 04） ----------
 
 export interface NextFreeNameOptions {

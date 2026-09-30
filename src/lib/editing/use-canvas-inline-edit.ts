@@ -2,6 +2,7 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import { useEditorStore } from '../../store/editor'
 import type { AnyProjection } from '../diagram-registry'
 import { mindmapDomIdOf } from '../canvas-selection/mindmap-adapter'
+import { parseKanbanCardElementId, parseKanbanColumnElementId } from '../pipeline/element-id'
 import type { DataIdResolver } from '../canvas-selection/data-id'
 import type { ViewState } from '../canvas-view/view-state'
 import {
@@ -69,6 +70,12 @@ export function inlineEditTextOf(projection: AnyProjection | null, target: Canva
     // er 双击编辑的是别名：无别名实体预填空串（输入即新增别名）
     return projection.er.entities.find((e) => e.name === target.name)?.alias ?? ''
   }
+  if (projection.type === 'kanban' && target.kind === 'kanban-card') {
+    return projection.kanban.cards.find((c) => c.elementId === target.elementId)?.description ?? ''
+  }
+  if (projection.type === 'kanban' && target.kind === 'kanban-column') {
+    return projection.kanban.columns.find((c) => c.elementId === target.elementId)?.title ?? ''
+  }
   return ''
 }
 
@@ -125,6 +132,19 @@ function findTargetElement(root: Element, target: CanvasInlineEditTarget, text: 
     // er 的 data-id 即实体名（渲染后处理从 DOM id `entity-{名}-{n}` 反注，工单 03）
     for (const el of root.querySelectorAll('[data-id]')) {
       if (el.getAttribute('data-id') === target.name) return el
+    }
+    return null
+  }
+  if (target.kind === 'kanban-card' || target.kind === 'kanban-column') {
+    // kanban 的 data-id 即节点 id（渲染后处理从 `.sections` / `.items` 内的 DOM id 反注，
+    // more-diagrams 工单 06）；elementId 形如 `kanban-card:<id>`，取回节点 id 寻址
+    const parsed =
+      target.kind === 'kanban-card'
+        ? parseKanbanCardElementId(target.elementId)
+        : parseKanbanColumnElementId(target.elementId)
+    if (parsed === null) return null
+    for (const el of root.querySelectorAll('[data-id]')) {
+      if (el.getAttribute('data-id') === parsed.id) return el
     }
     return null
   }
@@ -197,7 +217,9 @@ export function useCanvasInlineEdit({ projection, resolver, svg, containerRef, v
                 ? 'state'
                 : type === 'er'
                   ? 'er'
-                  : 'flowchart'
+                  : type === 'kanban'
+                    ? 'kanban'
+                    : 'flowchart'
       const target = inlineEditTargetFromEvent(e.target, resolver, mindmapNodes, kind)
       if (target === null) return
       e.preventDefault()

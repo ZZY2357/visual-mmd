@@ -47,6 +47,9 @@ export type Selection =
   | { kind: 'timeline-period'; elementId: string }
   | { kind: 'timeline-event'; elementId: string }
   | { kind: 'timeline-section'; elementId: string }
+  // kanban（more-diagrams 工单 06）：列是分组元素、卡片是节点元素
+  | { kind: 'kanban-column'; elementId: string }
+  | { kind: 'kanban-card'; elementId: string }
 
 export const DIAGRAM_SELECTION: Selection = { kind: 'diagram' }
 
@@ -110,6 +113,10 @@ export function selectionKey(sel: Selection): string {
       return `timeline-event:${sel.elementId}`
     case 'timeline-section':
       return `timeline-section:${sel.elementId}`
+    case 'kanban-column':
+      return `kanban-column:${sel.elementId}`
+    case 'kanban-card':
+      return `kanban-card:${sel.elementId}`
   }
 }
 

@@ -144,6 +144,10 @@ describe('MENU_ACTIONS 穷尽性（工单 05 → 工单 01）', () => {
       { kind: 'blank', diagramType: 'timeline' },
       { kind: 'timeline-period', elementId: 'period:1' },
       { kind: 'timeline-event', elementId: 'event:1' },
+      // kanban（more-diagrams 工单 06）：空白加列、列上加卡片 / 改标题、卡片改描述 / 改元数据
+      { kind: 'blank', diagramType: 'kanban' },
+      { kind: 'kanban-column', elementId: 'kanban-column:Todo' },
+      { kind: 'kanban-card', elementId: 'kanban-card:t1' },
     ]
     const reachableIds = new Set(allTargets.flatMap((target) => contextMenuItems(target)))
     // apply-style 不经 onMenuItem 分发（CanvasPanel 渲染成子菜单开关，点样式名直接调
