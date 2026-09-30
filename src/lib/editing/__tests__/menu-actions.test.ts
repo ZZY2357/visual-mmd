@@ -36,6 +36,10 @@ const SEQUENCE = `sequenceDiagram
     participant 甲
     participant 乙
     甲->>乙: hi
+    Note over 甲: 备注行
+    loop 循环
+        甲->>乙: 轮询
+    end
 `
 
 function flowProjectionOf(source: string): AnyProjection {
@@ -215,57 +219,80 @@ describe('删除组与连线菜单（分发语义）', () => {
       id: keyof typeof MENU_ACTIONS
       target: ContextMenuTarget
       intent: Record<string, unknown>
+      projection: AnyProjection
     }> = [
       {
         id: 'delete',
         target: { kind: 'flowchart-node', nodeId: 'A' },
         intent: { type: 'delete-node', nodeId: 'A' },
+        projection: flowProjectionOf(FLOW),
       },
       {
         id: 'delete',
         target: { kind: 'flowchart-edge', from: 'A', to: 'B', occurrence: 1 },
         intent: { type: 'delete-edge', from: 'A', to: 'B', occurrence: 1 },
+        projection: flowProjectionOf(FLOW),
       },
       {
         id: 'delete',
         target: { kind: 'mindmap-node', elementId: 'mindmap-node:2' },
         intent: { type: 'delete-node', elementId: 'mindmap-node:2' },
+        projection: mindProjectionOf(MINDMAP),
       },
-      { id: 'delete-class', target: { kind: 'class-node', name: 'Foo' }, intent: { type: 'delete-class', name: 'Foo' } },
+      {
+        id: 'delete-class',
+        target: { kind: 'class-node', name: 'Foo' },
+        intent: { type: 'delete-class', name: 'Foo' },
+        projection: classProjectionOf(CLASS),
+      },
       {
         id: 'delete-participant',
         target: { kind: 'sequence-participant', actorId: '甲' },
         intent: { type: 'delete-participant', actorId: '甲' },
+        projection: seqProjectionOf(SEQUENCE),
       },
       {
         id: 'delete-relation',
         target: { kind: 'class-relation', elementId: 'relation:1' },
         intent: { type: 'delete-relation', elementId: 'relation:1' },
+        projection: classProjectionOf(CLASS),
       },
       {
         id: 'delete-message',
         target: { kind: 'sequence-message', elementId: 'message:1' },
         intent: { type: 'delete-message', elementId: 'message:1' },
+        projection: seqProjectionOf(SEQUENCE),
       },
       {
         id: 'delete-note',
         target: { kind: 'sequence-note', elementId: 'note:1' },
         intent: { type: 'delete-note', elementId: 'note:1' },
+        projection: seqProjectionOf(SEQUENCE),
       },
       {
         id: 'delete-block',
         target: { kind: 'sequence-block', elementId: 'block:1' },
         intent: { type: 'delete-block', elementId: 'block:1' },
+        projection: seqProjectionOf(SEQUENCE),
       },
     ]
-    for (const { id, target, intent } of cases) {
-      const ctx = fakeCtx()
+    for (const { id, target, intent, projection } of cases) {
+      // deleteTarget 经能力包 deleteIntent（architecture-deepening-2 工单 03）：需要投影做存在性校验
+      const ctx = fakeCtx({ projection })
       MENU_ACTIONS[id](ctx, target)
       expect(ctx.intents).toHaveLength(1)
       expect(ctx.intents[0]).toMatchObject(intent)
       expect(ctx.selections).toEqual([null])
       expect(ctx.closed).toBe(1)
     }
+  })
+
+  it('目标已不在投影（能力包 deleteIntent → null）时安静地不落码，仍清空选中并关菜单', () => {
+    const ctx = fakeCtx({ projection: classProjectionOf(CLASS) })
+    MENU_ACTIONS['delete-class'](ctx, { kind: 'class-node', name: '__不存在__' })
+    expect(ctx.intents).toEqual([])
+    expect(ctx.selections).toEqual([null])
+    expect(ctx.closed).toBe(1)
   })
 
   it('无菜单目标（undefined）时 delete 安静地不执行', () => {

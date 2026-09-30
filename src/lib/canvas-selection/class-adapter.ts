@@ -1,4 +1,5 @@
 import { resolveClassSelection, type ClassProjection } from '../projection/class-projection'
+import { classDeleteIntent } from '../editing/canvas-keyboard'
 import { elementDataIdResolver, nodeDataIdResolver, type DataIdResolver } from './data-id'
 import { edgeSelectionOf } from './edge-adapter'
 import { annotateClassRelationIdentities, relationShapesOf } from './edge-locate'
@@ -40,4 +41,6 @@ export const classCanvasCapabilities: CanvasCapabilities<ProjectionOf<'class'>> 
   keyboardProjection: (projection) => ({ kind: 'class', projection: projection.class }),
   edgeAnnotator: (projection) => (root) => annotateClassRelationIdentities(root, relationShapesOf(projection.class.relations)),
   resolveSelection: (projection, selection) => resolveClassSelection(projection.class, selection),
+  // 删除意图（architecture-deepening-2 工单 03）：唯一映射在 canvas-keyboard.classDeleteIntent
+  deleteIntent: (projection, selection) => classDeleteIntent(projection.class, selection),
 }

@@ -1,17 +1,16 @@
 import { useEffect, useRef } from 'react'
 import { useEditorStore } from '../../store/editor'
 import type { Selection } from '../projection/selection'
+import { capabilitiesOf, projectionOfKeyboardTarget } from '../canvas-selection/capabilities'
 import { pickDirectionalTarget } from './directional-navigation'
 import type { InlineEditTarget } from './inline-edit'
 import {
-  classDeleteIntent,
   isNavigationKey,
   keyToClassAction,
   keyToNodeAction,
   keyToSequenceAction,
   mindmapActionIntents,
   nodeActionIntents,
-  sequenceDeleteIntent,
   type CanvasKeyboardProjection,
   type CanvasNavigation,
   type NodeExtent,
@@ -38,8 +37,11 @@ import {
  *   （AddMemberInlineForm / AddRelationInlineForm，经 onEditKey 请求），不新造浮层
  * - sequence（工单 05）：Tab = 加参与者（复用空白菜单的创建 + 内联命名路径）、
  *   Enter = 加消息（落到已有 AddMessageInlineForm）
- * - 四图种 Delete = 删除选中元素（class/sequence 的删除经 classDeleteIntent /
- *   sequenceDeleteIntent 复用既有 delete-* 意图，级联与属性面板一致）
+ * - 四图种 Delete = 删除选中元素（class/sequence 的删除经能力包 deleteIntent——
+ *   「选中种类 → 删除意图」的唯一映射，与右键菜单 / 属性面板共用，architecture-deepening-2
+ *   工单 03；级联与属性面板一致。flowchart / mindmap 的删除仍走 nodeActionIntents /
+ *   mindmapActionIntents 的 plan——删除后还要按 plan 决定不选中，意图本身与能力包等价，
+ *   等价性由 canvas-selection/__tests__/delete-intent.test.ts 钉住）
  *
  * **可达性代价（ADR-0013 已记录）**：class / sequence 上 Tab 被用作编辑动作并
  * preventDefault，因此在这两类图的画布上**无法用 Tab 跳出画布**——焦点离开仍可点击或
@@ -143,7 +145,10 @@ export function useCanvasKeyboard(
         const classAction = keyToClassAction(e.key, { shift: e.shiftKey })
         if (classAction === null) return
         if (classAction === 'delete') {
-          const intent = classDeleteIntent(target.projection, selection)
+          // 删除意图（architecture-deepening-2 工单 03）：查能力包的唯一映射，
+          // 与右键菜单 / 属性面板删除共用；存在性校验（→ null）也在能力包里
+          const wrapper = projectionOfKeyboardTarget(target)
+          const intent = capabilitiesOf(wrapper).deleteIntent(wrapper, selection)
           if (intent === null) return
           e.preventDefault()
           if (commitIntent(intent)) select(null)
@@ -162,7 +167,9 @@ export function useCanvasKeyboard(
         const seqAction = keyToSequenceAction(e.key, { shift: e.shiftKey })
         if (seqAction === null) return
         if (seqAction === 'delete') {
-          const intent = sequenceDeleteIntent(target.projection, selection)
+          // 同 ③：删除意图查能力包的唯一映射（工单 03）
+          const wrapper = projectionOfKeyboardTarget(target)
+          const intent = capabilitiesOf(wrapper).deleteIntent(wrapper, selection)
           if (intent === null) return
           e.preventDefault()
           if (commitIntent(intent)) select(null)

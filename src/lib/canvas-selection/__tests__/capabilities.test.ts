@@ -13,7 +13,7 @@ import { sequenceDataIdResolver } from '../sequence-adapter'
 import type { Selection } from '../../projection/selection'
 
 /**
- * 画布能力包查表测试（工单 04）：4 个图种 × 7 项能力，断言无 undefined 遗漏；
+ * 画布能力包查表测试（工单 04）：4 个图种 × 8 项能力，断言无 undefined 遗漏；
  * 尤其是可选成员 edgeAnnotator——flowchart / mindmap 必须没有（无位置序连线），
  * class / sequence 必须有。另含 class / sequence adapter 的 resolver 对照行为
  * （与迁出前的 CanvasPanel.resolverOf 逐分支同约定）。
@@ -37,9 +37,9 @@ function projectionOf(type: keyof typeof SOURCES): AnyProjection {
 
 const TYPES = ['flowchart', 'sequence', 'class', 'mindmap'] as const
 
-describe('capabilitiesOf：4 图种 × 7 能力查表（工单 04）', () => {
+describe('capabilitiesOf：4 图种 × 8 能力查表（工单 04 + architecture-deepening-2 工单 03）', () => {
   for (const type of TYPES) {
-    it(`${type}：七项能力齐备（edgeAnnotator 按图种有无位置序连线）`, () => {
+    it(`${type}：八项能力齐备（edgeAnnotator 按图种有无位置序连线）`, () => {
       const projection = projectionOf(type)
       const caps = capabilitiesOf(projection)
 
@@ -56,6 +56,7 @@ describe('capabilitiesOf：4 图种 × 7 能力查表（工单 04）', () => {
       expect(keyboard.kind).toBe(type)
 
       expect(typeof caps.resolveSelection).toBe('function')
+      expect(typeof caps.deleteIntent).toBe('function')
 
       const hasOrdinalEdges = type === 'class' || type === 'sequence'
       if (hasOrdinalEdges) {

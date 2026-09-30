@@ -1,5 +1,6 @@
 import { DIAGRAM_TYPES, type AnyProjection, type DiagramTypeId } from '../diagram-registry'
 import type { CanvasKeyboardProjection } from '../editing/canvas-keyboard'
+import type { EditIntent } from '../pipeline/parser'
 import type { Selection } from '../projection/selection'
 import type { CanvasSelection, DataIdResolver } from './data-id'
 
@@ -43,6 +44,17 @@ export interface CanvasCapabilities<T extends AnyProjection = AnyProjection> {
   /** 选中在投影中是否仍存在，不存在回落 null（原 PropertyPanel.resolveProjectionSelection 的
    * 四份 resolve*Selection 分发；工单 03 定案：归能力包，不归选中 codec） */
   resolveSelection(projection: T, selection: Selection | null): Selection | null
+  /** 选中 → 删除意图（architecture-deepening-2 工单 03）：与 resolveSelection 同形的唯一映射，
+   * 存在性校验（元素已不在投影 / null / 图表级 / 别种选中 → null）就在这里做一次。
+   * 键盘 Delete、右键菜单 deleteTarget、属性面板删除三个入口共用，等价性由
+   * `__tests__/delete-intent.test.ts` 的性质测试钉住。 */
+  deleteIntent(projection: T, selection: Selection | null): EditIntent | null
+}
+
+/** 键盘 Hook 的 tagged union（`{ kind, projection }`）→ 包装投影。
+ * kind 与图种 id 同名，字段名也随之；测试与键盘 Hook 用它回到能力包查表。 */
+export function projectionOfKeyboardTarget(target: CanvasKeyboardProjection): AnyProjection {
+  return { type: target.kind, [target.kind]: target.projection } as AnyProjection
 }
 
 /** 图种 → 能力包（唯一分发点；CanvasPanel / PropertyPanel 各剩一次查表调用） */

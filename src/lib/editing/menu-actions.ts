@@ -2,17 +2,14 @@ import type { AnyProjection } from '../diagram-registry'
 import type { EditIntent } from '../pipeline/parser'
 import type { Selection } from '../projection/selection'
 import { selectionOfMenuTarget } from '../canvas-selection/selection-codec'
+import { capabilitiesOf } from '../canvas-selection/capabilities'
 import type { ContextMenuItemId, ContextMenuTarget } from './context-menu'
 import type { CanvasInlineEditTarget } from './inline-edit'
 import type { NodeFormKind } from './use-canvas-context-menu'
 import { nextNodeId, mindmapActionIntents, type MindmapActionPlan } from './canvas-keyboard'
 import { nextFreeName } from '../pipeline/element-id'
-import { deleteClassIntent, deleteRelationIntent, setRelationIntent, RELATION_KIND_OPTIONS } from './class-forms'
+import { setRelationIntent, RELATION_KIND_OPTIONS } from './class-forms'
 import {
-  deleteBlockIntent,
-  deleteMessageIntent,
-  deleteNoteIntent,
-  deleteParticipantIntent,
   setMessageIntent,
   MESSAGE_ARROW_OPTIONS,
 } from './sequence-forms'
@@ -139,19 +136,21 @@ function addSubgraph(ctx: MenuActionContext): void {
   ctx.close()
 }
 
-/** 删除右键目标（节点/连线/mindmap 节点/类/参与者/位置序连线与块级元素） */
+/**
+ * 删除右键目标（architecture-deepening-2 工单 03）：目标先经 selectionOfMenuTarget
+ * 转成选中（与「选中该目标」同一份映射），再查能力包的 deleteIntent——
+ * 「选中种类 → 删除意图」的唯一映射，与键盘删除 / 属性面板删除共用；
+ * 存在性校验（目标已被外部改掉 → null）也在能力包里做，这里不再各写一遍。
+ * 原先按 target.kind 分支的 if 链（9 分支 × 手写 delete-* 意图）随之消失。
+ */
 function deleteTarget(ctx: MenuActionContext, target: ContextMenuTarget | undefined): void {
   if (target === undefined) return
-  if (target.kind === 'flowchart-node') ctx.commitIntent({ type: 'delete-node', nodeId: target.nodeId })
-  else if (target.kind === 'flowchart-edge')
-    ctx.commitIntent({ type: 'delete-edge', from: target.from, to: target.to, occurrence: target.occurrence })
-  else if (target.kind === 'mindmap-node') ctx.commitIntent({ type: 'delete-node', elementId: target.elementId })
-  else if (target.kind === 'class-node') ctx.commitIntent(deleteClassIntent(target.name))
-  else if (target.kind === 'sequence-participant') ctx.commitIntent(deleteParticipantIntent(target.actorId))
-  else if (target.kind === 'class-relation') ctx.commitIntent(deleteRelationIntent(target.elementId))
-  else if (target.kind === 'sequence-message') ctx.commitIntent(deleteMessageIntent(target.elementId))
-  else if (target.kind === 'sequence-note') ctx.commitIntent(deleteNoteIntent(target.elementId))
-  else if (target.kind === 'sequence-block') ctx.commitIntent(deleteBlockIntent(target.elementId))
+  const proj = ctx.projection
+  const selection = selectionOfMenuTarget(target)
+  if (proj !== null && selection !== null) {
+    const intent = capabilitiesOf(proj).deleteIntent(proj, selection)
+    if (intent !== null) ctx.commitIntent(intent)
+  }
   ctx.select(null)
   ctx.close()
 }

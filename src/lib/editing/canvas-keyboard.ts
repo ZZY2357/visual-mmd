@@ -164,6 +164,53 @@ export function keyToSequenceAction(key: string, mods: { shift?: boolean } = {})
 }
 
 /**
+ * 选中元素 → 删除意图（flowchart，architecture-deepening-2 工单 03）：
+ * 节点 / 连线 / 子图 / classDef 四类各映射到既有 delete-* 意图，存在性在这里校验一次
+ * （已不在投影 / 图表级 / 别种选中 → null）。能力包 flowchart adapter 委托本函数，
+ * 与 classDeleteIntent / sequenceDeleteIntent 同为「选中种类 → 删除意图」唯一映射的图种分片。
+ */
+export function flowchartDeleteIntent(
+  projection: FlowchartProjection,
+  selection: Selection | null,
+): FlowchartIntent | null {
+  if (selection === null) return null
+  switch (selection.kind) {
+    case 'node':
+      return projection.nodes.some((n) => n.nodeId === selection.nodeId)
+        ? { type: 'delete-node', nodeId: selection.nodeId }
+        : null
+    case 'edge':
+      return projection.edges.some(
+        (e) =>
+          e.from === selection.from && e.to === selection.to && e.occurrence === selection.occurrence,
+      )
+        ? { type: 'delete-edge', from: selection.from, to: selection.to, occurrence: selection.occurrence }
+        : null
+    case 'subgraph':
+      return projection.subgraphs.some((s) => s.elementId === selection.elementId)
+        ? { type: 'delete-subgraph', elementId: selection.elementId }
+        : null
+    case 'classdef':
+      return projection.classDefs.some((c) => c.name === selection.name)
+        ? { type: 'delete-classdef', name: selection.name }
+        : null
+    default:
+      return null
+  }
+}
+
+/** 选中元素 → 删除意图（mindmap，工单 03）：删节点（连同子树，由管线处理）。 */
+export function mindmapDeleteIntent(
+  projection: MindmapProjection,
+  selection: Selection | null,
+): MindmapIntent | null {
+  if (selection === null || selection.kind !== 'mindmap-node') return null
+  return projection.nodes.some((n) => n.elementId === selection.elementId)
+    ? { type: 'delete-node', elementId: selection.elementId }
+    : null
+}
+
+/**
  * 选中元素 → 删除意图（class）：四类可寻址元素各映射到既有 delete-* 意图，
  * 级联（删类连带成员/关系/note）由管线负责——与属性面板的删除走同一条链路，
  * 选中元素已不在投影 / 图表级 / 别种选中 → null（不落码、不 preventDefault）。

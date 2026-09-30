@@ -1,5 +1,6 @@
 import { parseMindmapNodeElementId } from '../pipeline/element-id'
 import { resolveMindmapSelection, type MindmapProjection } from '../projection/mindmap-projection'
+import { mindmapDeleteIntent } from '../editing/canvas-keyboard'
 import type { CanvasSelection, DataIdResolver } from './data-id'
 import type { CanvasCapabilities, ProjectionOf } from './capabilities'
 
@@ -60,4 +61,6 @@ export const mindmapCanvasCapabilities: CanvasCapabilities<ProjectionOf<'mindmap
   },
   keyboardProjection: (projection) => ({ kind: 'mindmap', projection: projection.mindmap }),
   resolveSelection: (projection, selection) => resolveMindmapSelection(projection.mindmap, selection),
+  // 删除意图（architecture-deepening-2 工单 03）：唯一映射在 canvas-keyboard.mindmapDeleteIntent
+  deleteIntent: (projection, selection) => mindmapDeleteIntent(projection.mindmap, selection),
 }
