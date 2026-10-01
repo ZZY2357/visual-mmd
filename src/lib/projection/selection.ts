@@ -157,6 +157,14 @@ export type Selection =
   // 渲染器 0 处 data-、0 处 attr('id')），实测降级见 treeview-adapter；
   // 选中只来自结构树 / 表单 / 键盘。
   | { kind: 'treeview-node'; elementId: string }
+  // eventmodeling（more-diagrams 工单 28）：帧走**位置序身份**（`frame:N`——帧号可乱序/改动，
+  // 位置序唯一稳定；帧号 `frameId` 为字段）；数据块走位置序身份（`data:N`）。派生连线
+  // （默认推断 + `->>` 显式）走位置序身份（`relation:N`）但**无源码语句、只读**——
+  // 画布 DOM 无 data-id（research §4/§8.2 实测：em-box/em-swimlane/em-relation 均无 id），
+  // 实测降级见 eventmodeling-adapter；选中只来自结构树 / 表单 / 键盘。
+  | { kind: 'em-frame'; elementId: string }
+  | { kind: 'em-data'; elementId: string }
+  | { kind: 'em-relation'; elementId: string }
 
 export const DIAGRAM_SELECTION: Selection = { kind: 'diagram' }
 
@@ -312,6 +320,12 @@ export function selectionKey(sel: Selection): string {
       return `usecase-note:${sel.elementId}`
     case 'treeview-node':
       return `treeview-node:${sel.elementId}`
+    case 'em-frame':
+      return `em-frame:${sel.elementId}`
+    case 'em-data':
+      return `em-data:${sel.elementId}`
+    case 'em-relation':
+      return `em-relation:${sel.elementId}`
   }
 }
 

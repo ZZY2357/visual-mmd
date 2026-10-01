@@ -100,6 +100,12 @@ import { type CynefinProjection } from '../lib/projection/cynefin-projection'
 import { type UsecaseProjection } from '../lib/projection/usecase-projection'
 import { TreeviewNodeForm } from './treeview-forms'
 import { type TreeviewProjection } from '../lib/projection/treeview-projection'
+import {
+  EventModelingDataForm,
+  EventModelingDiagramForm,
+  EventModelingFrameForm,
+} from './eventmodeling-forms'
+import { type EventModelingProjection } from '../lib/projection/eventmodeling-projection'
 
 /**
  * 选中元素的属性表单，按投影图种分发（工单 04-bundle 自 PropertyPanel 迁出）：
@@ -1216,6 +1222,42 @@ function TreeviewSelectionForm({
   }
 }
 
+/**
+ * eventmodeling 选中表单（more-diagrams 工单 28）：图表级显示概览；帧落到
+ * EventModelingFrameForm、数据块落到 EventModelingDataForm。派生连线（默认推断关系）
+ * 无源码语句、只读 → 无表单（返回 null）。
+ */
+function EventModelingSelectionForm({
+  projection,
+  selection,
+}: {
+  projection: EventModelingProjection
+  selection: Selection | null
+}) {
+  const { t } = useTranslation()
+  if (selection === null) {
+    return (
+      <Text size="sm" c="dimmed" px="xs">
+        {t('app:propertyPanel.nothingSelected')}
+      </Text>
+    )
+  }
+  switch (selection.kind) {
+    case 'diagram':
+      return <EventModelingDiagramForm projection={projection} />
+    case 'em-frame': {
+      const frame = projection.frames.find((f) => f.elementId === selection.elementId)
+      return frame !== undefined ? <EventModelingFrameForm frame={frame} /> : null
+    }
+    case 'em-data': {
+      const block = projection.dataBlocks.find((d) => d.elementId === selection.elementId)
+      return block !== undefined ? <EventModelingDataForm block={block} /> : null
+    }
+    default:
+      return null
+  }
+}
+
 export function ProjectionSelectionForm({ projection, selection }: { projection: AnyProjection; selection: Selection | null }) {
   if (projection.type === 'flowchart') {
     return <FlowchartSelectionForm projection={projection.flowchart} selection={selection} />
@@ -1294,6 +1336,9 @@ export function ProjectionSelectionForm({ projection, selection }: { projection:
   }
   if (projection.type === 'treeview') {
     return <TreeviewSelectionForm projection={projection.treeview} selection={selection} />
+  }
+  if (projection.type === 'eventmodeling') {
+    return <EventModelingSelectionForm projection={projection.eventmodeling} selection={selection} />
   }
   return <ClassSelectionForm projection={projection.class} selection={selection} />
 }

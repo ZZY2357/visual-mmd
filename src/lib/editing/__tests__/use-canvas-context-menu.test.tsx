@@ -151,6 +151,8 @@ function resolverOf(projection: AnyProjection) {
   if (projection.type === 'usecase') return usecaseDataIdResolver(projection.usecase)
   // treeView（more-diagrams 工单 24）：画布 DOM 无 data-id 且渲染布局与源码行序无对应（research §4 实测降级），resolver 永不命中
   if (projection.type === 'treeview') return () => null
+  // eventmodeling（more-diagrams 工单 28）：画布 DOM 无 data-id（research §4/§8.3 实测降级），resolver 永不命中
+  if (projection.type === 'eventmodeling') return () => null
   const nodes = nodeDataIdResolver(projection.class.classes.map((c) => c.name))
   const edges = elementDataIdResolver(projection.class.relations.map((r) => r.elementId))
   return (dataId: string) => nodes(dataId) ?? edges(dataId)

@@ -299,6 +299,8 @@ describe('结构树分区描述（工单 06）', () => {
       usecase:
         'usecase-beta\n    actor Customer\n    systemBoundary shop["商城"]\n        Login("登录")\n    end\n    Customer --> Login',
       treeview: 'treeView-beta\n/\n    src/\n        main.ts\n    README.md',
+      eventmodeling:
+        'eventmodeling\n\ntf 01 ui CartUI\ntf 02 cmd AddItem\ntf 03 evt ItemAdded [[ItemAdded]]\n\ndata ItemAdded {\n  price: number\n}',
     }
     for (const id of Object.keys(DIAGRAM_TYPES) as (keyof typeof DIAGRAM_TYPES)[]) {
       const registration = DIAGRAM_TYPES[id]
