@@ -137,6 +137,9 @@ export const zhDict = {
         'add-architecture-junction': '添加接合点',
         'edit-architecture-service': '在属性面板中编辑',
         'edit-architecture-edge': '在属性面板中编辑',
+        // treemap（more-diagrams 工单 20）：空白菜单（画布 DOM 无 data-id，无元素级菜单项）
+        'add-treemap-group': '添加分组',
+        'add-treemap-leaf': '添加叶子',
         delete: '删除',
         styleName: '样式名称',
         styleNameInvalid: '名称不能为空，且不能含空格或逗号',
@@ -179,6 +182,7 @@ export const zhDict = {
       xychart: 'XY 图表',
       radar: '雷达图',
       architecture: '架构图',
+      treemap: '矩形树图',
     },
     library: {
       title: '图表库',
@@ -761,6 +765,19 @@ export const zhDict = {
       invalidArchId: 'ID 只能包含字母、数字、下划线、连字符',
       invalidArchTitle: '标题不能为空，且不能含方括号或换行',
       invalidArchIcon: '图标只能是内置枚举或 pack:icon-name 形态',
+      // ---- treemap（more-diagrams 工单 20） ----
+      treemapNodes: '节点（分组 / 叶子）',
+      treemapSectionHint: '分组（Section）：无值，可继续嵌套；在结构树中选中后按 Tab 加叶子子节点。',
+      treemapLeafHint: '叶子（Leaf）：面积 = 数值占比。',
+      treemapName: '名称',
+      treemapNameInvalid: '名称不能为空，且不能含引号或换行',
+      treemapValue: '数值',
+      treemapValueHint: '叶子占比（非负数字）',
+      treemapValueInvalid: '数值只能是非负数字',
+      treemapValueInvalidShort: '{{value}}（无效数值）',
+      treemapDiagramHint:
+        '矩形树图：在结构树中选中节点编辑名称与数值；选中分组后按 Tab 加叶子子节点、Enter 加同级叶子、Delete 删除。画布不提供点选（mermaid 渲染无 data-id）。',
+      deleteTreemapNode: '删除节点（连同子树）',
     },
     shapes: {
       rectangle: '矩形',

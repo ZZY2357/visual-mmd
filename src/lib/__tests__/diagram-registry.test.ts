@@ -98,6 +98,15 @@ describe('detectDiagramType：无法识别 → unsupported（null），绝不默
     expect(DIAGRAM_TYPES.architecture.detect('architecture-betaX\n')).toBe(false)
   })
 
+  it('treemap(-beta) 识别（more-diagrams 工单 20）：两个关键字都认领；声明行必须是裸关键字', () => {
+    expect(detectDiagramType('treemap\n"甲": 1\n')?.id).toBe('treemap')
+    expect(detectDiagramType('treemap-beta\n"甲": 1\n')?.id).toBe('treemap')
+    expect(detectDiagramType('TREEMAP\n')).toBeNull()
+    // 首行必须是关键字本身（research §1），带尾随内容的行不是表头
+    expect(DIAGRAM_TYPES.treemap.detect('treemap extra\n"甲": 1\n')).toBe(false)
+    expect(DIAGRAM_TYPES.treemap.detect('treemapX\n"甲": 1\n')).toBe(false)
+  })
+
   it('双关键字 detect 例（后续图种工单的写法约定）：-beta 可选且不越界误判', () => {
     // 后续 block/packet/xychart 工单应采用 `^<kw>(-beta)?\b` 形态；这里把形态锁死：
     // 可选 -beta 不妨碍裸关键字的识别，也不把更长的词（如 block-chain）误吞。

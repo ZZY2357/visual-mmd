@@ -22,6 +22,7 @@ import { isValidPacketFieldName, PACKET_DEFAULT_FIELD_COUNT, type PacketIntent }
 import { isValidKanbanId } from '../pipeline/kanban'
 import { isValidBlockId } from '../pipeline/block'
 import { isValidArchId, type ArchitectureIntent } from '../pipeline/architecture'
+import { isValidTreemapName, isValidTreemapValue, type TreemapIntent } from '../pipeline/treemap'
 import { setRelationIntent, RELATION_KIND_OPTIONS } from './class-forms'
 import {
   setMessageIntent,
@@ -239,6 +240,11 @@ export function createElement(ctx: MenuActionContext, target: ContextMenuTarget 
     if (proj.type === 'packet') {
       // packet（more-diagrams 工单 16）：添加入口是独立的 add-packet-field 动作
       //（+count 形态衔接前序 + 内联命名文本），不走 createElement
+      return null
+    }
+    if (proj.type === 'treemap') {
+      // treemap（more-diagrams 工单 20）：添加入口是独立的 add-treemap-group /
+      // add-treemap-leaf 动作（画布无 data-id，不做内联命名），不走 createElement
       return null
     }
     // mindmap：节点目标 = 挂为其子节点；空白 / 无目标 = 建根（空文档）或挂到根节点下
@@ -740,6 +746,30 @@ function addPacketField(ctx: MenuActionContext): void {
   }
 }
 
+// ---------- treemap（more-diagrams 工单 20） ----------
+
+/**
+ * 空白处加顶层节点（treemap）：落一行顶格 `"名"`（分组）或 `"名": 1`（叶子，数值可在
+ * 右侧表单改），名字避重；锚点回退文档末元素（insertAfter 语义）。不做内联编辑
+ * （画布无 data-id，工单降级定案）——名字/数值在右侧表单改。
+ */
+function addTreemapRoot(ctx: MenuActionContext, kind: 'section' | 'leaf'): void {
+  const proj = ctx.projection
+  if (proj === null || proj.type !== 'treemap') return
+  const names = proj.treemap.nodes.map((n) => n.name)
+  const name = nextFreeName(kind === 'section' ? '新分组' : '新叶子', names)
+  if (!isValidTreemapName(name)) return
+  const value = kind === 'leaf' ? '1' : undefined
+  if (value !== undefined && !isValidTreemapValue(value)) return
+  const plan: KeyPlan = {
+    intents: [{ type: 'add-root', name, value } satisfies TreemapIntent],
+    newElementTarget: {
+      selection: { kind: 'treemap-node', elementId: `treemap-node:${proj.treemap.nextNodeOrdinal}` },
+    },
+  }
+  if (applyPlan(plan, { commitIntent: ctx.commitIntent, select: ctx.select })) ctx.close()
+}
+
 // ---------- architecture（more-diagrams 工单 17） ----------
 
 /**
@@ -915,4 +945,8 @@ export const MENU_ACTIONS: Record<Exclude<ContextMenuItemId, 'apply-style'>, Men
   'add-architecture-junction': (ctx) => addArchitectureNode(ctx, 'junction'),
   'edit-architecture-service': selectMenuTargetAndClose,
   'edit-architecture-edge': selectMenuTargetAndClose,
+  // treemap（more-diagrams 工单 20）：空白加分组 / 加叶子（顶格，数值落 1，表单可改）；
+  // 元素级编辑降级到结构树 + 属性表单
+  'add-treemap-group': (ctx) => addTreemapRoot(ctx, 'section'),
+  'add-treemap-leaf': (ctx) => addTreemapRoot(ctx, 'leaf'),
 }

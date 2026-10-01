@@ -32,6 +32,8 @@ import {
   type ProjectionArchitectureJunction,
   type ProjectionArchitectureService,
 } from '../projection/architecture-projection'
+import type { ProjectionTreemapNode, TreemapProjection } from '../projection/treemap-projection'
+import { treemapKeyPlan } from '../editing/canvas-keyboard'
 import { DIAGRAM_SELECTION, type Selection } from '../projection/selection'
 import {
   applyPlan,
@@ -1547,6 +1549,75 @@ function architecturePartitions(projection: AnyProjection, { t }: TreePartitions
   ]
 }
 
+// ---------- treemap（more-diagrams 工单 20） ----------
+
+/**
+ * treemap 结构树条目的键盘（工单 20 / ADR-0013）：焦点在节点条目上时
+ * Tab = 加叶子子节点（仅 Section；叶子有值即叶子）/ Enter = 加同级叶子 /
+ * Delete = 删除该节点（连同子树，preventDefault 压掉默认行为）。
+ * 键 → plan 走能力包同一份 treemapKeyPlan，执行交给唯一的 applyPlan。
+ * treemap 画布无 data-id（research §4 实测，见 treemap-adapter），
+ * 结构树是唯一的键盘入口（与 timeline/journey 同口径）。
+ */
+function treemapEntryKeyDown(
+  projection: TreemapProjection,
+  elementId: string,
+): (e: KeyboardEvent) => void {
+  return (e: KeyboardEvent) => {
+    if (e.shiftKey) return
+    if (e.key !== 'Tab' && e.key !== 'Enter' && e.key !== 'Delete' && e.key !== 'Backspace') return
+    const selection: Selection = { kind: 'treemap-node', elementId }
+    const plan = treemapKeyPlan(projection, { key: e.key, mods: { shift: e.shiftKey }, selection })
+    if (plan === null) return
+    const { commitIntent, select } = useEditorStore.getState()
+    applyPlan(plan, { commitIntent, select, preventDefault: () => e.preventDefault() })
+  }
+}
+
+/**
+ * treemap 结构树（工单 20）：单一「节点」分区，层级节点递归展开（与 mindmap/state
+ * 复合状态同一套树形渲染器）。Section 是分组、Leaf 是叶子；叶子 detail 携带数值原文，
+ * **非法数值（手写源码的清单外形态）原样展示并标注**（不静默改写，工单定案）。
+ * treemap 画布无 data-id（research §4：渲染器只有 class + d3 值降序索引），
+ * 结构树 + 属性表单是完整编辑入口。
+ */
+function treemapPartitions(projection: AnyProjection, { t }: TreePartitionsContext): TreeSection[] {
+  if (projection.type !== 'treemap') return []
+  const p: TreemapProjection = projection.treemap
+
+  const nodeEntry = (node: ProjectionTreemapNode): TreeEntry => {
+    const children = node.children.map(nodeEntry)
+    return {
+      key: node.elementId,
+      label: node.name,
+      detail:
+        [
+          node.nodeKind === 'leaf'
+            ? node.valueValid
+              ? node.valueText ?? ''
+              : t('app:propertyPanel.treemapValueInvalidShort', { value: node.valueText ?? '' })
+            : undefined,
+        ]
+          .filter((x) => x !== undefined)
+          .join(' · ') || undefined,
+      depth: node.depth + 1,
+      selection: { kind: 'treemap-node', elementId: node.elementId },
+      onKeyDown: treemapEntryKeyDown(p, node.elementId),
+      children: children.length > 0 ? children : undefined,
+    }
+  }
+
+  return [
+    withDiagramLabel(diagramSection(p.roots.length > 0 ? 'treemap' : undefined), t('app:propertyPanel.diagram')),
+    {
+      key: 'nodes',
+      heading: t('app:propertyPanel.treemapNodes'),
+      count: p.nodes.length,
+      entries: p.roots.map(nodeEntry),
+    },
+  ]
+}
+
 /** 图种 → 分区描述（注册表 `tree` 字段的实参，registry 只持引用） */
 export const treePartitions: Record<DiagramTypeId, TreePartitions> = {
   flowchart: flowchartPartitions,
@@ -1569,4 +1640,5 @@ export const treePartitions: Record<DiagramTypeId, TreePartitions> = {
   xychart: xychartPartitions,
   radar: radarPartitions,
   architecture: architecturePartitions,
+  treemap: treemapPartitions,
 }

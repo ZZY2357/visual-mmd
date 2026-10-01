@@ -19,6 +19,7 @@ import { quadrantParser } from './pipeline/quadrant'
 import { xychartParser } from './pipeline/xychart'
 import { radarParser } from './pipeline/radar'
 import { architectureParser } from './pipeline/architecture'
+import { treemapParser } from './pipeline/treemap'
 import { frontmatterEnd } from './pipeline/frontmatter'
 import { buildFlowchartProjection, type FlowchartProjection } from './projection/flowchart-projection'
 import { buildSequenceProjection, type SequenceProjection } from './projection/sequence-projection'
@@ -51,6 +52,7 @@ import {
   buildArchitectureProjection,
   type ArchitectureProjection,
 } from './projection/architecture-projection'
+import { buildTreemapProjection, type TreemapProjection } from './projection/treemap-projection'
 import { flowchartCanvasCapabilities } from './canvas-selection/flowchart-adapter'
 import { sequenceCanvasCapabilities } from './canvas-selection/sequence-adapter'
 import { classCanvasCapabilities } from './canvas-selection/class-adapter'
@@ -70,6 +72,7 @@ import { quadrantCanvasCapabilities } from './canvas-selection/quadrant-adapter'
 import { xychartCanvasCapabilities } from './canvas-selection/xychart-adapter'
 import { radarCanvasCapabilities } from './canvas-selection/radar-adapter'
 import { architectureCanvasCapabilities } from './canvas-selection/architecture-adapter'
+import { treemapCanvasCapabilities } from './canvas-selection/treemap-adapter'
 import type { CanvasCapabilities } from './canvas-selection/capabilities'
 import { treePartitions, type TreePartitions } from './structure-tree/partitions'
 import { DEFAULT_DIAGRAM_SOURCE } from './storage'
@@ -111,6 +114,7 @@ export interface ProjectionTypes {
   xychart: XychartProjection
   radar: RadarProjection
   architecture: ArchitectureProjection
+  treemap: TreemapProjection
 }
 
 /** 已注册图种的 id 集合（字面量联合，随 ProjectionTypes 增长） */
@@ -459,6 +463,23 @@ export const ARCHITECTURE_TEMPLATE = `architecture-beta
 `
 
 /**
+ * treemap 起步模板（more-diagrams 工单 20）：一个根 Section、两个二级 Section、
+ * 五个叶子（research 起步模板草案——每一级 Section 都有子节点，避开 research 坑 6
+ * 「空 Section 不画」）。注意 treemap 词法（Langium）：名字必须带引号（research 坑 1）；
+ * 缩进即层级，同级等宽、子级更宽（research 坑 4）。
+ */
+export const TREEMAP_TEMPLATE = `treemap
+"预算分配"
+    "运营"
+        "人力": 700000
+        "设备": 200000
+        "物料": 100000
+    "市场"
+        "广告": 400000
+        "活动": 100000
+`
+
+/**
  * 注册表：数组是唯一权威（more-diagrams 工单 01），DIAGRAM_TYPES 由它推导。
  * detectDiagramType 按数组顺序显式遍历——不再维护手写的 if 分发链，
  * 新图种挂一条即可参与识别，无法识别时不再默认 flowchart（见下）。
@@ -665,6 +686,19 @@ export const DIAGRAM_TYPE_LIST: DiagramTypeRegistration[] = [
     buildProjection: (doc) => ({ type: 'architecture', architecture: buildArchitectureProjection(doc) }),
     tree: treePartitions.architecture,
     canvas: architectureCanvasCapabilities,
+  },
+  {
+    id: 'treemap',
+    parser: treemapParser,
+    template: TREEMAP_TEMPLATE,
+    // `treemap` 与 `treemap-beta` 两个关键字 mermaid 都渲染（Langium 终结符
+    // `TREEMAP_KEYWORD = "treemap-beta" | "treemap"`，research §1）；声明行必须是
+    // 裸关键字（research：首行必须是关键字本身）。Langium 关键字大小写敏感
+    // （mermaid 探测器 `/^\s*treemap/` 无 i 位），故不加 i
+    detect: (source) => /^treemap(-beta)?[ \t\r]*$/.test(firstStatementLine(source)),
+    buildProjection: (doc) => ({ type: 'treemap', treemap: buildTreemapProjection(doc) }),
+    tree: treePartitions.treemap,
+    canvas: treemapCanvasCapabilities,
   },
 ]
 

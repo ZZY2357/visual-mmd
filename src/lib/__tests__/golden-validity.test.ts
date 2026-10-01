@@ -108,6 +108,42 @@ describe('金样合法性：默认图表模板能被 mermaid 渲染', () => {
     await expect(mermaid.parse(ARCHITECTURE_TEMPLATE)).resolves.toBeTruthy()
   })
 
+  it('treemap 起步模板 parse 通过（more-diagrams 工单 20）', async () => {
+    const { TREEMAP_TEMPLATE } = await import('../diagram-registry')
+    await expect(mermaid.parse(TREEMAP_TEMPLATE)).resolves.toBeTruthy()
+  })
+
+  it('treemap 端到端编辑场景（工单 20 验收：加分组 → 组内加叶子 → 改叶子数值 → 改名 → 删子树）落在合法 mermaid 源码上', async () => {
+    const { TREEMAP_TEMPLATE } = await import('../diagram-registry')
+    const { treemapParser } = await import('../pipeline/treemap')
+    const { reassemble } = await import('../pipeline/document')
+    const parse = (src: string) => {
+      const r = treemapParser.parse(src)
+      if (!r.ok) throw new Error(`解析失败：${r.error.message}`)
+      return r.doc
+    }
+    const apply = (doc: ReturnType<typeof parse>, intent: Parameters<typeof treemapParser.resolveRewrites>[1]) => {
+      const rewrites = treemapParser.resolveRewrites(doc, intent)
+      if (rewrites === null) throw new Error(`意图被拒绝：${JSON.stringify(intent)}`)
+      return parse(reassemble(doc, rewrites))
+    }
+
+    let doc = parse(TREEMAP_TEMPLATE)
+    doc = apply(doc, { type: 'add-root', name: '售后' }) // 加顶层分组（treemap-node:9，锚点回退文档末元素）
+    doc = apply(doc, { type: 'add-child', parentElementId: 'treemap-node:9', name: '回访', value: '3' }) // 组内加叶子（treemap-node:10）
+    doc = apply(doc, { type: 'set-node-value', elementId: 'treemap-node:10', value: '42' }) // 改叶子数值
+    doc = apply(doc, { type: 'set-node-name', elementId: 'treemap-node:10', name: '客户回访' }) // 改名
+    doc = apply(doc, { type: 'add-sibling', elementId: 'treemap-node:10', name: '补偿', value: '7' }) // 加同级叶子（treemap-node:11）
+    doc = apply(doc, { type: 'delete-node', elementId: 'treemap-node:2' }) // 删「运营」子树
+
+    const source = doc.source
+    expect(source).toContain('    "客户回访": 42')
+    expect(source).toContain('    "补偿": 7')
+    expect(source).toContain('"售后"')
+    expect(source).not.toContain('"人力"')
+    await expect(mermaid.parse(source)).resolves.toBeTruthy()
+  })
+
   it('architecture 端到端编辑场景（工单 17 验收：加 service → 连到另一 service 并带箭头 → 改标题 → 移入 group → 删除一条边）落在合法 mermaid 源码上', async () => {
     const { ARCHITECTURE_TEMPLATE } = await import('../diagram-registry')
     const { architectureParser } = await import('../pipeline/architecture')
