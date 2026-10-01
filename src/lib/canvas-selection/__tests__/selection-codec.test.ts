@@ -35,6 +35,10 @@ const ALL_KINDS: readonly Selection[] = [
   // venn（more-diagrams 工单 21）：集合名字即身份、交集位置序；两者经 data-venn-sets 反注可寻址
   { kind: 'venn-set', id: 'frontend' },
   { kind: 'venn-union', elementId: 'venn-union:1' },
+  // cynefin（more-diagrams 工单 25）：域名词行固定身份、条目/转移位置序；三类均不可寻址
+  { kind: 'cynefin-domain', name: 'complex' },
+  { kind: 'cynefin-item', elementId: 'cynefin-item:1' },
+  { kind: 'cynefin-transition', elementId: 'cynefin-transition:1' },
 ]
 
 /**
@@ -168,6 +172,13 @@ describe('selectionOfMenuTarget', () => {
       [{ kind: 'xychart-series', elementId: 'series:1' }, { kind: 'xychart-series', elementId: 'series:1' }],
       [{ kind: 'xychart-axis', axis: 'x' }, { kind: 'xychart-axis', axis: 'x' }],
       [{ kind: 'xychart-title' }, { kind: 'xychart-title' }],
+      // cynefin（more-diagrams 工单 25）：域 / 条目 / 转移菜单目标一一对应各自 Selection kind
+      [{ kind: 'cynefin-domain', name: 'complex' }, { kind: 'cynefin-domain', name: 'complex' }],
+      [{ kind: 'cynefin-item', elementId: 'cynefin-item:1' }, { kind: 'cynefin-item', elementId: 'cynefin-item:1' }],
+      [
+        { kind: 'cynefin-transition', elementId: 'cynefin-transition:1' },
+        { kind: 'cynefin-transition', elementId: 'cynefin-transition:1' },
+      ],
     ]
     for (const [target, sel] of cases) {
       expect(selectionOfMenuTarget(target), target.kind).toEqual(sel)

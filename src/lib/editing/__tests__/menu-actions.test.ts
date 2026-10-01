@@ -209,6 +209,12 @@ describe('MENU_ACTIONS 穷尽性（工单 05 → 工单 01）', () => {
       { kind: 'blank', diagramType: 'venn' },
       { kind: 'venn-set', id: 'frontend' },
       { kind: 'venn-union', elementId: 'venn-union:1' },
+      // cynefin（more-diagrams 工单 25）：画布 DOM 无 data-id（实测降级），空白提供
+      // 加条目 / 加转移；域 / 条目 / 转移目标只能由程序构造
+      { kind: 'blank', diagramType: 'cynefin' },
+      { kind: 'cynefin-domain', name: 'complex' },
+      { kind: 'cynefin-item', elementId: 'cynefin-item:1' },
+      { kind: 'cynefin-transition', elementId: 'cynefin-transition:1' },
     ]
     const reachableIds = new Set(allTargets.flatMap((target) => contextMenuItems(target)))
     // apply-style 不经 onMenuItem 分发（CanvasPanel 渲染成子菜单开关，点样式名直接调

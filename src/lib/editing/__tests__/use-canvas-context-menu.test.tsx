@@ -143,6 +143,8 @@ function resolverOf(projection: AnyProjection) {
   // venn（more-diagrams 工单 21）：data-id 由 nodeAnnotator 从 `data-venn-sets` 内容键反注，
   // resolver 与真实能力包同源（vennDataIdResolver）
   if (projection.type === 'venn') return vennDataIdResolver(projection.venn)
+  // cynefin（more-diagrams 工单 25）：画布 DOM 无 data-id（research §4/§8.1 实测降级），resolver 永不命中
+  if (projection.type === 'cynefin') return () => null
   const nodes = nodeDataIdResolver(projection.class.classes.map((c) => c.name))
   const edges = elementDataIdResolver(projection.class.relations.map((r) => r.elementId))
   return (dataId: string) => nodes(dataId) ?? edges(dataId)

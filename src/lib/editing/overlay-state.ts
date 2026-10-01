@@ -71,6 +71,8 @@ export type NodeFormKind =
   | 'architecture-edge'
   // wardley（more-diagrams 工单 23）：加连线（两端从既有节点名下拉；空白/连线上均可）
   | 'wardley-link'
+  // cynefin（more-diagrams 工单 25）：加转移（两端从固定五域下拉；空白/转移上均可）
+  | 'cynefin-transition'
 
 export interface NodeFormState {
   kind: NodeFormKind
