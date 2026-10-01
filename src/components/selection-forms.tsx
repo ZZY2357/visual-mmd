@@ -50,6 +50,8 @@ import { JourneyDiagramForm, JourneySectionForm, JourneyTaskForm } from './journ
 import { type JourneyProjection } from '../lib/projection/journey-projection'
 import { PieDiagramForm, PieSectorForm } from './pie-forms'
 import { type PieProjection } from '../lib/projection/pie-projection'
+import { RadarAxisForm, RadarCurveForm, RadarDiagramForm } from './radar-forms'
+import { type RadarProjection } from '../lib/projection/radar-projection'
 import { BlockDiagramForm, BlockEdgeForm, BlockGroupForm, BlockNodeForm } from './block-forms'
 import { type BlockProjection } from '../lib/projection/block-projection'
 import { SankeyLinkForm, SankeyNodeForm } from './sankey-forms'
@@ -597,6 +599,42 @@ function PieSelectionForm({
 }
 
 /**
+ * radar（more-diagrams 工单 15）：选中轴 / 曲线时渲染对应表单；图表级 = 标题 + 选项。
+ * radar 画布无 data-id 寻址（见 radar-adapter），这些表单是主要文本编辑入口
+ * （轴 label 另有双击内联编辑，按 class 文本匹配）。
+ */
+function RadarSelectionForm({
+  projection,
+  selection,
+}: {
+  projection: RadarProjection
+  selection: Selection | null
+}) {
+  const { t } = useTranslation()
+  if (selection === null) {
+    return (
+      <Text size="sm" c="dimmed" px="xs">
+        {t('app:propertyPanel.nothingSelected')}
+      </Text>
+    )
+  }
+  switch (selection.kind) {
+    case 'diagram':
+      return <RadarDiagramForm projection={projection} />
+    case 'radar-axis': {
+      const axis = projection.axes.find((a) => a.elementId === selection.elementId)
+      return axis !== undefined ? <RadarAxisForm axis={axis} /> : null
+    }
+    case 'radar-curve': {
+      const curve = projection.curves.find((c) => c.elementId === selection.elementId)
+      return curve !== undefined ? <RadarCurveForm curve={curve} projection={projection} /> : null
+    }
+    default:
+      return null
+  }
+}
+
+/**
  * block 属性表单（more-diagrams 工单 09）：图表级 title/columns + 节点 / 嵌套块 /
  * 边三类元素。space 不进投影选中面（布局空位，无表单）。
  */
@@ -756,6 +794,9 @@ export function ProjectionSelectionForm({ projection, selection }: { projection:
   }
   if (projection.type === 'gantt') {
     return <GanttSelectionForm projection={projection.gantt} selection={selection} />
+  }
+  if (projection.type === 'radar') {
+    return <RadarSelectionForm projection={projection.radar} selection={selection} />
   }
   return <ClassSelectionForm projection={projection.class} selection={selection} />
 }

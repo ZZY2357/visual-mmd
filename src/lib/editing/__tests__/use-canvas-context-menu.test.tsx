@@ -115,9 +115,11 @@ function resolverOf(projection: AnyProjection) {
   if (projection.type === 'block') return blockDataIdResolver(projection.block)
   // sankey（more-diagrams 工单 13）：节点按名字（位置序反注）、链路按位置序 elementId
   if (projection.type === 'sankey') return sankeyDataIdResolver(projection.sankey)
-  // gantt（more-diagrams 工单 11）：任务条 data-id = mermaid 渲染 id，由能力包 resolver 承担
-  if (projection.type === 'gantt') return ganttDataIdResolver(projection.gantt)
-  const nodes = nodeDataIdResolver(projection.class.classes.map((c) => c.name))
+    // gantt（more-diagrams 工单 11）：任务条 data-id = mermaid 渲染 id，由能力包 resolver 承担
+    if (projection.type === 'gantt') return ganttDataIdResolver(projection.gantt)
+    // radar（more-diagrams 工单 15）：画布 DOM 无 data-id（实测降级），resolver 永不命中
+    if (projection.type === 'radar') return () => null
+    const nodes = nodeDataIdResolver(projection.class.classes.map((c) => c.name))
   const edges = elementDataIdResolver(projection.class.relations.map((r) => r.elementId))
   return (dataId: string) => nodes(dataId) ?? edges(dataId)
 }
@@ -148,6 +150,9 @@ function createdIdOf(target: CanvasInlineEditTarget): string {
       return target.id
     // gantt（more-diagrams 工单 11）：菜单添加路径不进内联编辑，此函数不会收到该目标
     case 'gantt-task':
+      return target.elementId
+    // radar（more-diagrams 工单 15）：双击轴标签可进内联编辑（文本匹配），目标带 elementId
+    case 'radar-axis':
       return target.elementId
   }
 }

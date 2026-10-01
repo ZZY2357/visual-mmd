@@ -89,6 +89,12 @@ export function inlineEditTextOf(projection: AnyProjection | null, target: Canva
     // gantt 双击编辑的是任务名（more-diagrams 工单 11）：按位置序 elementId 取投影现名
     return projection.gantt.tasks.find((task) => task.elementId === target.elementId)?.name ?? ''
   }
+  if (projection.type === 'radar' && target.kind === 'radar-axis') {
+    // radar 双击编辑的是轴 label（more-diagrams 工单 15）：展示文本 = label ?? id
+    // （mermaid db 语义 label ?? name）——无 label 轴预填 id，改完即创建 label
+    const axis = projection.radar.axes.find((a) => a.elementId === target.elementId)
+    return axis !== undefined ? (axis.label ?? axis.id) : ''
+  }
   return ''
 }
 
@@ -116,9 +122,19 @@ function findMindmapElement(root: Element, elementId: string, text: string): Ele
   return text === '' ? null : findMindmapTextElement(root, text)
 }
 
+/** radar：在轴标签 class（`text.radarAxisLabel`）里按可见文本定位——渲染器不给
+ * radar 任何 id / data-id（工单 15），class + 文本是唯一可用锚点 */
+function findRadarAxisLabelElement(root: Element, text: string): Element | null {
+  if (text === '') return null
+  for (const el of root.querySelectorAll('text.radarAxisLabel, .radarAxisLabel')) {
+    if ((el.textContent?.trim() ?? '') === text) return el
+  }
+  return null
+}
+
 /** 在渲染 SVG 中定位编辑目标的元素：flowchart/class/sequence 按 data-id（四者的
  * data-id 分别是节点 id / 类名 / 参与者 id，见 CanvasPanel 的 resolverOf），
- * mindmap 按 DOM id（回落文本）。 */
+ * mindmap 按 DOM id（回落文本），radar 轴按 class + 文本。 */
 function findTargetElement(root: Element, target: CanvasInlineEditTarget, text: string): Element | null {
   if (
     target.kind === 'flowchart' ||
@@ -185,6 +201,10 @@ function findTargetElement(root: Element, target: CanvasInlineEditTarget, text: 
     }
     return null
   }
+  if (target.kind === 'radar-axis') {
+    // radar 的轴标签无 data-id：按展示文本在 `radarAxisLabel` class 内匹配（工单 15）
+    return findRadarAxisLabelElement(root, text)
+  }
   return findMindmapElement(root, target.elementId, text)
 }
 
@@ -243,6 +263,10 @@ export function useCanvasInlineEdit({ projection, resolver, svg, containerRef, v
     (e: React.MouseEvent) => {
       const type = projection?.type
       const mindmapNodes = projection?.type === 'mindmap' ? projection.mindmap.nodes : []
+      const radarAxes =
+        projection?.type === 'radar'
+          ? projection.radar.axes.map((a) => ({ text: a.label ?? a.id, elementId: a.elementId }))
+          : []
       const kind: InlineEditDiagramKind =
         type === 'mindmap'
           ? 'mindmap'
@@ -262,8 +286,10 @@ export function useCanvasInlineEdit({ projection, resolver, svg, containerRef, v
                         ? 'block'
                         : type === 'gantt'
                           ? 'gantt'
-                          : 'flowchart'
-      const target = inlineEditTargetFromEvent(e.target, resolver, mindmapNodes, kind)
+                          : type === 'radar'
+                            ? 'radar'
+                            : 'flowchart'
+      const target = inlineEditTargetFromEvent(e.target, resolver, mindmapNodes, kind, radarAxes)
       if (target === null) return
       e.preventDefault()
       beginEdit(target)

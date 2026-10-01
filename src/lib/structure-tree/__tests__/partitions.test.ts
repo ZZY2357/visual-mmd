@@ -235,6 +235,8 @@ describe('结构树分区描述（工单 06）', () => {
       sankey: 'sankey-beta\n\nsrc,dst,3\n"n, ame",dst,1.5',
       gantt:
         'gantt\n    dateFormat YYYY-MM-DD\n    section 调研\n        需求梳理 :done, 2026-01-05, 3d',
+      radar:
+        'radar-beta\n    title 技能\n    axis a["甲"], b["乙"]\n    curve c1["一"]{ 1, 2 }\n    max 5',
     }
     for (const id of Object.keys(DIAGRAM_TYPES) as (keyof typeof DIAGRAM_TYPES)[]) {
       const registration = DIAGRAM_TYPES[id]

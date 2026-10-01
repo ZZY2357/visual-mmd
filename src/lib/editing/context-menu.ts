@@ -168,6 +168,10 @@ export type ContextMenuItemId =
   // 由结构树选中 + 属性表单承接；section 与指令行不可寻址。
   | 'add-gantt-task'
   | 'add-gantt-section'
+  // radar（more-diagrams 工单 15）：空白 = 加轴 / 加曲线（占位 id 避重，表单可改）。
+  // 轴与曲线的编辑不做元素级画布菜单（无 data-id 可命中），由结构树选中 + 属性表单承接。
+  | 'add-radar-axis'
+  | 'add-radar-curve'
 
 /**
  * 画布选中 → 菜单目标（工单 03 起为 `canvas-selection/selection-codec.ts` 的
@@ -223,6 +227,9 @@ function blankMenuItems(diagramType: DiagramTypeId): ContextMenuItemId[] {
     case 'gantt':
       // gantt 的空白入口（工单 11 定案）：加任务（缺省时长 1d，归属最后一个分组）与加分组
       return ['add-gantt-task', 'add-gantt-section']
+    case 'radar':
+      // radar 的空白入口（工单 15 定案）：加轴与加曲线（占位 id 避重，右侧表单可改）
+      return ['add-radar-axis', 'add-radar-curve']
     // DiagramTypeId 是开放类型（more-diagrams 工单 01）：未接入画布能力包的图种
     // 没有空白右键入口（unsupported 态下画布右键整体停用，不会走到这里）
     default:

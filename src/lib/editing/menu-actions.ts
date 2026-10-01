@@ -16,6 +16,7 @@ import { isValidTimelineSectionName, type TimelineIntent } from '../pipeline/tim
 import { isValidJourneySectionName, isValidJourneyTaskName, type JourneyIntent } from '../pipeline/journey'
 import { isValidPieLabel, type PieIntent } from '../pipeline/pie'
 import { isValidGanttSectionName, isValidGanttTaskName, type GanttIntent } from '../pipeline/gantt'
+import { isValidRadarId, nextRadarId, type RadarIntent } from '../pipeline/radar'
 import { isValidKanbanId } from '../pipeline/kanban'
 import { isValidBlockId } from '../pipeline/block'
 import { setRelationIntent, RELATION_KIND_OPTIONS } from './class-forms'
@@ -210,6 +211,11 @@ export function createElement(ctx: MenuActionContext, target: ContextMenuTarget 
     if (proj.type === 'gantt') {
       // gantt（more-diagrams 工单 11）：添加入口是独立的 add-gantt-task /
       // add-gantt-section 动作（添加路径不做内联命名；改名走双击内联编辑/表单），不走 createElement
+      return null
+    }
+    if (proj.type === 'radar') {
+      // radar（more-diagrams 工单 15）：添加入口是独立的 add-radar-axis /
+      // add-radar-curve 动作（画布无 data-id，不做内联命名），不走 createElement
       return null
     }
     // mindmap：节点目标 = 挂为其子节点；空白 / 无目标 = 建根（空文档）或挂到根节点下
@@ -577,6 +583,52 @@ function addGanttSection(ctx: MenuActionContext): void {
   if (applyPlan(plan, { commitIntent: ctx.commitIntent, select: ctx.select })) ctx.close()
 }
 
+// ---------- radar（more-diagrams 工单 15） ----------
+
+/**
+ * 空白处加轴（radar）：追加一个新轴段（占位 id 与占位标签「新轴」由管线负责）+
+ * 选中新轴。锚点 = 最后一条轴行（多轴行时新轴落在最后，mermaid 按书写顺序收集轴）；
+ * 无轴时无锚点（回退文档末尾）。不做内联编辑（画布无 data-id）。
+ */
+function addRadarAxis(ctx: MenuActionContext): void {
+  const proj = ctx.projection
+  if (proj === null || proj.type !== 'radar') return
+  const id = nextRadarId('axis', proj.radar.axes.map((a) => a.id))
+  if (!isValidRadarId(id)) return
+  const lastAxis = proj.radar.axes[proj.radar.axes.length - 1]
+  const plan: KeyPlan = {
+    intents: [
+      { type: 'add-axis', id, afterElementId: lastAxis?.elementId } satisfies RadarIntent,
+    ],
+    newElementTarget: {
+      selection: { kind: 'radar-axis', elementId: `axis:${proj.radar.nextAxisOrdinal}` },
+    },
+  }
+  if (applyPlan(plan, { commitIntent: ctx.commitIntent, select: ctx.select })) ctx.close()
+}
+
+/**
+ * 空白处加曲线（radar）：追加一条键值形态新曲线（占位 id 与标签「新曲线」由管线负责；
+ * 对每轴补 `axisId: 0` 条目——mermaid computeCurveEntries 缺条目抛错，新曲线必须
+ * 全轴有值）+ 选中新曲线。不做内联编辑（画布无 data-id）。
+ */
+function addRadarCurve(ctx: MenuActionContext): void {
+  const proj = ctx.projection
+  if (proj === null || proj.type !== 'radar') return
+  const id = nextRadarId('curve', proj.radar.curves.map((c) => c.id))
+  if (!isValidRadarId(id)) return
+  const lastCurve = proj.radar.curves[proj.radar.curves.length - 1]
+  const plan: KeyPlan = {
+    intents: [
+      { type: 'add-curve', id, afterElementId: lastCurve?.elementId } satisfies RadarIntent,
+    ],
+    newElementTarget: {
+      selection: { kind: 'radar-curve', elementId: `curve:${proj.radar.nextCurveOrdinal}` },
+    },
+  }
+  if (applyPlan(plan, { commitIntent: ctx.commitIntent, select: ctx.select })) ctx.close()
+}
+
 export const MENU_ACTIONS: Record<Exclude<ContextMenuItemId, 'apply-style'>, MenuAction> = {
   // 「创建 + 选中 + 内联命名」五个入口共用 createElement（工单 01 收敛）
   'add-node': createElement,
@@ -682,4 +734,7 @@ export const MENU_ACTIONS: Record<Exclude<ContextMenuItemId, 'apply-style'>, Men
   // gantt（more-diagrams 工单 11）：空白加任务 / 加分组；元素级编辑降级到结构树 + 属性表单
   'add-gantt-task': addGanttTask,
   'add-gantt-section': addGanttSection,
+  // radar（more-diagrams 工单 15）：空白加轴 / 加曲线；元素级编辑降级到结构树 + 属性表单
+  'add-radar-axis': addRadarAxis,
+  'add-radar-curve': addRadarCurve,
 }

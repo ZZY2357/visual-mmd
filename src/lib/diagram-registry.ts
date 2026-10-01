@@ -15,6 +15,7 @@ import { pieParser } from './pipeline/pie'
 import { blockParser } from './pipeline/block'
 import { sankeyParser } from './pipeline/sankey'
 import { ganttParser } from './pipeline/gantt'
+import { radarParser } from './pipeline/radar'
 import { frontmatterEnd } from './pipeline/frontmatter'
 import { buildFlowchartProjection, type FlowchartProjection } from './projection/flowchart-projection'
 import { buildSequenceProjection, type SequenceProjection } from './projection/sequence-projection'
@@ -34,6 +35,7 @@ import { buildPieProjection, type PieProjection } from './projection/pie-project
 import { buildBlockProjection, type BlockProjection } from './projection/block-projection'
 import { buildSankeyProjection, type SankeyProjection } from './projection/sankey-projection'
 import { buildGanttProjection, type GanttProjection } from './projection/gantt-projection'
+import { buildRadarProjection, type RadarProjection } from './projection/radar-projection'
 import { flowchartCanvasCapabilities } from './canvas-selection/flowchart-adapter'
 import { sequenceCanvasCapabilities } from './canvas-selection/sequence-adapter'
 import { classCanvasCapabilities } from './canvas-selection/class-adapter'
@@ -49,6 +51,7 @@ import { pieCanvasCapabilities } from './canvas-selection/pie-adapter'
 import { blockCanvasCapabilities } from './canvas-selection/block-adapter'
 import { sankeyCanvasCapabilities } from './canvas-selection/sankey-adapter'
 import { ganttCanvasCapabilities } from './canvas-selection/gantt-adapter'
+import { radarCanvasCapabilities } from './canvas-selection/radar-adapter'
 import type { CanvasCapabilities } from './canvas-selection/capabilities'
 import { treePartitions, type TreePartitions } from './structure-tree/partitions'
 import { DEFAULT_DIAGRAM_SOURCE } from './storage'
@@ -85,6 +88,7 @@ export interface ProjectionTypes {
   block: BlockProjection
   sankey: SankeyProjection
   gantt: GanttProjection
+  radar: RadarProjection
 }
 
 /** 已注册图种的 id 集合（字面量联合，随 ProjectionTypes 增长） */
@@ -352,6 +356,22 @@ export const GANTT_TEMPLATE = `gantt
 `
 
 /**
+ * radar 起步模板（more-diagrams 工单 15）：title、四个轴（单行多段）、两条曲线
+ * （**双形态各一**：值列表 `{ 1, 2, 3, 4 }` 与键值 `{ a: 2, ... }`）、`max` 上限与
+ * `graticule`（图表级表单可切 polygon 的既有入口——set-option-value 意图按 elementId
+ * 定点改写，不存在的选项行没有添加意图）。label 引号必需（STRING token）；
+ * `ticks` / `showLegend` 留给用户自行添加（模板保持最小可读）。
+ */
+export const RADAR_TEMPLATE = `radar-beta
+    title 技能评估示例
+    axis math["数学"], science["科学"], art["艺术"], sport["体育"]
+    curve alice["Alice"]{ 1, 2, 3, 4 }
+    curve bob["Bob"]{ math: 4, science: 3, art: 2, sport: 1 }
+    max 5
+    graticule circle
+`
+
+/**
  * 注册表：数组是唯一权威（more-diagrams 工单 01），DIAGRAM_TYPES 由它推导。
  * detectDiagramType 按数组顺序显式遍历——不再维护手写的 if 分发链，
  * 新图种挂一条即可参与识别，无法识别时不再默认 flowchart（见下）。
@@ -503,6 +523,17 @@ export const DIAGRAM_TYPE_LIST: DiagramTypeRegistration[] = [
     buildProjection: (doc) => ({ type: 'gantt', gantt: buildGanttProjection(doc) }),
     tree: treePartitions.gantt,
     canvas: ganttCanvasCapabilities,
+  },
+  {
+    id: 'radar',
+    parser: radarParser,
+    template: RADAR_TEMPLATE,
+    // `\b` 让关键字不被 `radarXxx` 之类的更长词误认；只认 `radar-beta`（mermaid 12
+    // 的 radar 语法只有这一个关键字，Langium 语法勘察确认）
+    detect: (source) => /^radar-beta\b/i.test(firstStatementLine(source)),
+    buildProjection: (doc) => ({ type: 'radar', radar: buildRadarProjection(doc) }),
+    tree: treePartitions.radar,
+    canvas: radarCanvasCapabilities,
   },
 ]
 
