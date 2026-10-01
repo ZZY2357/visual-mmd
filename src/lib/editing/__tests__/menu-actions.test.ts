@@ -238,6 +238,12 @@ describe('MENU_ACTIONS 穷尽性（工单 05 → 工单 01）', () => {
       { kind: 'agentflow-edge', elementId: 'edge:a->b' },
       { kind: 'agentflow-flow', elementId: 'container:flow:1' },
       { kind: 'agentflow-doc', elementId: 'agentflow-doc:1' },
+      // zenuml（more-diagrams 工单 19）：画布 DOM 无 data-id（任务 0 实测降级），空白提供
+      // 加参与者 / 加消息；参与者（改别名/删除）/ 消息（改文本/删除）目标只能由程序构造
+      { kind: 'blank', diagramType: 'zenuml' },
+      { kind: 'zenuml-participant', elementId: 'participant:Client' },
+      { kind: 'zenuml-message', elementId: 'message:1' },
+      { kind: 'zenuml-fragment', elementId: 'fragment:1' },
     ]
     const reachableIds = new Set(allTargets.flatMap((target) => contextMenuItems(target)))
     // apply-style 不经 onMenuItem 分发（CanvasPanel 渲染成子菜单开关，点样式名直接调

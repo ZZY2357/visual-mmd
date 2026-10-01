@@ -162,6 +162,13 @@ export function canvasIdOf(selection: Selection): string | null {
     // ——只在 canvasIdOf 给出节点 id）；容器/文档行画布无 data-id，安静地不高亮。
     case 'agentflow-node':
       return selection.nodeId
+    // zenuml（more-diagrams 工单 19）：画布 DOM 无 data-id（任务 0 实测：渲染产物无
+    // data-id / 无 id，见 zenuml-adapter），三类选中都不可寻址——安静地不高亮
+    //（结构树选中仍在，属性表单可编）
+    case 'zenuml-participant':
+    case 'zenuml-message':
+    case 'zenuml-fragment':
+      return null
     default:
       return null
   }
@@ -312,6 +319,10 @@ export function fromCanvasId(diagramType: DiagramTypeId, canvas: CanvasSelection
     // 走 agentflowSelectionOf 收窄成 `agentflow-edge`（elementId 由三元组重建）
     return agentflowSelectionOf(canvas)
   }
+  if (diagramType === 'zenuml') {
+    // zenuml（more-diagrams 工单 19）：画布 DOM 无 data-id（任务 0 实测），画布选中不产生
+    return null
+  }
   if (canvas.kind === 'element') return edgeSelectionOf(diagramType, canvas.elementId)
   if (canvas.kind === 'node') {
     return diagramType === 'sequence'
@@ -454,6 +465,13 @@ export function selectionOfMenuTarget(target: ContextMenuTarget): Selection | nu
       return { kind: 'agentflow-flow', elementId: target.elementId }
     case 'agentflow-doc':
       return { kind: 'agentflow-doc', elementId: target.elementId }
+    // zenuml（more-diagrams 工单 19）：参与者 / 消息 / 片段菜单目标一一对应各自 Selection kind
+    case 'zenuml-participant':
+      return { kind: 'zenuml-participant', elementId: target.elementId }
+    case 'zenuml-message':
+      return { kind: 'zenuml-message', elementId: target.elementId }
+    case 'zenuml-fragment':
+      return { kind: 'zenuml-fragment', elementId: target.elementId }
     case 'blank':
       return null
   }
@@ -507,6 +525,7 @@ export function menuTargetOfCanvas(
     if (diagramType === 'wardley') return null // 无 data-id（实测降级，research §4），画布节点不可命中
     if (diagramType === 'cynefin') return null // 无 data-id（实测降级，research §4/§8.1），画布节点不可命中
     if (diagramType === 'treeview') return null // 无 data-id 且渲染布局与源码行序无对应（实测降级，research §4），画布节点不可命中
+    if (diagramType === 'zenuml') return null // 无 data-id（任务 0 实测降级），画布节点不可命中
     if (diagramType === 'gantt') {
       // gantt（more-diagrams 工单 11）：任务条虽可寻址，但元素级菜单不做（与 journey/pie
       // 同口径），编辑由结构树选中 + 属性表单承接——画布节点不产生菜单目标

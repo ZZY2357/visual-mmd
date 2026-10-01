@@ -17,6 +17,7 @@ import {
   TREEVIEW_TEMPLATE,
   EVENT_MODELING_TEMPLATE,
   AGENTFLOW_TEMPLATE,
+  ZENUML_TEMPLATE,
   type AnyProjection,
 } from '../../diagram-registry'
 import type { EditIntent } from '../../pipeline/parser'
@@ -38,6 +39,7 @@ import { usecaseParser } from '../../pipeline/usecase'
 import { treeviewParser } from '../../pipeline/treeview'
 import { eventModelingParser } from '../../pipeline/eventmodeling'
 import { agentflowParser } from '../../pipeline/agentflow'
+import { zenumlParser } from '../../pipeline/zenuml'
 import { buildClassProjection } from '../../projection/class-projection'
 import { buildFlowchartProjection } from '../../projection/flowchart-projection'
 import { buildMindmapProjection } from '../../projection/mindmap-projection'
@@ -56,6 +58,7 @@ import { buildUsecaseProjection } from '../../projection/usecase-projection'
 import { buildTreeviewProjection } from '../../projection/treeview-projection'
 import { buildEventModelingProjection } from '../../projection/eventmodeling-projection'
 import { buildAgentflowProjection } from '../../projection/agentflow-projection'
+import { buildZenumlProjection } from '../../projection/zenuml-projection'
 import type { Selection } from '../../projection/selection'
 import {
   blockDeleteIntent,
@@ -76,6 +79,7 @@ import {
   treeviewDeleteIntent,
   eventModelingDeleteIntent,
   agentflowDeleteIntent,
+  zenumlDeleteIntent,
 } from '../../editing/canvas-keyboard'
 import {
   deleteClassDefIntent,
@@ -680,6 +684,40 @@ function agentflowCases(p: ReturnType<typeof agentflowProjection>): DeleteCase[]
   return cases
 }
 
+/** zenumlProjection：zenuml 投影（more-diagrams 工单 19） */
+function zenumlProjection(): Extract<AnyProjection, { type: 'zenuml' }> {
+  const parsed = zenumlParser.parse(ZENUML_TEMPLATE)
+  if (!parsed.ok) throw new Error(parsed.error.message)
+  return { type: 'zenuml', zenuml: buildZenumlProjection(parsed.doc) }
+}
+
+/** zenuml（more-diagrams 工单 19）：消息 / 已声明参与者两类删除入口各一条。
+ * 未声明的隐式参与者（只出现在消息里）不产出删除意图——删它等于删消息，
+ * 归消息删除入口，避免歧义（见 canvas-keyboard.zenumlDeleteIntent）。 */
+function zenumlCases(p: ReturnType<typeof zenumlProjection>): DeleteCase[] {
+  const message = p.zenuml.messages[0]
+  const participant = p.zenuml.participants.find((q) => q.declared)
+  if (message === undefined || participant === undefined) {
+    throw new Error('ZENUML_TEMPLATE 必须含消息与已声明参与者')
+  }
+  return [
+    {
+      name: 'zenuml-message',
+      selection: { kind: 'zenuml-message', elementId: message.elementId },
+      panelIntent: { type: 'delete-zenuml-message', elementId: message.elementId },
+      menuTarget: { kind: 'zenuml-message', elementId: message.elementId },
+      menuItemId: 'delete',
+    },
+    {
+      name: 'zenuml-participant（已声明）',
+      selection: { kind: 'zenuml-participant', elementId: participant.elementId },
+      panelIntent: { type: 'delete-zenuml-participant', elementId: participant.elementId },
+      menuTarget: { kind: 'zenuml-participant', elementId: participant.elementId },
+      menuItemId: 'delete',
+    },
+  ]
+}
+
 const SUITES = [
   { type: 'flowchart' as const, projection: flowProjection, cases: flowchartCases },
   { type: 'class' as const, projection: classProjection, cases: classCases },
@@ -699,6 +737,7 @@ const SUITES = [
   { type: 'treeview' as const, projection: treeviewProjection, cases: treeviewCases },
   { type: 'eventmodeling' as const, projection: eventModelingProjection, cases: eventModelingCases },
   { type: 'agentflow' as const, projection: agentflowProjection, cases: agentflowCases },
+  { type: 'zenuml' as const, projection: zenumlProjection, cases: zenumlCases },
 ]
 
 describe('deleteIntent 等价性：三个删除入口对同一 selection 产出同一意图（工单 03）', () => {
@@ -761,6 +800,8 @@ describe('deleteIntent 等价性：三个删除入口对同一 selection 产出�
                 return eventModelingDeleteIntent(projection.eventmodeling, sel)
               case 'agentflow':
                 return agentflowDeleteIntent(projection.agentflow, sel)
+              case 'zenuml':
+                return zenumlDeleteIntent(projection.zenuml, sel)
             }
           })()
           // 键盘按选中种类设门（flowchart/mindmap 只删节点）；门内的种类必须与能力包等价
@@ -782,7 +823,8 @@ describe('deleteIntent 等价性：三个删除入口对同一 selection 产出�
             suite.type === 'usecase' ||
             suite.type === 'treeview' ||
             suite.type === 'eventmodeling' ||
-            suite.type === 'agentflow'
+            suite.type === 'agentflow' ||
+            suite.type === 'zenuml'
           if (!keyboardHandles) {
             expect(viaKeyboard).toBeNull() // 门外：键盘安静地不产出意图（零变化护栏）
             return
@@ -849,6 +891,7 @@ describe('deleteIntent 等价性：三个删除入口对同一 selection 产出�
           treeview: { kind: 'treeview-node', elementId: 'treeview-node:999' },
           eventmodeling: { kind: 'em-frame', elementId: 'frame:999' },
           agentflow: { kind: 'agentflow-node', nodeId: '__不存在__' },
+          zenuml: { kind: 'zenuml-message', elementId: 'message:999' },
         }
         expect(caps.deleteIntent(projection, gone[suite.type])).toBeNull()
 

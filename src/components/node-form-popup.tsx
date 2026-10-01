@@ -18,6 +18,7 @@ import { AddArchitectureEdgeInlineForm } from './architecture-forms'
 import { AddWardleyLinkInlineForm } from './wardley-forms'
 import { AddCynefinTransitionInlineForm } from './cynefin-forms'
 import { AddAgentflowEdgeInlineForm } from './agentflow-forms'
+import { AddZenumlMessageInlineForm } from './zenuml-forms'
 
 /**
  * class/sequence 节点菜单的表单浮层（工单 06/04；工单 04-canvas-bundle 自 CanvasPanel 迁出）：
@@ -174,6 +175,14 @@ export function NodeFormPopup(props: { state: NodeFormState; projection: AnyProj
         {state.kind === 'agentflow-edge' && projection.type === 'agentflow' && (
           <AddAgentflowEdgeInlineForm
             projection={projection.agentflow}
+            initialFrom={state.from}
+            afterElementId={state.anchorElementId}
+            onDone={props.onClose}
+          />
+        )}
+        {state.kind === 'zenuml-message' && projection.type === 'zenuml' && (
+          <AddZenumlMessageInlineForm
+            participants={projection.zenuml.participants}
             initialFrom={state.from}
             afterElementId={state.anchorElementId}
             onDone={props.onClose}

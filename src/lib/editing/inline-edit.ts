@@ -16,6 +16,7 @@ import { isValidPacketFieldName } from '../pipeline/packet'
 import { isValidXychartText } from '../pipeline/xychart'
 import { isValidRadarLabelText } from '../pipeline/radar'
 import { isValidArchTitle } from '../pipeline/architecture'
+import { isValidZenumlLabel } from '../pipeline/zenuml'
 import {
   parseArchitectureGroupElementId,
   parseArchitectureServiceElementId,
@@ -99,6 +100,10 @@ export type CanvasInlineEditTarget =
   /** architecture（more-diagrams 工单 17）：双击 service / group 改标题（set-service-title /
    * set-group-title 意图；id 是语法标识不在此改。junction 无标题、边不可寻址——不接双击） */
   | { kind: 'architecture'; elementKind: 'service' | 'group'; id: string }
+  /** zenuml（more-diagrams 工单 19）：改参与者别名（set-zenuml-participant-alias 意图；
+   * id 是语法标识不在此改）。画布 DOM 无 data-id（任务 0 实测）——双击不可寻址，
+   * 本目标只由右键菜单「改别名」与结构树构造。 */
+  | { kind: 'zenuml-participant'; elementId: string }
 
 export type InlineEditCommit =
   | { action: 'commit'; intent: EditIntent }
@@ -187,6 +192,7 @@ export type InlineEditDiagramKind =
   | 'xychart'
   | 'radar'
   | 'architecture'
+  | 'zenuml'
 
 /** radar 双击寻址的轴候选（文本 → elementId；由调用方从投影展开，展示文本 label ?? id） */
 export interface RadarAxisCandidate {
@@ -235,6 +241,9 @@ export function inlineEditTargetFromEvent(
   kind: InlineEditDiagramKind = 'flowchart',
   radarAxes: RadarAxisCandidate[] = [],
 ): CanvasInlineEditTarget | null {
+  // zenuml（more-diagrams 工单 19）：画布 DOM 无 data-id（任务 0 实测），双击不可寻址——
+  // 安静地不进入内联编辑（改别名走右键菜单 / 结构树构造的 zenuml-participant 目标）
+  if (kind === 'zenuml') return null
   const byId = targetFromDataId(target, resolver)
   if (byId !== null) {
     if (kind === 'mindmap') return { kind: 'mindmap', elementId: byId.nodeId }
@@ -405,6 +414,15 @@ export function inlineEditCommitOf(target: CanvasInlineEditTarget, text: string,
         target.elementKind === 'service'
           ? { type: 'set-service-title', id: target.id, title: next }
           : { type: 'set-group-title', id: target.id, title: next },
+    }
+  }
+  if (target.kind === 'zenuml-participant') {
+    // zenuml（more-diagrams 工单 19）：非空改动 = set-zenuml-participant-alias（落 `as "…"`；
+    // 清空 = 去别名回退 id 展示——顶部守卫已把清空按 unchanged 关闭，走属性表单而非双击）
+    if (!isValidZenumlLabel(next)) return { action: 'invalid' }
+    return {
+      action: 'commit',
+      intent: { type: 'set-zenuml-participant-alias', elementId: target.elementId, alias: next },
     }
   }
   if (!isValidMindmapNodeText(next)) return { action: 'invalid' }

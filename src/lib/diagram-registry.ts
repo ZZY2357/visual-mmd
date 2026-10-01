@@ -28,6 +28,7 @@ import { usecaseParser } from './pipeline/usecase'
 import { treeviewParser } from './pipeline/treeview'
 import { eventModelingParser } from './pipeline/eventmodeling'
 import { agentflowParser } from './pipeline/agentflow'
+import { zenumlParser } from './pipeline/zenuml'
 import { frontmatterEnd } from './pipeline/frontmatter'
 import { buildFlowchartProjection, type FlowchartProjection } from './projection/flowchart-projection'
 import { buildSequenceProjection, type SequenceProjection } from './projection/sequence-projection'
@@ -69,6 +70,7 @@ import { buildUsecaseProjection, type UsecaseProjection } from './projection/use
 import { buildTreeviewProjection, type TreeviewProjection } from './projection/treeview-projection'
 import { buildEventModelingProjection, type EventModelingProjection } from './projection/eventmodeling-projection'
 import { buildAgentflowProjection, type AgentflowProjection } from './projection/agentflow-projection'
+import { buildZenumlProjection, type ZenumlProjection } from './projection/zenuml-projection'
 import { flowchartCanvasCapabilities } from './canvas-selection/flowchart-adapter'
 import { sequenceCanvasCapabilities } from './canvas-selection/sequence-adapter'
 import { classCanvasCapabilities } from './canvas-selection/class-adapter'
@@ -97,6 +99,7 @@ import { usecaseCanvasCapabilities } from './canvas-selection/usecase-adapter'
 import { treeviewCanvasCapabilities } from './canvas-selection/treeview-adapter'
 import { eventModelingCanvasCapabilities } from './canvas-selection/eventmodeling-adapter'
 import { agentflowCanvasCapabilities } from './canvas-selection/agentflow-adapter'
+import { zenumlCanvasCapabilities } from './canvas-selection/zenuml-adapter'
 import type { CanvasCapabilities } from './canvas-selection/capabilities'
 import { treePartitions, type TreePartitions } from './structure-tree/partitions'
 import { DEFAULT_DIAGRAM_SOURCE } from './storage'
@@ -147,6 +150,7 @@ export interface ProjectionTypes {
   treeview: TreeviewProjection
   eventmodeling: EventModelingProjection
   agentflow: AgentflowProjection
+  zenuml: ZenumlProjection
 }
 
 /** 已注册图种的 id 集合（字面量联合，随 ProjectionTypes 增长） */
@@ -690,6 +694,25 @@ export const AGENTFLOW_TEMPLATE = `agentflow-beta TB
 `
 
 /**
+ * zenuml 起步模板（more-diagrams 工单 19）：两个参与者（其一 @Database 注解）、一条同步
+ * （`A.b()`）一条异步（`A->B.m()`）消息、一个 if/else 片段（工单定案构成）。
+ * 注意：zenuml 是**外部渲染器**（`@mermaid-js/mermaid-zenuml`，异步注册），语法权威见
+ * zenuml.com（mermaid 文档不可抓）。方案名参与者在消息端点隐式引入，显式 `participant`
+ * 声明只为别名 / 注解服务（名字即身份，research §10）。
+ */
+export const ZENUML_TEMPLATE = `zenuml
+    title 下单流程
+    participant Client as "客户端"
+    @Database Server
+    Client->Server.placeOrder(item)
+    if (item.stock > 0) {
+        Server.checkStock()
+    } else {
+        Client->Server.reject()
+    }
+`
+
+/**
  * 注册表：数组是唯一权威（more-diagrams 工单 01），DIAGRAM_TYPES 由它推导。
  * detectDiagramType 按数组顺序显式遍历——不再维护手写的 if 分发链，
  * 新图种挂一条即可参与识别，无法识别时不再默认 flowchart（见下）。
@@ -1011,6 +1034,18 @@ export const DIAGRAM_TYPE_LIST: DiagramTypeRegistration[] = [
     buildProjection: (doc) => ({ type: 'agentflow', agentflow: buildAgentflowProjection(doc) }),
     tree: treePartitions.agentflow,
     canvas: agentflowCanvasCapabilities,
+  },
+  {
+    id: 'zenuml',
+    parser: zenumlParser,
+    template: ZENUML_TEMPLATE,
+    // zenuml 词法**只有小写 `zenuml`**（外部插件 `@mermaid-js/mermaid-zenuml` 的 detector
+    // `/^\s*zenuml/`，大小写敏感；research §10）。声明行必须是裸关键字——zenuml 是
+    // 类代码语法，表头后跟别的内容不认领（与 ZenumlParser.HEADER_RE 同口径）
+    detect: (source) => /^zenuml[ \t\r]*$/.test(firstStatementLine(source)),
+    buildProjection: (doc) => ({ type: 'zenuml', zenuml: buildZenumlProjection(doc) }),
+    tree: treePartitions.zenuml,
+    canvas: zenumlCanvasCapabilities,
   },
 ]
 

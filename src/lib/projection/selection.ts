@@ -173,6 +173,14 @@ export type Selection =
   | { kind: 'agentflow-edge'; elementId: string }
   | { kind: 'agentflow-flow'; elementId: string }
   | { kind: 'agentflow-doc'; elementId: string }
+  // zenuml（more-diagrams 工单 19）：参与者是**名字即身份**（`participant:<id>`——zenuml
+  // 按名引用、重名即同一参与者；隐式端点合成的参与者无声明行）；消息走位置序身份
+  // （`message:N`——消息无显式 id）；片段（分组）走位置序身份（`fragment:N`）。
+  // 画布 DOM **无 data-id / 无 id**（工单 19 任务 0 实测：渲染产物只有 class 与不成映射的
+  // `data-participant`），画布寻址整体降级——选中只来自结构树 / 表单 / 键盘（见 zenuml-adapter）。
+  | { kind: 'zenuml-participant'; elementId: string }
+  | { kind: 'zenuml-message'; elementId: string }
+  | { kind: 'zenuml-fragment'; elementId: string }
 
 export const DIAGRAM_SELECTION: Selection = { kind: 'diagram' }
 
@@ -342,6 +350,12 @@ export function selectionKey(sel: Selection): string {
       return `agentflow-flow:${sel.elementId}`
     case 'agentflow-doc':
       return `agentflow-doc:${sel.elementId}`
+    case 'zenuml-participant':
+      return `zenuml-participant:${sel.elementId}`
+    case 'zenuml-message':
+      return `zenuml-message:${sel.elementId}`
+    case 'zenuml-fragment':
+      return `zenuml-fragment:${sel.elementId}`
   }
 }
 

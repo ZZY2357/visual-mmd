@@ -137,6 +137,14 @@ export type ContextMenuTarget =
   | { kind: 'agentflow-edge'; elementId: string }
   | { kind: 'agentflow-flow'; elementId: string }
   | { kind: 'agentflow-doc'; elementId: string }
+// zenuml（more-diagrams 工单 19）：画布 DOM 无 data-id（任务 0 实测：渲染产物无 data-id /
+// 无 id，见 zenuml-adapter），无元素级菜单目标——参与者 / 消息 / 片段目标只由测试/程序构造，
+// 画布右键实际只产出 blank（空白菜单提供 加参与者 / 加消息 入口）。
+// 参与者 elementId 即投影 elementId（`participant:<id>`，名字即身份）；消息 / 片段
+// elementId 即投影位置序身份。
+  | { kind: 'zenuml-participant'; elementId: string }
+  | { kind: 'zenuml-message'; elementId: string }
+  | { kind: 'zenuml-fragment'; elementId: string }
 
 export type ContextMenuItemId =
   | 'add-node'
@@ -316,6 +324,14 @@ export type ContextMenuItemId =
   | 'add-agentflow-flow'
   | 'edit-agentflow-node'
   | 'edit-agentflow-flow'
+  // zenuml（more-diagrams 工单 19）：空白 = 加参与者（占位 id 避重）/ 加消息（表单浮出，
+  // 提交才落码）；参与者 = 改别名（D5「选中 + 关菜单」，右侧 ZenumlParticipantForm 改）/
+  // 删除声明行；消息 = 改文本（D5，右侧 ZenumlMessageForm 改）/ 删除。
+  // 片段（分组）无菜单动作（分组无删除/编辑语义，工单 19 不做）。
+  | 'add-zenuml-participant'
+  | 'add-zenuml-message'
+  | 'edit-zenuml-participant'
+  | 'edit-zenuml-message'
 
 /**
  * 画布选中 → 菜单目标（工单 03 起为 `canvas-selection/selection-codec.ts` 的
@@ -420,6 +436,9 @@ function blankMenuItems(diagramType: DiagramTypeId): ContextMenuItemId[] {
       // agentflow 的空白入口（工单 27 定案）：加节点（缺省 `n{N}` id + task 形状）/
       // 加 flow 容器（空标题）
       return ['add-agentflow-node', 'add-agentflow-flow']
+    case 'zenuml':
+      // zenuml 的空白入口（工单 19 定案）：加参与者（占位 id 避重）/ 加消息（表单浮出，提交才落码）
+      return ['add-zenuml-participant', 'add-zenuml-message']
     // DiagramTypeId 是开放类型（more-diagrams 工单 01）：未接入画布能力包的图种
     // 没有空白右键入口（unsupported 态下画布右键整体停用，不会走到这里）
     default:
@@ -613,5 +632,13 @@ export function contextMenuItems(target: ContextMenuTarget): ContextMenuItemId[]
       return ['edit-agentflow-flow', 'delete']
     case 'agentflow-doc':
       return ['delete']
+    // zenuml（more-diagrams 工单 19）：参与者 = 改别名（D5「选中 + 关菜单」，右侧表单改）/
+    // 删除声明行；消息 = 改文本（D5，右侧表单改）/ 删除；片段（分组）无动作
+    case 'zenuml-participant':
+      return ['edit-zenuml-participant', 'delete']
+    case 'zenuml-message':
+      return ['edit-zenuml-message', 'delete']
+    case 'zenuml-fragment':
+      return []
   }
 }

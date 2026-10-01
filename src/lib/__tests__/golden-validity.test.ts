@@ -455,6 +455,55 @@ describe('金样合法性：默认图表模板能被 mermaid 渲染', () => {
     await expect(mermaid.parse(source)).resolves.toBeTruthy()
   })
 
+  it('zenuml 起步模板（more-diagrams 工单 19）经外部注册后可被 mermaid 识别且 parse 不崩', async () => {
+    const { ZENUML_TEMPLATE } = await import('../diagram-registry')
+    const { ensureZenumlRegistered, isZenumlSource } = await import('../zenuml-registration')
+    // zenuml 是外部图，必须先注册插件（懒加载 @zenuml/core），detectType 才认得它
+    await ensureZenumlRegistered()
+    await expect(mermaid.parse(ZENUML_TEMPLATE)).resolves.toBeTruthy()
+    expect(mermaid.detectType(ZENUML_TEMPLATE)).toBe('zenuml')
+    // 本仓自有的探测器与 mermaid 判定一致（mermaid.parse 对 zenuml 恒不抛，故用它兜底）
+    expect(isZenumlSource(ZENUML_TEMPLATE)).toBe(true)
+  })
+
+  it('zenuml 端到端编辑场景（工单 19 验收：加参与者 → 改别名 → 加消息 → 改消息 → 删消息）落在合法 zenuml 源码上', async () => {
+    const { ZENUML_TEMPLATE } = await import('../diagram-registry')
+    const { zenumlParser } = await import('../pipeline/zenuml')
+    const { ensureZenumlRegistered, isZenumlSource } = await import('../zenuml-registration')
+    const { reassemble } = await import('../pipeline/document')
+    const parse = (src: string) => {
+      const r = zenumlParser.parse(src)
+      if (!r.ok) throw new Error(`解析失败：${r.error.message}`)
+      return r.doc
+    }
+    const apply = (doc: ReturnType<typeof parse>, intent: Parameters<typeof zenumlParser.resolveRewrites>[1]) => {
+      const rewrites = zenumlParser.resolveRewrites(doc, intent)
+      if (rewrites === null) throw new Error(`意图被拒绝：${JSON.stringify(intent)}`)
+      return parse(reassemble(doc, rewrites))
+    }
+
+    let doc = parse(ZENUML_TEMPLATE)
+    doc = apply(doc, { type: 'add-zenuml-participant', id: 'Logger', alias: '日志' }) // 加参与者
+    doc = apply(doc, { type: 'set-zenuml-participant-alias', elementId: 'participant:Logger', alias: '审计日志' }) // 改别名
+    doc = apply(doc, {
+      type: 'add-zenuml-message',
+      messageKind: 'async',
+      from: 'Client',
+      to: 'Logger',
+      method: 'write',
+      args: 'log',
+    }) // 加异步消息
+    doc = apply(doc, { type: 'set-zenuml-message-text', elementId: 'message:4', method: 'append', args: 'entry' }) // 改消息
+    doc = apply(doc, { type: 'delete-zenuml-message', elementId: 'message:1' }) // 删消息
+
+    const source = doc.source
+    expect(source).toContain('participant Logger as "审计日志"')
+    expect(source).toContain('Client->Logger.append(entry)')
+    await ensureZenumlRegistered()
+    expect(mermaid.detectType(source)).toBe('zenuml') // 编辑产物仍是合法 zenuml（detectType 认得）
+    expect(isZenumlSource(source)).toBe(true)
+  })
+
   it('sequence 源码 parse 通过', async () => {
     const src = `sequenceDiagram
     Alice->>Bob: 你好

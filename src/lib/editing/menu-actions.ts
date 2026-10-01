@@ -31,6 +31,7 @@ import { isValidUsecaseId, type UsecaseIntent } from '../pipeline/usecase'
 import { isValidTreeviewName, type TreeviewIntent } from '../pipeline/treeview'
 import { type EventModelingIntent } from '../pipeline/eventmodeling'
 import { isValidNewNodeId, type AgentflowIntent } from '../pipeline/agentflow'
+import { isValidZenumlId, type ZenumlIntent } from '../pipeline/zenuml'
 import { setRelationIntent, RELATION_KIND_OPTIONS } from './class-forms'
 import {
   setMessageIntent,
@@ -296,6 +297,11 @@ export function createElement(ctx: MenuActionContext, target: ContextMenuTarget 
       // agentflow（more-diagrams 工单 27）：添加入口是独立的 add-agentflow-node /
       // add-agentflow-flow 动作（新增节点不做内联命名——节点身份即源码 id，
       // 文本改名走属性表单），不走 createElement
+      return null
+    }
+    if (proj.type === 'zenuml') {
+      // zenuml（more-diagrams 工单 19）：添加入口是独立的 add-zenuml-participant /
+      // add-zenuml-message 动作（画布无 data-id，不做内联命名），不走 createElement
       return null
     }
     // mindmap：节点目标 = 挂为其子节点；空白 / 无目标 = 建根（空文档）或挂到根节点下
@@ -1056,6 +1062,8 @@ function usecaseKnownIds(proj: Extract<AnyProjection, { type: 'usecase' }>): str
   return proj.usecase.nodes.map((n) => n.id)
 }
 
+// ---------- usecase（more-diagrams 工单 26） ----------
+
 /**
  * 空白处加 actor（usecase）：落一行 `actor <id>`（id 避重占位 base `Actor`），
  * 锚点回退文档末元素（insertAfter 默认语义）。不做内联编辑——id 与标签在右侧
@@ -1185,6 +1193,42 @@ function addAgentflowFlow(ctx: MenuActionContext): void {
   const id = nextFreeName('f', used, { referential: false })
   if (!isValidNewNodeId(id)) return
   if (ctx.commitIntent({ type: 'add-flow', id, title: '新流程' } satisfies AgentflowIntent)) ctx.close()
+}
+
+// ---------- zenuml（more-diagrams 工单 19） ----------
+
+/**
+ * 空白处加参与者（zenuml）：落一行 `participant <id>`（id 避重占位 base `P`，别名留空），
+ * 锚点回退文档末元素（insertAfter 默认语义）。不做内联编辑（画布无 data-id，工单降级
+ * 定案）——id 与别名在右侧 ZenumlParticipantForm 改。选中新参与者。
+ */
+function addZenumlParticipant(ctx: MenuActionContext): void {
+  const proj = ctx.projection
+  if (proj === null || proj.type !== 'zenuml') return
+  const id = nextFreeName('P', proj.zenuml.participants.map((p) => p.id), { referential: false })
+  if (!isValidZenumlId(id)) return
+  const plan: KeyPlan = {
+    intents: [{ type: 'add-zenuml-participant', id } satisfies ZenumlIntent],
+    newElementTarget: { selection: { kind: 'zenuml-participant', elementId: `participant:${id}` } },
+  }
+  if (applyPlan(plan, { commitIntent: ctx.commitIntent, select: ctx.select })) ctx.close()
+}
+
+/**
+ * 加消息（zenuml）：表单浮出，提交才落码。空白处与消息上同一语义——表单的 from / 终点 /
+ * 方法名 / 参数在浮层里选（与 sankey-link / wardley-link 的「表单承接」同口径）。
+ */
+function addZenumlMessage(ctx: MenuActionContext): void {
+  const proj = ctx.projection
+  if (proj === null || proj.type !== 'zenuml') return
+  ctx.openForm('zenuml-message')
+}
+
+/** 改参与者别名（菜单项，双击同语义）：进入内联编辑（预填当前别名，set-zenuml-participant-alias 落码） */
+function editZenumlParticipantAlias(ctx: MenuActionContext, target: ContextMenuTarget | undefined): void {
+  if (target === undefined || target.kind !== 'zenuml-participant') return
+  ctx.beginInlineEdit({ kind: 'zenuml-participant', elementId: target.elementId })
+  ctx.close()
 }
 
 export const MENU_ACTIONS: Record<Exclude<ContextMenuItemId, 'apply-style'>, MenuAction> = {
@@ -1379,4 +1423,11 @@ export const MENU_ACTIONS: Record<Exclude<ContextMenuItemId, 'apply-style'>, Men
   'add-agentflow-flow': addAgentflowFlow,
   'edit-agentflow-node': selectMenuTargetAndClose,
   'edit-agentflow-flow': selectMenuTargetAndClose,
+  // zenuml（more-diagrams 工单 19）：空白 = 加参与者（占位 id 避重）/ 加消息（表单浮出，
+  // 提交才落码）；参与者 = 改别名（内联编辑，双击同语义）/ 删除；消息 = 改文本（D5「选中 +
+  // 关菜单」，右侧 ZenumlMessageForm 改）/ 删除；片段无元素级动作（容器，改条件走结构树 + 表单）
+  'add-zenuml-participant': addZenumlParticipant,
+  'add-zenuml-message': addZenumlMessage,
+  'edit-zenuml-participant': editZenumlParticipantAlias,
+  'edit-zenuml-message': selectMenuTargetAndClose,
 }

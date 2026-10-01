@@ -268,6 +268,9 @@ export default function App() {
                 <Menu.Item onClick={() => newDiagram('agentflow', t('newDiagram.agentflow'))}>
                   {t('newDiagram.agentflow')}
                 </Menu.Item>
+                <Menu.Item onClick={() => newDiagram('zenuml', t('newDiagram.zenuml'))}>
+                  {t('newDiagram.zenuml')}
+                </Menu.Item>
               </Menu.Dropdown>
             </Menu>
             <Button

@@ -76,6 +76,9 @@ export type NodeFormKind =
   // agentflow（more-diagrams 工单 27）：从选中节点拉一条边（from 预选，终点从既有节点下拉，
   // 提交才落码）
   | 'agentflow-edge'
+  // zenuml（more-diagrams 工单 19）：加消息（from / to / method / args 四字段，提交才落码；
+  // 空白 / 消息上均可）
+  | 'zenuml-message'
 
 export interface NodeFormState {
   kind: NodeFormKind

@@ -114,6 +114,13 @@ import {
   AgentflowNodeForm,
 } from './agentflow-forms'
 import { type AgentflowProjection } from '../lib/projection/agentflow-projection'
+import {
+  ZenumlDiagramForm,
+  ZenumlFragmentForm,
+  ZenumlMessageForm,
+  ZenumlParticipantForm,
+} from './zenuml-forms'
+import { type ZenumlProjection } from '../lib/projection/zenuml-projection'
 
 /**
  * 选中元素的属性表单，按投影图种分发（工单 04-bundle 自 PropertyPanel 迁出）：
@@ -1312,6 +1319,39 @@ function AgentflowSelectionForm({
   }
 }
 
+/**
+ * zenuml 选中表单（more-diagrams 工单 19）：图表级显示提示；参与者落到 ZenumlParticipantForm
+ * （按 elementId 寻回），消息落到 ZenumlMessageForm，片段落到 ZenumlFragmentForm。
+ */
+function ZenumlSelectionForm({
+  projection,
+  selection,
+}: {
+  projection: ZenumlProjection
+  selection: Selection | null
+}) {
+  if (selection === null) return null
+  if (selection.kind === 'diagram') {
+    return <ZenumlDiagramForm projection={projection} />
+  }
+  switch (selection.kind) {
+    case 'zenuml-participant': {
+      const part = projection.participants.find((p) => p.elementId === selection.elementId)
+      return part !== undefined ? <ZenumlParticipantForm participant={part} /> : null
+    }
+    case 'zenuml-message': {
+      const msg = projection.messages.find((m) => m.elementId === selection.elementId)
+      return msg !== undefined ? <ZenumlMessageForm message={msg} /> : null
+    }
+    case 'zenuml-fragment': {
+      const frag = projection.fragments.find((f) => f.elementId === selection.elementId)
+      return frag !== undefined ? <ZenumlFragmentForm fragment={frag} /> : null
+    }
+    default:
+      return null
+  }
+}
+
 export function ProjectionSelectionForm({ projection, selection }: { projection: AnyProjection; selection: Selection | null }) {
   if (projection.type === 'flowchart') {
     return <FlowchartSelectionForm projection={projection.flowchart} selection={selection} />
@@ -1396,6 +1436,9 @@ export function ProjectionSelectionForm({ projection, selection }: { projection:
   }
   if (projection.type === 'agentflow') {
     return <AgentflowSelectionForm projection={projection.agentflow} selection={selection} />
+  }
+  if (projection.type === 'zenuml') {
+    return <ZenumlSelectionForm projection={projection.zenuml} selection={selection} />
   }
   return <ClassSelectionForm projection={projection.class} selection={selection} />
 }
