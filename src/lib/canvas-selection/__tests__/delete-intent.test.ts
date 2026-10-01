@@ -13,6 +13,7 @@ import {
   XYCHART_TEMPLATE,
   ISHIKAWA_TEMPLATE,
   VENN_TEMPLATE,
+  USECASE_TEMPLATE,
   type AnyProjection,
 } from '../../diagram-registry'
 import type { EditIntent } from '../../pipeline/parser'
@@ -30,6 +31,7 @@ import { xychartParser } from '../../pipeline/xychart'
 import { architectureParser } from '../../pipeline/architecture'
 import { ishikawaParser } from '../../pipeline/ishikawa'
 import { vennParser } from '../../pipeline/venn'
+import { usecaseParser } from '../../pipeline/usecase'
 import { buildClassProjection } from '../../projection/class-projection'
 import { buildFlowchartProjection } from '../../projection/flowchart-projection'
 import { buildMindmapProjection } from '../../projection/mindmap-projection'
@@ -44,6 +46,7 @@ import { buildXychartProjection } from '../../projection/xychart-projection'
 import { buildArchitectureProjection } from '../../projection/architecture-projection'
 import { buildIshikawaProjection } from '../../projection/ishikawa-projection'
 import { buildVennProjection } from '../../projection/venn-projection'
+import { buildUsecaseProjection } from '../../projection/usecase-projection'
 import type { Selection } from '../../projection/selection'
 import {
   blockDeleteIntent,
@@ -60,6 +63,7 @@ import {
   architectureDeleteIntent,
   ishikawaDeleteIntent,
   vennDeleteIntent,
+  usecaseDeleteIntent,
 } from '../../editing/canvas-keyboard'
 import {
   deleteClassDefIntent,
@@ -521,6 +525,47 @@ function vennCases(p: ReturnType<typeof vennProjection>): DeleteCase[] {
   ]
 }
 
+/** usecaseProjection：usecase 投影（more-diagrams 工单 26） */
+function usecaseProjection(): Extract<AnyProjection, { type: 'usecase' }> {
+  const parsed = usecaseParser.parse(USECASE_TEMPLATE)
+  if (!parsed.ok) throw new Error(parsed.error.message)
+  return { type: 'usecase', usecase: buildUsecaseProjection(parsed.doc) }
+}
+
+/** usecase（more-diagrams 工单 26）：actor / 用例 / 关系三类删除入口各一条
+ *（删节点连带删关系与 note、删边界连带删 end 由管线负责） */
+function usecaseCases(p: ReturnType<typeof usecaseProjection>): DeleteCase[] {
+  const actor = p.usecase.nodes.find((n) => n.nodeKind === 'actor')
+  const kase = p.usecase.nodes.find((n) => n.nodeKind === 'usecase')
+  const relation = p.usecase.relations[0]
+  if (actor === undefined || kase === undefined || relation === undefined) {
+    throw new Error('USECASE_TEMPLATE 必须含 actor / 用例 / 关系')
+  }
+  return [
+    {
+      name: 'usecase-actor',
+      selection: { kind: 'usecase-actor', elementId: actor.elementId },
+      panelIntent: { type: 'delete-usecase-element', elementId: actor.elementId },
+      menuTarget: { kind: 'usecase-actor', elementId: actor.elementId },
+      menuItemId: 'delete',
+    },
+    {
+      name: 'usecase-usecase',
+      selection: { kind: 'usecase-usecase', elementId: kase.elementId },
+      panelIntent: { type: 'delete-usecase-element', elementId: kase.elementId },
+      menuTarget: { kind: 'usecase-usecase', elementId: kase.elementId },
+      menuItemId: 'delete',
+    },
+    {
+      name: 'usecase-relation',
+      selection: { kind: 'usecase-relation', elementId: relation.elementId },
+      panelIntent: { type: 'delete-usecase-relation', elementId: relation.elementId },
+      menuTarget: { kind: 'usecase-relation', elementId: relation.elementId },
+      menuItemId: 'delete',
+    },
+  ]
+}
+
 const SUITES = [
   { type: 'flowchart' as const, projection: flowProjection, cases: flowchartCases },
   { type: 'class' as const, projection: classProjection, cases: classCases },
@@ -536,6 +581,7 @@ const SUITES = [
   { type: 'architecture' as const, projection: architectureProjection, cases: architectureCases },
   { type: 'ishikawa' as const, projection: ishikawaProjection, cases: ishikawaCases },
   { type: 'venn' as const, projection: vennProjection, cases: vennCases },
+  { type: 'usecase' as const, projection: usecaseProjection, cases: usecaseCases },
 ]
 
 describe('deleteIntent 等价性：三个删除入口对同一 selection 产出同一意图（工单 03）', () => {
@@ -590,6 +636,8 @@ describe('deleteIntent 等价性：三个删除入口对同一 selection 产出�
                 return ishikawaDeleteIntent(projection.ishikawa, sel)
               case 'venn':
                 return vennDeleteIntent(projection.venn, sel)
+              case 'usecase':
+                return usecaseDeleteIntent(projection.usecase, sel)
             }
           })()
           // 键盘按选中种类设门（flowchart/mindmap 只删节点）；门内的种类必须与能力包等价
@@ -607,7 +655,8 @@ describe('deleteIntent 等价性：三个删除入口对同一 selection 产出�
             suite.type === 'xychart' ||
             suite.type === 'architecture' ||
             suite.type === 'ishikawa' ||
-            suite.type === 'venn'
+            suite.type === 'venn' ||
+            suite.type === 'usecase'
           if (!keyboardHandles) {
             expect(viaKeyboard).toBeNull() // 门外：键盘安静地不产出意图（零变化护栏）
             return
@@ -670,6 +719,7 @@ describe('deleteIntent 等价性：三个删除入口对同一 selection 产出�
           architecture: { kind: 'architecture-service', name: '__不存在__' },
           ishikawa: { kind: 'ishikawa-node', elementId: 'ishikawa-node:999' },
           venn: { kind: 'venn-set', id: '__不存在__' },
+          usecase: { kind: 'usecase-usecase', elementId: 'usecase:__不存在__' },
         }
         expect(caps.deleteIntent(projection, gone[suite.type])).toBeNull()
 

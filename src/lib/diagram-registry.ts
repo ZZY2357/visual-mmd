@@ -24,6 +24,7 @@ import { ishikawaParser } from './pipeline/ishikawa'
 import { wardleyParser } from './pipeline/wardley'
 import { vennParser } from './pipeline/venn'
 import { cynefinParser } from './pipeline/cynefin'
+import { usecaseParser } from './pipeline/usecase'
 import { frontmatterEnd } from './pipeline/frontmatter'
 import { buildFlowchartProjection, type FlowchartProjection } from './projection/flowchart-projection'
 import { buildSequenceProjection, type SequenceProjection } from './projection/sequence-projection'
@@ -61,6 +62,7 @@ import { buildIshikawaProjection, type IshikawaProjection } from './projection/i
 import { buildWardleyProjection, type WardleyProjection } from './projection/wardley-projection'
 import { buildVennProjection, type VennProjection } from './projection/venn-projection'
 import { buildCynefinProjection, type CynefinProjection } from './projection/cynefin-projection'
+import { buildUsecaseProjection, type UsecaseProjection } from './projection/usecase-projection'
 import { flowchartCanvasCapabilities } from './canvas-selection/flowchart-adapter'
 import { sequenceCanvasCapabilities } from './canvas-selection/sequence-adapter'
 import { classCanvasCapabilities } from './canvas-selection/class-adapter'
@@ -85,6 +87,7 @@ import { ishikawaCanvasCapabilities } from './canvas-selection/ishikawa-adapter'
 import { wardleyCanvasCapabilities } from './canvas-selection/wardley-adapter'
 import { vennCanvasCapabilities } from './canvas-selection/venn-adapter'
 import { cynefinCanvasCapabilities } from './canvas-selection/cynefin-adapter'
+import { usecaseCanvasCapabilities } from './canvas-selection/usecase-adapter'
 import type { CanvasCapabilities } from './canvas-selection/capabilities'
 import { treePartitions, type TreePartitions } from './structure-tree/partitions'
 import { DEFAULT_DIAGRAM_SOURCE } from './storage'
@@ -131,6 +134,7 @@ export interface ProjectionTypes {
   wardley: WardleyProjection
   venn: VennProjection
   cynefin: CynefinProjection
+  usecase: UsecaseProjection
 }
 
 /** 已注册图种的 id 集合（字面量联合，随 ProjectionTypes 增长） */
@@ -587,6 +591,27 @@ export const CYNEFIN_TEMPLATE = `cynefin-beta
 `
 
 /**
+ * usecase-beta 起步模板（more-diagrams 工单 26）：两个 actor、一个系统边界（含三个用例）、
+ * 一条注释四条连线（含 include / generalization）。注意 mermaid 词法（research §1/§2 实测）：
+ * 关键字**是 `usecase-beta`**（探测器 `/^\s*usecase-beta(?:\s|$)/`，裸 `usecase` 不认）；
+ * actor 用 `actor <id>`、用例可裸声明或用 `("标签")` / `["标签"]`；边界用 `systemBoundary … end`。
+ */
+export const USECASE_TEMPLATE = `usecase-beta
+    actor Customer("Customer")
+    actor Admin("Administrator")
+    systemBoundary shop["Online Shop"]
+        Browse("Browse products")
+        Checkout("Checkout")
+        Payment("Process payment")
+    end
+    note for Checkout "备注：结算前校验购物车"
+    Customer --> Browse
+    Customer --> Checkout
+    Checkout ..> : include Payment
+    Admin --|> Customer
+`
+
+/**
  * 注册表：数组是唯一权威（more-diagrams 工单 01），DIAGRAM_TYPES 由它推导。
  * detectDiagramType 按数组顺序显式遍历——不再维护手写的 if 分发链，
  * 新图种挂一条即可参与识别，无法识别时不再默认 flowchart（见下）。
@@ -854,6 +879,19 @@ export const DIAGRAM_TYPE_LIST: DiagramTypeRegistration[] = [
     buildProjection: (doc) => ({ type: 'cynefin', cynefin: buildCynefinProjection(doc) }),
     tree: treePartitions.cynefin,
     canvas: cynefinCanvasCapabilities,
+  },
+  {
+    id: 'usecase',
+    parser: usecaseParser,
+    template: USECASE_TEMPLATE,
+    // usecase 词法**只有 `usecase-beta`**（research §1 实测：mermaid 探测器
+    // `/^\s*usecase-beta(?:\s|$)/`、词法 `keyword("USECASE", /usecase-beta/)`；裸 `usecase`
+    // 不被认领）。声明行可同行带 `direction`（TB|TD|BT|LR|RL），与 UsecaseParser.HEADER_RE 同口径
+    detect: (source) =>
+      /^usecase-beta(?:[ \t]+(?:TB|TD|BT|LR|RL))?[ \t\r]*$/.test(firstStatementLine(source)),
+    buildProjection: (doc) => ({ type: 'usecase', usecase: buildUsecaseProjection(doc) }),
+    tree: treePartitions.usecase,
+    canvas: usecaseCanvasCapabilities,
   },
 ]
 

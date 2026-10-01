@@ -147,6 +147,17 @@ describe('detectDiagramType：无法识别 → unsupported（null），绝不默
     expect(DIAGRAM_TYPES.cynefin.detect('cynefin\ncomplex\n')).toBe(false)
   })
 
+  it('usecase-beta 识别（more-diagrams 工单 26）：只有小写关键字与可选方向修饰符；裸 usecase 不认领', () => {
+    expect(detectDiagramType('usecase-beta\n    actor A\n')?.id).toBe('usecase')
+    expect(detectDiagramType('usecase-beta TB\n    actor A\n')?.id).toBe('usecase')
+    // mermaid 探测器 `/^\s*usecase-beta(?:\s|$)/`、词法 `keyword("USECASE", /usecase-beta/)`（research §1 实测）：
+    // 裸 `usecase`、大小写变体、带其它尾随内容都不认领
+    expect(detectDiagramType('usecase\n    actor A\n')).toBeNull()
+    expect(detectDiagramType('USECASE-BETA\n')).toBeNull()
+    expect(DIAGRAM_TYPES.usecase.detect('usecase-beta extra\n    actor A\n')).toBe(false)
+    expect(DIAGRAM_TYPES.usecase.detect('usecase-betaX\n')).toBe(false)
+  })
+
   it('双关键字 detect 例（后续图种工单的写法约定）：-beta 可选且不越界误判', () => {
     // 后续 block/packet/xychart 工单应采用 `^<kw>(-beta)?\b` 形态；这里把形态锁死：
     // 可选 -beta 不妨碍裸关键字的识别，也不把更长的词（如 block-chain）误吞。

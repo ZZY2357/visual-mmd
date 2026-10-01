@@ -89,9 +89,15 @@ import { type IshikawaProjection } from '../lib/projection/ishikawa-projection'
 import { WardleyEvolveForm, WardleyLinkForm, WardleyNodeForm } from './wardley-forms'
 import { type WardleyProjection } from '../lib/projection/wardley-projection'
 import { VennAreaForm, VennDiagramForm } from './venn-forms'
+import {
+  UsecaseDiagramForm,
+  UsecaseNodeForm,
+  UsecaseRelationForm,
+} from './usecase-forms'
 import { type VennProjection } from '../lib/projection/venn-projection'
 import { CynefinDiagramForm, CynefinDomainForm, CynefinItemForm, CynefinTransitionForm } from './cynefin-forms'
 import { type CynefinProjection } from '../lib/projection/cynefin-projection'
+import { type UsecaseProjection } from '../lib/projection/usecase-projection'
 
 /**
  * 选中元素的属性表单，按投影图种分发（工单 04-bundle 自 PropertyPanel 迁出）：
@@ -1134,6 +1140,44 @@ function CynefinSelectionForm({
   }
 }
 
+/**
+ * usecase 选中表单（more-diagrams 工单 26）：图表级显示提示；actor / 用例 / 边界都落到
+ * 同一张 UsecaseNodeForm（按 elementId 在投影中寻回节点），关系落到 UsecaseRelationForm。
+ */
+function UsecaseSelectionForm({
+  projection,
+  selection,
+}: {
+  projection: UsecaseProjection
+  selection: Selection | null
+}) {
+  const { t } = useTranslation()
+  if (selection === null) {
+    return (
+      <Text size="sm" c="dimmed" px="xs">
+        {t('app:propertyPanel.nothingSelected')}
+      </Text>
+    )
+  }
+  switch (selection.kind) {
+    case 'diagram':
+      return <UsecaseDiagramForm projection={projection} />
+    case 'usecase-actor':
+    case 'usecase-usecase':
+    case 'usecase-boundary':
+    case 'usecase-note': {
+      const node = projection.nodes.find((n) => n.elementId === selection.elementId)
+      return node !== undefined ? <UsecaseNodeForm node={node} /> : null
+    }
+    case 'usecase-relation': {
+      const relation = projection.relations.find((r) => r.elementId === selection.elementId)
+      return relation !== undefined ? <UsecaseRelationForm relation={relation} /> : null
+    }
+    default:
+      return null
+  }
+}
+
 export function ProjectionSelectionForm({ projection, selection }: { projection: AnyProjection; selection: Selection | null }) {
   if (projection.type === 'flowchart') {
     return <FlowchartSelectionForm projection={projection.flowchart} selection={selection} />
@@ -1206,6 +1250,9 @@ export function ProjectionSelectionForm({ projection, selection }: { projection:
   }
   if (projection.type === 'cynefin') {
     return <CynefinSelectionForm projection={projection.cynefin} selection={selection} />
+  }
+  if (projection.type === 'usecase') {
+    return <UsecaseSelectionForm projection={projection.usecase} selection={selection} />
   }
   return <ClassSelectionForm projection={projection.class} selection={selection} />
 }

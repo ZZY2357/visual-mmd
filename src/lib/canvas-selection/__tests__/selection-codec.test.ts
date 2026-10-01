@@ -39,6 +39,13 @@ const ALL_KINDS: readonly Selection[] = [
   { kind: 'cynefin-domain', name: 'complex' },
   { kind: 'cynefin-item', elementId: 'cynefin-item:1' },
   { kind: 'cynefin-transition', elementId: 'cynefin-transition:1' },
+  // usecase（more-diagrams 工单 26）：actor / 用例 / 边界 / 注释名字即身份、关系位置序；
+  // 渲染器已写 data-id 由 nodeAnnotator 归一为 elementId，四类均经 data-id 可寻址
+  { kind: 'usecase-actor', elementId: 'actor:Customer' },
+  { kind: 'usecase-usecase', elementId: 'usecase:Login' },
+  { kind: 'usecase-boundary', elementId: 'boundary:shop' },
+  { kind: 'usecase-relation', elementId: 'relation:1' },
+  { kind: 'usecase-note', elementId: 'note:1' },
 ]
 
 /**
@@ -56,9 +63,18 @@ const ADDRESSABLE: Record<DiagramTypeId, ReadonlySet<string>> = {
   xychart: new Set(['xychart-series', 'xychart-axis', 'xychart-title']),
   // venn（more-diagrams 工单 21）：集合 / 交集经 data-venn-sets 内容键反注为 data-id
   venn: new Set(['venn-set', 'venn-union']),
+  // usecase（more-diagrams 工单 26）：四类元素（actor / 用例 / 边界 / 关系）+ 注释，
+  // 渲染器已写 data-id、由 nodeAnnotator 归一为投影 elementId，均经 data-id 可寻址
+  usecase: new Set([
+    'usecase-actor',
+    'usecase-usecase',
+    'usecase-boundary',
+    'usecase-relation',
+    'usecase-note',
+  ]),
 }
 
-const TYPES: readonly DiagramTypeId[] = ['flowchart', 'sequence', 'class', 'mindmap', 'sankey', 'xychart', 'venn']
+const TYPES: readonly DiagramTypeId[] = ['flowchart', 'sequence', 'class', 'mindmap', 'sankey', 'xychart', 'venn', 'usecase']
 
 /** data-id → CanvasSelection（与各 resolver 的产出形态一致）：
  * 节点类 data-id 即节点 id；位置序连线 data-id 即 elementId；mindmap 的画布选中 id 是 elementId */
@@ -73,7 +89,13 @@ function canvasSelectionOf(sel: Selection, dataId: string): CanvasSelection {
     sel.kind === 'xychart-title' ||
     // venn（more-diagrams 工单 21）：集合 / 交集的画布选中都是 node（data-id = elementId）
     sel.kind === 'venn-set' ||
-    sel.kind === 'venn-union'
+    sel.kind === 'venn-union' ||
+    // usecase（more-diagrams 工单 26）：四类元素 + 注释的画布选中都是 node（data-id = elementId）
+    sel.kind === 'usecase-actor' ||
+    sel.kind === 'usecase-usecase' ||
+    sel.kind === 'usecase-boundary' ||
+    sel.kind === 'usecase-relation' ||
+    sel.kind === 'usecase-note'
   ) {
     return { kind: 'node', id: dataId }
   }
@@ -99,6 +121,11 @@ describe('canvasIdOf', () => {
       'xychart-title',
       'venn-set',
       'venn-union',
+      'usecase-actor',
+      'usecase-usecase',
+      'usecase-boundary',
+      'usecase-relation',
+      'usecase-note',
     ])
     for (const sel of ALL_KINDS) {
       const dataId = canvasIdOf(sel)

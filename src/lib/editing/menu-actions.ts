@@ -27,6 +27,7 @@ import { isValidIshikawaText, type IshikawaIntent } from '../pipeline/ishikawa'
 import { isValidWardleyName, type WardleyIntent } from '../pipeline/wardley'
 import { isValidVennSetId, type VennIntent } from '../pipeline/venn'
 import { CYNEFIN_DOMAINS, type CynefinDomainName, type CynefinIntent } from '../pipeline/cynefin'
+import { isValidUsecaseId, type UsecaseIntent } from '../pipeline/usecase'
 import { setRelationIntent, RELATION_KIND_OPTIONS } from './class-forms'
 import {
   setMessageIntent,
@@ -270,6 +271,12 @@ export function createElement(ctx: MenuActionContext, target: ContextMenuTarget 
     if (proj.type === 'cynefin') {
       // cynefin（more-diagrams 工单 25）：添加入口是独立的 add-cynefin-item /
       // add-cynefin-transition 动作（画布无 data-id，不做内联命名），不走 createElement
+      return null
+    }
+    if (proj.type === 'usecase') {
+      // usecase（more-diagrams 工单 26）：添加入口是独立的 add-usecase-actor /
+      // add-usecase-case / add-usecase-boundary 动作（占位 id 避重，不做内联命名），
+      // 不走 createElement
       return null
     }
     // mindmap：节点目标 = 挂为其子节点；空白 / 无目标 = 建根（空文档）或挂到根节点下
@@ -979,6 +986,58 @@ function addVennUnion(ctx: MenuActionContext, target: ContextMenuTarget | undefi
   if (applyPlan(plan, { commitIntent: ctx.commitIntent, select: ctx.select })) ctx.close()
 }
 
+// ---------- usecase（more-diagrams 工单 26） ----------
+
+/** 全部已知源码标识符（actor / 用例 / 边界共享命名空间），供新增占位 id 避重 */
+function usecaseKnownIds(proj: Extract<AnyProjection, { type: 'usecase' }>): string[] {
+  return proj.usecase.nodes.map((n) => n.id)
+}
+
+/**
+ * 空白处加 actor（usecase）：落一行 `actor <id>`（id 避重占位 base `Actor`），
+ * 锚点回退文档末元素（insertAfter 默认语义）。不做内联编辑——id 与标签在右侧
+ * UsecaseNodeForm 改。选中新 actor。
+ */
+function addUsecaseActor(ctx: MenuActionContext): void {
+  const proj = ctx.projection
+  if (proj === null || proj.type !== 'usecase') return
+  const id = nextFreeName('Actor', usecaseKnownIds(proj))
+  if (!isValidUsecaseId(id)) return
+  const plan: KeyPlan = {
+    intents: [{ type: 'add-actor', id } satisfies UsecaseIntent],
+    newElementTarget: { selection: { kind: 'usecase-actor', elementId: `actor:${id}` } },
+  }
+  if (applyPlan(plan, { commitIntent: ctx.commitIntent, select: ctx.select })) ctx.close()
+}
+
+/** 空白处加用例（usecase）：落一行 `<id>("<占位标签>")`（id 避重 base `Usecase`），
+ * 锚点回退文档末尾。选中新用例。 */
+function addUsecaseCase(ctx: MenuActionContext): void {
+  const proj = ctx.projection
+  if (proj === null || proj.type !== 'usecase') return
+  const id = nextFreeName('Usecase', usecaseKnownIds(proj))
+  if (!isValidUsecaseId(id)) return
+  const plan: KeyPlan = {
+    intents: [{ type: 'add-usecase', id, label: '新用例', shape: 'ellipse' } satisfies UsecaseIntent],
+    newElementTarget: { selection: { kind: 'usecase-usecase', elementId: `usecase:${id}` } },
+  }
+  if (applyPlan(plan, { commitIntent: ctx.commitIntent, select: ctx.select })) ctx.close()
+}
+
+/** 空白处加系统边界（usecase）：落 `systemBoundary <id>["<占位标题>"]` … `end` 两行
+ * （id 避重 base `Boundary`），锚点回退文档末尾。选中新边界。 */
+function addUsecaseBoundary(ctx: MenuActionContext): void {
+  const proj = ctx.projection
+  if (proj === null || proj.type !== 'usecase') return
+  const id = nextFreeName('Boundary', usecaseKnownIds(proj))
+  if (!isValidUsecaseId(id)) return
+  const plan: KeyPlan = {
+    intents: [{ type: 'add-boundary', id, label: '新系统边界' } satisfies UsecaseIntent],
+    newElementTarget: { selection: { kind: 'usecase-boundary', elementId: `boundary:${id}` } },
+  }
+  if (applyPlan(plan, { commitIntent: ctx.commitIntent, select: ctx.select })) ctx.close()
+}
+
 export const MENU_ACTIONS: Record<Exclude<ContextMenuItemId, 'apply-style'>, MenuAction> = {
   // 「创建 + 选中 + 内联命名」五个入口共用 createElement（工单 01 收敛）
   'add-node': createElement,
@@ -992,11 +1051,17 @@ export const MENU_ACTIONS: Record<Exclude<ContextMenuItemId, 'apply-style'>, Men
   // add-style（空白菜单项）= 打开「添加样式」小表单；apply-style（节点子菜单）才不经分发
   'add-style': (ctx) => ctx.openStyleForm(),
   'link-from-here': (ctx, target) => {
-    // narrow 到 flowchart / state / er / architecture 节点才能带预选起点进入连线模式
+    // narrow 到 flowchart / state / er / architecture / usecase 节点才能带预选起点进入连线模式
     if (target !== undefined && target.kind === 'flowchart-node') ctx.enterLinkMode(target.nodeId)
     else if (target !== undefined && target.kind === 'state-node') ctx.enterLinkMode(target.id)
     else if (target !== undefined && target.kind === 'er-entity') ctx.enterLinkMode(target.name)
     else if (target !== undefined && target.kind === 'architecture-service') ctx.enterLinkMode(target.name)
+    else if (target !== undefined && target.kind === 'usecase-actor') {
+      // usecase：起点用**源码标识符**（不是 elementId）——关系行的端点是标识符
+      ctx.enterLinkMode(target.elementId.slice('actor:'.length))
+    } else if (target !== undefined && target.kind === 'usecase-usecase') {
+      ctx.enterLinkMode(target.elementId.slice('usecase:'.length))
+    }
   },
   'add-subgraph': addSubgraph,
   'add-member': openFormOf('member'),
@@ -1138,4 +1203,12 @@ export const MENU_ACTIONS: Record<Exclude<ContextMenuItemId, 'apply-style'>, Men
   // 元素级编辑降级到结构树 + 属性表单
   'add-cynefin-item': addCynefinItem,
   'add-cynefin-transition': openFormOf('cynefin-transition'),
+  // usecase（more-diagrams 工单 26）：空白加 actor / 加用例 / 加系统边界（占位 id 避重，
+  // 表单可改）；actor / 用例 / 边界 / 关系的标签与种类走 D5（选中 + 关菜单，
+  // 右侧 UsecaseNodeForm / UsecaseRelationForm 改）
+  'add-usecase-actor': addUsecaseActor,
+  'add-usecase-case': addUsecaseCase,
+  'add-usecase-boundary': addUsecaseBoundary,
+  'edit-usecase-element': selectMenuTargetAndClose,
+  'edit-usecase-relation': selectMenuTargetAndClose,
 }

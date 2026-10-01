@@ -156,6 +156,13 @@ export const zhDict = {
         // 元素级目标只由结构树选中构造）
         'add-cynefin-item': '添加条目',
         'add-cynefin-transition': '添加转移',
+        // usecase（more-diagrams 工单 26）：空白 = 加 actor / 加用例 / 加系统边界；
+        // actor / 用例 / 边界 = 改标签（D5 选中 + 关菜单）；关系 = 改标签与种类
+        'add-usecase-actor': '添加参与者',
+        'add-usecase-case': '添加用例',
+        'add-usecase-boundary': '添加系统边界',
+        'edit-usecase-element': '在属性面板中编辑',
+        'edit-usecase-relation': '在属性面板中编辑',
         delete: '删除',
         styleName: '样式名称',
         styleNameInvalid: '名称不能为空，且不能含空格或逗号',
@@ -203,6 +210,7 @@ export const zhDict = {
       wardley: 'Wardley 地图',
       venn: '韦恩图',
       cynefin: 'Cynefin 框架图',
+      usecase: '用例图',
     },
     library: {
       title: '图表库',
@@ -905,6 +913,30 @@ export const zhDict = {
         accTitle: '无障碍标题',
         accDescr: '无障碍描述',
       },
+      // ---- usecase（more-diagrams 工单 26） ----
+      usecaseActors: '参与者',
+      usecaseBoundaries: '系统边界',
+      usecaseCases: '用例',
+      usecaseRelations: '关系',
+      usecaseBoundaryDetail: '{{count}} 个用例',
+      usecaseTitle: '标题',
+      usecaseLabel: '标签',
+      usecaseIdentifier: '标识符',
+      usecaseIdentifierHint: '源码标识符（actor / 用例 / 边界共享命名空间，改名会连带改写引用它的关系）',
+      invalidUsecaseLabel: '标签不能为空，且不能含引号或换行',
+      invalidUsecaseId: '标识符只能是字母 / 数字 / 下划线 / 连字符，且不以数字开头',
+      usecaseActorHint: '参与者「{{id}}」：画布节点可点选；标签与标识符在此表单改。',
+      usecaseCaseHint: '用例「{{id}}」：画布节点可点选；标签与标识符在此表单改。',
+      usecaseBoundaryHint: '系统边界「{{id}}」：画布可点选；标题与标识符在此表单改。',
+      usecaseRelationHint: '{{source}} {{operator}} {{target}}',
+      usecaseRelationKind: '关系种类',
+      usecaseRelationLabel: '标签',
+      usecaseDiagramHint:
+        '用例图：参与者 {{actors}}、用例 {{cases}}、系统边界 {{boundaries}}、关系 {{relations}}。节点可在画布点选；选中参与者 / 用例后按 Tab 加用例、Enter 加参与者、Delete 删除。',
+      deleteUsecaseActor: '删除参与者（连同引用它的关系与注释）',
+      deleteUsecaseCase: '删除用例（连同引用它的关系与注释）',
+      deleteUsecaseBoundary: '删除系统边界（连同它的 end）',
+      deleteUsecaseRelation: '删除关系',
     },
     shapes: {
       rectangle: '矩形',
