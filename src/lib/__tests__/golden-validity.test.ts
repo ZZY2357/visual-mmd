@@ -98,6 +98,41 @@ describe('金样合法性：默认图表模板能被 mermaid 渲染', () => {
     await expect(mermaid.parse(XYCHART_TEMPLATE)).resolves.toBeTruthy()
   })
 
+  it('architecture 起步模板 parse 通过（more-diagrams 工单 17）', async () => {
+    const { ARCHITECTURE_TEMPLATE } = await import('../diagram-registry')
+    await expect(mermaid.parse(ARCHITECTURE_TEMPLATE)).resolves.toBeTruthy()
+  })
+
+  it('architecture 端到端编辑场景（工单 17 验收：加 service → 连到另一 service 并带箭头 → 改标题 → 移入 group → 删除一条边）落在合法 mermaid 源码上', async () => {
+    const { ARCHITECTURE_TEMPLATE } = await import('../diagram-registry')
+    const { architectureParser } = await import('../pipeline/architecture')
+    const { reassemble } = await import('../pipeline/document')
+    const parse = (src: string) => {
+      const r = architectureParser.parse(src)
+      if (!r.ok) throw new Error(`解析失败：${r.error.message}`)
+      return r.doc
+    }
+    const apply = (doc: ReturnType<typeof parse>, intent: Parameters<typeof architectureParser.resolveRewrites>[1]) => {
+      const rewrites = architectureParser.resolveRewrites(doc, intent)
+      if (rewrites === null) throw new Error(`意图被拒绝：${JSON.stringify(intent)}`)
+      return parse(reassemble(doc, rewrites))
+    }
+
+    let doc = parse(ARCHITECTURE_TEMPLATE)
+    doc = apply(doc, { type: 'add-service', id: 'api', title: 'api' }) // 加 service
+    doc = apply(doc, { type: 'add-edge', from: 'api', to: 'db', arrow: 'target', fromPort: 'R', toPort: 'L' }) // 带箭头连线
+    doc = apply(doc, { type: 'set-service-title', id: 'api', title: 'API 网关' }) // 改标题（双击内联同意图）
+    doc = apply(doc, { type: 'set-service-parent', id: 'cache', parent: 'private' }) // 移入分组（改 in 字段）
+    doc = apply(doc, { type: 'delete-edge', elementId: 'edge:3' }) // 删除一条边
+
+    const source = doc.source
+    expect(source).toContain('service api[API 网关]')
+    expect(source).toContain('api:R --> L:db')
+    expect(source).toContain('service cache(disk)[缓存] in private')
+    expect(source).not.toContain('j1:R -- L:cache')
+    await expect(mermaid.parse(source)).resolves.toBeTruthy()
+  })
+
   it('sequence 源码 parse 通过', async () => {
     const src = `sequenceDiagram
     Alice->>Bob: 你好

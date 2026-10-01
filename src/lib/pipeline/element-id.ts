@@ -229,6 +229,42 @@ export function requirementFieldElementId(ordinal: number): string {
   return `field:${ordinal}`
 }
 
+// ---------- architecture-beta（more-diagrams 工单 17） ----------
+
+/**
+ * architecture 的三类节点声明（`service:<id>` / `group:<gid>` / `junction:<jid>` / `#2`）。
+ * mermaid 的 architecture db 用一张 registeredIds 表共享 service / group / junction 的
+ * id 命名空间（重名抛错），故名字即身份、occurrence 只是解析器对非法源码的兜底；
+ * 边（`edge:N`）与对齐（`align:N`）是位置序字面量（ADR-0012），不在此编码
+ * ——`edge:N` 与 block 边共用同一前缀（图种先收窄，不会跨图种命中）。
+ */
+export function architectureServiceElementId(id: string, occurrence = 1): string {
+  return keyed('service', id, occurrence)
+}
+
+export function parseArchitectureServiceElementId(elementId: string): { id: string; occurrence: number } | null {
+  const parsed = parseKeyed('service', elementId)
+  return parsed === null ? null : { id: parsed.key, occurrence: parsed.occurrence }
+}
+
+export function architectureGroupElementId(gid: string, occurrence = 1): string {
+  return keyed('group', gid, occurrence)
+}
+
+export function parseArchitectureGroupElementId(elementId: string): { id: string; occurrence: number } | null {
+  const parsed = parseKeyed('group', elementId)
+  return parsed === null ? null : { id: parsed.key, occurrence: parsed.occurrence }
+}
+
+export function architectureJunctionElementId(id: string, occurrence = 1): string {
+  return keyed('junction', id, occurrence)
+}
+
+export function parseArchitectureJunctionElementId(elementId: string): { id: string; occurrence: number } | null {
+  const parsed = parseKeyed('junction', elementId)
+  return parsed === null ? null : { id: parsed.key, occurrence: parsed.occurrence }
+}
+
 // ---------- 下一个可用名/ID（architecture-deepening-2 工单 04） ----------
 
 export interface NextFreeNameOptions {

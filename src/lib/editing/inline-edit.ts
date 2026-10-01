@@ -13,6 +13,11 @@ import { parseBlockNodeElementId } from '../pipeline/element-id'
 import { isValidGanttTaskName } from '../pipeline/gantt'
 import { isValidQuadrantPointText } from '../pipeline/quadrant'
 import { isValidXychartText } from '../pipeline/xychart'
+import { isValidArchTitle } from '../pipeline/architecture'
+import {
+  parseArchitectureGroupElementId,
+  parseArchitectureServiceElementId,
+} from '../pipeline/element-id'
 import type { ProjectionMindmapNode } from '../projection/mindmap-projection'
 import { selectionFromEventTarget, type CanvasSelection, type DataIdResolver } from '../canvas-selection/data-id'
 
@@ -80,6 +85,9 @@ export type CanvasInlineEditTarget =
   /** xychart（more-diagrams 工单 14）：双击系列改名字（set-series-name 意图；位置序
    * elementId 寻址。轴/标题无双击——文档级属性元素，走右侧属性表单） */
   | { kind: 'xychart-series'; elementId: string }
+  /** architecture（more-diagrams 工单 17）：双击 service / group 改标题（set-service-title /
+   * set-group-title 意图；id 是语法标识不在此改。junction 无标题、边不可寻址——不接双击） */
+  | { kind: 'architecture'; elementKind: 'service' | 'group'; id: string }
 
 export type InlineEditCommit =
   | { action: 'commit'; intent: EditIntent }
@@ -165,6 +173,7 @@ export type InlineEditDiagramKind =
   | 'gantt'
   | 'quadrant'
   | 'xychart'
+  | 'architecture'
 
 /**
  * 双击目标 → 编辑对象；两边都匹配不上时返回 null（如点在空白处/边上），
@@ -227,6 +236,15 @@ export function inlineEditTargetFromEvent(
       return /^series:[1-9][0-9]*$/.test(byId.nodeId)
         ? { kind: 'xychart-series', elementId: byId.nodeId }
         : null
+    }
+    // architecture（more-diagrams 工单 17）：resolver 返回 node.id = 投影 elementId
+    // （`service:<id>` / `group:<gid>` / `junction:<jid>`，渲染后从 DOM id 反注）；
+    // 只有 service / group 可双击（改标题），junction 双击安静忽略
+    if (kind === 'architecture') {
+      const service = parseArchitectureServiceElementId(byId.nodeId)
+      if (service !== null) return { kind: 'architecture', elementKind: 'service', id: service.id }
+      const group = parseArchitectureGroupElementId(byId.nodeId)
+      return group !== null ? { kind: 'architecture', elementKind: 'group', id: group.id } : null
     }
     return byId
   }
@@ -307,6 +325,19 @@ export function inlineEditCommitOf(target: CanvasInlineEditTarget, text: string,
     // 顶部守卫已把清空按 unchanged 关闭）
     if (!isValidXychartText(next)) return { action: 'invalid' }
     return { action: 'commit', intent: { type: 'set-series-name', elementId: target.elementId, name: next } }
+  }
+  if (target.kind === 'architecture') {
+    // architecture（more-diagrams 工单 17）：非空改动 = set-service-title / set-group-title
+    //（标题含方括号/换行非法；清空 = 去掉 [title]（显示回落 id）——清空已被顶部守卫按
+    // unchanged 关闭，走属性表单而非双击）
+    if (!isValidArchTitle(next)) return { action: 'invalid' }
+    return {
+      action: 'commit',
+      intent:
+        target.elementKind === 'service'
+          ? { type: 'set-service-title', id: target.id, title: next }
+          : { type: 'set-group-title', id: target.id, title: next },
+    }
   }
   if (!isValidMindmapNodeText(next)) return { action: 'invalid' }
   return { action: 'commit', intent: { type: 'set-node-text', elementId: target.elementId, text: next } }

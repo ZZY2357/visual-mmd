@@ -90,6 +90,15 @@ export type Selection =
   | { kind: 'xychart-series'; elementId: string }
   | { kind: 'xychart-axis'; axis: 'x' | 'y' }
   | { kind: 'xychart-title' }
+  // architecture-beta（more-diagrams 工单 17）：三类节点（service / group / junction）
+  // 是**名字即身份**（mermaid db 的 registeredIds 共享命名空间，重名抛出）；边走位置序
+  // 身份（`edge:N`，与 block 边同前缀、图种先收窄）。节点 DOM id 带源码 id（渲染后反注
+  // 可寻址）；边不可寻址（见 architecture-adapter），选中只来自结构树 / 表单 / 键盘。
+  | { kind: 'architecture-service'; name: string }
+  | { kind: 'architecture-group'; name: string }
+  | { kind: 'architecture-junction'; name: string }
+  | { kind: 'architecture-edge'; elementId: string }
+  | { kind: 'architecture-align'; elementId: string }
 
 export const DIAGRAM_SELECTION: Selection = { kind: 'diagram' }
 
@@ -197,6 +206,16 @@ export function selectionKey(sel: Selection): string {
       return `xychart-axis:${sel.axis}`
     case 'xychart-title':
       return 'xychart-title'
+    case 'architecture-service':
+      return `architecture-service:${sel.name}`
+    case 'architecture-group':
+      return `architecture-group:${sel.name}`
+    case 'architecture-junction':
+      return `architecture-junction:${sel.name}`
+    case 'architecture-edge':
+      return `architecture-edge:${sel.elementId}`
+    case 'architecture-align':
+      return `architecture-align:${sel.elementId}`
   }
 }
 

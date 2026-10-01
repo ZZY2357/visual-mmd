@@ -207,6 +207,35 @@ export function annotateQuadrantDataIds(
   }
 }
 
+/**
+ * mermaid v12 architecture-beta（more-diagrams 工单 17）：渲染器给三类节点写带源码 id 的
+ * DOM id（离线核查 `architectureDiagram-*.mjs`）：service 外层 `g.architecture-service` id 为
+ * `${diagramId}-service-${id}`、背景 path id 为 `${diagramId}-node-${id}`；junction rect id
+ * 为 `${diagramId}-node-${id}`；group 背景 path id 为 `${diagramId}-group-${id}`。三类节点
+ * 共享 id 命名空间（db 的 registeredIds），按 svgId 前缀剥离得回源码 id 反注 data-id。
+ * 作用域限定在 svg 内 `-service-` / `-node-` / `-group-` 三种带 svgId 前缀的 id 形态
+ * （注册图种中只有 architecture 用这三个词元；flowchart `-flowchart-` / state `-state-`
+ * / kanban 裸后缀 / requirement 前缀剥离都在各自专属形态里先反注，幂等跳过已标注者）。
+ * 门卫：`.architecture-service` 是渲染器专属 class——junction-only（无 service）的文档
+ * 不命中门卫、整体不反注（如实降级，见 architecture-adapter 注释）。幂等。
+ */
+export function annotateArchitectureDataIds(root: ParentNode): void {
+  if (root.querySelector('.architecture-service') === null) return
+  const svgId = root.querySelector('svg')?.getAttribute('id') ?? ''
+  if (svgId === '') return
+  const prefix = `${svgId}-`
+  const form = /^(?:service|node|group)-(.+)$/
+  for (const el of root.querySelectorAll('svg [id]')) {
+    if (el.getAttribute('data-id') !== null) continue
+    const domId = el.getAttribute('id')
+    if (domId === null || !domId.startsWith(prefix)) continue
+    const m = form.exec(domId.slice(prefix.length))
+    const nodeId = m !== null ? m[1] : null
+    if (nodeId === null || nodeId === '') continue
+    el.setAttribute('data-id', nodeId)
+  }
+}
+
 export function annotateNodeDataIds(root: ParentNode): void {
   for (const g of root.querySelectorAll('g.node')) {
     if (g.getAttribute('data-id') !== null) continue

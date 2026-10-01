@@ -14,6 +14,9 @@ import {
 import { blockSelectionOf } from './block-adapter'
 import { xychartSelectionOf } from './xychart-adapter'
 import {
+  parseArchitectureGroupElementId,
+  parseArchitectureJunctionElementId,
+  parseArchitectureServiceElementId,
   parseBlockGroupElementId,
   parseBlockNodeElementId,
 } from '../pipeline/element-id'
@@ -121,6 +124,14 @@ export function canvasIdOf(selection: Selection): string | null {
       return 'xychart-title'
     case 'xychart-axis':
       return selection.axis === 'x' ? 'xychart-x-axis' : 'xychart-y-axis'
+    // architecture（more-diagrams 工单 17）：三类节点 data-id 即源码 id（渲染后从
+    // `-service-` / `-node-` / `-group-` 词元的 DOM id 反注）；边不可寻址（DOM id 是
+    // `L_{from}_{to}_0`，计数器恒 0、重复边互相覆盖，见 architecture-adapter），
+    // align 不产生画布元素——安静地不高亮。
+    case 'architecture-service':
+    case 'architecture-group':
+    case 'architecture-junction':
+      return selection.name
     default:
       return null
   }
@@ -197,6 +208,19 @@ export function fromCanvasId(diagramType: DiagramTypeId, canvas: CanvasSelection
     // xychart（more-diagrams 工单 14）：node.id = `series:N` / 固定身份（类名组反注），
     // 唯一映射在 xychartSelectionOf
     if (canvas.kind === 'node') return xychartSelectionOf(canvas)
+    return null
+  }
+  if (diagramType === 'architecture') {
+    // architecture（more-diagrams 工单 17）：node.id = 投影 elementId（带前缀，按前缀解回
+    // 三类节点）；边不可寻址（element 分支收不到），画布元素选中不产生
+    if (canvas.kind === 'node') {
+      const service = parseArchitectureServiceElementId(canvas.id)
+      if (service !== null) return { kind: 'architecture-service', name: service.id }
+      const group = parseArchitectureGroupElementId(canvas.id)
+      if (group !== null) return { kind: 'architecture-group', name: group.id }
+      const junction = parseArchitectureJunctionElementId(canvas.id)
+      return junction !== null ? { kind: 'architecture-junction', name: junction.id } : null
+    }
     return null
   }
   if (canvas.kind === 'element') return edgeSelectionOf(diagramType, canvas.elementId)
@@ -284,6 +308,15 @@ export function selectionOfMenuTarget(target: ContextMenuTarget): Selection | nu
       return { kind: 'xychart-axis', axis: target.axis }
     case 'xychart-title':
       return { kind: 'xychart-title' }
+    // architecture（more-diagrams 工单 17）：三类节点 / 边菜单目标一一对应各自 Selection kind
+    case 'architecture-service':
+      return { kind: 'architecture-service', name: target.name }
+    case 'architecture-group':
+      return { kind: 'architecture-group', name: target.name }
+    case 'architecture-junction':
+      return { kind: 'architecture-junction', name: target.name }
+    case 'architecture-edge':
+      return { kind: 'architecture-edge', elementId: target.elementId }
     case 'blank':
       return null
   }
@@ -381,6 +414,16 @@ export function menuTargetOfCanvas(
     // xychart（more-diagrams 工单 14）：node.id = `series:N` / 固定身份（类名组反注），
     // 唯一映射在 xychartSelectionOf
     if (diagramType === 'xychart') return xychartMenuTargetOf(canvas)
+    // architecture（more-diagrams 工单 17）：node.id = 投影 elementId（带前缀），按前缀
+    // 解回三类节点；都解不开 → null（安静地不弹菜单）。边不可寻址，无边菜单目标。
+    if (diagramType === 'architecture') {
+      const service = parseArchitectureServiceElementId(canvas.id)
+      if (service !== null) return { kind: 'architecture-service', name: service.id }
+      const group = parseArchitectureGroupElementId(canvas.id)
+      if (group !== null) return { kind: 'architecture-group', name: group.id }
+      const junction = parseArchitectureJunctionElementId(canvas.id)
+      return junction !== null ? { kind: 'architecture-junction', name: junction.id } : null
+    }
     return { kind: 'sequence-participant', actorId: canvas.id }
   }
   if (canvas.kind === 'element') {

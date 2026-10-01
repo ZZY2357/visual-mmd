@@ -24,6 +24,7 @@ import { sankeyDataIdResolver } from '../../canvas-selection/sankey-adapter'
 import { ganttDataIdResolver } from '../../canvas-selection/gantt-adapter'
 import { quadrantDataIdResolver } from '../../canvas-selection/quadrant-adapter'
 import { xychartDataIdResolver } from '../../canvas-selection/xychart-adapter'
+import { architectureDataIdResolver } from '../../canvas-selection/architecture-adapter'
 import { nodeDataIdResolver, elementDataIdResolver } from '../../canvas-selection/data-id'
 import type { AnyProjection } from '../../diagram-registry'
 import { useCanvasContextMenu, type NodeFormState } from '../use-canvas-context-menu'
@@ -124,6 +125,8 @@ function resolverOf(projection: AnyProjection) {
   if (projection.type === 'quadrant') return quadrantDataIdResolver(projection.quadrant)
   // xychart（more-diagrams 工单 14）：系列/标题/轴（类名组反注，node.id = elementId 或固定身份）
   if (projection.type === 'xychart') return xychartDataIdResolver(projection.xychart)
+  // architecture（more-diagrams 工单 17）：三类节点 data-id 即源码 id（DOM id 反注，node.id = elementId）
+  if (projection.type === 'architecture') return architectureDataIdResolver(projection.architecture)
   const nodes = nodeDataIdResolver(projection.class.classes.map((c) => c.name))
   const edges = elementDataIdResolver(projection.class.relations.map((r) => r.elementId))
   return (dataId: string) => nodes(dataId) ?? edges(dataId)
@@ -160,6 +163,9 @@ function createdIdOf(target: CanvasInlineEditTarget): string {
       return target.elementId
     case 'xychart-series':
       return target.elementId
+    // architecture（more-diagrams 工单 17）：service / group 添加进内联命名标题（junction 不进）
+    case 'architecture':
+      return target.id
   }
 }
 

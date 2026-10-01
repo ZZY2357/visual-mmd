@@ -238,6 +238,8 @@ describe('结构树分区描述（工单 06）', () => {
       quadrant:
         'quadrantChart\n    title 优先级\n    x-axis 低 --> 高\n    y-axis 低 --> 高\n    quadrant-1 甲\n    quadrant-2 乙\n    quadrant-3 丙\n    quadrant-4 丁\n    A: [0.3, 0.6]',
       xychart: 'xychart-beta\n    title "T"\n    x-axis [a, b, c]\n    y-axis "v" 0 --> 10\n    bar [1, 2, 3]',
+      architecture:
+        'architecture-beta\n    group platform(cloud)[平台]\n    service web(server)[Web]\n    service db(database)[数据库] in platform\n    web:R -- L:db',
     }
     for (const id of Object.keys(DIAGRAM_TYPES) as (keyof typeof DIAGRAM_TYPES)[]) {
       const registration = DIAGRAM_TYPES[id]
