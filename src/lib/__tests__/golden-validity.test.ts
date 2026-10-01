@@ -113,6 +113,42 @@ describe('金样合法性：默认图表模板能被 mermaid 渲染', () => {
     await expect(mermaid.parse(TREEMAP_TEMPLATE)).resolves.toBeTruthy()
   })
 
+  it('venn 起步模板 parse 通过（more-diagrams 工单 21）', async () => {
+    const { VENN_TEMPLATE } = await import('../diagram-registry')
+    await expect(mermaid.parse(VENN_TEMPLATE)).resolves.toBeTruthy()
+  })
+
+  it('venn 端到端编辑场景（工单 21 验收：加集合 → 改标签 → 加交集 → 改尺寸 → 删集合）落在合法 mermaid 源码上', async () => {
+    const { VENN_TEMPLATE } = await import('../diagram-registry')
+    const { vennParser } = await import('../pipeline/venn')
+    const { reassemble } = await import('../pipeline/document')
+    const parse = (src: string) => {
+      const r = vennParser.parse(src)
+      if (!r.ok) throw new Error(`解析失败：${r.error.message}`)
+      return r.doc
+    }
+    const apply = (doc: ReturnType<typeof parse>, intent: Parameters<typeof vennParser.resolveRewrites>[1]) => {
+      const rewrites = vennParser.resolveRewrites(doc, intent)
+      if (rewrites === null) throw new Error(`意图被拒绝：${JSON.stringify(intent)}`)
+      return parse(reassemble(doc, rewrites))
+    }
+
+    let doc = parse(VENN_TEMPLATE)
+    doc = apply(doc, { type: 'add-set', id: 'design' }) // 加集合（追加文档末尾）
+    doc = apply(doc, { type: 'set-label', elementId: 'venn-set:design', label: '设计' }) // 改标签
+    doc = apply(doc, { type: 'add-union', ids: ['design', 'frontend'], label: '交互' }) // 加交集
+    doc = apply(doc, { type: 'set-size', elementId: 'venn-set:design', size: '20' }) // 改尺寸
+    doc = apply(doc, { type: 'set-title', text: '能力矩阵' }) // 改标题（原地改既有 title 行）
+    doc = apply(doc, { type: 'delete-area', elementId: 'venn-set:devops' }) // 删集合（级联删引用它的交集由管线负责）
+
+    const source = doc.source
+    expect(source).toContain('set design["设计"]: 20')
+    expect(source).toContain('union design,frontend["交互"]')
+    expect(source).toContain('title 能力矩阵')
+    expect(source).not.toContain('set devops')
+    await expect(mermaid.parse(source)).resolves.toBeTruthy()
+  })
+
   it('treemap 端到端编辑场景（工单 20 验收：加分组 → 组内加叶子 → 改叶子数值 → 改名 → 删子树）落在合法 mermaid 源码上', async () => {
     const { TREEMAP_TEMPLATE } = await import('../diagram-registry')
     const { treemapParser } = await import('../pipeline/treemap')
@@ -144,8 +180,7 @@ describe('金样合法性：默认图表模板能被 mermaid 渲染', () => {
     await expect(mermaid.parse(source)).resolves.toBeTruthy()
   })
 
-  it('architecture 端到端编辑场景（工单 17 验收：加 service → 连到另一 service 并带箭头 → 改标题 → 移入 group → 删除一条边）落在合法 mermaid 源码上', async () => {
-    const { ARCHITECTURE_TEMPLATE } = await import('../diagram-registry')
+  it('architecture 端到端编辑场景（工单 17 验收：加 service → 连到另一 service 并带箭头 → 改标题 → 移入 group → 删除一条边）落在合法 mermaid 源码上', async () => {    const { ARCHITECTURE_TEMPLATE } = await import('../diagram-registry')
     const { architectureParser } = await import('../pipeline/architecture')
     const { reassemble } = await import('../pipeline/document')
     const parse = (src: string) => {

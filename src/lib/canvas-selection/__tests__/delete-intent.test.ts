@@ -11,6 +11,7 @@ import {
   SEQUENCE_TEMPLATE,
   TIMELINE_TEMPLATE,
   XYCHART_TEMPLATE,
+  VENN_TEMPLATE,
   type AnyProjection,
 } from '../../diagram-registry'
 import type { EditIntent } from '../../pipeline/parser'
@@ -26,6 +27,7 @@ import { ganttParser } from '../../pipeline/gantt'
 import { packetParser } from '../../pipeline/packet'
 import { xychartParser } from '../../pipeline/xychart'
 import { architectureParser } from '../../pipeline/architecture'
+import { vennParser } from '../../pipeline/venn'
 import { buildClassProjection } from '../../projection/class-projection'
 import { buildFlowchartProjection } from '../../projection/flowchart-projection'
 import { buildMindmapProjection } from '../../projection/mindmap-projection'
@@ -38,6 +40,7 @@ import { buildGanttProjection } from '../../projection/gantt-projection'
 import { buildPacketProjection } from '../../projection/packet-projection'
 import { buildXychartProjection } from '../../projection/xychart-projection'
 import { buildArchitectureProjection } from '../../projection/architecture-projection'
+import { buildVennProjection } from '../../projection/venn-projection'
 import type { Selection } from '../../projection/selection'
 import {
   blockDeleteIntent,
@@ -52,6 +55,7 @@ import {
   timelineDeleteIntent,
   xychartDeleteIntent,
   architectureDeleteIntent,
+  vennDeleteIntent,
 } from '../../editing/canvas-keyboard'
 import {
   deleteClassDefIntent,
@@ -462,6 +466,35 @@ function architectureCases(p: ReturnType<typeof architectureProjection>): Delete
   return cases
 }
 
+/** vennProjection：venn 投影（more-diagrams 工单 21） */
+function vennProjection(): Extract<AnyProjection, { type: 'venn' }> {
+  const parsed = vennParser.parse(VENN_TEMPLATE)
+  if (!parsed.ok) throw new Error(parsed.error.message)
+  return { type: 'venn', venn: buildVennProjection(parsed.doc) }
+}
+
+/** venn（more-diagrams 工单 21）：集合 / 交集两类删除入口各一条（删集合连带删交集由管线负责） */
+function vennCases(p: ReturnType<typeof vennProjection>): DeleteCase[] {
+  const set = p.venn.sets[0]
+  const union = p.venn.unions[0]
+  return [
+    {
+      name: 'venn-set',
+      selection: { kind: 'venn-set', id: set.ids[0] },
+      panelIntent: { type: 'delete-area', elementId: set.elementId },
+      menuTarget: { kind: 'venn-set', id: set.ids[0] },
+      menuItemId: 'delete',
+    },
+    {
+      name: 'venn-union',
+      selection: { kind: 'venn-union', elementId: union.elementId },
+      panelIntent: { type: 'delete-area', elementId: union.elementId },
+      menuTarget: { kind: 'venn-union', elementId: union.elementId },
+      menuItemId: 'delete',
+    },
+  ]
+}
+
 const SUITES = [
   { type: 'flowchart' as const, projection: flowProjection, cases: flowchartCases },
   { type: 'class' as const, projection: classProjection, cases: classCases },
@@ -475,6 +508,7 @@ const SUITES = [
   { type: 'packet' as const, projection: packetProjection, cases: packetCases },
   { type: 'xychart' as const, projection: xychartProjection, cases: xychartCases },
   { type: 'architecture' as const, projection: architectureProjection, cases: architectureCases },
+  { type: 'venn' as const, projection: vennProjection, cases: vennCases },
 ]
 
 describe('deleteIntent 等价性：三个删除入口对同一 selection 产出同一意图（工单 03）', () => {
@@ -525,6 +559,8 @@ describe('deleteIntent 等价性：三个删除入口对同一 selection 产出�
                 return xychartDeleteIntent(projection.xychart, sel)
               case 'architecture':
                 return architectureDeleteIntent(projection.architecture, sel)
+              case 'venn':
+                return vennDeleteIntent(projection.venn, sel)
             }
           })()
           // 键盘按选中种类设门（flowchart/mindmap 只删节点）；门内的种类必须与能力包等价
@@ -540,7 +576,8 @@ describe('deleteIntent 等价性：三个删除入口对同一 selection 产出�
             suite.type === 'gantt' ||
             suite.type === 'packet' ||
             suite.type === 'xychart' ||
-            suite.type === 'architecture'
+            suite.type === 'architecture' ||
+            suite.type === 'venn'
           if (!keyboardHandles) {
             expect(viaKeyboard).toBeNull() // 门外：键盘安静地不产出意图（零变化护栏）
             return
@@ -601,6 +638,7 @@ describe('deleteIntent 等价性：三个删除入口对同一 selection 产出�
           packet: { kind: 'packet-field', elementId: 'field:999' },
           xychart: { kind: 'xychart-series', elementId: 'series:999' },
           architecture: { kind: 'architecture-service', name: '__不存在__' },
+          venn: { kind: 'venn-set', id: '__不存在__' },
         }
         expect(caps.deleteIntent(projection, gone[suite.type])).toBeNull()
 

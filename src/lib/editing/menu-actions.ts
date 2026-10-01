@@ -23,6 +23,7 @@ import { isValidKanbanId } from '../pipeline/kanban'
 import { isValidBlockId } from '../pipeline/block'
 import { isValidArchId, type ArchitectureIntent } from '../pipeline/architecture'
 import { isValidTreemapName, isValidTreemapValue, type TreemapIntent } from '../pipeline/treemap'
+import { isValidVennSetId, type VennIntent } from '../pipeline/venn'
 import { setRelationIntent, RELATION_KIND_OPTIONS } from './class-forms'
 import {
   setMessageIntent,
@@ -245,6 +246,11 @@ export function createElement(ctx: MenuActionContext, target: ContextMenuTarget 
     if (proj.type === 'treemap') {
       // treemap（more-diagrams 工单 20）：添加入口是独立的 add-treemap-group /
       // add-treemap-leaf 动作（画布无 data-id，不做内联命名），不走 createElement
+      return null
+    }
+    if (proj.type === 'venn') {
+      // venn（more-diagrams 工单 21）：添加入口是独立的 add-venn-set / add-venn-union
+      // 动作（占位 id/交集避重，不做内联命名——命名交给属性表单），不走 createElement
       return null
     }
     // mindmap：节点目标 = 挂为其子节点；空白 / 无目标 = 建根（空文档）或挂到根节点下
@@ -810,6 +816,54 @@ function addArchitectureNode(
   }
 }
 
+// ---------- venn（more-diagrams 工单 21） ----------
+
+/**
+ * 空白处加集合（venn）：落一行 `set <id>`（id 避重占位），锚点回退文档末元素
+ * （insertAfter 默认语义）。不做内联编辑（与 pie/treemap 降级同口径）——id 与标签在
+ * 右侧 VennAreaForm 改。选中新集合。
+ */
+function addVennSet(ctx: MenuActionContext): void {
+  const proj = ctx.projection
+  if (proj === null || proj.type !== 'venn') return
+  const id = proj.venn.nextSetId
+  if (!isValidVennSetId(id)) return
+  const plan: KeyPlan = {
+    intents: [{ type: 'add-set', id } satisfies VennIntent],
+    newElementTarget: { selection: { kind: 'venn-set', id } },
+  }
+  if (applyPlan(plan, { commitIntent: ctx.commitIntent, select: ctx.select })) ctx.close()
+}
+
+/**
+ * 加交集（venn）：落一行 `union <a>,<b>`（不足两个集合则无动作——交集至少两个 id），
+ * 锚点回退文档末尾。集合上右键时以该集合首 id 与文档序相邻集合首 id 组交集（与键盘
+ * Enter 同口径）；空白处取文档序前两个集合。选中新交集（elementId 按位置序预测）。
+ */
+function addVennUnion(ctx: MenuActionContext, target: ContextMenuTarget | undefined): void {
+  const proj = ctx.projection
+  if (proj === null || proj.type !== 'venn') return
+  const p = proj.venn
+  let a: string | undefined
+  let b: string | undefined
+  if (target !== undefined && target.kind === 'venn-set') {
+    const idx = p.sets.findIndex((s) => s.ids[0] === target.id)
+    if (idx === -1) return
+    a = p.sets[idx].ids[0]
+    // 优先与后一个集合组交集；已是最后一个则与前一个集合组（仍保证两个不同集合）
+    b = p.sets[idx + 1]?.ids[0] ?? p.sets[idx - 1]?.ids[0]
+  } else {
+    a = p.sets[0]?.ids[0]
+    b = p.sets[1]?.ids[0]
+  }
+  if (a === undefined || b === undefined || a === b) return
+  const plan: KeyPlan = {
+    intents: [{ type: 'add-union', ids: [a, b] } satisfies VennIntent],
+    newElementTarget: { selection: { kind: 'venn-union', elementId: `venn-union:${p.nextUnionOrdinal}` } },
+  }
+  if (applyPlan(plan, { commitIntent: ctx.commitIntent, select: ctx.select })) ctx.close()
+}
+
 export const MENU_ACTIONS: Record<Exclude<ContextMenuItemId, 'apply-style'>, MenuAction> = {
   // 「创建 + 选中 + 内联命名」五个入口共用 createElement（工单 01 收敛）
   'add-node': createElement,
@@ -949,4 +1003,11 @@ export const MENU_ACTIONS: Record<Exclude<ContextMenuItemId, 'apply-style'>, Men
   // 元素级编辑降级到结构树 + 属性表单
   'add-treemap-group': (ctx) => addTreemapRoot(ctx, 'section'),
   'add-treemap-leaf': (ctx) => addTreemapRoot(ctx, 'leaf'),
+  // venn（more-diagrams 工单 21）：空白加集合 / 加交集（占位 id / 两个集合组二元交集，
+  // 表单可改）；集合 / 交集的标签与尺寸走 D5（选中 + 关菜单，右侧 VennAreaForm 改）；
+  // 集合上「加集合」/「加交集」与空白同语义（锚点/成员由 addVenn* 按目标算）
+  'add-venn-set': addVennSet,
+  'add-venn-union': addVennUnion,
+  'add-venn-union-here': addVennUnion,
+  'edit-venn-area': selectMenuTargetAndClose,
 }

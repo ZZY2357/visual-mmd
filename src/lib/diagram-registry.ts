@@ -20,6 +20,7 @@ import { xychartParser } from './pipeline/xychart'
 import { radarParser } from './pipeline/radar'
 import { architectureParser } from './pipeline/architecture'
 import { treemapParser } from './pipeline/treemap'
+import { vennParser } from './pipeline/venn'
 import { frontmatterEnd } from './pipeline/frontmatter'
 import { buildFlowchartProjection, type FlowchartProjection } from './projection/flowchart-projection'
 import { buildSequenceProjection, type SequenceProjection } from './projection/sequence-projection'
@@ -53,6 +54,7 @@ import {
   type ArchitectureProjection,
 } from './projection/architecture-projection'
 import { buildTreemapProjection, type TreemapProjection } from './projection/treemap-projection'
+import { buildVennProjection, type VennProjection } from './projection/venn-projection'
 import { flowchartCanvasCapabilities } from './canvas-selection/flowchart-adapter'
 import { sequenceCanvasCapabilities } from './canvas-selection/sequence-adapter'
 import { classCanvasCapabilities } from './canvas-selection/class-adapter'
@@ -73,6 +75,7 @@ import { xychartCanvasCapabilities } from './canvas-selection/xychart-adapter'
 import { radarCanvasCapabilities } from './canvas-selection/radar-adapter'
 import { architectureCanvasCapabilities } from './canvas-selection/architecture-adapter'
 import { treemapCanvasCapabilities } from './canvas-selection/treemap-adapter'
+import { vennCanvasCapabilities } from './canvas-selection/venn-adapter'
 import type { CanvasCapabilities } from './canvas-selection/capabilities'
 import { treePartitions, type TreePartitions } from './structure-tree/partitions'
 import { DEFAULT_DIAGRAM_SOURCE } from './storage'
@@ -115,6 +118,7 @@ export interface ProjectionTypes {
   radar: RadarProjection
   architecture: ArchitectureProjection
   treemap: TreemapProjection
+  venn: VennProjection
 }
 
 /** 已注册图种的 id 集合（字面量联合，随 ProjectionTypes 增长） */
@@ -480,6 +484,21 @@ export const TREEMAP_TEMPLATE = `treemap
 `
 
 /**
+ * venn-beta 起步模板（more-diagrams 工单 21）：title、三个集合（其一无 label、其一带尺寸）
+ * 与两个交集（二元 + 三元，各带 label）。注意 mermaid 词法（research §8 实测）：
+ * 关键字**只有小写 `venn-beta`**（探测器 `/^\s*venn-beta/` 大小写敏感，裸 `venn` 不认）；
+ * label 用 `["…"]`、尺寸用 `: <数值>` 段；三角形交集（A∩B∩C）mermaid 会渲染。
+ */
+export const VENN_TEMPLATE = `venn-beta
+    title 团队技能分布
+    set frontend["前端"]
+    set backend["后端"]
+    set devops
+    union frontend,backend["全栈"]
+    union frontend,backend,devops["平台工程"]
+`
+
+/**
  * 注册表：数组是唯一权威（more-diagrams 工单 01），DIAGRAM_TYPES 由它推导。
  * detectDiagramType 按数组顺序显式遍历——不再维护手写的 if 分发链，
  * 新图种挂一条即可参与识别，无法识别时不再默认 flowchart（见下）。
@@ -699,6 +718,18 @@ export const DIAGRAM_TYPE_LIST: DiagramTypeRegistration[] = [
     buildProjection: (doc) => ({ type: 'treemap', treemap: buildTreemapProjection(doc) }),
     tree: treePartitions.treemap,
     canvas: treemapCanvasCapabilities,
+  },
+  {
+    id: 'venn',
+    parser: vennParser,
+    template: VENN_TEMPLATE,
+    // venn 词法**只有小写 `venn-beta`**（research §8 实测：mermaid 探测器
+    // `/^\s*venn-beta/` 大小写敏感、无 `(-beta)?` 分支，裸 `venn` 不被认领）。
+    // 声明行必须是裸关键字（行尾只允许空白，与 VennParser.HEADER_RE 同口径）
+    detect: (source) => /^venn-beta[ \t\r]*$/.test(firstStatementLine(source)),
+    buildProjection: (doc) => ({ type: 'venn', venn: buildVennProjection(doc) }),
+    tree: treePartitions.venn,
+    canvas: vennCanvasCapabilities,
   },
 ]
 

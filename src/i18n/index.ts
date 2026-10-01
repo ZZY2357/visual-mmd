@@ -140,6 +140,12 @@ export const zhDict = {
         // treemap（more-diagrams 工单 20）：空白菜单（画布 DOM 无 data-id，无元素级菜单项）
         'add-treemap-group': '添加分组',
         'add-treemap-leaf': '添加叶子',
+        // venn（more-diagrams 工单 21）：空白 = 加集合 / 加交集；集合 / 交集 = 改标签与
+        // 尺寸（D5 选中 + 关菜单）；集合上另有加集合 / 加交集
+        'add-venn-set': '添加集合',
+        'add-venn-union': '添加交集',
+        'add-venn-union-here': '添加交集',
+        'edit-venn-area': '在属性面板中编辑',
         delete: '删除',
         styleName: '样式名称',
         styleNameInvalid: '名称不能为空，且不能含空格或逗号',
@@ -183,6 +189,7 @@ export const zhDict = {
       radar: '雷达图',
       architecture: '架构图',
       treemap: '矩形树图',
+      venn: '韦恩图',
     },
     library: {
       title: '图表库',
@@ -778,6 +785,21 @@ export const zhDict = {
       treemapDiagramHint:
         '矩形树图：在结构树中选中节点编辑名称与数值；选中分组后按 Tab 加叶子子节点、Enter 加同级叶子、Delete 删除。画布不提供点选（mermaid 渲染无 data-id）。',
       deleteTreemapNode: '删除节点（连同子树）',
+      // ---- venn（more-diagrams 工单 21） ----
+      vennSets: '集合',
+      vennUnions: '交集',
+      vennTitle: '标题',
+      vennLabel: '标签',
+      vennSize: '尺寸',
+      vennSizeHint: '集合 / 交集圆面积（mermaid 数值，无千分位逗号）',
+      invalidVennLabel: '标签不能为空，且不能含引号或换行',
+      invalidVennSize: '尺寸只能是数字（可选正负号与小数点，无千分位逗号）',
+      vennSetHint: '集合「{{id}}」：画布圆可点选 / 双击改标签。',
+      vennUnionHint: '交集「{{ids}}」：画布区域可点选。',
+      vennDiagramHint:
+        '韦恩图：集合与交集可在画布点选；标签与尺寸在此表单改。选中集合后按 Tab 加集合、Enter 加交集、Delete 删除。文本节点（text）与样式行不在画布可选中，仅保留源码。',
+      deleteVennSet: '删除集合（连同引用它的交集）',
+      deleteVennUnion: '删除交集',
     },
     shapes: {
       rectangle: '矩形',

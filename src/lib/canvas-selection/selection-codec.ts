@@ -14,6 +14,7 @@ import {
 } from '../pipeline/element-id'
 import { blockSelectionOf } from './block-adapter'
 import { xychartSelectionOf } from './xychart-adapter'
+import { vennSelectionOf } from './venn-adapter'
 import {
   parseArchitectureGroupElementId,
   parseArchitectureJunctionElementId,
@@ -137,6 +138,12 @@ export function canvasIdOf(selection: Selection): string | null {
     case 'architecture-group':
     case 'architecture-junction':
       return selection.name
+    // venn（more-diagrams 工单 21）：集合 / 交集的 data-id 即投影 elementId
+    // （渲染后从 `data-venn-sets` 内容键反注，见 venn-adapter / node-data-ids）
+    case 'venn-set':
+      return `venn-set:${selection.id}`
+    case 'venn-union':
+      return selection.elementId
     default:
       return null
   }
@@ -242,6 +249,11 @@ export function fromCanvasId(diagramType: DiagramTypeId, canvas: CanvasSelection
     }
     return null
   }
+  if (diagramType === 'venn') {
+    // venn（more-diagrams 工单 21）：node.id = 投影 elementId（`venn-set:<id>` /
+    // `venn-union:N`，渲染后从 `data-venn-sets` 反注），按前缀解回两类选中
+    return vennSelectionOf(canvas)
+  }
   if (canvas.kind === 'element') return edgeSelectionOf(diagramType, canvas.elementId)
   if (canvas.kind === 'node') {
     return diagramType === 'sequence'
@@ -339,6 +351,11 @@ export function selectionOfMenuTarget(target: ContextMenuTarget): Selection | nu
       return { kind: 'architecture-junction', name: target.name }
     case 'architecture-edge':
       return { kind: 'architecture-edge', elementId: target.elementId }
+    // venn（more-diagrams 工单 21）：集合 / 交集菜单目标一一对应各自 Selection kind
+    case 'venn-set':
+      return { kind: 'venn-set', id: target.id }
+    case 'venn-union':
+      return { kind: 'venn-union', elementId: target.elementId }
     case 'blank':
       return null
   }
@@ -455,6 +472,19 @@ export function menuTargetOfCanvas(
       if (group !== null) return { kind: 'architecture-group', name: group.id }
       const junction = parseArchitectureJunctionElementId(canvas.id)
       return junction !== null ? { kind: 'architecture-junction', name: junction.id } : null
+    }
+    // venn（more-diagrams 工单 21）：node.id = 投影 elementId（`venn-set:<id>` /
+    // `venn-union:N`，渲染后从 `data-venn-sets` 反注），两类元素都有画布菜单
+    if (diagramType === 'venn') {
+      const selection = vennSelectionOf(canvas)
+      switch (selection?.kind) {
+        case 'venn-set':
+          return { kind: 'venn-set', id: selection.id }
+        case 'venn-union':
+          return { kind: 'venn-union', elementId: selection.elementId }
+        default:
+          return null
+      }
     }
     return { kind: 'sequence-participant', actorId: canvas.id }
   }

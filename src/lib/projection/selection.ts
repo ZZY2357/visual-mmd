@@ -112,6 +112,13 @@ export type Selection =
   // （`treemap-node:N`，文档序——渲染序按值降序、≠ 文档序，画布 DOM 无 data-id，
   // 实测降级见 treemap-adapter；选中只来自结构树 / 表单 / 键盘）。
   | { kind: 'treemap-node'; elementId: string }
+  // venn-beta（more-diagrams 工单 21）：集合是**名字即身份**（`venn-set:<id>`——id 是
+  // 内容键，mermaid DB 是按 id 的 Map）；交集走**位置序身份**（`venn-union:N`——
+  // `data-venn-sets` 键是 id 列表字典序拼接，重复 id 列表会同键冲突，位置序才唯一，
+  // research §4/§8 实测）。集合 / 交集的画布 data-id 由内容键 `data-venn-sets` 反注
+  // （见 venn-adapter）；text 节点与单条 style 无 data-* 降级（结构树 + 表单为入口）。
+  | { kind: 'venn-set'; id: string }
+  | { kind: 'venn-union'; elementId: string }
 
 export const DIAGRAM_SELECTION: Selection = { kind: 'diagram' }
 
@@ -237,6 +244,10 @@ export function selectionKey(sel: Selection): string {
       return `architecture-align:${sel.elementId}`
     case 'treemap-node':
       return `treemap-node:${sel.elementId}`
+    case 'venn-set':
+      return `venn-set:${sel.id}`
+    case 'venn-union':
+      return `venn-union:${sel.elementId}`
   }
 }
 

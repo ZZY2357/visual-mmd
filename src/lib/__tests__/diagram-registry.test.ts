@@ -51,12 +51,11 @@ describe('detectDiagramType：已注册图种识别不变（回归）', () => {
 
 describe('detectDiagramType：无法识别 → unsupported（null），绝不默认 flowchart', () => {
   it.each([
-    ['冷门图种 venn-beta', 'venn-beta\n    A o B\n'],
     ['纯文本', '这不是 Mermaid 源码\n'],
     ['空源码', ''],
     // block / block-beta 已注册（more-diagrams 工单 09）、packet / packet-beta 已注册
-    //（more-diagrams 工单 16）、xychart / xychart-beta 已注册（more-diagrams 工单 14），
-    // 均移入各自「返回 X」的用例，不再落 null 清单
+    //（more-diagrams 工单 16）、xychart / xychart-beta 已注册（more-diagrams 工单 14）、
+    // venn-beta 已注册（more-diagrams 工单 21），均移入各自「返回 X」的用例
   ])('%s 返回 null', (_name, source) => {
     expect(detectDiagramType(source)).toBeNull()
   })
@@ -107,6 +106,16 @@ describe('detectDiagramType：无法识别 → unsupported（null），绝不默
     expect(DIAGRAM_TYPES.treemap.detect('treemapX\n"甲": 1\n')).toBe(false)
   })
 
+  it('venn-beta 识别（more-diagrams 工单 21）：只有小写关键字；裸 venn 不认领', () => {
+    expect(detectDiagramType('venn-beta\n    set a\n')?.id).toBe('venn')
+    // mermaid 探测器 `/^\s*venn-beta/` 大小写敏感、无 (-beta)? 分支（research §8 实测）：
+    // 裸 `venn` 与大小写变体都不被认领
+    expect(detectDiagramType('venn\n    set a\n')).toBeNull()
+    expect(detectDiagramType('VENN-BETA\n')).toBeNull()
+    expect(DIAGRAM_TYPES.venn.detect('venn-beta extra\n    set a\n')).toBe(false)
+    expect(DIAGRAM_TYPES.venn.detect('venn-betaX\n')).toBe(false)
+  })
+
   it('双关键字 detect 例（后续图种工单的写法约定）：-beta 可选且不越界误判', () => {
     // 后续 block/packet/xychart 工单应采用 `^<kw>(-beta)?\b` 形态；这里把形态锁死：
     // 可选 -beta 不妨碍裸关键字的识别，也不把更长的词（如 block-chain）误吞。
@@ -153,7 +162,7 @@ describe('注册表自洽性（开放 DiagramTypeId 的运行期穷尽性）', (
 
 describe('unsupported 态的编辑路径', () => {
   it('commitIntent 在 unsupported 源码上拒绝（不喂给 flowchart 解析器）', () => {
-    const unsupportedSource = 'venn-beta\n    A o B\n'
+    const unsupportedSource = 'unknownDiagram\n    A o B\n'
     useEditorStore.setState({ source: unsupportedSource })
     const applied = useEditorStore.getState().commitIntent({ type: 'set-direction', direction: 'LR' })
     expect(applied).toBe(false)

@@ -264,6 +264,7 @@ describe('结构树分区描述（工单 06）', () => {
       architecture:
         'architecture-beta\n    group platform(cloud)[平台]\n    service web(server)[Web]\n    service db(database)[数据库] in platform\n    web:R -- L:db',
       treemap: 'treemap\n"根"\n    "甲"\n        "叶1": 3\n    "乙": 2',
+      venn: 'venn-beta\n    title 技能\n    set frontend["前端"]\n    set backend["后端"]\n    union frontend,backend["全栈"]',
     }
     for (const id of Object.keys(DIAGRAM_TYPES) as (keyof typeof DIAGRAM_TYPES)[]) {
       const registration = DIAGRAM_TYPES[id]
