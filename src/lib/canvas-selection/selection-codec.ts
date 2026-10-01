@@ -15,6 +15,7 @@ import {
 import { blockSelectionOf } from './block-adapter'
 import { xychartSelectionOf } from './xychart-adapter'
 import { vennSelectionOf } from './venn-adapter'
+import { agentflowSelectionOf } from './agentflow-adapter'
 import {
   parseArchitectureGroupElementId,
   parseArchitectureJunctionElementId,
@@ -146,6 +147,12 @@ export function canvasIdOf(selection: Selection): string | null {
       return `venn-set:${selection.id}`
     case 'venn-union':
       return selection.elementId
+    // agentflow（more-diagrams 工单 27）：节点 data-id 即源码节点 id（渲染后从
+    // `{svgId}-agentflow-{id}-{n}` DOM id 反注，见 node-data-ids 的 agentflow 形态）；
+    // 边走原生 `L_{from}_{to}_{n}` data-id（尽力而为，与 flowchart 同口径，不进高亮链路
+    // ——只在 canvasIdOf 给出节点 id）；容器/文档行画布无 data-id，安静地不高亮。
+    case 'agentflow-node':
+      return selection.nodeId
     default:
       return null
   }
@@ -272,6 +279,12 @@ export function fromCanvasId(diagramType: DiagramTypeId, canvas: CanvasSelection
     // `venn-union:N`，渲染后从 `data-venn-sets` 反注），按前缀解回两类选中
     return vennSelectionOf(canvas)
   }
+  if (diagramType === 'agentflow') {
+    // agentflow（more-diagrams 工单 27）：节点 data-id 即源码节点 id（反注）；边是原生
+    // `L_{from}_{to}_{n}` data-id，edgeDataIdResolver 已解回 (from,to,occurrence) ——
+    // 走 agentflowSelectionOf 收窄成 `agentflow-edge`（elementId 由三元组重建）
+    return agentflowSelectionOf(canvas)
+  }
   if (canvas.kind === 'element') return edgeSelectionOf(diagramType, canvas.elementId)
   if (canvas.kind === 'node') {
     return diagramType === 'sequence'
@@ -388,6 +401,16 @@ export function selectionOfMenuTarget(target: ContextMenuTarget): Selection | nu
       return { kind: 'cynefin-item', elementId: target.elementId }
     case 'cynefin-transition':
       return { kind: 'cynefin-transition', elementId: target.elementId }
+    // agentflow（more-diagrams 工单 27）：节点 / 边 / 容器 / 文档行菜单目标一一对应各自
+    // Selection kind
+    case 'agentflow-node':
+      return { kind: 'agentflow-node', nodeId: target.nodeId }
+    case 'agentflow-edge':
+      return { kind: 'agentflow-edge', elementId: target.elementId }
+    case 'agentflow-flow':
+      return { kind: 'agentflow-flow', elementId: target.elementId }
+    case 'agentflow-doc':
+      return { kind: 'agentflow-doc', elementId: target.elementId }
     case 'blank':
       return null
   }
@@ -521,6 +544,8 @@ export function menuTargetOfCanvas(
           return null
       }
     }
+    // agentflow（more-diagrams 工单 27）：node.id = 源码节点 id（反注），节点有画布菜单
+    if (diagramType === 'agentflow') return { kind: 'agentflow-node', nodeId: canvas.id }
     return { kind: 'sequence-participant', actorId: canvas.id }
   }
   if (canvas.kind === 'element') {
@@ -550,7 +575,17 @@ export function menuTargetOfCanvas(
         return null
     }
   }
-  return diagramType === 'flowchart'
-    ? { kind: 'flowchart-edge', from: canvas.from, to: canvas.to, occurrence: canvas.occurrence }
-    : null
+  // canvas.kind === 'edge'（原生 `L_{from}_{to}_{n}` data-id 命中的边）：flowchart 与
+  // agentflow 都走这条路径——agentflow 边身份同 flowchart 口径（`L_{from}_{to}_{n}`），
+  // 用 (from,to,occurrence) 重建成位置序 elementId 后给菜单目标
+  if (diagramType === 'flowchart') {
+    return { kind: 'flowchart-edge', from: canvas.from, to: canvas.to, occurrence: canvas.occurrence }
+  }
+  if (diagramType === 'agentflow') {
+    const selection = agentflowSelectionOf(canvas)
+    return selection !== null && selection.kind === 'agentflow-edge'
+      ? { kind: 'agentflow-edge', elementId: selection.elementId }
+      : null
+  }
+  return null
 }

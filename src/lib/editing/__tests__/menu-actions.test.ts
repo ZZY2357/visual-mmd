@@ -215,6 +215,14 @@ describe('MENU_ACTIONS 穷尽性（工单 05 → 工单 01）', () => {
       { kind: 'cynefin-domain', name: 'complex' },
       { kind: 'cynefin-item', elementId: 'cynefin-item:1' },
       { kind: 'cynefin-transition', elementId: 'cynefin-transition:1' },
+      // agentflow（more-diagrams 工单 27）：节点画布可寻址（DOM id 反注）、边有原生 data-id；
+      // 空白提供 加节点 / 加 flow；节点 = 改文本 / 从这里连线 / 删除；边 = 改标签 / 删除；
+      // 容器（画布无 data-id）/ 文档行目标只能由程序构造
+      { kind: 'blank', diagramType: 'agentflow' },
+      { kind: 'agentflow-node', nodeId: 'a' },
+      { kind: 'agentflow-edge', elementId: 'edge:a->b' },
+      { kind: 'agentflow-flow', elementId: 'container:flow:1' },
+      { kind: 'agentflow-doc', elementId: 'agentflow-doc:1' },
     ]
     const reachableIds = new Set(allTargets.flatMap((target) => contextMenuItems(target)))
     // apply-style 不经 onMenuItem 分发（CanvasPanel 渲染成子菜单开关，点样式名直接调

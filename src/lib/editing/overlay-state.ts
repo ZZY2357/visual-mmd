@@ -73,6 +73,9 @@ export type NodeFormKind =
   | 'wardley-link'
   // cynefin（more-diagrams 工单 25）：加转移（两端从固定五域下拉；空白/转移上均可）
   | 'cynefin-transition'
+  // agentflow（more-diagrams 工单 27）：从选中节点拉一条边（from 预选，终点从既有节点下拉，
+  // 提交才落码）
+  | 'agentflow-edge'
 
 export interface NodeFormState {
   kind: NodeFormKind

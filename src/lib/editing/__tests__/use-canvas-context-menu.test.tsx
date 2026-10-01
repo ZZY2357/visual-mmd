@@ -27,6 +27,7 @@ import { quadrantDataIdResolver } from '../../canvas-selection/quadrant-adapter'
 import { xychartDataIdResolver } from '../../canvas-selection/xychart-adapter'
 import { architectureDataIdResolver } from '../../canvas-selection/architecture-adapter'
 import { vennDataIdResolver } from '../../canvas-selection/venn-adapter'
+import { agentflowDataIdResolver } from '../../canvas-selection/agentflow-adapter'
 import { nodeDataIdResolver, elementDataIdResolver } from '../../canvas-selection/data-id'
 import type { AnyProjection } from '../../diagram-registry'
 import { useCanvasContextMenu, type NodeFormState } from '../use-canvas-context-menu'
@@ -145,6 +146,9 @@ function resolverOf(projection: AnyProjection) {
   if (projection.type === 'venn') return vennDataIdResolver(projection.venn)
   // cynefin（more-diagrams 工单 25）：画布 DOM 无 data-id（research §4/§8.1 实测降级），resolver 永不命中
   if (projection.type === 'cynefin') return () => null
+  // agentflow（more-diagrams 工单 27）：节点 DOM id 反注（`{svgId}-agentflow-{id}-{n}`）、
+  // 边原生 `L_{from}_{to}_{n}` data-id，resolver 与真实能力包同源（agentflowDataIdResolver）
+  if (projection.type === 'agentflow') return agentflowDataIdResolver(projection.agentflow)
   const nodes = nodeDataIdResolver(projection.class.classes.map((c) => c.name))
   const edges = elementDataIdResolver(projection.class.relations.map((r) => r.elementId))
   return (dataId: string) => nodes(dataId) ?? edges(dataId)

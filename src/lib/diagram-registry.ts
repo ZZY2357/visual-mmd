@@ -24,6 +24,7 @@ import { ishikawaParser } from './pipeline/ishikawa'
 import { wardleyParser } from './pipeline/wardley'
 import { vennParser } from './pipeline/venn'
 import { cynefinParser } from './pipeline/cynefin'
+import { agentflowParser } from './pipeline/agentflow'
 import { frontmatterEnd } from './pipeline/frontmatter'
 import { buildFlowchartProjection, type FlowchartProjection } from './projection/flowchart-projection'
 import { buildSequenceProjection, type SequenceProjection } from './projection/sequence-projection'
@@ -61,6 +62,7 @@ import { buildIshikawaProjection, type IshikawaProjection } from './projection/i
 import { buildWardleyProjection, type WardleyProjection } from './projection/wardley-projection'
 import { buildVennProjection, type VennProjection } from './projection/venn-projection'
 import { buildCynefinProjection, type CynefinProjection } from './projection/cynefin-projection'
+import { buildAgentflowProjection, type AgentflowProjection } from './projection/agentflow-projection'
 import { flowchartCanvasCapabilities } from './canvas-selection/flowchart-adapter'
 import { sequenceCanvasCapabilities } from './canvas-selection/sequence-adapter'
 import { classCanvasCapabilities } from './canvas-selection/class-adapter'
@@ -85,6 +87,7 @@ import { ishikawaCanvasCapabilities } from './canvas-selection/ishikawa-adapter'
 import { wardleyCanvasCapabilities } from './canvas-selection/wardley-adapter'
 import { vennCanvasCapabilities } from './canvas-selection/venn-adapter'
 import { cynefinCanvasCapabilities } from './canvas-selection/cynefin-adapter'
+import { agentflowCanvasCapabilities } from './canvas-selection/agentflow-adapter'
 import type { CanvasCapabilities } from './canvas-selection/capabilities'
 import { treePartitions, type TreePartitions } from './structure-tree/partitions'
 import { DEFAULT_DIAGRAM_SOURCE } from './storage'
@@ -131,6 +134,7 @@ export interface ProjectionTypes {
   wardley: WardleyProjection
   venn: VennProjection
   cynefin: CynefinProjection
+  agentflow: AgentflowProjection
 }
 
 /** 已注册图种的 id 集合（字面量联合，随 ProjectionTypes 增长） */
@@ -587,6 +591,36 @@ export const CYNEFIN_TEMPLATE = `cynefin-beta
 `
 
 /**
+ * agentflow-beta 起步模板（more-diagrams 工单 27，research §7 草案）：`agentflow-beta TB`
+ * 声明 + 两个 flow 分组 + 六种形状别名（input/task/tool/refdoc/decision/action）+
+ * 三种边算子（`-->` sequence / `-.-` reference / `--x` failure）+ 一条链式边。
+ * 注意词法（research §1/§8）：
+ * - 关键字**只有小写 `agentflow-beta`**（探测与语法均大小写敏感）；
+ * - 节点是 flowchart 风格 `id["label"]`，形状用 `@{ shape: … }` 指定；
+ * - 容器 `flow id["title"] … end` 可嵌套；`global … end` 使块内节点保持顶层；
+ * - `@{ … }` 元数据是 YAML，本 app **逐字保留、不消费**（多行块整块 verbatim）。
+ */
+export const AGENTFLOW_TEMPLATE = `agentflow-beta TB
+  brief["Release brief"]@{ shape: input }
+  flow writer["Drafting Agent"]
+    draft["Draft the notes"]@{ shape: task }
+    lookup["changelog_search"]@{ shape: tool }
+    guide["Tone of voice"]@{ shape: refdoc }
+    draft --> lookup
+    draft -.- guide
+  end
+  flow reviewer["Review Agent"]
+    check["Check the claims"]@{ shape: task }
+    ok["Accurate?"]@{ shape: decision }
+    check --> ok
+  end
+  publish["Publish"]@{ shape: action }
+  brief --> writer
+  writer --> reviewer
+  ok --> publish
+`
+
+/**
  * 注册表：数组是唯一权威（more-diagrams 工单 01），DIAGRAM_TYPES 由它推导。
  * detectDiagramType 按数组顺序显式遍历——不再维护手写的 if 分发链，
  * 新图种挂一条即可参与识别，无法识别时不再默认 flowchart（见下）。
@@ -854,6 +888,20 @@ export const DIAGRAM_TYPE_LIST: DiagramTypeRegistration[] = [
     buildProjection: (doc) => ({ type: 'cynefin', cynefin: buildCynefinProjection(doc) }),
     tree: treePartitions.cynefin,
     canvas: cynefinCanvasCapabilities,
+  },
+  {
+    id: 'agentflow',
+    parser: agentflowParser,
+    template: AGENTFLOW_TEMPLATE,
+    // mermaid 12 只有 `agentflow-beta` 一个关键字（research §1/§8.1）：无裸名 `agentflow`；
+    // **检测与语法均大小写敏感**（实测 `AgentFlow-Beta`/`AGENTFLOW-BETA`/`agentflow`
+    // 均 `No diagram type detected`）——故不加 i。声明行可带同行方向修饰符
+    //（`TB|TD|BT|LR|RL`，独立词），尾随别的内容不认领
+    detect: (source) =>
+      /^agentflow-beta(?:[ \t]+(?:TB|TD|BT|LR|RL))?[ \t\r]*$/.test(firstStatementLine(source)),
+    buildProjection: (doc) => ({ type: 'agentflow', agentflow: buildAgentflowProjection(doc) }),
+    tree: treePartitions.agentflow,
+    canvas: agentflowCanvasCapabilities,
   },
 ]
 

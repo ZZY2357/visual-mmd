@@ -24,6 +24,11 @@
  * 节点 id 自身可含 `-`，以尾部 `-数字` 为序号切分 */
 const FLOWCHART_NODE_DOM_ID = /(?:^|-)flowchart-(.+)-(\d+)$/
 
+/** mermaid v12 agentflow-beta 节点 DOM id 形态（more-diagrams 工单 27）：
+ * `{svgId}-agentflow-{节点id}-{序号}`——与 flowchart **完全同形**（research §8.2 实测）；
+ * 节点 id 自身可含 `-`/`_`/数字，以尾部 `-数字` 为序号切分 */
+const AGENTFLOW_NODE_DOM_ID = /(?:^|-)agentflow-(.+)-(\d+)$/
+
 /** mermaid v12 class 类框 DOM id 形态：`{svgId}-classId-{类名}-{序号}`；
  * 类名自身可含 `-`，同样以尾部 `-数字` 切分 */
 const CLASS_NODE_DOM_ID = /(?:^|-)classId-(.+)-(\d+)$/
@@ -53,10 +58,12 @@ const ER_ENTITY_DOM_ID = /(?:^)entity-(.+)-(\d+)$/
  * 含空格的引号名 mermaid 原样放进 DOM id（非法 DOM id），同样安静降级为不可寻址。
  */
 
-/** DOM id → 节点 id（flowchart / class / state / er 四种形态）；不是节点 id 时 null */
+/** DOM id → 节点 id（flowchart / agentflow / class / state / er 五种形态）；不是节点 id 时 null */
 function nodeIdOfDomId(domId: string): string | null {
   const flow = FLOWCHART_NODE_DOM_ID.exec(domId)
   if (flow !== null) return flow[1]
+  const agentflow = AGENTFLOW_NODE_DOM_ID.exec(domId)
+  if (agentflow !== null) return agentflow[1]
   const cls = CLASS_NODE_DOM_ID.exec(domId)
   if (cls !== null) return cls[1]
   const state = STATE_NODE_DOM_ID.exec(domId)

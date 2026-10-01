@@ -140,6 +140,14 @@ export type Selection =
   | { kind: 'cynefin-domain'; name: string }
   | { kind: 'cynefin-item'; elementId: string }
   | { kind: 'cynefin-transition'; elementId: string }
+  // agentflow-beta（more-diagrams 工单 27）：节点是**名字即身份**（`node:<id>`——DOM id
+  // `{svgId}-agentflow-{id}-{n}` 可前缀剥离反注 data-id，画布点选可用）；边走位置序身份
+  // （`edge:<from>-><to>`）；容器（`flow`）走开行 elementId（**无 data-id、无 data-et**，
+  // research §8.2 实测——容器不做画布点选，走结构树）；文档级属性行可整行寻址。
+  | { kind: 'agentflow-node'; nodeId: string }
+  | { kind: 'agentflow-edge'; elementId: string }
+  | { kind: 'agentflow-flow'; elementId: string }
+  | { kind: 'agentflow-doc'; elementId: string }
 
 export const DIAGRAM_SELECTION: Selection = { kind: 'diagram' }
 
@@ -283,6 +291,14 @@ export function selectionKey(sel: Selection): string {
       return `cynefin-item:${sel.elementId}`
     case 'cynefin-transition':
       return `cynefin-transition:${sel.elementId}`
+    case 'agentflow-node':
+      return `agentflow-node:${sel.nodeId}`
+    case 'agentflow-edge':
+      return `agentflow-edge:${sel.elementId}`
+    case 'agentflow-flow':
+      return `agentflow-flow:${sel.elementId}`
+    case 'agentflow-doc':
+      return `agentflow-doc:${sel.elementId}`
   }
 }
 

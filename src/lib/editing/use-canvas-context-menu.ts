@@ -186,6 +186,15 @@ function nodeFormForTarget(
     if (t === undefined) return null
     return { kind, anchorElementId: t.elementId, from: t.from, x, y }
   }
+  if (kind === 'agentflow-edge') {
+    // agentflow 加边表单（more-diagrams 工单 27）：节点右键 / 从这里连线 → 锚点为该节点
+    // 声明行，from 预选该节点；终点由表单选择
+    if (proj.type !== 'agentflow') return null
+    if (target.kind !== 'agentflow-node') return null
+    const node = proj.agentflow.nodes.find((n) => n.nodeId === target.nodeId)
+    if (node === undefined) return null
+    return { kind, anchorElementId: `node:${target.nodeId}`, from: target.nodeId, x, y }
+  }
   if (kind === 'block') {
     // sequence 独有的添加逻辑块：参与者上右键 → 锚点为该参与者的声明；
     // 空白处右键 → 无锚点（管线回退到文档最后一个元素）
@@ -234,6 +243,8 @@ function formTargetOfSelection(selection: Selection): ContextMenuTarget | null {
   if (selection.kind === 'wardley-link') return { kind: 'wardley-link', elementId: selection.elementId }
   // cynefin（more-diagrams 工单 25）：转移 → 加转移表单（Tab 键）的锚点与 from 预填
   if (selection.kind === 'cynefin-transition') return { kind: 'cynefin-transition', elementId: selection.elementId }
+  // agentflow（more-diagrams 工单 27）：节点 → 加边表单（从这里连线）的锚点与 from 预选
+  if (selection.kind === 'agentflow-node') return { kind: 'agentflow-node', nodeId: selection.nodeId }
   return null
 }
 
@@ -339,6 +350,18 @@ export function useCanvasContextMenu(
           if (commitIntent({ type: 'add-edge', from, to, fromPort: 'R', toPort: 'L', arrow: 'target' })) {
             select({ kind: 'architecture-edge', elementId: `edge:${proj.architecture.edges.length + 1}` })
           }
+        } else if (proj !== null && proj.type === 'agentflow') {
+          // agentflow 加边（more-diagrams 工单 27）：默认 sequence `-->`，落码后按位置序选中。
+          // elementId 口径 = `edge:{from}->{to}`（重复边 `#n`），与 parser 一致。
+          if (commitIntent({ type: 'add-edge', from, to, edgeKind: 'sequence' })) {
+            const key = `edge:${from}->${to}`
+            const occurrence =
+              proj.agentflow.edges.filter((e) => e.from === from && e.to === to).length + 1
+            select({
+              kind: 'agentflow-edge',
+              elementId: occurrence === 1 ? key : `${key}#${occurrence}`,
+            })
+          }
         } else if (commitIntent({ type: 'add-edge', from, to, lineStyle: 'solid', head: 'arrow' })) {
           select({ kind: 'edge', from, to, occurrence: 1 })
         }
@@ -428,7 +451,8 @@ export function useCanvasContextMenu(
         | 'xychart-bar'
         | 'architecture-edge'
         | 'wardley-link'
-        | 'cynefin-transition',
+        | 'cynefin-transition'
+        | 'agentflow-edge',
     ): void => {
       const proj = latest.current.projection
       const { selection } = useEditorStore.getState()

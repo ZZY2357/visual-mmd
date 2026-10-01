@@ -147,6 +147,22 @@ describe('detectDiagramType：无法识别 → unsupported（null），绝不默
     expect(DIAGRAM_TYPES.cynefin.detect('cynefin\ncomplex\n')).toBe(false)
   })
 
+  it('agentflow-beta 识别（more-diagrams 工单 27）：**只有小写关键字 + 大小写敏感**（与 venn-beta 同，research §1/§8.1）', () => {
+    expect(detectDiagramType('agentflow-beta\n  a["A"]\n')?.id).toBe('agentflow')
+    expect(detectDiagramType('agentflow-beta TB\n  a["A"]\n')?.id).toBe('agentflow')
+    // 同行方向修饰符是独立词（TB/TD/BT/LR/RL）；实测 mermaid 12 解析 TB 通过
+    expect(detectDiagramType('agentflow-beta LR\n  a["A"]\n')?.id).toBe('agentflow')
+    // 大小写敏感：`AgentFlow-Beta` / `AGENTFLOW-BETA` 均不被 mermaid 认领（命令级实测）→ 我们也不认
+    expect(detectDiagramType('AgentFlow-Beta\n  a["A"]\n')).toBeNull()
+    expect(DIAGRAM_TYPES.agentflow.detect('AGENTFLOW-BETA\n')).toBe(false)
+    // 无裸 `agentflow` 关键字（mermaid 词法只有 `agentflow-beta`）→ 不认领
+    expect(detectDiagramType('agentflow\n  a["A"]\n')).toBeNull()
+    expect(DIAGRAM_TYPES.agentflow.detect('agentflow\n')).toBe(false)
+    // 声明行必须是裸关键字（可带独立方向词）：带尾随别的内容 / 更长词不认领
+    expect(DIAGRAM_TYPES.agentflow.detect('agentflow-beta extra\n  a["A"]\n')).toBe(false)
+    expect(DIAGRAM_TYPES.agentflow.detect('agentflow-betaX\n')).toBe(false)
+  })
+
   it('双关键字 detect 例（后续图种工单的写法约定）：-beta 可选且不越界误判', () => {
     // 后续 block/packet/xychart 工单应采用 `^<kw>(-beta)?\b` 形态；这里把形态锁死：
     // 可选 -beta 不妨碍裸关键字的识别，也不把更长的词（如 block-chain）误吞。

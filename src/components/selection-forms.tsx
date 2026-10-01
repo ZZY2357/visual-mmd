@@ -92,6 +92,14 @@ import { VennAreaForm, VennDiagramForm } from './venn-forms'
 import { type VennProjection } from '../lib/projection/venn-projection'
 import { CynefinDiagramForm, CynefinDomainForm, CynefinItemForm, CynefinTransitionForm } from './cynefin-forms'
 import { type CynefinProjection } from '../lib/projection/cynefin-projection'
+import {
+  AgentflowContainerForm,
+  AgentflowDiagramForm,
+  AgentflowDocLineForm,
+  AgentflowEdgeForm,
+  AgentflowNodeForm,
+} from './agentflow-forms'
+import { type AgentflowProjection } from '../lib/projection/agentflow-projection'
 
 /**
  * 选中元素的属性表单，按投影图种分发（工单 04-bundle 自 PropertyPanel 迁出）：
@@ -1134,6 +1142,52 @@ function CynefinSelectionForm({
   }
 }
 
+/**
+ * agentflow 属性表单（more-diagrams 工单 27）：图表级 = 提示 + 改方向 + 加边（两端从既有
+ * 节点下拉，空白亦可用）；节点 = 改 id / 改文本 / 改形状 / 删除（节点画布可寻址，
+ * research §8.2 实测）；边 = 改标签 / 删除；容器 = 改标题（仅 flow）/ 删除（连带块内元素）；
+ * 文档行 = 只读展示 + 删除。容器与文档行画布无 data-id（如实降级），这些表单 + 结构树是
+ * 唯一编辑入口。
+ */
+function AgentflowSelectionForm({
+  projection,
+  selection,
+}: {
+  projection: AgentflowProjection
+  selection: Selection | null
+}) {
+  const { t } = useTranslation()
+  if (selection === null) {
+    return (
+      <Text size="sm" c="dimmed" px="xs">
+        {t('app:propertyPanel.nothingSelected')}
+      </Text>
+    )
+  }
+  switch (selection.kind) {
+    case 'diagram':
+      return <AgentflowDiagramForm projection={projection} />
+    case 'agentflow-node': {
+      const node = projection.nodes.find((n) => n.nodeId === selection.nodeId)
+      return node !== undefined ? <AgentflowNodeForm node={node} projection={projection} /> : null
+    }
+    case 'agentflow-edge': {
+      const edge = projection.edges.find((e) => e.elementId === selection.elementId)
+      return edge !== undefined ? <AgentflowEdgeForm edge={edge} /> : null
+    }
+    case 'agentflow-flow': {
+      const container = projection.containers.find((c) => c.elementId === selection.elementId)
+      return container !== undefined ? <AgentflowContainerForm container={container} /> : null
+    }
+    case 'agentflow-doc': {
+      const docLine = projection.docLines.find((d) => d.elementId === selection.elementId)
+      return docLine !== undefined ? <AgentflowDocLineForm docLine={docLine} /> : null
+    }
+    default:
+      return null
+  }
+}
+
 export function ProjectionSelectionForm({ projection, selection }: { projection: AnyProjection; selection: Selection | null }) {
   if (projection.type === 'flowchart') {
     return <FlowchartSelectionForm projection={projection.flowchart} selection={selection} />
@@ -1206,6 +1260,9 @@ export function ProjectionSelectionForm({ projection, selection }: { projection:
   }
   if (projection.type === 'cynefin') {
     return <CynefinSelectionForm projection={projection.cynefin} selection={selection} />
+  }
+  if (projection.type === 'agentflow') {
+    return <AgentflowSelectionForm projection={projection.agentflow} selection={selection} />
   }
   return <ClassSelectionForm projection={projection.class} selection={selection} />
 }

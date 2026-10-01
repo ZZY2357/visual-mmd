@@ -27,6 +27,7 @@ import { isValidIshikawaText, type IshikawaIntent } from '../pipeline/ishikawa'
 import { isValidWardleyName, type WardleyIntent } from '../pipeline/wardley'
 import { isValidVennSetId, type VennIntent } from '../pipeline/venn'
 import { CYNEFIN_DOMAINS, type CynefinDomainName, type CynefinIntent } from '../pipeline/cynefin'
+import { isValidNewNodeId, type AgentflowIntent } from '../pipeline/agentflow'
 import { setRelationIntent, RELATION_KIND_OPTIONS } from './class-forms'
 import {
   setMessageIntent,
@@ -270,6 +271,12 @@ export function createElement(ctx: MenuActionContext, target: ContextMenuTarget 
     if (proj.type === 'cynefin') {
       // cynefin（more-diagrams 工单 25）：添加入口是独立的 add-cynefin-item /
       // add-cynefin-transition 动作（画布无 data-id，不做内联命名），不走 createElement
+      return null
+    }
+    if (proj.type === 'agentflow') {
+      // agentflow（more-diagrams 工单 27）：添加入口是独立的 add-agentflow-node /
+      // add-agentflow-flow 动作（新增节点不做内联命名——节点身份即源码 id，
+      // 文本改名走属性表单），不走 createElement
       return null
     }
     // mindmap：节点目标 = 挂为其子节点；空白 / 无目标 = 建根（空文档）或挂到根节点下
@@ -979,6 +986,46 @@ function addVennUnion(ctx: MenuActionContext, target: ContextMenuTarget | undefi
   if (applyPlan(plan, { commitIntent: ctx.commitIntent, select: ctx.select })) ctx.close()
 }
 
+// ---------- agentflow（more-diagrams 工单 27） ----------
+
+/**
+ * 空白处加节点（agentflow）：落一行 `<id>["<id>"]@{ shape: task }`（缺省 task 形状，
+ * id 避重），锚点回退文档末元素（insertAfter 语义）。**不做内联命名**——节点身份即源码 id，
+ * 改显示文本走属性表单（`set-node-text`），改 id 走 `rename-node`（牵动全图引用重写，
+ * 不适合内联编辑）；节点 id 与文本都落成 `id`，用户随后在右侧会看到同名并改名。
+ * 选中新节点（画布可寻址，research §8.2）。
+ */
+function addAgentflowNode(ctx: MenuActionContext): void {
+  const proj = ctx.projection
+  if (proj === null || proj.type !== 'agentflow') return
+  const nodeId = nextFreeName('n', proj.agentflow.nodes.map((n) => n.nodeId), { referential: false })
+  if (!isValidNewNodeId(nodeId)) return
+  const plan: KeyPlan = {
+    intents: [{ type: 'add-node', nodeId, text: nodeId, shape: 'task' } satisfies AgentflowIntent],
+    newElementTarget: { selection: { kind: 'agentflow-node', nodeId } },
+  }
+  if (applyPlan(plan, { commitIntent: ctx.commitIntent, select: ctx.select })) ctx.close()
+}
+
+/**
+ * 空白处加流程容器（agentflow）：落 `flow fid["新流程"]` + `end` 两行（id 避重，
+ * 标题由管线缺省）；锚点回退文档末元素。容器**画布不可点选**（无 data-id，research §8.2
+ * 如实降级），可在结构树选中、在右侧表单改标题。
+ *
+ * **不做落码后选中**：容器开行的 elementId 是文档级条目序号（`container:flow:{N}`，
+ * 见 pipeline/agentflow.ts），插入后全文档条目重排，无法从投影稳定预测新 id——
+ * 与其选中一个可能落空的 id（resolveAgentflowSelection 会回落图表级），不如不选。
+ * 新容器即刻出现在结构树「流程容器」分区，用户在那里选它改标题。
+ */
+function addAgentflowFlow(ctx: MenuActionContext): void {
+  const proj = ctx.projection
+  if (proj === null || proj.type !== 'agentflow') return
+  const used = proj.agentflow.containers.map((c) => c.id).filter((id): id is string => id !== null)
+  const id = nextFreeName('f', used, { referential: false })
+  if (!isValidNewNodeId(id)) return
+  if (ctx.commitIntent({ type: 'add-flow', id, title: '新流程' } satisfies AgentflowIntent)) ctx.close()
+}
+
 export const MENU_ACTIONS: Record<Exclude<ContextMenuItemId, 'apply-style'>, MenuAction> = {
   // 「创建 + 选中 + 内联命名」五个入口共用 createElement（工单 01 收敛）
   'add-node': createElement,
@@ -992,11 +1039,12 @@ export const MENU_ACTIONS: Record<Exclude<ContextMenuItemId, 'apply-style'>, Men
   // add-style（空白菜单项）= 打开「添加样式」小表单；apply-style（节点子菜单）才不经分发
   'add-style': (ctx) => ctx.openStyleForm(),
   'link-from-here': (ctx, target) => {
-    // narrow 到 flowchart / state / er / architecture 节点才能带预选起点进入连线模式
+    // narrow 到 flowchart / state / er / architecture / agentflow 节点才能带预选起点进入连线模式
     if (target !== undefined && target.kind === 'flowchart-node') ctx.enterLinkMode(target.nodeId)
     else if (target !== undefined && target.kind === 'state-node') ctx.enterLinkMode(target.id)
     else if (target !== undefined && target.kind === 'er-entity') ctx.enterLinkMode(target.name)
     else if (target !== undefined && target.kind === 'architecture-service') ctx.enterLinkMode(target.name)
+    else if (target !== undefined && target.kind === 'agentflow-node') ctx.enterLinkMode(target.nodeId)
   },
   'add-subgraph': addSubgraph,
   'add-member': openFormOf('member'),
@@ -1138,4 +1186,12 @@ export const MENU_ACTIONS: Record<Exclude<ContextMenuItemId, 'apply-style'>, Men
   // 元素级编辑降级到结构树 + 属性表单
   'add-cynefin-item': addCynefinItem,
   'add-cynefin-transition': openFormOf('cynefin-transition'),
+  // agentflow（more-diagrams 工单 27）：空白加节点（id 避重、缺省 task 形状，选中后用属性
+  // 表单改名/改形状）/ 加 flow 容器（id 避重、落 open+end 两行）；节点上「加节点」= 空白同
+  // 语义（锚点回退文档末）；「从这里连线」已接入（link-from-here）；节点/边/容器的字段编辑
+  // 走 D5（选中 + 关菜单，右侧表单改）；不做内联编辑（节点身份即 id，改名牵动全图引用）
+  'add-agentflow-node': addAgentflowNode,
+  'add-agentflow-flow': addAgentflowFlow,
+  'edit-agentflow-node': selectMenuTargetAndClose,
+  'edit-agentflow-flow': selectMenuTargetAndClose,
 }

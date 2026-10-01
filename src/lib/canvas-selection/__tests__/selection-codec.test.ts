@@ -5,7 +5,7 @@ import { canvasIdOf, fromCanvasId, menuTargetOfCanvas, selectionOfMenuTarget } f
 import type { ContextMenuTarget } from '../../editing/context-menu'
 import { sameSelection, type Selection } from '../../projection/selection'
 
-/** 全部 21 个 Selection kind 的样例（工单 03：全 kind 枚举测试的清单；工单 13 补 sankey 两类、14 补 xychart 三类） */
+/** 全部 Selection kind 的样例（工单 03：全 kind 枚举测试的清单；工单 13 补 sankey 两类、14 补 xychart 三类） */
 const ALL_KINDS: readonly Selection[] = [
   { kind: 'diagram' },
   { kind: 'node', nodeId: 'A' },
@@ -39,6 +39,12 @@ const ALL_KINDS: readonly Selection[] = [
   { kind: 'cynefin-domain', name: 'complex' },
   { kind: 'cynefin-item', elementId: 'cynefin-item:1' },
   { kind: 'cynefin-transition', elementId: 'cynefin-transition:1' },
+  // agentflow（more-diagrams 工单 27）：节点 DOM id 含节点 id 可反注（可寻址）、
+  // 边 `data-id="L_from_to_n"`（flowchart 口径，可寻址）；容器无 data-id（不可寻址）、文档行不可寻址
+  { kind: 'agentflow-node', nodeId: 'draft' },
+  { kind: 'agentflow-edge', elementId: 'edge:draft->lookup' },
+  { kind: 'agentflow-flow', elementId: 'container:flow:3' },
+  { kind: 'agentflow-doc', elementId: 'agentflow-doc:1' },
 ]
 
 /**
@@ -56,9 +62,23 @@ const ADDRESSABLE: Record<DiagramTypeId, ReadonlySet<string>> = {
   xychart: new Set(['xychart-series', 'xychart-axis', 'xychart-title']),
   // venn（more-diagrams 工单 21）：集合 / 交集经 data-venn-sets 内容键反注为 data-id
   venn: new Set(['venn-set', 'venn-union']),
+  // agentflow（more-diagrams 工单 27）：节点 DOM id 含节点 id，可反注 → `canvasIdOf` 给节点 id；
+  // 边虽有原生 data-id `L_{from}_{to}_{n}`（画布 → 选中可重建，见「menuTargetOfCanvas」用例），
+  // 但选中侧只带合成 elementId `edge:{from}->{to}`，无法仅由 Selection 反推 CSS data-id，
+  // 故 `canvasIdOf` 对边返回 null（高亮/导航只认节点）——如实标注，不硬凑。
+  agentflow: new Set(['agentflow-node']),
 }
 
-const TYPES: readonly DiagramTypeId[] = ['flowchart', 'sequence', 'class', 'mindmap', 'sankey', 'xychart', 'venn']
+const TYPES: readonly DiagramTypeId[] = [
+  'flowchart',
+  'sequence',
+  'class',
+  'mindmap',
+  'sankey',
+  'xychart',
+  'venn',
+  'agentflow',
+]
 
 /** data-id → CanvasSelection（与各 resolver 的产出形态一致）：
  * 节点类 data-id 即节点 id；位置序连线 data-id 即 elementId；mindmap 的画布选中 id 是 elementId */
@@ -73,7 +93,9 @@ function canvasSelectionOf(sel: Selection, dataId: string): CanvasSelection {
     sel.kind === 'xychart-title' ||
     // venn（more-diagrams 工单 21）：集合 / 交集的画布选中都是 node（data-id = elementId）
     sel.kind === 'venn-set' ||
-    sel.kind === 'venn-union'
+    sel.kind === 'venn-union' ||
+    // agentflow（more-diagrams 工单 27）：节点画布选中是 node（反注后 data-id = nodeId）
+    sel.kind === 'agentflow-node'
   ) {
     return { kind: 'node', id: dataId }
   }
@@ -99,6 +121,7 @@ describe('canvasIdOf', () => {
       'xychart-title',
       'venn-set',
       'venn-union',
+      'agentflow-node',
     ])
     for (const sel of ALL_KINDS) {
       const dataId = canvasIdOf(sel)
@@ -116,7 +139,7 @@ describe('canvasIdOf', () => {
 })
 
 describe('fromCanvasId（往返）', () => {
-  it('21 kind × 6 图种逐格核对：可寻址组合 sameSelection 回原选中，不可寻址组合不回', () => {
+  it('全 kind × 全图种逐格核对：可寻址组合 sameSelection 回原选中，不可寻址组合不回', () => {
     for (const type of TYPES) {
       for (const sel of ALL_KINDS) {
         const label = `${type}/${sel.kind}`
@@ -151,7 +174,7 @@ describe('fromCanvasId（往返）', () => {
 })
 
 describe('selectionOfMenuTarget', () => {
-  it('9 个元素目标逐个映射为对应 Selection', () => {
+  it('全部元素目标逐个映射为对应 Selection', () => {
     const cases: readonly (readonly [ContextMenuTarget, Selection])[] = [
       [{ kind: 'flowchart-node', nodeId: 'A' }, { kind: 'node', nodeId: 'A' }],
       [
@@ -179,6 +202,14 @@ describe('selectionOfMenuTarget', () => {
         { kind: 'cynefin-transition', elementId: 'cynefin-transition:1' },
         { kind: 'cynefin-transition', elementId: 'cynefin-transition:1' },
       ],
+      // agentflow（more-diagrams 工单 27）：节点 / 边 / 容器 / 文档行菜单目标一一对应各自 Selection kind
+      [{ kind: 'agentflow-node', nodeId: 'draft' }, { kind: 'agentflow-node', nodeId: 'draft' }],
+      [
+        { kind: 'agentflow-edge', elementId: 'edge:draft->lookup' },
+        { kind: 'agentflow-edge', elementId: 'edge:draft->lookup' },
+      ],
+      [{ kind: 'agentflow-flow', elementId: 'container:flow:3' }, { kind: 'agentflow-flow', elementId: 'container:flow:3' }],
+      [{ kind: 'agentflow-doc', elementId: 'agentflow-doc:1' }, { kind: 'agentflow-doc', elementId: 'agentflow-doc:1' }],
     ]
     for (const [target, sel] of cases) {
       expect(selectionOfMenuTarget(target), target.kind).toEqual(sel)
@@ -213,6 +244,20 @@ describe('menuTargetOfCanvas（往返）', () => {
       occurrence: 1,
     })
     expect(menuTargetOfCanvas('class', { kind: 'edge', from: 'A', to: 'B', occurrence: 1 })).toBeNull()
+    // agentflow（more-diagrams 工单 27）：节点 data-id 即源码节点 id 反注；
+    // 边身份同 flowchart 口径（`L_{from}_{to}_{n}`），反注为 `agentflow-edge`
+    expect(menuTargetOfCanvas('agentflow', { kind: 'node', id: 'draft' })).toEqual({
+      kind: 'agentflow-node',
+      nodeId: 'draft',
+    })
+    expect(menuTargetOfCanvas('agentflow', { kind: 'edge', from: 'draft', to: 'lookup', occurrence: 1 })).toEqual({
+      kind: 'agentflow-edge',
+      elementId: 'edge:draft->lookup',
+    })
+    expect(menuTargetOfCanvas('agentflow', { kind: 'edge', from: 'draft', to: 'lookup', occurrence: 2 })).toEqual({
+      kind: 'agentflow-edge',
+      elementId: 'edge:draft->lookup#2',
+    })
   })
 
   it('位置序连线经 edgeSelectionOf 收窄：本图种可寻址的才是菜单目标', () => {
@@ -262,6 +307,8 @@ describe('menuTargetOfCanvas（往返）', () => {
       ['xychart', { kind: 'node', id: 'series:1' }],
       ['xychart', { kind: 'node', id: 'xychart-x-axis' }],
       ['xychart', { kind: 'node', id: 'xychart-title' }],
+      ['agentflow', { kind: 'node', id: 'draft' }],
+      ['agentflow', { kind: 'edge', from: 'draft', to: 'lookup', occurrence: 1 }],
     ]
     for (const [type, canvas] of canvasCases) {
       const target = menuTargetOfCanvas(type, canvas)
