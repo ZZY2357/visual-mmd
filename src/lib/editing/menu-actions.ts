@@ -24,6 +24,7 @@ import { isValidBlockId } from '../pipeline/block'
 import { isValidArchId, type ArchitectureIntent } from '../pipeline/architecture'
 import { isValidTreemapName, isValidTreemapValue, type TreemapIntent } from '../pipeline/treemap'
 import { isValidIshikawaText, type IshikawaIntent } from '../pipeline/ishikawa'
+import { isValidWardleyName, type WardleyIntent } from '../pipeline/wardley'
 import { setRelationIntent, RELATION_KIND_OPTIONS } from './class-forms'
 import {
   setMessageIntent,
@@ -251,6 +252,12 @@ export function createElement(ctx: MenuActionContext, target: ContextMenuTarget 
     if (proj.type === 'ishikawa') {
       // ishikawa（more-diagrams 工单 22）：添加入口是独立的 add-ishikawa-cause 动作
       //（画布无 data-id，不做内联命名），不走 createElement
+      return null
+    }
+    if (proj.type === 'wardley') {
+      // wardley（more-diagrams 工单 23）：添加入口是独立的 add-wardley-component /
+      // add-wardley-anchor / add-wardley-link 动作（画布无 data-id，不做内联命名），
+      // 不走 createElement
       return null
     }
     // mindmap：节点目标 = 挂为其子节点；空白 / 无目标 = 建根（空文档）或挂到根节点下
@@ -811,6 +818,34 @@ function addIshikawaCause(ctx: MenuActionContext): void {
   if (applyPlan(plan, { commitIntent: ctx.commitIntent, select: ctx.select })) ctx.close()
 }
 
+// ---------- wardley（more-diagrams 工单 23） ----------
+
+/**
+ * 空白处加节点（wardley）：落一行 `component "名" [0.5, 0.5]` / `anchor "名" [0.5, 0.5]`
+ * （坐标落图正中，可在右侧表单改），名字避重；锚点回退文档末元素（insertAfter 语义）。
+ * 不做内联编辑（画布无 data-id，工单降级定案）——名字/坐标在右侧 WardleyNodeForm 改。
+ */
+function addWardleyNode(ctx: MenuActionContext, nodeKind: 'component' | 'anchor'): void {
+  const proj = ctx.projection
+  if (proj === null || proj.type !== 'wardley') return
+  const name = nextFreeName(nodeKind === 'component' ? '新组件' : '新锚点', proj.wardley.nodes.map((n) => n.name))
+  if (!isValidWardleyName(name)) return
+  const plan: KeyPlan = {
+    intents: [
+      {
+        type: 'add-node',
+        nodeKind,
+        name,
+        coords: { visibility: '0.5', evolution: '0.5' },
+      } satisfies WardleyIntent,
+    ],
+    newElementTarget: {
+      selection: { kind: 'wardley-node', name },
+    },
+  }
+  if (applyPlan(plan, { commitIntent: ctx.commitIntent, select: ctx.select })) ctx.close()
+}
+
 // ---------- architecture（more-diagrams 工单 17） ----------
 
 /**
@@ -993,4 +1028,9 @@ export const MENU_ACTIONS: Record<Exclude<ContextMenuItemId, 'apply-style'>, Men
   // ishikawa（more-diagrams 工单 22）：空白加主因（插在末条主因之后，无主因则挂鱼头下）；
   // 元素级编辑降级到结构树 + 属性表单
   'add-ishikawa-cause': addIshikawaCause,
+  // wardley（more-diagrams 工单 23）：空白加 component / 加 anchor（名字避重、坐标落图正中，
+  // 表单可改）；加连线（两端从既有节点名下选，提交才落码）。元素级编辑降级到结构树 + 属性表单
+  'add-wardley-component': (ctx) => addWardleyNode(ctx, 'component'),
+  'add-wardley-anchor': (ctx) => addWardleyNode(ctx, 'anchor'),
+  'add-wardley-link': openFormOf('wardley-link'),
 }

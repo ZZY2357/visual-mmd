@@ -210,6 +210,53 @@ describe('金样合法性：默认图表模板能被 mermaid 渲染', () => {
     await expect(mermaid.parse(source)).resolves.toBeTruthy()
   })
 
+  it('wardley 起步模板 parse 通过（more-diagrams 工单 23）', async () => {
+    const { WARDLEY_TEMPLATE } = await import('../diagram-registry')
+    await expect(mermaid.parse(WARDLEY_TEMPLATE)).resolves.toBeTruthy()
+  })
+
+  it('wardley 端到端编辑场景（工单 23 验收：加组件 → 加锚点 → 改名 → 改坐标 → 加连线 → 删节点级联删连线/演化 → 删一条文档行）落在合法 mermaid 源码上', async () => {
+    const { WARDLEY_TEMPLATE } = await import('../diagram-registry')
+    const { wardleyParser } = await import('../pipeline/wardley')
+    const { reassemble } = await import('../pipeline/document')
+    const parse = (src: string) => {
+      const r = wardleyParser.parse(src)
+      if (!r.ok) throw new Error(`解析失败：${r.error.message}`)
+      return r.doc
+    }
+    const apply = (doc: ReturnType<typeof parse>, intent: Parameters<typeof wardleyParser.resolveRewrites>[1]) => {
+      const rewrites = wardleyParser.resolveRewrites(doc, intent)
+      if (rewrites === null) throw new Error(`意图被拒绝：${JSON.stringify(intent)}`)
+      return parse(reassemble(doc, rewrites))
+    }
+
+    let doc = parse(WARDLEY_TEMPLATE)
+    doc = apply(doc, {
+      type: 'add-node',
+      nodeKind: 'component',
+      name: '配送',
+      coords: { visibility: '0.4', evolution: '0.2' },
+    }) // 加组件（坐标默认或指定）
+    doc = apply(doc, { type: 'add-node', nodeKind: 'anchor', name: '监管' }) // 加锚点（坐标落默认 [0.5, 0.5]）
+    doc = apply(doc, { type: 'set-node-name', elementId: 'wardley-node:配送', name: '物流' }) // 改名（中文自动加引号）
+    doc = apply(doc, {
+      type: 'set-node-coords',
+      elementId: 'wardley-node:物流',
+      visibility: '0.3',
+      evolution: '0.15',
+    }) // 改坐标
+    doc = apply(doc, { type: 'add-link', from: '茶', to: '物流' }) // 加连线
+    doc = apply(doc, { type: 'delete-node', elementId: 'wardley-node:水壶' }) // 删节点（连带删触及连线与 evolve）
+    doc = apply(doc, { type: 'delete-doc-line', elementId: 'wardley-doc:2' }) // 删 size 行
+
+    const source = doc.source
+    expect(source).toContain('component "物流" [0.3, 0.15]')
+    expect(source).toContain('anchor "监管"')
+    expect(source).toContain('"茶" -> "物流"')
+    expect(source).not.toContain('"水壶"')
+    await expect(mermaid.parse(source)).resolves.toBeTruthy()
+  })
+
   it('sequence 源码 parse 通过', async () => {
     const src = `sequenceDiagram
     Alice->>Bob: 你好

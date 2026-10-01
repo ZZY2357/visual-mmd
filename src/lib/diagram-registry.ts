@@ -21,6 +21,7 @@ import { radarParser } from './pipeline/radar'
 import { architectureParser } from './pipeline/architecture'
 import { treemapParser } from './pipeline/treemap'
 import { ishikawaParser } from './pipeline/ishikawa'
+import { wardleyParser } from './pipeline/wardley'
 import { frontmatterEnd } from './pipeline/frontmatter'
 import { buildFlowchartProjection, type FlowchartProjection } from './projection/flowchart-projection'
 import { buildSequenceProjection, type SequenceProjection } from './projection/sequence-projection'
@@ -55,6 +56,7 @@ import {
 } from './projection/architecture-projection'
 import { buildTreemapProjection, type TreemapProjection } from './projection/treemap-projection'
 import { buildIshikawaProjection, type IshikawaProjection } from './projection/ishikawa-projection'
+import { buildWardleyProjection, type WardleyProjection } from './projection/wardley-projection'
 import { flowchartCanvasCapabilities } from './canvas-selection/flowchart-adapter'
 import { sequenceCanvasCapabilities } from './canvas-selection/sequence-adapter'
 import { classCanvasCapabilities } from './canvas-selection/class-adapter'
@@ -76,6 +78,7 @@ import { radarCanvasCapabilities } from './canvas-selection/radar-adapter'
 import { architectureCanvasCapabilities } from './canvas-selection/architecture-adapter'
 import { treemapCanvasCapabilities } from './canvas-selection/treemap-adapter'
 import { ishikawaCanvasCapabilities } from './canvas-selection/ishikawa-adapter'
+import { wardleyCanvasCapabilities } from './canvas-selection/wardley-adapter'
 import type { CanvasCapabilities } from './canvas-selection/capabilities'
 import { treePartitions, type TreePartitions } from './structure-tree/partitions'
 import { DEFAULT_DIAGRAM_SOURCE } from './storage'
@@ -119,6 +122,7 @@ export interface ProjectionTypes {
   architecture: ArchitectureProjection
   treemap: TreemapProjection
   ishikawa: IshikawaProjection
+  wardley: WardleyProjection
 }
 
 /** 已注册图种的 id 集合（字面量联合，随 ProjectionTypes 增长） */
@@ -501,6 +505,33 @@ export const ISHIKAWA_TEMPLATE = `ishikawa-beta
 `
 
 /**
+ * wardley 起步模板（more-diagrams 工单 23）：`wardley-beta` 声明 + title/size、
+ * 一条 evolution 轴、1 个 anchor + 4 个 component（含 `(inertia)` 标注与中文引号名）、
+ * 4 条依赖连线、一条 evolve 演化目标（research §7 草案）。
+ * 注意词法（research §1）：坐标是 `[visibility, evolution]`——即 `[Y, X]`（与直觉相反）；
+ * 非 ASCII 名必须引号包裹。
+ */
+export const WARDLEY_TEMPLATE = `wardley-beta
+title 茶铺价值链
+size [1100, 600]
+
+evolution "未建模" -> "分化" -> "收敛" -> "商品化"
+
+anchor "顾客" [0.95, 0.63]
+component "茶" [0.63, 0.81]
+component "热水" [0.52, 0.80]
+component "水壶" [0.43, 0.35] (inertia)
+component "电力" [0.10, 0.70]
+
+"顾客" -> "茶"
+"茶" -> "热水"
+"热水" -> "水壶"
+"水壶" -> "电力"
+
+evolve "水壶" 0.62
+`
+
+/**
  * 注册表：数组是唯一权威（more-diagrams 工单 01），DIAGRAM_TYPES 由它推导。
  * detectDiagramType 按数组顺序显式遍历——不再维护手写的 if 分发链，
  * 新图种挂一条即可参与识别，无法识别时不再默认 flowchart（见下）。
@@ -732,6 +763,18 @@ export const DIAGRAM_TYPE_LIST: DiagramTypeRegistration[] = [
     buildProjection: (doc) => ({ type: 'ishikawa', ishikawa: buildIshikawaProjection(doc) }),
     tree: treePartitions.ishikawa,
     canvas: ishikawaCanvasCapabilities,
+  },
+  {
+    id: 'wardley',
+    parser: wardleyParser,
+    template: WARDLEY_TEMPLATE,
+    // `\b` 让关键字不被 `wardleyXxx` 之类的更长词误认；mermaid 12 只有 `wardley-beta`
+    // 一个关键字（Langium 语法勘察，research §1）。探测器（mermaid 自身）大小写不敏感、
+    // 但 Langium 关键字字面量大小写敏感——此处按 mermaid 探测器口径放宽为 i
+    detect: (source) => /^wardley-beta\b/i.test(firstStatementLine(source)),
+    buildProjection: (doc) => ({ type: 'wardley', wardley: buildWardleyProjection(doc) }),
+    tree: treePartitions.wardley,
+    canvas: wardleyCanvasCapabilities,
   },
 ]
 

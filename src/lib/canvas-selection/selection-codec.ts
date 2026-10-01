@@ -137,6 +137,8 @@ export function canvasIdOf(selection: Selection): string | null {
     case 'architecture-group':
     case 'architecture-junction':
       return selection.name
+    // wardley（more-diagrams 工单 23）：画布 DOM 无 data-id（research §4 实测：渲染器只写
+    // class），三类选中都不可寻址——安静地不高亮（结构树选中仍在，属性表单可编）
     default:
       return null
   }
@@ -187,6 +189,11 @@ export function fromCanvasId(diagramType: DiagramTypeId, canvas: CanvasSelection
     // ishikawa（more-diagrams 工单 22）：画布 DOM 无 data-id（research §4 实测：渲染器
     // `data-` 出现 0 次，只有 class；且 flattenTree 按深度奇偶重排、渲染序 ≠ 源码序），
     // 画布选中不产生
+    return null
+  }
+  if (diagramType === 'wardley') {
+    // wardley（more-diagrams 工单 23）：画布 DOM 无 data-id（research §4 实测：渲染器
+    // 只写 class `wardley-node` + `<defs>` 箭头 marker），画布选中不产生
     return null
   }
   if (diagramType === 'gantt') {
@@ -345,6 +352,13 @@ export function selectionOfMenuTarget(target: ContextMenuTarget): Selection | nu
       return { kind: 'architecture-junction', name: target.name }
     case 'architecture-edge':
       return { kind: 'architecture-edge', elementId: target.elementId }
+    // wardley（more-diagrams 工单 23）：节点 / 连线 / evolve 菜单目标一一对应各自 Selection kind
+    case 'wardley-node':
+      return { kind: 'wardley-node', name: target.name }
+    case 'wardley-link':
+      return { kind: 'wardley-link', elementId: target.elementId }
+    case 'wardley-evolve':
+      return { kind: 'wardley-evolve', elementId: target.elementId }
     case 'blank':
       return null
   }
@@ -395,6 +409,7 @@ export function menuTargetOfCanvas(
     if (diagramType === 'radar') return null // 无 data-id（实测降级），画布节点不可命中
     if (diagramType === 'treemap') return null // 无 data-id（实测降级，research §4），画布节点不可命中
     if (diagramType === 'ishikawa') return null // 无 data-id 且渲染序 ≠ 源码序（实测降级，research §4），画布节点不可命中
+    if (diagramType === 'wardley') return null // 无 data-id（实测降级，research §4），画布节点不可命中
     if (diagramType === 'gantt') {
       // gantt（more-diagrams 工单 11）：任务条虽可寻址，但元素级菜单不做（与 journey/pie
       // 同口径），编辑由结构树选中 + 属性表单承接——画布节点不产生菜单目标

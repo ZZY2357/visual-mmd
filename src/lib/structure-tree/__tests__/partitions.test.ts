@@ -291,6 +291,8 @@ describe('结构树分区描述（工单 06）', () => {
         'architecture-beta\n    group platform(cloud)[平台]\n    service web(server)[Web]\n    service db(database)[数据库] in platform\n    web:R -- L:db',
       treemap: 'treemap\n"根"\n    "甲"\n        "叶1": 3\n    "乙": 2',
       ishikawa: 'ishikawa-beta\n    照片模糊\n    人\n        手抖\n    设备\n        镜头脏',
+      wardley:
+        'wardley-beta\n    title 茶铺\n    anchor "顾客" [0.95, 0.63]\n    component "茶" [0.63, 0.81]\n    "顾客" -> "茶"\n    evolve "茶" 0.62',
     }
     for (const id of Object.keys(DIAGRAM_TYPES) as (keyof typeof DIAGRAM_TYPES)[]) {
       const registration = DIAGRAM_TYPES[id]

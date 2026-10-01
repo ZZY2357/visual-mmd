@@ -118,6 +118,14 @@ describe('detectDiagramType：无法识别 → unsupported（null），绝不默
     expect(DIAGRAM_TYPES.ishikawa.detect('ishikawaX\n    甲\n')).toBe(false)
   })
 
+  it('wardley-beta 识别（more-diagrams 工单 23）：探测器大小写不敏感（mermaid 口径）', () => {
+    expect(detectDiagramType('wardley-beta\ncomponent "茶" [0.5, 0.5]\n')?.id).toBe('wardley')
+    expect(detectDiagramType('WARDLEY-BETA\n')?.id).toBe('wardley')
+    // `\b` 防止 wardleyXxx 被误认
+    expect(DIAGRAM_TYPES.wardley.detect('wardley-betaX\n')).toBe(false)
+    expect(DIAGRAM_TYPES.wardley.detect('flowchart TB\n A-->B')).toBe(false)
+  })
+
   it('双关键字 detect 例（后续图种工单的写法约定）：-beta 可选且不越界误判', () => {
     // 后续 block/packet/xychart 工单应采用 `^<kw>(-beta)?\b` 形态；这里把形态锁死：
     // 可选 -beta 不妨碍裸关键字的识别，也不把更长的词（如 block-chain）误吞。

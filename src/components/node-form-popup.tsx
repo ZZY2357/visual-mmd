@@ -15,6 +15,7 @@ import { AddBlockEdgeInlineForm } from './block-forms'
 import { AddSankeyLinkInlineForm } from './sankey-forms'
 import { AddXychartSeriesInlineForm } from './xychart-forms'
 import { AddArchitectureEdgeInlineForm } from './architecture-forms'
+import { AddWardleyLinkInlineForm } from './wardley-forms'
 
 /**
  * class/sequence 节点菜单的表单浮层（工单 06/04；工单 04-canvas-bundle 自 CanvasPanel 迁出）：
@@ -148,6 +149,14 @@ export function NodeFormPopup(props: { state: NodeFormState; projection: AnyProj
               ...projection.architecture.services.map((s) => s.id),
               ...projection.architecture.junctions.map((j) => j.id),
             ]}
+            initialFrom={state.from}
+            afterElementId={state.anchorElementId}
+            onDone={props.onClose}
+          />
+        )}
+        {state.kind === 'wardley-link' && projection.type === 'wardley' && (
+          <AddWardleyLinkInlineForm
+            nodeNames={projection.wardley.nodes.map((n) => n.name)}
             initialFrom={state.from}
             afterElementId={state.anchorElementId}
             onDone={props.onClose}
