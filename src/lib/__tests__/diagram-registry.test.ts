@@ -54,9 +54,9 @@ describe('detectDiagramType：无法识别 → unsupported（null），绝不默
     ['冷门图种 venn-beta', 'venn-beta\n    A o B\n'],
     ['纯文本', '这不是 Mermaid 源码\n'],
     ['空源码', ''],
-    // block / block-beta 已注册（more-diagrams 工单 09），移入上方「各归各」；
-    // packet / packet-beta 已注册（more-diagrams 工单 16），同上
-    ['xychart-beta', 'xychart-beta\n    line [1, 2]\n'],
+    // block / block-beta 已注册（more-diagrams 工单 09）、packet / packet-beta 已注册
+    //（more-diagrams 工单 16）、xychart / xychart-beta 已注册（more-diagrams 工单 14），
+    // 均移入各自「返回 X」的用例，不再落 null 清单
   ])('%s 返回 null', (_name, source) => {
     expect(detectDiagramType(source)).toBeNull()
   })
@@ -80,6 +80,14 @@ describe('detectDiagramType：无法识别 → unsupported（null），绝不默
     expect(detectDiagramType('sankey\n\na,b,1\n')?.id).toBe('sankey')
     // 正文是 CSV 流：带尾随内容的声明行不是表头，不认领
     expect(DIAGRAM_TYPES.sankey.detect('sankey-beta extra\na,b,1\n')).toBe(false)
+  })
+
+  it('xychart(-beta) 识别（more-diagrams 工单 14）：两个关键字都认领，方向修饰符可选；声明行带别的内容不认领', () => {
+    expect(detectDiagramType('xychart-beta\nbar [1]\n')?.id).toBe('xychart')
+    expect(detectDiagramType('xychart\nbar [1]\n')?.id).toBe('xychart')
+    expect(detectDiagramType('xychart horizontal\nbar [1]\n')?.id).toBe('xychart')
+    expect(detectDiagramType('XYCHART-BETA\nbar [1]\n')?.id).toBe('xychart')
+    expect(DIAGRAM_TYPES.xychart.detect('xychart-beta extra\nbar [1]\n')).toBe(false)
   })
 
   it('双关键字 detect 例（后续图种工单的写法约定）：-beta 可选且不越界误判', () => {

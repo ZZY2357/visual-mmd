@@ -98,6 +98,11 @@ describe('金样合法性：默认图表模板能被 mermaid 渲染', () => {
     await expect(mermaid.parse(source)).resolves.toBeTruthy()
   })
 
+  it('xychart 起步模板 parse 通过（more-diagrams 工单 14）', async () => {
+    const { XYCHART_TEMPLATE } = await import('../diagram-registry')
+    await expect(mermaid.parse(XYCHART_TEMPLATE)).resolves.toBeTruthy()
+  })
+
   it('sequence 源码 parse 通过', async () => {
     const src = `sequenceDiagram
     Alice->>Bob: 你好
@@ -254,9 +259,38 @@ describe('金样合法性：默认图表模板能被 mermaid 渲染', () => {
     doc = apply(doc, { type: 'delete-field', elementId: 'field:4' }) // 删末字段
     doc = apply(doc, { type: 'delete-field', elementId: 'field:2' }) // 删中间字段（后续 +count 自动衔接）
 
-    const source = doc.source
-    expect(source).not.toContain('Destination Port')
-    expect(source).toContain('+16: "Flags"')
-    await expect(mermaid.parse(source)).resolves.toBeTruthy()
+    const packetSource = doc.source
+    expect(packetSource).not.toContain('Destination Port')
+    expect(packetSource).toContain('+16: "Flags"')
+    await expect(mermaid.parse(packetSource)).resolves.toBeTruthy()
+  })
+
+  it('xychart 端到端编辑场景（工单 14 验收：加 bar 系列 → 加数值 → 改系列名 → y 轴 range 改 0-->100 → 删除一条系列）落在合法 mermaid 源码上', async () => {
+    const { XYCHART_TEMPLATE } = await import('../diagram-registry')
+    const { xychartParser } = await import('../pipeline/xychart')
+    const { reassemble } = await import('../pipeline/document')
+    const parse = (src: string) => {
+      const r = xychartParser.parse(src)
+      if (!r.ok) throw new Error(`解析失败：${r.error.message}`)
+      return r.doc
+    }
+    const apply = (doc: ReturnType<typeof parse>, intent: Parameters<typeof xychartParser.resolveRewrites>[1]) => {
+      const rewrites = xychartParser.resolveRewrites(doc, intent)
+      if (rewrites === null) throw new Error(`意图被拒绝：${JSON.stringify(intent)}`)
+      return parse(reassemble(doc, rewrites))
+    }
+
+    let doc = parse(XYCHART_TEMPLATE)
+    doc = apply(doc, { type: 'add-series', seriesType: 'bar', name: '预测', values: ['120', '180'] }) // 加 bar 系列
+    doc = apply(doc, { type: 'add-series-value', elementId: 'series:3', value: '300' }) // 给系列加一个数值
+    doc = apply(doc, { type: 'set-series-name', elementId: 'series:3', name: '预估' }) // 改系列名
+    doc = apply(doc, { type: 'set-axis-range', axis: 'y', min: '0', max: '100' }) // y 轴 range 改 0-->100
+    doc = apply(doc, { type: 'delete-series', elementId: 'series:1' }) // 删除一条系列
+
+    const xychartSource = doc.source
+    expect(xychartSource).toContain('bar "预估" [120, 180, 300]')
+    expect(xychartSource).toContain('y-axis "销售额" 0 --> 100')
+    expect(xychartSource).not.toContain('bar [200, 350, 150]')
+    await expect(mermaid.parse(xychartSource)).resolves.toBeTruthy()
   })
 })

@@ -5,7 +5,7 @@ import { canvasIdOf, fromCanvasId, menuTargetOfCanvas, selectionOfMenuTarget } f
 import type { ContextMenuTarget } from '../../editing/context-menu'
 import { sameSelection, type Selection } from '../../projection/selection'
 
-/** 全部 18 个 Selection kind 的样例（工单 03：全 kind 枚举测试的清单；工单 13 补 sankey 两类） */
+/** 全部 21 个 Selection kind 的样例（工单 03：全 kind 枚举测试的清单；工单 13 补 sankey 两类、14 补 xychart 三类） */
 const ALL_KINDS: readonly Selection[] = [
   { kind: 'diagram' },
   { kind: 'node', nodeId: 'A' },
@@ -25,10 +25,13 @@ const ALL_KINDS: readonly Selection[] = [
   { kind: 'mindmap-node', elementId: 'mindmap-node:1' },
   { kind: 'sankey-node', name: 'Foo' },
   { kind: 'sankey-link', elementId: 'link:1' },
+  { kind: 'xychart-series', elementId: 'series:1' },
+  { kind: 'xychart-axis', axis: 'x' },
+  { kind: 'xychart-title' },
 ]
 
 /**
- * 显式可寻址表（工单 03 定案）：18 个 kind × 5 个图种，逐格钉住「画布上是否可寻址」。
+ * 显式可寻址表（工单 03 定案）：逐格钉住「画布上是否可寻址」。
  * 新增 kind 时必须在这里回答——漏答即测试失败，而不是线上静默（属性面板空白）。
  */
 const ADDRESSABLE: Record<DiagramTypeId, ReadonlySet<string>> = {
@@ -38,14 +41,24 @@ const ADDRESSABLE: Record<DiagramTypeId, ReadonlySet<string>> = {
   mindmap: new Set(['mindmap-node']),
   // sankey（more-diagrams 工单 13）：节点按名字、链路按位置序 `link:N`，均经位置序反注
   sankey: new Set(['sankey-node', 'sankey-link']),
+  // xychart（more-diagrams 工单 14）：系列位置序 `series:N`、标题/轴固定身份，均经类名组反注
+  xychart: new Set(['xychart-series', 'xychart-axis', 'xychart-title']),
 }
 
-const TYPES: readonly DiagramTypeId[] = ['flowchart', 'sequence', 'class', 'mindmap', 'sankey']
+const TYPES: readonly DiagramTypeId[] = ['flowchart', 'sequence', 'class', 'mindmap', 'sankey', 'xychart']
 
 /** data-id → CanvasSelection（与各 resolver 的产出形态一致）：
  * 节点类 data-id 即节点 id；位置序连线 data-id 即 elementId；mindmap 的画布选中 id 是 elementId */
 function canvasSelectionOf(sel: Selection, dataId: string): CanvasSelection {
-  if (sel.kind === 'node' || sel.kind === 'participant' || sel.kind === 'class' || sel.kind === 'sankey-node') {
+  if (
+    sel.kind === 'node' ||
+    sel.kind === 'participant' ||
+    sel.kind === 'class' ||
+    sel.kind === 'sankey-node' ||
+    sel.kind === 'xychart-series' ||
+    sel.kind === 'xychart-axis' ||
+    sel.kind === 'xychart-title'
+  ) {
     return { kind: 'node', id: dataId }
   }
   if (sel.kind === 'mindmap-node') return { kind: 'node', id: sel.elementId }
@@ -53,7 +66,7 @@ function canvasSelectionOf(sel: Selection, dataId: string): CanvasSelection {
 }
 
 describe('canvasIdOf', () => {
-  it('可寻址的 10 个 kind 给出 data-id，不可寻址的 8 个 kind 返回 null', () => {
+  it('可寻址的 13 个 kind 给出 data-id，不可寻址的 8 个 kind 返回 null', () => {
     const addressableKinds = new Set([
       'node',
       'participant',
@@ -65,6 +78,9 @@ describe('canvasIdOf', () => {
       'mindmap-node',
       'sankey-node',
       'sankey-link',
+      'xychart-series',
+      'xychart-axis',
+      'xychart-title',
     ])
     for (const sel of ALL_KINDS) {
       const dataId = canvasIdOf(sel)
@@ -82,7 +98,7 @@ describe('canvasIdOf', () => {
 })
 
 describe('fromCanvasId（往返）', () => {
-  it('18 kind × 5 图种逐格核对：可寻址组合 sameSelection 回原选中，不可寻址组合不回', () => {
+  it('21 kind × 6 图种逐格核对：可寻址组合 sameSelection 回原选中，不可寻址组合不回', () => {
     for (const type of TYPES) {
       for (const sel of ALL_KINDS) {
         const label = `${type}/${sel.kind}`
@@ -134,6 +150,10 @@ describe('selectionOfMenuTarget', () => {
       // sankey（more-diagrams 工单 13）：节点 / 链路菜单目标一一对应各自 Selection kind
       [{ kind: 'sankey-node', name: 'Foo' }, { kind: 'sankey-node', name: 'Foo' }],
       [{ kind: 'sankey-link', elementId: 'link:1' }, { kind: 'sankey-link', elementId: 'link:1' }],
+      // xychart（more-diagrams 工单 14）：系列 / 轴 / 标题菜单目标一一对应各自 Selection kind
+      [{ kind: 'xychart-series', elementId: 'series:1' }, { kind: 'xychart-series', elementId: 'series:1' }],
+      [{ kind: 'xychart-axis', axis: 'x' }, { kind: 'xychart-axis', axis: 'x' }],
+      [{ kind: 'xychart-title' }, { kind: 'xychart-title' }],
     ]
     for (const [target, sel] of cases) {
       expect(selectionOfMenuTarget(target), target.kind).toEqual(sel)
@@ -188,6 +208,19 @@ describe('menuTargetOfCanvas（往返）', () => {
       kind: 'sankey-node',
       name: 'Foo',
     })
+    // xychart（more-diagrams 工单 14）：node.id = `series:N` / 固定身份（类名组反注）
+    expect(menuTargetOfCanvas('xychart', { kind: 'node', id: 'series:2' })).toEqual({
+      kind: 'xychart-series',
+      elementId: 'series:2',
+    })
+    expect(menuTargetOfCanvas('xychart', { kind: 'node', id: 'xychart-y-axis' })).toEqual({
+      kind: 'xychart-axis',
+      axis: 'y',
+    })
+    expect(menuTargetOfCanvas('xychart', { kind: 'node', id: 'xychart-title' })).toEqual({
+      kind: 'xychart-title',
+    })
+    expect(menuTargetOfCanvas('xychart', { kind: 'node', id: '__nope__' })).toBeNull()
     // mermaid 自己的连线 id 不是位置序身份 → null（安静地不弹菜单）
     expect(menuTargetOfCanvas('class', { kind: 'element', elementId: 'id_A_B_1' })).toBeNull()
   })
@@ -201,6 +234,9 @@ describe('menuTargetOfCanvas（往返）', () => {
       ['class', { kind: 'node', id: 'Foo' }],
       ['class', { kind: 'element', elementId: 'relation:1' }],
       ['mindmap', { kind: 'node', id: 'mindmap-node:1' }],
+      ['xychart', { kind: 'node', id: 'series:1' }],
+      ['xychart', { kind: 'node', id: 'xychart-x-axis' }],
+      ['xychart', { kind: 'node', id: 'xychart-title' }],
     ]
     for (const [type, canvas] of canvasCases) {
       const target = menuTargetOfCanvas(type, canvas)

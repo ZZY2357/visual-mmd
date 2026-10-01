@@ -88,6 +88,11 @@ export type Selection =
   // packet（more-diagrams 工单 16）：字段走位置序身份（`field:N`，packet 语法无字段 id）。
   // 画布 DOM 的 data-id 由渲染后处理按 start-bit 映射反注（见 packet-adapter / node-data-ids）。
   | { kind: 'packet-field'; elementId: string }
+  // xychart（more-diagrams 工单 14）：系列 = 节点级元素（位置序身份 `series:N`）；
+  // 标题与轴 = 文档级属性元素（固定身份，画布经类名组反注可寻址）。
+  | { kind: 'xychart-series'; elementId: string }
+  | { kind: 'xychart-axis'; axis: 'x' | 'y' }
+  | { kind: 'xychart-title' }
 
 export const DIAGRAM_SELECTION: Selection = { kind: 'diagram' }
 
@@ -191,6 +196,12 @@ export function selectionKey(sel: Selection): string {
       return `quadrant-quadrant:${sel.elementId}`
     case 'packet-field':
       return `packet-field:${sel.elementId}`
+    case 'xychart-series':
+      return `xychart-series:${sel.elementId}`
+    case 'xychart-axis':
+      return `xychart-axis:${sel.axis}`
+    case 'xychart-title':
+      return 'xychart-title'
   }
 }
 

@@ -45,6 +45,7 @@ export interface StyleFormState {
 // requirement（more-diagrams 工单 07）：'requirement-relation' = 从选中节点拉一条关系
 // block（more-diagrams 工单 09）：'block-edge' = 从选中块节点拉一条边
 // sankey（more-diagrams 工单 13）：'sankey-link' = 加链路（source 预填同源，空白/链路上均可）
+// xychart（more-diagrams 工单 14）：'xychart-line' / 'xychart-bar' = 加系列（空白/系列上均可）
 export type NodeFormKind =
   | 'member'
   | 'relation'
@@ -63,6 +64,9 @@ export type NodeFormKind =
   | 'block-edge'
   // sankey（more-diagrams 工单 13）：加链路（三列表单）
   | 'sankey-link'
+  // xychart（more-diagrams 工单 14）：加系列（名字 + 数值行，line / bar 两形态）
+  | 'xychart-line'
+  | 'xychart-bar'
 
 export interface NodeFormState {
   kind: NodeFormKind

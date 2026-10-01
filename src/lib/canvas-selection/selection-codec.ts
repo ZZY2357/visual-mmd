@@ -13,6 +13,7 @@ import {
   parseRequirementElemBlockElementId,
 } from '../pipeline/element-id'
 import { blockSelectionOf } from './block-adapter'
+import { xychartSelectionOf } from './xychart-adapter'
 import {
   parseBlockGroupElementId,
   parseBlockNodeElementId,
@@ -117,6 +118,14 @@ export function canvasIdOf(selection: Selection): string | null {
     // （渲染后按 start-bit 映射反注，见 packet-adapter / node-data-ids）
     case 'packet-field':
       return selection.elementId
+    // xychart（more-diagrams 工单 14）：系列 data-id = 位置序 `series:N`（渲染后从
+    // `g.plot` 内按类名序号反注）；标题/轴 data-id 固定（渲染后按类名组反注）
+    case 'xychart-series':
+      return selection.elementId
+    case 'xychart-title':
+      return 'xychart-title'
+    case 'xychart-axis':
+      return selection.axis === 'x' ? 'xychart-x-axis' : 'xychart-y-axis'
     default:
       return null
   }
@@ -192,6 +201,12 @@ export function fromCanvasId(diagramType: DiagramTypeId, canvas: CanvasSelection
     // 链路走位置序（edgeSelectionOf 收窄）
     if (canvas.kind === 'node') return { kind: 'sankey-node', name: canvas.id }
     if (canvas.kind === 'element') return edgeSelectionOf(diagramType, canvas.elementId)
+    return null
+  }
+  if (diagramType === 'xychart') {
+    // xychart（more-diagrams 工单 14）：node.id = `series:N` / 固定身份（类名组反注），
+    // 唯一映射在 xychartSelectionOf
+    if (canvas.kind === 'node') return xychartSelectionOf(canvas)
     return null
   }
   if (canvas.kind === 'element') return edgeSelectionOf(diagramType, canvas.elementId)
@@ -275,7 +290,32 @@ export function selectionOfMenuTarget(target: ContextMenuTarget): Selection | nu
     // packet（more-diagrams 工单 16）：字段菜单目标一一对应 Selection kind
     case 'packet-field':
       return { kind: 'packet-field', elementId: target.elementId }
+    // xychart（more-diagrams 工单 14）：系列 / 轴 / 标题菜单目标一一对应各自 Selection kind
+    case 'xychart-series':
+      return { kind: 'xychart-series', elementId: target.elementId }
+    case 'xychart-axis':
+      return { kind: 'xychart-axis', axis: target.axis }
+    case 'xychart-title':
+      return { kind: 'xychart-title' }
     case 'blank':
+      return null
+  }
+}
+
+/**
+ * xychart（more-diagrams 工单 14）：画布 node.id → 菜单目标（固定身份 + 位置序系列）。
+ * Selection 与 ContextMenuTarget 的 xychart 形态同构，经 xychartSelectionOf 唯一映射后转形。
+ */
+function xychartMenuTargetOf(canvas: { kind: 'node'; id: string }): ContextMenuTarget | null {
+  const selection = xychartSelectionOf(canvas)
+  switch (selection?.kind) {
+    case 'xychart-series':
+      return { kind: 'xychart-series', elementId: selection.elementId }
+    case 'xychart-axis':
+      return { kind: 'xychart-axis', axis: selection.axis }
+    case 'xychart-title':
+      return { kind: 'xychart-title' }
+    default:
       return null
   }
 }
@@ -359,6 +399,9 @@ export function menuTargetOfCanvas(
     }
     // sankey（more-diagrams 工单 13）：node.id = 节点名（位置序反注），名字即身份
     if (diagramType === 'sankey') return { kind: 'sankey-node', name: canvas.id }
+    // xychart（more-diagrams 工单 14）：node.id = `series:N` / 固定身份（类名组反注），
+    // 唯一映射在 xychartSelectionOf
+    if (diagramType === 'xychart') return xychartMenuTargetOf(canvas)
     return { kind: 'sequence-participant', actorId: canvas.id }
   }
   if (canvas.kind === 'element') {
