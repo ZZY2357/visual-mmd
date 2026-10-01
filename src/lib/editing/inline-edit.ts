@@ -186,6 +186,7 @@ export type InlineEditDiagramKind =
   | 'packet'
   | 'xychart'
   | 'radar'
+  | 'architecture'
 
 /** radar 双击寻址的轴候选（文本 → elementId；由调用方从投影展开，展示文本 label ?? id） */
 export interface RadarAxisCandidate {
@@ -217,7 +218,6 @@ function targetFromRadarAxisText(
   }
   return null
 }
-  | 'architecture'
 
 /**
  * 双击目标 → 编辑对象；两边都匹配不上时返回 null（如点在空白处/边上），
