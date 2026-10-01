@@ -13,7 +13,8 @@ _Avoid_: 文件、文档
 **图表类型（Diagram Type）**:
 Mermaid 支持的一类图的种类（如 flowchart、sequence）。每种图表类型拥有独立的编辑界面。
 覆盖目标为 mermaid 支持的全部图种；编辑深度分层：核心语法全链路可编辑，边角语法逐字保留，
-画布交互只承诺 DOM 可寻址的元素。
+画布交互只承诺 DOM 可寻址的元素。少数图种（如 zenuml，依赖外部渲染包）只有只读渲染与代码面板，
+不进可视化编辑链。
 _Avoid_: 图格式
 
 **Mermaid 源码（Mermaid Source）**:

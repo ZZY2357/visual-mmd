@@ -98,13 +98,17 @@ function nodeFormForTarget(
     return { kind, anchorElementId: state.tailElementId ?? undefined, from: target.id, x, y }
   }
   if (kind === 'er-attribute' || kind === 'er-relation') {
-    // er 属性 / 关系表单（more-diagrams 工单 03）：实体节点右键 → 锚点为该实体的
-    // 属性锚点（块内最后一个属性 ?? 声明行），关系表单预选起点该实体
+    // er 属性 / 关系表单（more-diagrams 工单 03）：实体节点右键 → 锚点：属性表单用实体的
+    // 属性锚点（块内最后一个属性 ?? 声明行）；关系表单用实体的**闭合行**（tailElementId，
+    // 有块时即 `}`；无块时即声明行），否则关系会被插进属性块内部（工单 29 验收发现）。
     if (target.kind !== 'er-entity' || proj.type !== 'er') return null
     const entity = proj.er.entities.find((e) => e.name === target.name)
     if (entity === undefined) return null
     const base = {
-      anchorElementId: entity.attrAnchorElementId ?? entity.tailElementId ?? undefined,
+      anchorElementId:
+        kind === 'er-relation'
+          ? (entity.tailElementId ?? undefined)
+          : (entity.attrAnchorElementId ?? entity.tailElementId ?? undefined),
       x,
       y,
     }

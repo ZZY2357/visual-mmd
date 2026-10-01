@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import mermaid from 'mermaid'
 import { DEFAULT_DIAGRAM_SOURCE } from '../storage'
+import { DIAGRAM_TYPE_LIST } from '../diagram-registry'
 
 /**
  * 金样合法性（spec Testing Decisions 的雏形）：
@@ -731,4 +732,17 @@ describe('金样合法性：默认图表模板能被 mermaid 渲染', () => {
     expect(xychartSource).not.toContain('bar [200, 350, 150]')
     await expect(mermaid.parse(xychartSource)).resolves.toBeTruthy()
   })
+})
+
+/**
+ * 全图种模板的 mermaid 合法性（more-diagrams 工单 29 验收回归清单的渲染项）。
+ * 上面对历史模板逐条列了用例；这一条改为**遍历注册表**——日后新注册的图种自动纳入，
+ * 不需要记得再补一条用例（漏补正是回归最容易发生的地方）。
+ */
+describe('全图种回归清单：每张注册模板都能被 mermaid v12 parse 通过', () => {
+  for (const registration of DIAGRAM_TYPE_LIST) {
+    it(`${registration.id} 起步模板 parse 通过`, async () => {
+      await expect(mermaid.parse(registration.template)).resolves.toBeTruthy()
+    })
+  }
 })

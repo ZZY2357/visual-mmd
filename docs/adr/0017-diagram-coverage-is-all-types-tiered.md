@@ -31,3 +31,25 @@ zenuml 还依赖外部渲染包。
 - 画布交互承诺从"所有图种对等"收窄为"可寻址的对等、不可寻址的结构树对等"——
   CONTEXT.md 的画布相关定义按此口径理解。
 - 未注册图种的 detect 默认行为从"当作 flowchart"改为"只读降级"，属可观察行为变化。
+
+## 落地（more-diagrams 工单 29 验收，2026-10-01）
+
+本批 28 张工单全部 resolved 并合入 main，**覆盖范围无缩水**——分层对齐按既定承诺兑现：
+
+- **`DIAGRAM_TYPE_LIST` 实测 31 图种** = 4 原有（flowchart/sequence/class/mindmap）+ 27 新增
+  （第一波 17 + 第二波 9 + zenuml 之外的盘点差异见下）。计数由 `diagram-registry.test.ts` 钉住。
+- **可寻址图种**（画布点选 / 高亮 / 内联编辑原样生效，走 flowchart/class 同一条 data-id 链路）：
+  kanban、requirement、usecase、agentflow、venn（集合/交集）、既有四图种。
+- **不可寻址图种**（ADR-0007 诚实降级：不伪造 DOM 交互，结构树 + 属性表单为完整编辑入口）：
+  gitgraph、timeline、journey、pie、gantt、quadrant、sankey、xychart、radar、packet、architecture、
+  c4、treemap、ishikawa、wardley、cynefin、eventmodeling。降级证据（渲染 chunk 行号）逐图种
+  落在各工单 Comments 与 `docs/mermaid-upgrade-regression-checklist.md`。
+- **只读渲染**（不进 `DIAGRAM_TYPE_LIST` 可视化编辑链）：**zenuml**——依赖外部
+  `@mermaid-js/mermaid-zenuml` 懒加载注册，按工单 19 任务 0 的降级路径处理（渲染 + 代码面板照常，
+  表单降级提示）。
+- **升格（超出工单原文、e2e 必需的唯一一项）**：gitgraph 新增 `checkout`/`switch` 语句插入与
+  「切换分支」按钮（`branch` 创建即 checkout、`merge` 只作用于当前分支，否则 e2e「merge 回 main」
+  无手段）。其余图种无升格。
+- **验收期间真机走查暴露 3 个此前单测未覆盖的真 Bug**（ER 属性行分隔 / ER 关系锚点 / Gantt 元数据
+  表单 React 19 `currentTarget` 陷阱），全部修复并加回归测试——证明「单测 + `mermaid.parse`」证据链
+  不能替代真机走查（详见 spec.md 落地修正节与工单 29 Comments）。

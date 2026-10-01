@@ -252,6 +252,83 @@ describe('er 解析器：意图落码', () => {
     expect(erParser.resolveRewrites(doc, { type: 'add-relation', from: 'A', to: 'B', cardLeft: 'xx', line: '--', cardRight: '||' })).toBeNull()
     expect(erParser.resolveRewrites(doc, { type: 'add-relation', from: 'A', to: 'B', cardLeft: '||', line: '-x', cardRight: '||' })).toBeNull()
   })
+
+  // 工单 29 验收发现：无 keys/comment 的属性行加键时丢分隔空格（`string field` + PK → `string fieldPK`）
+  it('无后缀属性行加键：补分隔空格（验收回归）', () => {
+    const doc = parseOk('erDiagram\n    CAR {\n        string field\n    }\n')
+    const attr = doc.elements.find((p) => p.element.kind === 'er-attribute')!
+    const r = erParser.resolveRewrites(doc, {
+      type: 'set-attribute',
+      elementId: attr.id,
+      changes: { keys: ['PK'] },
+    })
+    expect(reassemble(doc, r!)).toContain('string field PK')
+    expect(reassemble(doc, r!)).not.toContain('fieldPK')
+  })
+
+  it('无后缀属性行加注释：补分隔空格（验收回归）', () => {
+    const doc = parseOk('erDiagram\n    CAR {\n        string field\n    }\n')
+    const attr = doc.elements.find((p) => p.element.kind === 'er-attribute')!
+    const r = erParser.resolveRewrites(doc, {
+      type: 'set-attribute',
+      elementId: attr.id,
+      changes: { comment: '说明' },
+    })
+    expect(reassemble(doc, r!)).toContain('string field "说明"')
+    expect(reassemble(doc, r!)).not.toContain('field"')
+  })
+
+  it('已有后缀属性行改写键：沿用原文空白，不重复补空格', () => {
+    const doc = parseOk('erDiagram\n    CAR {\n        string make PK "制造商"\n    }\n')
+    const attr = doc.elements.find((p) => p.element.kind === 'er-attribute')!
+    const r = erParser.resolveRewrites(doc, {
+      type: 'set-attribute',
+      elementId: attr.id,
+      changes: { keys: ['PK', 'FK'] },
+    })
+    expect(reassemble(doc, r!)).toContain('string make PK, FK "制造商"')
+  })
+
+  // 工单 29 验收发现：以带属性块的实体为锚点拉关系时，关系被插进了实体块内部。
+  // UI 契约：编辑层传的锚点是实体的**闭合行**（er-end），见 use-canvas-context-menu。
+  it('锚点为实体闭合行：关系落在块之后而非块内部（验收回归）', () => {
+    const source = 'erDiagram\n    CAR {\n        string make PK\n    }\n    DRIVER\n'
+    const doc = parseOk(source)
+    const end = doc.elements.find((p) => p.element.kind === 'er-end')!
+    const r = erParser.resolveRewrites(doc, {
+      type: 'add-relation',
+      afterElementId: end.id,
+      from: 'CAR',
+      to: 'DRIVER',
+      cardLeft: '||',
+      line: '--',
+      cardRight: '|{',
+      label: '引用',
+    })
+    const out = reassemble(doc, r!)
+    expect(out).toBe('erDiagram\n    CAR {\n        string make PK\n    }\n    CAR ||--|{ DRIVER : 引用\n    DRIVER\n')
+    expect(out.indexOf('||--|{')).toBeGreaterThan(out.indexOf('}'))
+  })
+
+  // 纵深防御：即使锚点误传为「开块实体声明行」，管线也应自行推进到块闭合行之后
+  it('锚点误传为开块实体声明行：仍落在块之后（纵深防御）', () => {
+    const source = 'erDiagram\n    CAR {\n        string make PK\n    }\n    DRIVER\n'
+    const doc = parseOk(source)
+    const car = doc.elements.find(
+      (p) => p.element.kind === 'er-entity' && (p.element as unknown as { openBrace: boolean }).openBrace,
+    )!
+    const r = erParser.resolveRewrites(doc, {
+      type: 'add-relation',
+      afterElementId: car.id,
+      from: 'CAR',
+      to: 'DRIVER',
+      cardLeft: '||',
+      line: '--',
+      cardRight: '|{',
+    })
+    const out = reassemble(doc, r!)
+    expect(out.indexOf('||--|{')).toBeGreaterThan(out.indexOf('}'))
+  })
 })
 
 describe('er 词法助手', () => {

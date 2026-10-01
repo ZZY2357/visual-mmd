@@ -204,4 +204,32 @@ describe('验收场景（gantt，单测等价覆盖）', () => {
     // 弱替代证据（代替真机渲染）：产物仍是合法 mermaid
     await expect(mermaid.parse(useEditorStore.getState().source)).resolves.toBeTruthy()
   })
+
+  // 工单 29 验收发现：GanttTaskForm 的元数据字段 onChange 曾把 `e.currentTarget.value`
+  // 写在惰性状态更新器里（`setMetaDraft((d) => ({ ...d, x: e.currentTarget.value }))`）。
+  // React 19 会在事件处理结束后把 currentTarget 置 null，更新器若被延后执行即抛
+  // `Cannot read properties of null (reading 'value')`，整页白屏。此用例逐个形态、
+  // 逐个字段键入，断言不抛错且落码正确。
+  it('元数据各形态逐字段键入不抛错（currentTarget 不能在惰性更新器里读）', async () => {
+    resetEditorHistory('gantt\n    dateFormat YYYY-MM-DD\n    section 开发\n        新任务: 1d\n')
+    let c = rerender()
+    act(() => useEditorStore.getState().select({ kind: 'gantt-task', elementId: 'task:1' }))
+
+    const types = async (label: string, value: string): Promise<void> => {
+      c = rerender()
+      await typeInto(inputByLabel(c, label), value)
+    }
+
+    // date-end：起始 + 结束
+    await types(zhDict.app.propertyPanel.ganttTaskStart, '2026-02-01')
+    await types(zhDict.app.propertyPanel.ganttTaskEnd, '2026-02-05')
+    // after-end：依赖 + 结束（先切形态，再逐字段键入——真机白屏即发生在这一步）
+    c = rerender()
+    await selectOption(c, zhDict.app.propertyPanel.ganttTaskShape, zhDict.app.propertyPanel.ganttShapeAfterEnd)
+    await types(zhDict.app.propertyPanel.ganttTaskAfterIds, 'a1')
+    await types(zhDict.app.propertyPanel.ganttTaskEnd, '4d')
+    c = rerender()
+    await pressEnter(inputByLabel(c, zhDict.app.propertyPanel.ganttTaskEnd))
+    expect(useEditorStore.getState().source).toContain('新任务: after a1, 4d')
+  })
 })

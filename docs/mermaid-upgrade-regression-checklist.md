@@ -96,3 +96,82 @@
    对齐到关系序（条数 / 顺序任一不符即整体放弃标注）；sequence 的注释 / 块标注同理依赖
    `rect.note` / `line.loopLine` 的宿主 `g` 结构。升版若改这些结构，对应种类退化为
    「点标签 / 点基数不响应」，**不会点错关系**（这条是工单 02 引入的新的 mermaid 结构依赖）。
+
+## 2026-10-01 追加：more-diagrams 批次全部新图种（工单 29 验收）
+
+`more-diagrams` 批次把覆盖目标扩到 mermaid 全部图种（ADR-0017）。本批新增 27 图种
+（`DIAGRAM_TYPE_LIST` 实测 31 = 4 原有 + 27 新增）；升版时**每图种按下表逐项复核**。
+复核口径：`detect` 关键字是否仍被认领、模板能否被自身解析器解析、`mermaid.parse` 能否通过、
+结构树是否非空、`data-*` 可寻址结论是否仍成立（`annotate*DataIds` 是否仍能反注）。
+
+### A. 关键字检测（`detect` 逐条复核；本仓 `diagram-registry.ts` 的 detect 正则）
+
+| 图种 | 关键字 | 备注 |
+| --- | --- | --- |
+| state | `stateDiagram` / `stateDiagram-v2` | 双声明同认 |
+| er | `erDiagram` | |
+| gitgraph | `gitGraph` | |
+| timeline | `timeline` | |
+| kanban | `kanban` | |
+| requirement | `requirementDiagram` | `requirementDiagram_v2` 在 v12 已消失，**不认** |
+| journey | `journey` | |
+| block | `block` / `block-beta` | 双关键字 |
+| pie | `pie` | |
+| gantt | `gantt` | |
+| quadrant | `quadrantChart` | |
+| sankey | `sankey` / `sankey-beta` | 双关键字、行尾仅空白 |
+| xychart | `xychart` / `xychart-beta`（可带 `horizontal`/`vertical`） | 双关键字 |
+| radar | `radar-beta` | |
+| packet | `packet` / `packet-beta` | 双关键字 |
+| architecture | `architecture-beta` | 行尾仅空白 |
+| c4 | `C4Context`/`C4Container`/`C4Component`/`C4Dynamic`/`C4Deployment` | **全大写**、大小写敏感 |
+| treemap | `treemap` / `treemap-beta` | 双关键字、**大小写敏感** |
+| venn | `venn-beta` | 裸关键字、**大小写敏感** |
+| ishikawa | `ishikawa` / `ishikawa-beta` | 双关键字 |
+| wardley | `wardley-beta` | |
+| treeview | `treeView-beta` | 裸关键字、**大小写敏感**（`treeView` 不认） |
+| cynefin | `cynefin-beta` / `cynefin-beta:` | **大小写敏感** |
+| usecase | `usecase-beta`（可带 `direction`） | 裸 `usecase` **不认** |
+| eventmodeling | `eventmodeling`（正文首行） | **非 frontmatter 声明式**；无 `-beta` 后缀 |
+| agentflow | `agentflow-beta`（可带方向） | **大小写敏感**，无裸名 |
+| zenuml | `zenuml` | 外部 `@mermaid-js/mermaid-zenuml` 注册；只读渲染、**不进 `DIAGRAM_TYPE_LIST` 编辑链** |
+
+### B. 画布 DOM 可寻址性（升版复核本列结论；列「不可寻址」者走 ADR-0007 诚实降级）
+
+| 图种 | 可寻址性（v12 实测） | 复核动作 |
+| --- | --- | --- |
+| kanban | **可寻址**（节点 DOM id = `{svgId}-{节点id}`，`annotateKanbanDataIds` 反注） | 确认 `.sections`/`.items` 内 `.cluster`/`.node` 的 DOM id 形态未变 |
+| requirement | **可寻址**（`{svgId}-{名字}`，`annotateRequirementDataIds` 反注，作用域 `g.root g.nodes g.node`） | 确认统一 dagre 布局器仍落 `g.root > g.nodes` |
+| usecase | **可寻址**（渲染器原生写 `data-id`；另有 `data-usecase-id`/`data-usecase-kind`；边 `data-id=edge-N`） | 确认原生 `data-id` 未移除 |
+| agentflow | **可寻址**（前缀 `agentflow-`，节点/边均 `data-id`） | 确认前缀未变 |
+| venn | **部分可寻址**（集合/交集 `data-venn-sets` 反注为 `data-id`；text/单条 style 无 `data-*` 降级） | 确认 @upsetjs/venn.js 仍写 `data-venn-sets` |
+| gitgraph | **不可寻址**（提交 id 只在 `class` 属性；全 chunk 仅 `<defs>` 有 id） | 确认 `drawCommitBullet` 未改 `data-id` |
+| timeline | **不可寻址**（`drawNode` 只写 class；背景板 id 走渲染计数器） | 确认无新增 `data-id` |
+| journey | **不可寻址**（渲染器无 `data-id`） | 同上 |
+| pie | **不可寻址**（无 `data-id`） | 同上 |
+| radar | **不可寻址** | 同上 |
+| sankey | **不可寻址**（CSV 流渲染无 `data-id`） | 同上 |
+| xychart | **不可寻址**（点/系列无 `data-id`） | 同上 |
+| treemap | **不可寻址**（且渲染器按值重排 DOM，渲染序 ≠ 源码序） | 同上，**不可用 DOM 索引反推源位置** |
+| ishikawa | **不可寻址**（同上，按深度重排） | 同上 |
+| wardley | **不可寻址**（`data-*` 计数为 0） | 同上 |
+| cynefin | **不可寻址** | 同上 |
+| eventmodeling | **不可寻址** | 同上 |
+| zenuml | **不可寻址 → 只读渲染降级** | 确认外部包未提供可寻址结构 |
+
+### C. 结构依赖（升版时最易碎的断言，逐图种复核）
+
+1. **连线身份=位置序（ADR-0012）** 适用于所有带连线的图种：state 转移、er 关系、requirement
+   关系、block 边、architecture 边、agentflow 边等。升版若改连线渲染顺序，`relation:N` 归属
+   随之变化——各图种解析器的关系条数 / 顺序不符即**整体放弃标注**（不误归属）。
+2. **缩进即语法**：kanban（卡片归属列）、ishikawa（相对缩进挂因果链）、usecase 等——升版若改
+   缩进解析语义，需复核落码缩进。
+3. **CSV 流非同构**：sankey 正文是 RFC-4180 变体 CSV，不套行式语句框架；升版若改 CSV 词法
+   （引号 / 转义 / 空行），需单独复核 `pipeline/sankey.ts`。
+4. **关键字大小写**：treemap / venn / treeview / cynefin / usecase / agentflow / c4 的 `detect`
+   **大小写敏感**（与 mermaid 探测器同口径，均无 `i` 位）；升版若放宽关键字大小写，需同步放宽。
+5. **裸关键字独占**：venn / treeView / zenuml / eventmodeling / C4 的声明行必须是裸关键字
+   （行尾仅空白）；升版若允许同行尾随内容，需同步放宽。
+6. **`mermaid.parse` 收口**：`src/lib/__tests__/golden-validity.test.ts` 遍历 `DIAGRAM_TYPE_LIST`
+   的每张模板 + 全部新图种关键字的 `detect` 互不误判（`diagram-registry.test.ts`）——升版后
+   **这两组测试必须全绿**，任一红即冻结升级。
