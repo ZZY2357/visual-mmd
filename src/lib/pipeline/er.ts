@@ -3,7 +3,7 @@ import type { DiagramParser, EditIntent, ParseResult, SourceParseError } from '.
 import { frontmatterEnd } from './frontmatter'
 import { erEntityElementId } from './element-id'
 import type { Span } from './span'
-import { indentLines, insertAfter } from './insert'
+import { indentLines, insertAfter, resolveAnchor } from './insert'
 
 /**
  * erDiagram 完整解析器（more-diagrams 工单 03，语法事实以
@@ -138,6 +138,20 @@ export function renderErAttribute(
   const name = changes.name ?? d.name
   const keys = changes.keys !== undefined ? changes.keys.join(', ') : d.keysRaw
   const comment = changes.comment !== undefined ? changes.comment : d.comment
+  // 原行在名字之后是否已有后缀段（keys / 注释）；无后缀时 d.gap2 装的是行尾空白。
+  const hadSuffix = d.keysRaw !== '' || d.comment !== null
+  if (!hadSuffix) {
+    // 名字与行尾之间原本没有分段：新增 keys/注释时以原文行尾空白作分隔（至少一个空格），
+    // 否则会产出 `string fieldPK` 这样粘连的键段（工单 29 验收发现）。
+    const sep = d.gap2 !== '' ? d.gap2 : ' '
+    if (keys !== '' || comment !== null) {
+      let suffix = keys
+      if (comment !== null) suffix += (keys !== '' ? ' ' : '') + `"${comment}"`
+      return `${type}${nullable ? '?' : ''}${d.gap1}${d.star ? '*' : ''}${name}${sep}${suffix}${d.tail}`
+    }
+    return `${type}${nullable ? '?' : ''}${d.gap1}${d.star ? '*' : ''}${name}${d.gap2}${d.tail}`
+  }
+  // 原文已有后缀段：沿用原文空白（gap2 名字后 / gap3 keys 后），逐字保留（ADR-0008）
   let s = `${type}${nullable ? '?' : ''}${d.gap1}${d.star ? '*' : ''}${name}${d.gap2}`
   if (keys !== '') s += keys
   if (comment !== null) s += (d.keysRaw !== '' ? d.gap3 : ' ') + `"${comment}"`
@@ -721,8 +735,22 @@ export class ErParser implements DiagramParser {
       colonRaw: intent.label !== undefined && intent.label !== '' ? ' : ' : '',
       label: intent.label ?? '',
     }
+    // 锚点是「属性块开行」的实体时，关系必须落在块闭合 `}` 之后——否则会插进块体，
+    // 产出 mermaid 拒绝的语法（工单 29 验收发现）。无开行的实体（裸声明）锚点即行末。
+    const anchor = resolveAnchor(doc, intent.afterElementId)
+    let afterElementId = intent.afterElementId
+    if (anchor !== null) {
+      const anchorData = anchor.element as ErElementData
+      // 锚点是「属性块开行」的实体时，关系必须落在块闭合 `}` 之后——否则会插进块体，
+      // 产出 mermaid 拒绝的语法（工单 29 验收发现）。无开行的实体（裸声明）锚点即行末。
+      if (anchorData.kind === 'er-entity' && anchorData.openBrace) {
+        const end = this.matchingEnd(doc, anchor)
+        if (end !== null) afterElementId = end.id
+      }
+    }
     return insertAfter(doc, {
-      afterElementId: intent.afterElementId,
+      afterElementId,
+      anchor: 'line-end',
       render: (indent) => indentLines(indent, [renderErRelation(data)]),
     })
   }

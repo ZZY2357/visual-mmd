@@ -273,7 +273,10 @@ export function GanttTaskForm({ task }: { task: ProjectionGanttTask }) {
         label={t('app:propertyPanel.ganttTaskId')}
         placeholder={t('app:propertyPanel.ganttTaskIdPlaceholder')}
         value={metaDraft.taskId}
-        onChange={(e) => setMetaDraft((d) => ({ ...d, taskId: e.currentTarget.value }))}
+        onChange={(e) => {
+          const value = e.currentTarget.value
+          setMetaDraft((d) => ({ ...d, taskId: value }))
+        }}
         onBlur={() => {
           if (metaFields !== null) commitMeta(task.tags, metaFields)
         }}
@@ -282,7 +285,10 @@ export function GanttTaskForm({ task }: { task: ProjectionGanttTask }) {
         <TextInput
           label={t('app:propertyPanel.ganttTaskStart')}
           value={metaDraft.start}
-          onChange={(e) => setMetaDraft((d) => ({ ...d, start: e.currentTarget.value }))}
+          onChange={(e) => {
+            const value = e.currentTarget.value
+            setMetaDraft((d) => ({ ...d, start: value }))
+          }}
           onBlur={() => {
             if (metaFields !== null) commitMeta(task.tags, metaFields)
           }}
@@ -299,7 +305,10 @@ export function GanttTaskForm({ task }: { task: ProjectionGanttTask }) {
               : t('app:propertyPanel.ganttTaskEnd')
           }
           value={metaDraft.end}
-          onChange={(e) => setMetaDraft((d) => ({ ...d, end: e.currentTarget.value }))}
+          onChange={(e) => {
+            const value = e.currentTarget.value
+            setMetaDraft((d) => ({ ...d, end: value }))
+          }}
           onBlur={() => {
             if (metaFields !== null) commitMeta(task.tags, metaFields)
           }}
@@ -312,7 +321,10 @@ export function GanttTaskForm({ task }: { task: ProjectionGanttTask }) {
         <TextInput
           label={t('app:propertyPanel.ganttTaskAfterIds')}
           value={metaDraft.afterIds}
-          onChange={(e) => setMetaDraft((d) => ({ ...d, afterIds: e.currentTarget.value }))}
+          onChange={(e) => {
+            const value = e.currentTarget.value
+            setMetaDraft((d) => ({ ...d, afterIds: value }))
+          }}
           onBlur={() => {
             if (metaFields !== null) commitMeta(task.tags, metaFields)
           }}
@@ -325,7 +337,10 @@ export function GanttTaskForm({ task }: { task: ProjectionGanttTask }) {
         <TextInput
           label={t('app:propertyPanel.ganttTaskUntilId')}
           value={metaDraft.untilId}
-          onChange={(e) => setMetaDraft((d) => ({ ...d, untilId: e.currentTarget.value }))}
+          onChange={(e) => {
+            const value = e.currentTarget.value
+            setMetaDraft((d) => ({ ...d, untilId: value }))
+          }}
           onBlur={() => {
             if (metaFields !== null) commitMeta(task.tags, metaFields)
           }}

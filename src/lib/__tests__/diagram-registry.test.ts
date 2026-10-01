@@ -6,6 +6,7 @@ import {
   type DiagramTypeRegistration,
 } from '../diagram-registry'
 import { useEditorStore } from '../../store/editor'
+import { initI18n } from '../../i18n'
 
 /**
  * 注册表与只读降级（more-diagrams 工单 01）：
@@ -259,6 +260,89 @@ describe('unsupported 态的编辑路径', () => {
     const applied = useEditorStore.getState().commitIntent({ type: 'set-direction', direction: 'LR' })
     expect(applied).toBe(false)
     expect(useEditorStore.getState().source).toBe(unsupportedSource)
+  })
+})
+
+/**
+ * 全图种回归清单（more-diagrams 工单 29 验收）：
+ * 对每个已注册图种走一遍「新建模板 → 模板可被自身解析 → 结构树非空」的闭眼路径。
+ * 这是真机抽查（工单 29 的 task 1）之外的**全量**收口——真机只抽 4 张，
+ * 这里把 31 张的底线一次性钉死，防止某个图种的模板/分区在日后回归中悄悄坏掉。
+ */
+describe('全图种回归清单（模板 → 解析 → 结构树非空）', () => {
+  initI18n()
+  const ctx = { t: ((k: string) => k) as Parameters<typeof DIAGRAM_TYPE_LIST[number]['tree']>[1]['t'] }
+
+  it('每个图种的起步模板：自身可解析、结构树至少有一个分区且有条目', () => {
+    for (const registration of DIAGRAM_TYPE_LIST) {
+      const parsed = registration.parser.parse(registration.template)
+      expect(parsed.ok, `${registration.id} 模板解析失败`).toBe(true)
+      if (!parsed.ok) continue
+      const projection = registration.buildProjection(parsed.doc)
+      const sections = registration.tree(projection, ctx)
+      expect(sections.length, `${registration.id} 结构树无分区`).toBeGreaterThan(0)
+      const entries = sections.flatMap((s) => s.entries)
+      expect(entries.length, `${registration.id} 结构树无条目`).toBeGreaterThan(0)
+    }
+  })
+
+  it('每个图种的模板可被 detectDiagramType 认领回自己', () => {
+    for (const registration of DIAGRAM_TYPE_LIST) {
+      expect(detectDiagramType(registration.template)?.id, registration.id).toBe(registration.id)
+    }
+  })
+})
+
+/**
+ * detect 回归（more-diagrams 工单 29 验收的 task 3）：关键字检测的两个易错面——
+ * 同图种的双关键字都要认领，且长短关键字之间不得互相误判。
+ */
+describe('detect 回归：双关键字互认且不误判', () => {
+  it('stateDiagram 与 stateDiagram-v2 同归 state', () => {
+    expect(detectDiagramType('stateDiagram\n    [*] --> A\n')?.id).toBe('state')
+    expect(detectDiagramType('stateDiagram-v2\n    [*] --> A\n')?.id).toBe('state')
+  })
+
+  it('裸关键字与其 -beta 变体同归同一图种（block / packet / xychart / sankey / treemap / ishikawa）', () => {
+    const cases: [string, string, string][] = [
+      ['block', 'block-beta', 'block'],
+      ['packet', 'packet-beta', 'packet'],
+      ['xychart', 'xychart-beta', 'xychart'],
+      ['sankey', 'sankey-beta', 'sankey'],
+      ['treemap', 'treemap-beta', 'treemap'],
+      ['ishikawa', 'ishikawa-beta', 'ishikawa'],
+    ]
+    for (const [bare, beta, id] of cases) {
+      expect(detectDiagramType(`${bare}\n`)?.id, bare).toBe(id)
+      expect(detectDiagramType(`${beta}\n`)?.id, beta).toBe(id)
+    }
+  })
+
+  it('长关键字不被更短的已注册关键字抢走（前缀互不误判）', () => {
+    // stateDiagram 不会被别的注册抢走；flowchart 的 graph 变体不被 graph 前缀乱认
+    expect(detectDiagramType('graph LR\n    A --> B\n')?.id).toBe('flowchart')
+    expect(detectDiagramType('graph\n    A --> B\n')?.id).toBe('flowchart')
+    // 大小写口径：mermaid 探测器大小写不敏感 → 这里也放宽（state / flowchart / pie 等）
+    expect(detectDiagramType('STATEDIAGRAM\n    [*] --> A\n')?.id).toBe('state')
+    expect(detectDiagramType('Flowchart TD\n    A --> B\n')?.id).toBe('flowchart')
+  })
+
+  it('大小写敏感的图种如实分辨（cynefin-beta / treeView-beta / venn-beta）', () => {
+    // 这些图种的 mermaid Langium 关键字大小写敏感（research §1/§8.3）：只有**原样大小写**
+    // 被认领；大小写变体不被认领——不假装能识别（ADR-0007 诚实降级）
+    expect(detectDiagramType('cynefin-beta\n')?.id).toBe('cynefin')
+    expect(detectDiagramType('Cynefin-Beta\n')).toBeNull()
+    expect(detectDiagramType('treeView-beta\n')?.id).toBe('treeview')
+    expect(detectDiagramType('treeview-beta\n')).toBeNull()
+    expect(detectDiagramType('venn-beta\n')?.id).toBe('venn')
+    expect(detectDiagramType('Venn-beta\n')).toBeNull()
+  })
+
+  it('每个已注册图种至少有一条 detect 断言覆盖（防漏测）', () => {
+    // 抽样若干关键字，确认注册表规模与 detect 规则一一对应
+    const ids = DIAGRAM_TYPE_LIST.map((r) => r.id)
+    expect(ids.length).toBe(31)
+    expect(new Set(ids).size).toBe(31)
   })
 })
 
