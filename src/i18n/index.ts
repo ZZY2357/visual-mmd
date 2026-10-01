@@ -146,6 +146,12 @@ export const zhDict = {
         'add-wardley-component': '添加组件',
         'add-wardley-anchor': '添加锚点',
         'add-wardley-link': '添加连线',
+        // venn（more-diagrams 工单 21）：空白 = 加集合 / 加交集；集合 / 交集 = 改标签与
+        // 尺寸（D5 选中 + 关菜单）；集合上另有加集合 / 加交集
+        'add-venn-set': '添加集合',
+        'add-venn-union': '添加交集',
+        'add-venn-union-here': '添加交集',
+        'edit-venn-area': '在属性面板中编辑',
         delete: '删除',
         styleName: '样式名称',
         styleNameInvalid: '名称不能为空，且不能含空格或逗号',
@@ -191,6 +197,7 @@ export const zhDict = {
       treemap: '矩形树图',
       ishikawa: '鱼骨图',
       wardley: 'Wardley 地图',
+      venn: '韦恩图',
     },
     library: {
       title: '图表库',
@@ -844,6 +851,21 @@ export const zhDict = {
         accelerator: '加速器',
         deaccelerator: '减速器',
       },
+      // ---- venn（more-diagrams 工单 21） ----
+      vennSets: '集合',
+      vennUnions: '交集',
+      vennTitle: '标题',
+      vennLabel: '标签',
+      vennSize: '尺寸',
+      vennSizeHint: '集合 / 交集圆面积（mermaid 数值，无千分位逗号）',
+      invalidVennLabel: '标签不能为空，且不能含引号或换行',
+      invalidVennSize: '尺寸只能是数字（可选正负号与小数点，无千分位逗号）',
+      vennSetHint: '集合「{{id}}」：画布圆可点选 / 双击改标签。',
+      vennUnionHint: '交集「{{ids}}」：画布区域可点选。',
+      vennDiagramHint:
+        '韦恩图：集合与交集可在画布点选；标签与尺寸在此表单改。选中集合后按 Tab 加集合、Enter 加交集、Delete 删除。文本节点（text）与样式行不在画布可选中，仅保留源码。',
+      deleteVennSet: '删除集合（连同引用它的交集）',
+      deleteVennUnion: '删除交集',
     },
     shapes: {
       rectangle: '矩形',

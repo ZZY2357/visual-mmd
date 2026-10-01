@@ -32,6 +32,9 @@ const ALL_KINDS: readonly Selection[] = [
   { kind: 'wardley-node', name: '茶' },
   { kind: 'wardley-link', elementId: 'wardley-link:1' },
   { kind: 'wardley-evolve', elementId: 'wardley-evolve:1' },
+  // venn（more-diagrams 工单 21）：集合名字即身份、交集位置序；两者经 data-venn-sets 反注可寻址
+  { kind: 'venn-set', id: 'frontend' },
+  { kind: 'venn-union', elementId: 'venn-union:1' },
 ]
 
 /**
@@ -47,9 +50,11 @@ const ADDRESSABLE: Record<DiagramTypeId, ReadonlySet<string>> = {
   sankey: new Set(['sankey-node', 'sankey-link']),
   // xychart（more-diagrams 工单 14）：系列位置序 `series:N`、标题/轴固定身份，均经类名组反注
   xychart: new Set(['xychart-series', 'xychart-axis', 'xychart-title']),
+  // venn（more-diagrams 工单 21）：集合 / 交集经 data-venn-sets 内容键反注为 data-id
+  venn: new Set(['venn-set', 'venn-union']),
 }
 
-const TYPES: readonly DiagramTypeId[] = ['flowchart', 'sequence', 'class', 'mindmap', 'sankey', 'xychart']
+const TYPES: readonly DiagramTypeId[] = ['flowchart', 'sequence', 'class', 'mindmap', 'sankey', 'xychart', 'venn']
 
 /** data-id → CanvasSelection（与各 resolver 的产出形态一致）：
  * 节点类 data-id 即节点 id；位置序连线 data-id 即 elementId；mindmap 的画布选中 id 是 elementId */
@@ -61,7 +66,10 @@ function canvasSelectionOf(sel: Selection, dataId: string): CanvasSelection {
     sel.kind === 'sankey-node' ||
     sel.kind === 'xychart-series' ||
     sel.kind === 'xychart-axis' ||
-    sel.kind === 'xychart-title'
+    sel.kind === 'xychart-title' ||
+    // venn（more-diagrams 工单 21）：集合 / 交集的画布选中都是 node（data-id = elementId）
+    sel.kind === 'venn-set' ||
+    sel.kind === 'venn-union'
   ) {
     return { kind: 'node', id: dataId }
   }
@@ -70,7 +78,7 @@ function canvasSelectionOf(sel: Selection, dataId: string): CanvasSelection {
 }
 
 describe('canvasIdOf', () => {
-  it('可寻址的 13 个 kind 给出 data-id，不可寻址的 8 个 kind 返回 null', () => {
+  it('可寻址的 kind 给出 data-id，不可寻址的 kind 返回 null', () => {
     const addressableKinds = new Set([
       'node',
       'participant',
@@ -85,6 +93,8 @@ describe('canvasIdOf', () => {
       'xychart-series',
       'xychart-axis',
       'xychart-title',
+      'venn-set',
+      'venn-union',
     ])
     for (const sel of ALL_KINDS) {
       const dataId = canvasIdOf(sel)

@@ -88,6 +88,8 @@ import { IshikawaNodeForm } from './ishikawa-forms'
 import { type IshikawaProjection } from '../lib/projection/ishikawa-projection'
 import { WardleyEvolveForm, WardleyLinkForm, WardleyNodeForm } from './wardley-forms'
 import { type WardleyProjection } from '../lib/projection/wardley-projection'
+import { VennAreaForm, VennDiagramForm } from './venn-forms'
+import { type VennProjection } from '../lib/projection/venn-projection'
 
 /**
  * 选中元素的属性表单，按投影图种分发（工单 04-bundle 自 PropertyPanel 迁出）：
@@ -1053,6 +1055,42 @@ function WardleySelectionForm({
   }
 }
 
+/**
+ * venn 选中表单（more-diagrams 工单 21）：图表级显示提示，集合 / 交集都落到同一张
+ * VennAreaForm（按 elementId 在投影中寻回区域）。集合选中用名字（id）寻回、
+ * 交集选中用 elementId 寻回。
+ */
+function VennSelectionForm({
+  projection,
+  selection,
+}: {
+  projection: VennProjection
+  selection: Selection | null
+}) {
+  const { t } = useTranslation()
+  if (selection === null) {
+    return (
+      <Text size="sm" c="dimmed" px="xs">
+        {t('app:propertyPanel.nothingSelected')}
+      </Text>
+    )
+  }
+  switch (selection.kind) {
+    case 'diagram':
+      return <VennDiagramForm projection={projection} />
+    case 'venn-set': {
+      const area = projection.sets.find((s) => s.ids[0] === selection.id)
+      return area !== undefined ? <VennAreaForm area={area} /> : null
+    }
+    case 'venn-union': {
+      const area = projection.unions.find((u) => u.elementId === selection.elementId)
+      return area !== undefined ? <VennAreaForm area={area} /> : null
+    }
+    default:
+      return null
+  }
+}
+
 export function ProjectionSelectionForm({ projection, selection }: { projection: AnyProjection; selection: Selection | null }) {
   if (projection.type === 'flowchart') {
     return <FlowchartSelectionForm projection={projection.flowchart} selection={selection} />
@@ -1119,6 +1157,9 @@ export function ProjectionSelectionForm({ projection, selection }: { projection:
   }
   if (projection.type === 'wardley') {
     return <WardleySelectionForm projection={projection.wardley} selection={selection} />
+  }
+  if (projection.type === 'venn') {
+    return <VennSelectionForm projection={projection.venn} selection={selection} />
   }
   return <ClassSelectionForm projection={projection.class} selection={selection} />
 }

@@ -2,6 +2,8 @@
 
 在 /tdd 或 /code-review 中，默认不做真机/浏览器测试，因为速度很慢，只有要求你做真机/浏览器测试时才做
 
+mermaid-js 的源代码在 C:\Users\zzy2357\Workspace\Web\mermaid，可以查阅，可以用 codegraph cli 看 mermaid 的代码索引
+
 ## Agent skills
 
 ### Issue tracker

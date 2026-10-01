@@ -204,6 +204,11 @@ describe('MENU_ACTIONS 穷尽性（工单 05 → 工单 01）', () => {
       { kind: 'wardley-node', name: '茶' },
       { kind: 'wardley-link', elementId: 'wardley-link:1' },
       { kind: 'wardley-evolve', elementId: 'wardley-evolve:1' },
+      // venn（more-diagrams 工单 21）：空白加集合 / 加交集 + 集合（改标签尺寸/加集合/加交集/删除）
+      // + 交集（改标签尺寸/删除）
+      { kind: 'blank', diagramType: 'venn' },
+      { kind: 'venn-set', id: 'frontend' },
+      { kind: 'venn-union', elementId: 'venn-union:1' },
     ]
     const reachableIds = new Set(allTargets.flatMap((target) => contextMenuItems(target)))
     // apply-style 不经 onMenuItem 分发（CanvasPanel 渲染成子菜单开关，点样式名直接调

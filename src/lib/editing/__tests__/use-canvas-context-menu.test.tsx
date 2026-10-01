@@ -26,6 +26,7 @@ import { packetDataIdResolver } from '../../canvas-selection/packet-adapter'
 import { quadrantDataIdResolver } from '../../canvas-selection/quadrant-adapter'
 import { xychartDataIdResolver } from '../../canvas-selection/xychart-adapter'
 import { architectureDataIdResolver } from '../../canvas-selection/architecture-adapter'
+import { vennDataIdResolver } from '../../canvas-selection/venn-adapter'
 import { nodeDataIdResolver, elementDataIdResolver } from '../../canvas-selection/data-id'
 import type { AnyProjection } from '../../diagram-registry'
 import { useCanvasContextMenu, type NodeFormState } from '../use-canvas-context-menu'
@@ -139,6 +140,9 @@ function resolverOf(projection: AnyProjection) {
   if (projection.type === 'ishikawa') return () => null
   // wardley（more-diagrams 工单 23）：画布 DOM 无 data-id（research §4 实测降级），resolver 永不命中
   if (projection.type === 'wardley') return () => null
+  // venn（more-diagrams 工单 21）：data-id 由 nodeAnnotator 从 `data-venn-sets` 内容键反注，
+  // resolver 与真实能力包同源（vennDataIdResolver）
+  if (projection.type === 'venn') return vennDataIdResolver(projection.venn)
   const nodes = nodeDataIdResolver(projection.class.classes.map((c) => c.name))
   const edges = elementDataIdResolver(projection.class.relations.map((r) => r.elementId))
   return (dataId: string) => nodes(dataId) ?? edges(dataId)

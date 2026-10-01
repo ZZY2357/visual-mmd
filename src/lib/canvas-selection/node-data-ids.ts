@@ -236,6 +236,35 @@ export function annotateArchitectureDataIds(root: ParentNode): void {
   }
 }
 
+/**
+ * mermaid v12 venn-beta（more-diagrams 工单 21）：渲染器把布局引擎 @upsetjs/venn.js 生成的
+ * 区域节点整体搬进真实 SVG（`vennDiagram-*.mjs` 的 draw，`appendChild` 搬运，属性随节点
+ * 保留）。每个区域 `<g class="venn-area venn-circle|venn-intersection">` 带
+ * **`data-venn-sets="<id 列表以 '_' 连接>"`**（content key，字典序——venn.js 内置，
+ * research §4/§8 已实测：全 SVG 只有这一个 `data-*`，且 id 列表已 sort）。
+ *
+ * 既有 data-id 链路只认 `data-id` 属性，故在此把 `data-venn-sets` 反注为 `data-id`，
+ * 让点选/高亮/右键菜单原样生效（与 flowchart/class 的反注链路同思路）。
+ * 作用域严格限定在 `g.venn-area`（venn 渲染器专属类名）——绝不进 `nodeIdOfDomId`
+ * 通用循环（工单 06 约定）。
+ *
+ * 映射门卫（**绝不误归属**）：按投影给的 `key → elementId` 表精确匹配 `data-venn-sets`；
+ * 未在投影的键（venn.js 合成出的成对交集——源码没写 `union` 语句的区域）安静跳过
+ * （点它不选中，如实降级）；幂等（已有 data-id 不动）。
+ */
+export function annotateVennDataIds(
+  root: ParentNode,
+  keys: ReadonlyMap<string, string>,
+): void {
+  for (const g of root.querySelectorAll('g.venn-area')) {
+    if (g.getAttribute('data-id') !== null) continue
+    const key = g.getAttribute('data-venn-sets')
+    if (key === null || key === '') continue
+    const elementId = keys.get(key)
+    if (elementId !== undefined) g.setAttribute('data-id', elementId)
+  }
+}
+
 export function annotateNodeDataIds(root: ParentNode): void {
   for (const g of root.querySelectorAll('g.node')) {
     if (g.getAttribute('data-id') !== null) continue

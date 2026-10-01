@@ -103,6 +103,11 @@ export type ContextMenuTarget =
   | { kind: 'wardley-node'; name: string }
   | { kind: 'wardley-link'; elementId: string }
   | { kind: 'wardley-evolve'; elementId: string }
+// venn（more-diagrams 工单 21）：集合经 `data-venn-sets` → `data-id` 反注可寻址
+// （见 venn-adapter），集合选中 id 即源码 id（名字即身份）、交集 elementId 即投影位置序
+// 身份 `venn-union:N`。两者都有画布菜单；text 节点与 style 行无 data-* 整体降级。
+  | { kind: 'venn-set'; id: string }
+  | { kind: 'venn-union'; elementId: string }
 
 export type ContextMenuItemId =
   | 'add-node'
@@ -241,6 +246,13 @@ export type ContextMenuItemId =
   | 'add-wardley-component'
   | 'add-wardley-anchor'
   | 'add-wardley-link'
+  // venn（more-diagrams 工单 21）：空白 = 加集合（占位 id 避重）/ 加交集（以两个集合组二元
+  // 交集）；集合 / 交集 = 改标签与尺寸（D5「选中 + 关菜单」，右侧 VennAreaForm 改）/
+  // 加集合（仅集合上，追加在其后）/ 加交集（以该区域首 id 与下一集合组二元交集）/ 删除
+  | 'add-venn-set'
+  | 'add-venn-union'
+  | 'edit-venn-area'
+  | 'add-venn-union-here'
 
 /**
  * 画布选中 → 菜单目标（工单 03 起为 `canvas-selection/selection-codec.ts` 的
@@ -323,6 +335,9 @@ function blankMenuItems(diagramType: DiagramTypeId): ContextMenuItemId[] {
       // wardley 的空白入口（工单 23 定案）：加 component / 加 anchor（坐标落图正中，
       // 名字避重）/ 加连线（两端从既有节点名下选，提交才落码）
       return ['add-wardley-component', 'add-wardley-anchor', 'add-wardley-link']
+    case 'venn':
+      // venn 的空白入口（工单 21 定案）：加集合（占位 id 避重）/ 加交集（两个集合组二元交集）
+      return ['add-venn-set', 'add-venn-union']
     // DiagramTypeId 是开放类型（more-diagrams 工单 01）：未接入画布能力包的图种
     // 没有空白右键入口（unsupported 态下画布右键整体停用，不会走到这里）
     default:
@@ -465,5 +480,12 @@ export function contextMenuItems(target: ContextMenuTarget): ContextMenuItemId[]
       return ['add-wardley-link', 'edit-label', 'delete']
     case 'wardley-evolve':
       return ['edit-label', 'delete']
+    // venn（more-diagrams 工单 21）：集合 = 改标签与尺寸（D5「选中 + 关菜单」，右侧
+    // VennAreaForm 改）/ 加集合（追加在其后）/ 加交集（以该集合与下一集合组二元交集）/ 删除；
+    // 交集 = 改标签与尺寸 / 删除（交集上不加「加集合」——无「集合的兄弟」语义）。
+    case 'venn-set':
+      return ['edit-venn-area', 'add-venn-set', 'add-venn-union-here', 'delete']
+    case 'venn-union':
+      return ['edit-venn-area', 'delete']
   }
 }
