@@ -142,6 +142,8 @@ export const zhDict = {
         'add-treemap-leaf': '添加叶子',
         // ishikawa（more-diagrams 工单 22）：空白菜单（画布 DOM 无 data-id，无元素级菜单项）
         'add-ishikawa-cause': '添加主因',
+        // treeView（more-diagrams 工单 24）：空白菜单（画布 DOM 无 data-id，无元素级菜单项）
+        'add-treeview-root': '添加根节点',
         delete: '删除',
         styleName: '样式名称',
         styleNameInvalid: '名称不能为空，且不能含空格或逗号',
@@ -186,6 +188,7 @@ export const zhDict = {
       architecture: '架构图',
       treemap: '矩形树图',
       ishikawa: '鱼骨图',
+      treeview: '目录树',
     },
     library: {
       title: '图表库',
@@ -794,6 +797,20 @@ export const zhDict = {
       ishikawaDiagramHint:
         '鱼骨图：第一行是鱼头（问题），后续行按缩进挂因果链。在结构树中选中节点编辑文本；选中后按 Tab 加子分支、Enter 加同级、Delete 删除。画布不提供点选（mermaid 渲染无 data-id）。',
       deleteIshikawaNode: '删除节点（连同分支）',
+      // ---- treeView（more-diagrams 工单 24） ----
+      treeviewRoots: '目录树（目录 / 文件）',
+      treeviewDirectoryShort: '目录',
+      treeviewFileShort: '文件',
+      treeviewDirectoryHint:
+        '目录：名称以 `/` 结尾。可在结构树中选中后按 Tab 加子节点（文件节点 Tab 不动作）、Enter 加同级、Delete 删除。',
+      treeviewFileHint:
+        '文件：可在结构树中选中后按 Enter 加同级、Delete 删除；加子节点请对其父目录操作。',
+      treeviewName: '名称',
+      treeviewNameInvalid: '名称不能为空，且不能含引号或换行',
+      treeviewIsDirectory: '作为目录（名称以 / 结尾）',
+      treeviewDiagramHint:
+        '目录树：缩进表示层级（每级 4 空格或 1 个 Tab），名称以 `/` 结尾即目录。在结构树中选中节点改名 / 切换目录 / 删除；选中后按 Tab 加子节点、Enter 加同级、Delete 删除。画布不提供点选（mermaid 渲染无 data-id）。',
+      deleteTreeviewNode: '删除节点（连同子树）',
     },
     shapes: {
       rectangle: '矩形',

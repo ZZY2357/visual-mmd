@@ -137,8 +137,10 @@ function resolverOf(projection: AnyProjection) {
   if (projection.type === 'treemap') return () => null
   // ishikawa（more-diagrams 工单 22）：画布 DOM 无 data-id 且渲染序 ≠ 源码序（research §4 实测降级），resolver 永不命中
   if (projection.type === 'ishikawa') return () => null
-  const nodes = nodeDataIdResolver(projection.class.classes.map((c) => c.name))
-  const edges = elementDataIdResolver(projection.class.relations.map((r) => r.elementId))
+  // treeView（more-diagrams 工单 24）：画布 DOM 无 data-id 且渲染布局与源码行序无对应（research §4 实测降级），resolver 永不命中
+  if (projection.type === 'treeview') return () => null
+  const nodes = nodeDataIdResolver(projection.class.classes.map((c: { name: string }) => c.name))
+  const edges = elementDataIdResolver(projection.class.relations.map((r: { elementId: string }) => r.elementId))
   return (dataId: string) => nodes(dataId) ?? edges(dataId)
 }
 

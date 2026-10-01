@@ -118,6 +118,18 @@ describe('detectDiagramType：无法识别 → unsupported（null），绝不默
     expect(DIAGRAM_TYPES.ishikawa.detect('ishikawaX\n    甲\n')).toBe(false)
   })
 
+  it('treeView-beta 识别（more-diagrams 工单 24）：只有 -beta 一个关键字且大小写敏感；声明行必须是裸关键字', () => {
+    expect(detectDiagramType('treeView-beta\n/\n    src/\n')?.id).toBe('treeview')
+    // Langium 关键字大小写敏感（research §1：探测器 `/^\\s*treeView-beta/` 无 i 位）：
+    // 大小写不符、或裸 `treeView`（无 -beta）都不认领
+    expect(detectDiagramType('TREEVIEW-BETA\n/\n')).toBeNull()
+    expect(detectDiagramType('treeview-beta\n/\n')).toBeNull()
+    expect(detectDiagramType('treeView\n/\n')).toBeNull()
+    // 声明行必须是关键字本身（首行即关键字），带尾随内容或更长词不认领
+    expect(DIAGRAM_TYPES.treeview.detect('treeView-beta extra\n/\n')).toBe(false)
+    expect(DIAGRAM_TYPES.treeview.detect('treeView-betaX\n/\n')).toBe(false)
+  })
+
   it('双关键字 detect 例（后续图种工单的写法约定）：-beta 可选且不越界误判', () => {
     // 后续 block/packet/xychart 工单应采用 `^<kw>(-beta)?\b` 形态；这里把形态锁死：
     // 可选 -beta 不妨碍裸关键字的识别，也不把更长的词（如 block-chain）误吞。

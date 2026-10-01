@@ -86,6 +86,8 @@ import { TreemapNodeForm } from './treemap-forms'
 import { type TreemapProjection } from '../lib/projection/treemap-projection'
 import { IshikawaNodeForm } from './ishikawa-forms'
 import { type IshikawaProjection } from '../lib/projection/ishikawa-projection'
+import { TreeviewNodeForm } from './treeview-forms'
+import { type TreeviewProjection } from '../lib/projection/treeview-projection'
 
 /**
  * 选中元素的属性表单，按投影图种分发（工单 04-bundle 自 PropertyPanel 迁出）：
@@ -1006,8 +1008,43 @@ function IshikawaSelectionForm({
   }
 }
 
-export function ProjectionSelectionForm({ projection, selection }: { projection: AnyProjection; selection: Selection | null }) {
-  if (projection.type === 'flowchart') {
+/**
+ * treeView 属性表单（more-diagrams 工单 24）：图表级 = 提示文案（无 title/方向语句，
+ * 外观靠主题，research §3——不做表单化编辑）；节点 = 改名 / 目录开关 / 删除。
+ * treeView 画布无 data-id 寻址（见 treeview-adapter），这两张表单是唯一文本编辑入口。
+ */
+function TreeviewSelectionForm({
+  projection,
+  selection,
+}: {
+  projection: TreeviewProjection
+  selection: Selection | null
+}) {
+  const { t } = useTranslation()
+  if (selection === null) {
+    return (
+      <Text size="sm" c="dimmed" px="xs">
+        {t('app:propertyPanel.nothingSelected')}
+      </Text>
+    )
+  }
+  switch (selection.kind) {
+    case 'diagram':
+      return (
+        <Text size="sm" c="dimmed" px="xs">
+          {t('app:propertyPanel.treeviewDiagramHint')}
+        </Text>
+      )
+    case 'treeview-node': {
+      const node = projection.nodes.find((n) => n.elementId === selection.elementId)
+      return node !== undefined ? <TreeviewNodeForm node={node} /> : null
+    }
+    default:
+      return null
+  }
+}
+
+export function ProjectionSelectionForm({ projection, selection }: { projection: AnyProjection; selection: Selection | null }) {  if (projection.type === 'flowchart') {
     return <FlowchartSelectionForm projection={projection.flowchart} selection={selection} />
   }
   if (projection.type === 'sequence') {
@@ -1069,6 +1106,9 @@ export function ProjectionSelectionForm({ projection, selection }: { projection:
   }
   if (projection.type === 'ishikawa') {
     return <IshikawaSelectionForm projection={projection.ishikawa} selection={selection} />
+  }
+  if (projection.type === 'treeview') {
+    return <TreeviewSelectionForm projection={projection.treeview} selection={selection} />
   }
   return <ClassSelectionForm projection={projection.class} selection={selection} />
 }

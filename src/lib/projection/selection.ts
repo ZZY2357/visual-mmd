@@ -116,6 +116,11 @@ export type Selection =
   // （`ishikawa-node:N`，文档序——渲染序按深度奇偶 pre/post-order 重排、≠ 文档序，
   // 画布 DOM 无 data-id，实测降级见 ishikawa-adapter；选中只来自结构树 / 表单 / 键盘）。
   | { kind: 'ishikawa-node'; elementId: string }
+  // treeView（more-diagrams 工单 24）：文件/目录统一走位置序身份
+  // （`treeview-node:N`，文档序）。画布 DOM 无 data-id、无稳定 id（research §4 实测
+  // 渲染器 0 处 data-、0 处 attr('id')），实测降级见 treeview-adapter；
+  // 选中只来自结构树 / 表单 / 键盘。
+  | { kind: 'treeview-node'; elementId: string }
 
 export const DIAGRAM_SELECTION: Selection = { kind: 'diagram' }
 
@@ -243,6 +248,8 @@ export function selectionKey(sel: Selection): string {
       return `treemap-node:${sel.elementId}`
     case 'ishikawa-node':
       return `ishikawa-node:${sel.elementId}`
+    case 'treeview-node':
+      return `treeview-node:${sel.elementId}`
   }
 }
 
