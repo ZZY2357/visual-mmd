@@ -25,6 +25,7 @@ import { wardleyParser } from './pipeline/wardley'
 import { vennParser } from './pipeline/venn'
 import { cynefinParser } from './pipeline/cynefin'
 import { usecaseParser } from './pipeline/usecase'
+import { treeviewParser } from './pipeline/treeview'
 import { frontmatterEnd } from './pipeline/frontmatter'
 import { buildFlowchartProjection, type FlowchartProjection } from './projection/flowchart-projection'
 import { buildSequenceProjection, type SequenceProjection } from './projection/sequence-projection'
@@ -63,6 +64,7 @@ import { buildWardleyProjection, type WardleyProjection } from './projection/war
 import { buildVennProjection, type VennProjection } from './projection/venn-projection'
 import { buildCynefinProjection, type CynefinProjection } from './projection/cynefin-projection'
 import { buildUsecaseProjection, type UsecaseProjection } from './projection/usecase-projection'
+import { buildTreeviewProjection, type TreeviewProjection } from './projection/treeview-projection'
 import { flowchartCanvasCapabilities } from './canvas-selection/flowchart-adapter'
 import { sequenceCanvasCapabilities } from './canvas-selection/sequence-adapter'
 import { classCanvasCapabilities } from './canvas-selection/class-adapter'
@@ -88,6 +90,7 @@ import { wardleyCanvasCapabilities } from './canvas-selection/wardley-adapter'
 import { vennCanvasCapabilities } from './canvas-selection/venn-adapter'
 import { cynefinCanvasCapabilities } from './canvas-selection/cynefin-adapter'
 import { usecaseCanvasCapabilities } from './canvas-selection/usecase-adapter'
+import { treeviewCanvasCapabilities } from './canvas-selection/treeview-adapter'
 import type { CanvasCapabilities } from './canvas-selection/capabilities'
 import { treePartitions, type TreePartitions } from './structure-tree/partitions'
 import { DEFAULT_DIAGRAM_SOURCE } from './storage'
@@ -135,6 +138,7 @@ export interface ProjectionTypes {
   venn: VennProjection
   cynefin: CynefinProjection
   usecase: UsecaseProjection
+  treeview: TreeviewProjection
 }
 
 /** 已注册图种的 id 集合（字面量联合，随 ProjectionTypes 增长） */
@@ -612,6 +616,23 @@ export const USECASE_TEMPLATE = `usecase-beta
 `
 
 /**
+ * treeView 起步模板（more-diagrams 工单 24，research §7 草案）：一行根目录 `/`
+ * + 两个子目录 + 每个目录下的文件。缩进即层级（**每级 4 空格**，或一个 Tab——
+ * `INDENTATION.length` 作 level，research §1）；目录以名字结尾的 `/` 表示
+ * （名称尾直接带 `/`，引号内亦然，research 坑 4）。关键字只有 `treeView-beta`
+ * 一个，且 **Langium 关键字大小写敏感**（探测器 `/^\s*treeView-beta/` 无 i 位）。
+ */
+export const TREEVIEW_TEMPLATE = `treeView-beta
+/
+    src/
+        main.ts
+        utils.ts
+    docs/
+        README.md
+        guide.md
+`
+
+/**
  * 注册表：数组是唯一权威（more-diagrams 工单 01），DIAGRAM_TYPES 由它推导。
  * detectDiagramType 按数组顺序显式遍历——不再维护手写的 if 分发链，
  * 新图种挂一条即可参与识别，无法识别时不再默认 flowchart（见下）。
@@ -892,6 +913,18 @@ export const DIAGRAM_TYPE_LIST: DiagramTypeRegistration[] = [
     buildProjection: (doc) => ({ type: 'usecase', usecase: buildUsecaseProjection(doc) }),
     tree: treePartitions.usecase,
     canvas: usecaseCanvasCapabilities,
+  },
+  {
+    id: 'treeview',
+    parser: treeviewParser,
+    template: TREEVIEW_TEMPLATE,
+    // 关键字只有 `treeView-beta` 一个（Langium 终结符 `TREEVIEW_KEYWORD = "treeView-beta"`，
+    // 无 `treeView` 别名，research §1）；且 Langium 关键字**大小写敏感**（mermaid 探测器
+    // `/^\s*treeView-beta/` 无 i 位），故此处也不加 i。声明行必须是裸关键字（首行即关键字本身）
+    detect: (source) => /^treeView-beta[ \t\r]*$/.test(firstStatementLine(source)),
+    buildProjection: (doc) => ({ type: 'treeview', treeview: buildTreeviewProjection(doc) }),
+    tree: treePartitions.treeview,
+    canvas: treeviewCanvasCapabilities,
   },
 ]
 

@@ -223,6 +223,8 @@ describe('MENU_ACTIONS 穷尽性（工单 05 → 工单 01）', () => {
       { kind: 'usecase-boundary', elementId: 'boundary:shop' },
       { kind: 'usecase-relation', elementId: 'relation:1' },
       { kind: 'usecase-note', elementId: 'note:1' },
+      // treeView（more-diagrams 工单 24）：画布 DOM 无 data-id（实测降级），只有空白添加入口
+      { kind: 'blank', diagramType: 'treeview' },
     ]
     const reachableIds = new Set(allTargets.flatMap((target) => contextMenuItems(target)))
     // apply-style 不经 onMenuItem 分发（CanvasPanel 渲染成子菜单开关，点样式名直接调

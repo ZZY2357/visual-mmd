@@ -14,6 +14,7 @@ import {
   ISHIKAWA_TEMPLATE,
   VENN_TEMPLATE,
   USECASE_TEMPLATE,
+  TREEVIEW_TEMPLATE,
   type AnyProjection,
 } from '../../diagram-registry'
 import type { EditIntent } from '../../pipeline/parser'
@@ -32,6 +33,7 @@ import { architectureParser } from '../../pipeline/architecture'
 import { ishikawaParser } from '../../pipeline/ishikawa'
 import { vennParser } from '../../pipeline/venn'
 import { usecaseParser } from '../../pipeline/usecase'
+import { treeviewParser } from '../../pipeline/treeview'
 import { buildClassProjection } from '../../projection/class-projection'
 import { buildFlowchartProjection } from '../../projection/flowchart-projection'
 import { buildMindmapProjection } from '../../projection/mindmap-projection'
@@ -47,6 +49,7 @@ import { buildArchitectureProjection } from '../../projection/architecture-proje
 import { buildIshikawaProjection } from '../../projection/ishikawa-projection'
 import { buildVennProjection } from '../../projection/venn-projection'
 import { buildUsecaseProjection } from '../../projection/usecase-projection'
+import { buildTreeviewProjection } from '../../projection/treeview-projection'
 import type { Selection } from '../../projection/selection'
 import {
   blockDeleteIntent,
@@ -64,6 +67,7 @@ import {
   ishikawaDeleteIntent,
   vennDeleteIntent,
   usecaseDeleteIntent,
+  treeviewDeleteIntent,
 } from '../../editing/canvas-keyboard'
 import {
   deleteClassDefIntent,
@@ -443,6 +447,26 @@ function ishikawaCases(p: ReturnType<typeof ishikawaProjection>): DeleteCase[] {
   ]
 }
 
+/** treeviewProjection：treeView 投影（more-diagrams 工单 24） */
+function treeviewProjection(): Extract<AnyProjection, { type: 'treeview' }> {
+  const parsed = treeviewParser.parse(TREEVIEW_TEMPLATE)
+  if (!parsed.ok) throw new Error(parsed.error.message)
+  return { type: 'treeview', treeview: buildTreeviewProjection(parsed.doc) }
+}
+
+/** treeView（more-diagrams 工单 24）：任一节点（含目录 / 文件）连同子树一条删除入口。 */
+function treeviewCases(p: ReturnType<typeof treeviewProjection>): DeleteCase[] {
+  const node = p.treeview.nodes.find((n) => !n.isDirectory) ?? p.treeview.nodes[0]
+  if (node === undefined) throw new Error('模板必须含节点')
+  return [
+    {
+      name: 'treeview-node',
+      selection: { kind: 'treeview-node', elementId: node.elementId },
+      panelIntent: { type: 'delete-node', elementId: node.elementId },
+    },
+  ]
+}
+
 /** architectureProjection：architecture 投影（more-diagrams 工单 17） */
 function architectureProjection(): Extract<AnyProjection, { type: 'architecture' }> {
   const parsed = architectureParser.parse(ARCHITECTURE_TEMPLATE)
@@ -582,6 +606,7 @@ const SUITES = [
   { type: 'ishikawa' as const, projection: ishikawaProjection, cases: ishikawaCases },
   { type: 'venn' as const, projection: vennProjection, cases: vennCases },
   { type: 'usecase' as const, projection: usecaseProjection, cases: usecaseCases },
+  { type: 'treeview' as const, projection: treeviewProjection, cases: treeviewCases },
 ]
 
 describe('deleteIntent 等价性：三个删除入口对同一 selection 产出同一意图（工单 03）', () => {
@@ -638,6 +663,8 @@ describe('deleteIntent 等价性：三个删除入口对同一 selection 产出�
                 return vennDeleteIntent(projection.venn, sel)
               case 'usecase':
                 return usecaseDeleteIntent(projection.usecase, sel)
+              case 'treeview':
+                return treeviewDeleteIntent(projection.treeview, sel)
             }
           })()
           // 键盘按选中种类设门（flowchart/mindmap 只删节点）；门内的种类必须与能力包等价
@@ -656,7 +683,8 @@ describe('deleteIntent 等价性：三个删除入口对同一 selection 产出�
             suite.type === 'architecture' ||
             suite.type === 'ishikawa' ||
             suite.type === 'venn' ||
-            suite.type === 'usecase'
+            suite.type === 'usecase' ||
+            suite.type === 'treeview'
           if (!keyboardHandles) {
             expect(viaKeyboard).toBeNull() // 门外：键盘安静地不产出意图（零变化护栏）
             return
@@ -720,6 +748,7 @@ describe('deleteIntent 等价性：三个删除入口对同一 selection 产出�
           ishikawa: { kind: 'ishikawa-node', elementId: 'ishikawa-node:999' },
           venn: { kind: 'venn-set', id: '__不存在__' },
           usecase: { kind: 'usecase-usecase', elementId: 'usecase:__不存在__' },
+          treeview: { kind: 'treeview-node', elementId: 'treeview-node:999' },
         }
         expect(caps.deleteIntent(projection, gone[suite.type])).toBeNull()
 

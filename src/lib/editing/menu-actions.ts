@@ -28,6 +28,7 @@ import { isValidWardleyName, type WardleyIntent } from '../pipeline/wardley'
 import { isValidVennSetId, type VennIntent } from '../pipeline/venn'
 import { CYNEFIN_DOMAINS, type CynefinDomainName, type CynefinIntent } from '../pipeline/cynefin'
 import { isValidUsecaseId, type UsecaseIntent } from '../pipeline/usecase'
+import { isValidTreeviewName, type TreeviewIntent } from '../pipeline/treeview'
 import { setRelationIntent, RELATION_KIND_OPTIONS } from './class-forms'
 import {
   setMessageIntent,
@@ -277,6 +278,11 @@ export function createElement(ctx: MenuActionContext, target: ContextMenuTarget 
       // usecase（more-diagrams 工单 26）：添加入口是独立的 add-usecase-actor /
       // add-usecase-case / add-usecase-boundary 动作（占位 id 避重，不做内联命名），
       // 不走 createElement
+      return null
+    }
+    if (proj.type === 'treeview') {
+      // treeView（more-diagrams 工单 24）：添加入口是独立的 add-treeview-root 动作
+      //（画布无 data-id，不做内联命名），不走 createElement
       return null
     }
     // mindmap：节点目标 = 挂为其子节点；空白 / 无目标 = 建根（空文档）或挂到根节点下
@@ -898,6 +904,50 @@ function addCynefinItem(ctx: MenuActionContext): void {
   if (applyPlan(plan, { commitIntent: ctx.commitIntent, select: ctx.select })) ctx.close()
 }
 
+// ---------- treeView（more-diagrams 工单 24） ----------
+
+/**
+ * 空白处加根节点（treeView）：追加到文档末尾（顶层，缩进取当前最小层级或 0）。
+ * 名字避重（缺省新目录）；不做内联编辑（画布无 data-id，工单降级定案）——
+ * 名称 / 目录开关在右侧表单改。空文档（无任何节点）时首个节点用 0 缩进。
+ */
+function addTreeviewRoot(ctx: MenuActionContext): void {
+  const proj = ctx.projection
+  if (proj === null || proj.type !== 'treeview') return
+  const p = proj.treeview
+  const names = p.nodes.map((n) => n.name)
+  const name = nextFreeName('新目录', names)
+  if (!isValidTreeviewName(name)) return
+  // 锚点：末个顶层节点用 add-sibling 保持同级；无顶层节点则用 add-child（缺省落文档末尾）。
+  const lastRoot = p.roots[p.roots.length - 1]
+  const intents: TreeviewIntent[] =
+    lastRoot !== undefined
+      ? [{ type: 'add-sibling', elementId: lastRoot.elementId, name, isDirectory: true }]
+      : [{ type: 'add-child', parentElementId: '', name, isDirectory: true }]
+  const ordinal =
+    lastRoot !== undefined ? treeviewSubtreeEndOrdinal(p.nodes, lastRoot.elementId) + 2 : 1
+  // add-child 的 parentElementId 空串语义：本解析器把不存在的父当作「文档末尾追加」
+  // （空树首行由 header 后的首行承接），ordinal 为 1。
+  const plan: KeyPlan = {
+    intents,
+    newElementTarget: { selection: { kind: 'treeview-node', elementId: `treeview-node:${ordinal}` } },
+  }
+  if (applyPlan(plan, { commitIntent: ctx.commitIntent, select: ctx.select })) ctx.close()
+}
+
+/** 目标节点整棵子树在平铺数组中的末位下标（找不到返回 -1） */
+function treeviewSubtreeEndOrdinal(
+  nodes: { elementId: string; level: number }[],
+  elementId: string,
+): number {
+  const index = nodes.findIndex((n) => n.elementId === elementId)
+  if (index < 0) return -1
+  const level = nodes[index].level
+  let end = index
+  for (let i = index + 1; i < nodes.length && nodes[i].level > level; i++) end = i
+  return end
+}
+
 // ---------- architecture（more-diagrams 工单 17） ----------
 
 /**
@@ -1211,4 +1261,7 @@ export const MENU_ACTIONS: Record<Exclude<ContextMenuItemId, 'apply-style'>, Men
   'add-usecase-boundary': addUsecaseBoundary,
   'edit-usecase-element': selectMenuTargetAndClose,
   'edit-usecase-relation': selectMenuTargetAndClose,
+  // treeView（more-diagrams 工单 24）：空白加根节点（顶层，追加到末个顶层之后 / 空树顶格）；
+  // 元素级编辑降级到结构树 + 属性表单
+  'add-treeview-root': addTreeviewRoot,
 }

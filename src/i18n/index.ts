@@ -163,6 +163,8 @@ export const zhDict = {
         'add-usecase-boundary': '添加系统边界',
         'edit-usecase-element': '在属性面板中编辑',
         'edit-usecase-relation': '在属性面板中编辑',
+        // treeView（more-diagrams 工单 24）：空白菜单（画布 DOM 无 data-id，无元素级菜单项）
+        'add-treeview-root': '添加根节点',
         delete: '删除',
         styleName: '样式名称',
         styleNameInvalid: '名称不能为空，且不能含空格或逗号',
@@ -211,6 +213,7 @@ export const zhDict = {
       venn: '韦恩图',
       cynefin: 'Cynefin 框架图',
       usecase: '用例图',
+      treeview: '目录树',
     },
     library: {
       title: '图表库',
@@ -937,6 +940,20 @@ export const zhDict = {
       deleteUsecaseCase: '删除用例（连同引用它的关系与注释）',
       deleteUsecaseBoundary: '删除系统边界（连同它的 end）',
       deleteUsecaseRelation: '删除关系',
+      // ---- treeView（more-diagrams 工单 24） ----
+      treeviewRoots: '目录树（目录 / 文件）',
+      treeviewDirectoryShort: '目录',
+      treeviewFileShort: '文件',
+      treeviewDirectoryHint:
+        '目录：名称以 `/` 结尾。可在结构树中选中后按 Tab 加子节点（文件节点 Tab 不动作）、Enter 加同级、Delete 删除。',
+      treeviewFileHint:
+        '文件：可在结构树中选中后按 Enter 加同级、Delete 删除；加子节点请对其父目录操作。',
+      treeviewName: '名称',
+      treeviewNameInvalid: '名称不能为空，且不能含引号或换行',
+      treeviewIsDirectory: '作为目录（名称以 / 结尾）',
+      treeviewDiagramHint:
+        '目录树：缩进表示层级（每级 4 空格或 1 个 Tab），名称以 `/` 结尾即目录。在结构树中选中节点改名 / 切换目录 / 删除；选中后按 Tab 加子节点、Enter 加同级、Delete 删除。画布不提供点选（mermaid 渲染无 data-id）。',
+      deleteTreeviewNode: '删除节点（连同子树）',
     },
     shapes: {
       rectangle: '矩形',

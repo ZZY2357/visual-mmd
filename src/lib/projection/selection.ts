@@ -152,6 +152,11 @@ export type Selection =
   | { kind: 'usecase-relation'; elementId: string }
   // usecase 注释节点（`note for X "…"`）：名字即身份 `note:<n>`（位置序计数）。
   | { kind: 'usecase-note'; elementId: string }
+  // treeView（more-diagrams 工单 24）：文件/目录统一走位置序身份
+  // （`treeview-node:N`，文档序）。画布 DOM 无 data-id、无稳定 id（research §4 实测
+  // 渲染器 0 处 data-、0 处 attr('id')），实测降级见 treeview-adapter；
+  // 选中只来自结构树 / 表单 / 键盘。
+  | { kind: 'treeview-node'; elementId: string }
 
 export const DIAGRAM_SELECTION: Selection = { kind: 'diagram' }
 
@@ -305,6 +310,8 @@ export function selectionKey(sel: Selection): string {
       return `usecase-relation:${sel.elementId}`
     case 'usecase-note':
       return `usecase-note:${sel.elementId}`
+    case 'treeview-node':
+      return `treeview-node:${sel.elementId}`
   }
 }
 

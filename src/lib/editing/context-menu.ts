@@ -283,6 +283,9 @@ export type ContextMenuItemId =
   | 'add-usecase-boundary'
   | 'edit-usecase-element'
   | 'edit-usecase-relation'
+  // treeView（more-diagrams 工单 24）：空白 = 加根节点（顶层节点）。节点的编辑不做
+  // 元素级画布菜单（无 data-id 可命中，research §4 实测降级），由结构树选中 + 属性表单承接。
+  | 'add-treeview-root'
 
 /**
  * 画布选中 → 菜单目标（工单 03 起为 `canvas-selection/selection-codec.ts` 的
@@ -376,6 +379,9 @@ function blankMenuItems(diagramType: DiagramTypeId): ContextMenuItemId[] {
       // usecase 的空白入口（工单 26 定案）：加 actor / 加用例（占位 id 避重）/
       // 加系统边界（`systemBoundary … end` 两行）。关系从节点菜单「从这里连线」进入更省一步
       return ['add-usecase-actor', 'add-usecase-case', 'add-usecase-boundary']
+    case 'treeview':
+      // treeView 的空白入口（工单 24 定案）：加根节点（顶层节点，追加到源码末尾）
+      return ['add-treeview-root']
     // DiagramTypeId 是开放类型（more-diagrams 工单 01）：未接入画布能力包的图种
     // 没有空白右键入口（unsupported 态下画布右键整体停用，不会走到这里）
     default:
