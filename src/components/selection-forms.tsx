@@ -84,6 +84,8 @@ import {
 import { type ArchitectureProjection } from '../lib/projection/architecture-projection'
 import { TreemapNodeForm } from './treemap-forms'
 import { type TreemapProjection } from '../lib/projection/treemap-projection'
+import { WardleyEvolveForm, WardleyLinkForm, WardleyNodeForm } from './wardley-forms'
+import { type WardleyProjection } from '../lib/projection/wardley-projection'
 
 /**
  * 选中元素的属性表单，按投影图种分发（工单 04-bundle 自 PropertyPanel 迁出）：
@@ -968,6 +970,51 @@ function TreemapSelectionForm({
   }
 }
 
+/**
+ * wardley 属性表单（more-diagrams 工单 23）：图表级 = 提示文案（title/size/evolution
+ * 等文档级行逐字保留，不做表单化编辑——工单定案）；节点 = 改名/改坐标/删除；
+ * 连线 = 改两端（下拉既有节点名）/删除；evolve = 改目标/删除。
+ * wardley 画布无 data-id 寻址（见 wardley-adapter），这些表单是唯一文本编辑入口。
+ */
+function WardleySelectionForm({
+  projection,
+  selection,
+}: {
+  projection: WardleyProjection
+  selection: Selection | null
+}) {
+  const { t } = useTranslation()
+  if (selection === null) {
+    return (
+      <Text size="sm" c="dimmed" px="xs">
+        {t('app:propertyPanel.nothingSelected')}
+      </Text>
+    )
+  }
+  switch (selection.kind) {
+    case 'diagram':
+      return (
+        <Text size="sm" c="dimmed" px="xs">
+          {t('app:propertyPanel.wardleyDiagramHint')}
+        </Text>
+      )
+    case 'wardley-node': {
+      const node = projection.nodes.find((n) => n.name === selection.name)
+      return node !== undefined ? <WardleyNodeForm node={node} projection={projection} /> : null
+    }
+    case 'wardley-link': {
+      const link = projection.links.find((l) => l.elementId === selection.elementId)
+      return link !== undefined ? <WardleyLinkForm link={link} projection={projection} /> : null
+    }
+    case 'wardley-evolve': {
+      const evolve = projection.evolves.find((e) => e.elementId === selection.elementId)
+      return evolve !== undefined ? <WardleyEvolveForm evolve={evolve} /> : null
+    }
+    default:
+      return null
+  }
+}
+
 export function ProjectionSelectionForm({ projection, selection }: { projection: AnyProjection; selection: Selection | null }) {
   if (projection.type === 'flowchart') {
     return <FlowchartSelectionForm projection={projection.flowchart} selection={selection} />
@@ -1028,6 +1075,9 @@ export function ProjectionSelectionForm({ projection, selection }: { projection:
   }
   if (projection.type === 'treemap') {
     return <TreemapSelectionForm projection={projection.treemap} selection={selection} />
+  }
+  if (projection.type === 'wardley') {
+    return <WardleySelectionForm projection={projection.wardley} selection={selection} />
   }
   return <ClassSelectionForm projection={projection.class} selection={selection} />
 }

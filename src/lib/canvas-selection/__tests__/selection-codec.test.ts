@@ -28,6 +28,10 @@ const ALL_KINDS: readonly Selection[] = [
   { kind: 'xychart-series', elementId: 'series:1' },
   { kind: 'xychart-axis', axis: 'x' },
   { kind: 'xychart-title' },
+  // wardley（more-diagrams 工单 23）：节点名字即身份、连线/演化位置序；三类均不可寻址
+  { kind: 'wardley-node', name: '茶' },
+  { kind: 'wardley-link', elementId: 'wardley-link:1' },
+  { kind: 'wardley-evolve', elementId: 'wardley-evolve:1' },
 ]
 
 /**

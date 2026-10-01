@@ -196,6 +196,12 @@ describe('MENU_ACTIONS 穷尽性（工单 05 → 工单 01）', () => {
       { kind: 'architecture-edge', elementId: 'edge:1' },
       // treemap（more-diagrams 工单 20）：画布 DOM 无 data-id（实测降级），只有空白添加入口
       { kind: 'blank', diagramType: 'treemap' },
+      // wardley（more-diagrams 工单 23）：画布 DOM 无 data-id（实测降级），空白提供
+      // 加 component / anchor / 连线；节点 / 连线 / evolve 目标只能由程序构造
+      { kind: 'blank', diagramType: 'wardley' },
+      { kind: 'wardley-node', name: '茶' },
+      { kind: 'wardley-link', elementId: 'wardley-link:1' },
+      { kind: 'wardley-evolve', elementId: 'wardley-evolve:1' },
     ]
     const reachableIds = new Set(allTargets.flatMap((target) => contextMenuItems(target)))
     // apply-style 不经 onMenuItem 分发（CanvasPanel 渲染成子菜单开关，点样式名直接调

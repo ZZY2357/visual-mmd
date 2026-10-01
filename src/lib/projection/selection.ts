@@ -112,6 +112,14 @@ export type Selection =
   // （`treemap-node:N`，文档序——渲染序按值降序、≠ 文档序，画布 DOM 无 data-id，
   // 实测降级见 treemap-adapter；选中只来自结构树 / 表单 / 键盘）。
   | { kind: 'treemap-node'; elementId: string }
+  // wardley-beta（more-diagrams 工单 23）：节点（component / anchor）是**名字即身份**
+  // （mermaid 按名引用解析、重名互相覆盖）；连线与 evolve 走位置序身份
+  // （`wardley-link:N` / `wardley-evolve:N`）；文档级属性行 / pipeline 块不进选中面
+  // （只读展示）。画布 DOM 无 data-id（research §4 实测：渲染器只写 class，仅 <defs>
+  // 箭头 marker 有 id），实测降级见 wardley-adapter；选中只来自结构树 / 表单 / 键盘。
+  | { kind: 'wardley-node'; name: string }
+  | { kind: 'wardley-link'; elementId: string }
+  | { kind: 'wardley-evolve'; elementId: string }
 
 export const DIAGRAM_SELECTION: Selection = { kind: 'diagram' }
 
@@ -237,6 +245,12 @@ export function selectionKey(sel: Selection): string {
       return `architecture-align:${sel.elementId}`
     case 'treemap-node':
       return `treemap-node:${sel.elementId}`
+    case 'wardley-node':
+      return `wardley-node:${sel.name}`
+    case 'wardley-link':
+      return `wardley-link:${sel.elementId}`
+    case 'wardley-evolve':
+      return `wardley-evolve:${sel.elementId}`
   }
 }
 

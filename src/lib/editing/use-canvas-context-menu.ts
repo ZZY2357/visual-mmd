@@ -166,6 +166,16 @@ function nodeFormForTarget(
     if (service === undefined) return null
     return { kind, anchorElementId: service.elementId, from: service.id, x, y }
   }
+  if (kind === 'wardley-link') {
+    // wardley 加连线表单（more-diagrams 工单 23）：空白右键 → 无锚点（管线回退文档末尾）；
+    // 连线上 Tab（经 formTargetOfSelection）→ 锚点为该连线行，from 预填同源
+    if (proj.type !== 'wardley') return null
+    if (target.kind === 'blank') return { kind, x, y }
+    if (target.kind !== 'wardley-link') return null
+    const link = proj.wardley.links.find((l) => l.elementId === target.elementId)
+    if (link === undefined) return null
+    return { kind, anchorElementId: link.elementId, from: link.from, x, y }
+  }
   if (kind === 'block') {
     // sequence 独有的添加逻辑块：参与者上右键 → 锚点为该参与者的声明；
     // 空白处右键 → 无锚点（管线回退到文档最后一个元素）
@@ -210,6 +220,8 @@ function formTargetOfSelection(selection: Selection): ContextMenuTarget | null {
   if (selection.kind === 'xychart-series') return { kind: 'xychart-series', elementId: selection.elementId }
   // architecture（more-diagrams 工单 17）：service → 加边表单（Enter 键）的锚点与预选起点
   if (selection.kind === 'architecture-service') return { kind: 'architecture-service', name: selection.name }
+  // wardley（more-diagrams 工单 23）：连线 → 加连线表单（Tab 键）的锚点与 from 预填
+  if (selection.kind === 'wardley-link') return { kind: 'wardley-link', elementId: selection.elementId }
   return null
 }
 
@@ -402,7 +414,8 @@ export function useCanvasContextMenu(
         | 'sankey-link'
         | 'xychart-line'
         | 'xychart-bar'
-        | 'architecture-edge',
+        | 'architecture-edge'
+        | 'wardley-link',
     ): void => {
       const proj = latest.current.projection
       const { selection } = useEditorStore.getState()

@@ -96,6 +96,13 @@ export type ContextMenuTarget =
   | { kind: 'architecture-group'; name: string }
   | { kind: 'architecture-junction'; name: string }
   | { kind: 'architecture-edge'; elementId: string }
+// wardley（more-diagrams 工单 23）：画布 DOM 无 data-id（research §4 实测降级，见
+// wardley-adapter），无元素级菜单目标——节点/连线/evolve 目标只由测试/程序构造，
+// 画布右键实际只产出 blank（空白菜单提供 加 component / 加 anchor / 加连线 入口）。
+// 节点选中 id 即名字（名字即身份）；连线 / evolve elementId 即投影位置序身份。
+  | { kind: 'wardley-node'; name: string }
+  | { kind: 'wardley-link'; elementId: string }
+  | { kind: 'wardley-evolve'; elementId: string }
 
 export type ContextMenuItemId =
   | 'add-node'
@@ -224,6 +231,13 @@ export type ContextMenuItemId =
   // 由结构树选中 + 属性表单承接。
   | 'add-treemap-group'
   | 'add-treemap-leaf'
+  // wardley（more-diagrams 工单 23）：空白 = 加 component / 加 anchor（名字避重、坐标落
+  // 图正中 [0.5, 0.5]，不做内联命名——画布无 data-id）/ 加连线（两端从既有节点名下拉，
+  // 提交才落码）。节点/连线/evolve 的编辑不做元素级画布菜单（无 data-id 可命中，
+  // research §4 实测降级），由结构树选中 + 属性表单承接。
+  | 'add-wardley-component'
+  | 'add-wardley-anchor'
+  | 'add-wardley-link'
 
 /**
  * 画布选中 → 菜单目标（工单 03 起为 `canvas-selection/selection-codec.ts` 的
@@ -299,6 +313,10 @@ function blankMenuItems(diagramType: DiagramTypeId): ContextMenuItemId[] {
     case 'treemap':
       // treemap 的空白入口（工单 20 定案）：加分组（顶格 Section）/ 加叶子（顶格 Leaf，数值落 1）
       return ['add-treemap-group', 'add-treemap-leaf']
+    case 'wardley':
+      // wardley 的空白入口（工单 23 定案）：加 component / 加 anchor（坐标落图正中，
+      // 名字避重）/ 加连线（两端从既有节点名下选，提交才落码）
+      return ['add-wardley-component', 'add-wardley-anchor', 'add-wardley-link']
     // DiagramTypeId 是开放类型（more-diagrams 工单 01）：未接入画布能力包的图种
     // 没有空白右键入口（unsupported 态下画布右键整体停用，不会走到这里）
     default:
@@ -431,5 +449,15 @@ export function contextMenuItems(target: ContextMenuTarget): ContextMenuItemId[]
       return ['delete']
     case 'architecture-edge':
       return ['edit-architecture-edge', 'delete']
+    // wardley（more-diagrams 工单 23）：节点 = 从这里拉连线（D5：选中 + 关菜单，字段在右侧
+    // WardleyNodeForm 改——画布无 data-id，这几个目标只由结构树选中经键路径构造）/ 删除；
+    // 连线 = 加连线（同源预填）/ 编辑（选中 + 关菜单，右侧 WardleyLinkForm 改端点）/ 删除；
+    // evolve = 编辑（选中 + 关菜单，右侧 WardleyEvolveForm 改目标）/ 删除
+    case 'wardley-node':
+      return ['edit-text', 'link-from-here', 'delete']
+    case 'wardley-link':
+      return ['add-wardley-link', 'edit-label', 'delete']
+    case 'wardley-evolve':
+      return ['edit-label', 'delete']
   }
 }

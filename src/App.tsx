@@ -247,6 +247,9 @@ export default function App() {
                 <Menu.Item onClick={() => newDiagram('treemap', t('newDiagram.treemap'))}>
                   {t('newDiagram.treemap')}
                 </Menu.Item>
+                <Menu.Item onClick={() => newDiagram('wardley', t('newDiagram.wardley'))}>
+                  {t('newDiagram.wardley')}
+                </Menu.Item>
               </Menu.Dropdown>
             </Menu>
             <Button

@@ -69,6 +69,8 @@ export type NodeFormKind =
   | 'xychart-bar'
   // architecture（more-diagrams 工单 17）：从选中 service 拉一条边（from 预选，提交才落码）
   | 'architecture-edge'
+  // wardley（more-diagrams 工单 23）：加连线（两端从既有节点名下拉；空白/连线上均可）
+  | 'wardley-link'
 
 export interface NodeFormState {
   kind: NodeFormKind
