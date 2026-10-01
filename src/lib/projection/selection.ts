@@ -108,6 +108,10 @@ export type Selection =
   | { kind: 'architecture-junction'; name: string }
   | { kind: 'architecture-edge'; elementId: string }
   | { kind: 'architecture-align'; elementId: string }
+  // treemap（more-diagrams 工单 20）：Section 分组与 Leaf 叶子统一走位置序身份
+  // （`treemap-node:N`，文档序——渲染序按值降序、≠ 文档序，画布 DOM 无 data-id，
+  // 实测降级见 treemap-adapter；选中只来自结构树 / 表单 / 键盘）。
+  | { kind: 'treemap-node'; elementId: string }
 
 export const DIAGRAM_SELECTION: Selection = { kind: 'diagram' }
 
@@ -231,6 +235,8 @@ export function selectionKey(sel: Selection): string {
       return `architecture-edge:${sel.elementId}`
     case 'architecture-align':
       return `architecture-align:${sel.elementId}`
+    case 'treemap-node':
+      return `treemap-node:${sel.elementId}`
   }
 }
 

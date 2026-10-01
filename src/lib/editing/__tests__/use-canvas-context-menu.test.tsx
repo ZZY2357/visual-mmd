@@ -133,6 +133,8 @@ function resolverOf(projection: AnyProjection) {
   if (projection.type === 'radar') return () => null
   // architecture（more-diagrams 工单 17）：三类节点 data-id 即源码 id（DOM id 反注，node.id = elementId）
   if (projection.type === 'architecture') return architectureDataIdResolver(projection.architecture)
+  // treemap（more-diagrams 工单 20）：画布 DOM 无 data-id（research §4 实测降级），resolver 永不命中
+  if (projection.type === 'treemap') return () => null
   const nodes = nodeDataIdResolver(projection.class.classes.map((c) => c.name))
   const edges = elementDataIdResolver(projection.class.relations.map((r) => r.elementId))
   return (dataId: string) => nodes(dataId) ?? edges(dataId)

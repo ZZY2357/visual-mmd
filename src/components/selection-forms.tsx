@@ -82,6 +82,8 @@ import {
   ArchitectureServiceForm,
 } from './architecture-forms'
 import { type ArchitectureProjection } from '../lib/projection/architecture-projection'
+import { TreemapNodeForm } from './treemap-forms'
+import { type TreemapProjection } from '../lib/projection/treemap-projection'
 
 /**
  * 选中元素的属性表单，按投影图种分发（工单 04-bundle 自 PropertyPanel 迁出）：
@@ -930,6 +932,42 @@ function ArchitectureSelectionForm({
   }
 }
 
+/**
+ * treemap 属性表单（more-diagrams 工单 20）：图表级 = 提示文案（title/classDef 等文档级
+ * 行逐字保留，不做表单化编辑——工单定案）；节点 = 改名 / 改叶子数值 / 删除。
+ * treemap 画布无 data-id 寻址（见 treemap-adapter），这两张表单是唯一文本编辑入口。
+ */
+function TreemapSelectionForm({
+  projection,
+  selection,
+}: {
+  projection: TreemapProjection
+  selection: Selection | null
+}) {
+  const { t } = useTranslation()
+  if (selection === null) {
+    return (
+      <Text size="sm" c="dimmed" px="xs">
+        {t('app:propertyPanel.nothingSelected')}
+      </Text>
+    )
+  }
+  switch (selection.kind) {
+    case 'diagram':
+      return (
+        <Text size="sm" c="dimmed" px="xs">
+          {t('app:propertyPanel.treemapDiagramHint')}
+        </Text>
+      )
+    case 'treemap-node': {
+      const node = projection.nodes.find((n) => n.elementId === selection.elementId)
+      return node !== undefined ? <TreemapNodeForm node={node} /> : null
+    }
+    default:
+      return null
+  }
+}
+
 export function ProjectionSelectionForm({ projection, selection }: { projection: AnyProjection; selection: Selection | null }) {
   if (projection.type === 'flowchart') {
     return <FlowchartSelectionForm projection={projection.flowchart} selection={selection} />
@@ -987,6 +1025,9 @@ export function ProjectionSelectionForm({ projection, selection }: { projection:
   }
   if (projection.type === 'architecture') {
     return <ArchitectureSelectionForm projection={projection.architecture} selection={selection} />
+  }
+  if (projection.type === 'treemap') {
+    return <TreemapSelectionForm projection={projection.treemap} selection={selection} />
   }
   return <ClassSelectionForm projection={projection.class} selection={selection} />
 }

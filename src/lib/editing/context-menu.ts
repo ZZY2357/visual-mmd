@@ -219,6 +219,11 @@ export type ContextMenuItemId =
   | 'add-architecture-junction'
   | 'edit-architecture-service'
   | 'edit-architecture-edge'
+  // treemap（more-diagrams 工单 20）：空白 = 加分组（Section）/ 加叶子（Leaf，数值落 1）。
+  // 节点的编辑不做元素级画布菜单（无 data-id 可命中，research §4 实测降级），
+  // 由结构树选中 + 属性表单承接。
+  | 'add-treemap-group'
+  | 'add-treemap-leaf'
 
 /**
  * 画布选中 → 菜单目标（工单 03 起为 `canvas-selection/selection-codec.ts` 的
@@ -291,6 +296,9 @@ function blankMenuItems(diagramType: DiagramTypeId): ContextMenuItemId[] {
       // architecture 的空白入口（more-diagrams 工单 17）：加 service（创建 + 内联命名标题）/
       // 加 group / 加 junction
       return ['add-architecture-service', 'add-architecture-group', 'add-architecture-junction']
+    case 'treemap':
+      // treemap 的空白入口（工单 20 定案）：加分组（顶格 Section）/ 加叶子（顶格 Leaf，数值落 1）
+      return ['add-treemap-group', 'add-treemap-leaf']
     // DiagramTypeId 是开放类型（more-diagrams 工单 01）：未接入画布能力包的图种
     // 没有空白右键入口（unsupported 态下画布右键整体停用，不会走到这里）
     default:

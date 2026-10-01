@@ -215,6 +215,26 @@ describe('结构树分区描述（工单 06）', () => {
     expect(bad?.detail).toContain('app:propertyPanel.pieValueInvalidShort')
   })
 
+  it('treemap：图表级 + 节点分区，层级递归展开、叶子 detail 携带数值；非法数值走「无效」标注键', () => {
+    const source = 'treemap\n"根"\n    "甲": 3\n    "坏": -1\n'
+    const parsed = DIAGRAM_TYPES.treemap.parser.parse(source)
+    if (!parsed.ok) throw new Error('解析失败')
+    const sections = DIAGRAM_TYPES.treemap.tree(DIAGRAM_TYPES.treemap.buildProjection(parsed.doc), { t })
+    expect(sections.map((s) => s.key)).toEqual(['diagram', 'nodes'])
+    expect(sections[1].heading).toBe('app:propertyPanel.treemapNodes')
+    expect(sections[1].count).toBe(3)
+    const root = sections[1].entries[0]
+    expect(root).toMatchObject({ depth: 1, selection: { kind: 'treemap-node', elementId: 'treemap-node:1' } })
+    expect(root?.children?.[0]).toMatchObject({
+      depth: 2,
+      detail: '3',
+      selection: { kind: 'treemap-node', elementId: 'treemap-node:2' },
+    })
+    expect(root?.children?.[0]?.onKeyDown).toBeTypeOf('function')
+    // 非法数值走「无效」标注键（t 替身直返键名；原文在 opts 里透传）
+    expect(root?.children?.[1]?.detail).toContain('app:propertyPanel.treemapValueInvalidShort')
+  })
+
   it('每个图种注册表的 tree 字段都能对自身的投影求值（穷尽性）', () => {
     const sources: Record<keyof typeof DIAGRAM_TYPES, string> = {
       flowchart: 'flowchart TB\nn1[甲]',
@@ -243,6 +263,7 @@ describe('结构树分区描述（工单 06）', () => {
         'radar-beta\n    title 技能\n    axis a["甲"], b["乙"]\n    curve c1["一"]{ 1, 2 }\n    max 5',
       architecture:
         'architecture-beta\n    group platform(cloud)[平台]\n    service web(server)[Web]\n    service db(database)[数据库] in platform\n    web:R -- L:db',
+      treemap: 'treemap\n"根"\n    "甲"\n        "叶1": 3\n    "乙": 2',
     }
     for (const id of Object.keys(DIAGRAM_TYPES) as (keyof typeof DIAGRAM_TYPES)[]) {
       const registration = DIAGRAM_TYPES[id]
