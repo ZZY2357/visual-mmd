@@ -74,6 +74,14 @@ import { PacketDiagramForm, PacketFieldForm } from './packet-forms'
 import { type PacketProjection } from '../lib/projection/packet-projection'
 import { XychartAxisForm, XychartSeriesForm, XychartTitleForm } from './xychart-forms'
 import { type XychartProjection } from '../lib/projection/xychart-projection'
+import {
+  ArchitectureAlignForm,
+  ArchitectureEdgeForm,
+  ArchitectureGroupForm,
+  ArchitectureJunctionForm,
+  ArchitectureServiceForm,
+} from './architecture-forms'
+import { type ArchitectureProjection } from '../lib/projection/architecture-projection'
 
 /**
  * 选中元素的属性表单，按投影图种分发（工单 04-bundle 自 PropertyPanel 迁出）：
@@ -870,6 +878,58 @@ function XychartSelectionForm({
   }
 }
 
+/**
+ * architecture 属性表单（more-diagrams 工单 17）：图表级 = 提示文案（config 不做编辑
+ * ——工单定案）；service / group / junction / 边 / align 五类元素。边不可寻址（见
+ * architecture-adapter），ArchitectureEdgeForm 只从结构树选中进入。
+ */
+function ArchitectureSelectionForm({
+  projection,
+  selection,
+}: {
+  projection: ArchitectureProjection
+  selection: Selection | null
+}) {
+  const { t } = useTranslation()
+  if (selection === null) {
+    return (
+      <Text size="sm" c="dimmed" px="xs">
+        {t('app:propertyPanel.nothingSelected')}
+      </Text>
+    )
+  }
+  switch (selection.kind) {
+    case 'diagram':
+      return (
+        <Text size="sm" c="dimmed" px="xs">
+          {t('app:propertyPanel.architectureDiagramHint')}
+        </Text>
+      )
+    case 'architecture-service': {
+      const service = projection.services.find((s) => s.id === selection.name)
+      return service !== undefined ? <ArchitectureServiceForm service={service} groups={projection.groups} /> : null
+    }
+    case 'architecture-group': {
+      const group = projection.groups.find((g) => g.id === selection.name)
+      return group !== undefined ? <ArchitectureGroupForm group={group} groups={projection.groups} /> : null
+    }
+    case 'architecture-junction': {
+      const junction = projection.junctions.find((j) => j.id === selection.name)
+      return junction !== undefined ? <ArchitectureJunctionForm junction={junction} groups={projection.groups} /> : null
+    }
+    case 'architecture-edge': {
+      const edge = projection.edges.find((e) => e.elementId === selection.elementId)
+      return edge !== undefined ? <ArchitectureEdgeForm edge={edge} /> : null
+    }
+    case 'architecture-align': {
+      const align = projection.aligns.find((a) => a.elementId === selection.elementId)
+      return align !== undefined ? <ArchitectureAlignForm align={align} /> : null
+    }
+    default:
+      return null
+  }
+}
+
 export function ProjectionSelectionForm({ projection, selection }: { projection: AnyProjection; selection: Selection | null }) {
   if (projection.type === 'flowchart') {
     return <FlowchartSelectionForm projection={projection.flowchart} selection={selection} />
@@ -924,6 +984,9 @@ export function ProjectionSelectionForm({ projection, selection }: { projection:
   }
   if (projection.type === 'radar') {
     return <RadarSelectionForm projection={projection.radar} selection={selection} />
+  }
+  if (projection.type === 'architecture') {
+    return <ArchitectureSelectionForm projection={projection.architecture} selection={selection} />
   }
   return <ClassSelectionForm projection={projection.class} selection={selection} />
 }

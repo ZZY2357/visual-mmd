@@ -90,6 +90,14 @@ describe('detectDiagramType：无法识别 → unsupported（null），绝不默
     expect(DIAGRAM_TYPES.xychart.detect('xychart-beta extra\nbar [1]\n')).toBe(false)
   })
 
+  it('architecture-beta 识别（more-diagrams 工单 17）：mermaid 词法只有这一个关键字；声明行必须是裸关键字', () => {
+    expect(detectDiagramType('architecture-beta\n    service a\n')?.id).toBe('architecture')
+    expect(detectDiagramType('ARCHITECTURE-BETA\n')?.id).toBe('architecture')
+    expect(detectDiagramType('architecture\n    service a\n')?.id).toBeUndefined()
+    expect(DIAGRAM_TYPES.architecture.detect('architecture-beta extra\n')).toBe(false)
+    expect(DIAGRAM_TYPES.architecture.detect('architecture-betaX\n')).toBe(false)
+  })
+
   it('双关键字 detect 例（后续图种工单的写法约定）：-beta 可选且不越界误判', () => {
     // 后续 block/packet/xychart 工单应采用 `^<kw>(-beta)?\b` 形态；这里把形态锁死：
     // 可选 -beta 不妨碍裸关键字的识别，也不把更长的词（如 block-chain）误吞。

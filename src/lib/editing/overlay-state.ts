@@ -67,6 +67,8 @@ export type NodeFormKind =
   // xychart（more-diagrams 工单 14）：加系列（名字 + 数值行，line / bar 两形态）
   | 'xychart-line'
   | 'xychart-bar'
+  // architecture（more-diagrams 工单 17）：从选中 service 拉一条边（from 预选，提交才落码）
+  | 'architecture-edge'
 
 export interface NodeFormState {
   kind: NodeFormKind

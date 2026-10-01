@@ -18,6 +18,7 @@ import { ganttParser } from './pipeline/gantt'
 import { quadrantParser } from './pipeline/quadrant'
 import { xychartParser } from './pipeline/xychart'
 import { radarParser } from './pipeline/radar'
+import { architectureParser } from './pipeline/architecture'
 import { frontmatterEnd } from './pipeline/frontmatter'
 import { buildFlowchartProjection, type FlowchartProjection } from './projection/flowchart-projection'
 import { buildSequenceProjection, type SequenceProjection } from './projection/sequence-projection'
@@ -46,6 +47,10 @@ import { packetParser } from './pipeline/packet'
 import { packetCanvasCapabilities } from './canvas-selection/packet-adapter'
 import { buildXychartProjection, type XychartProjection } from './projection/xychart-projection'
 import { buildRadarProjection, type RadarProjection } from './projection/radar-projection'
+import {
+  buildArchitectureProjection,
+  type ArchitectureProjection,
+} from './projection/architecture-projection'
 import { flowchartCanvasCapabilities } from './canvas-selection/flowchart-adapter'
 import { sequenceCanvasCapabilities } from './canvas-selection/sequence-adapter'
 import { classCanvasCapabilities } from './canvas-selection/class-adapter'
@@ -64,6 +69,7 @@ import { ganttCanvasCapabilities } from './canvas-selection/gantt-adapter'
 import { quadrantCanvasCapabilities } from './canvas-selection/quadrant-adapter'
 import { xychartCanvasCapabilities } from './canvas-selection/xychart-adapter'
 import { radarCanvasCapabilities } from './canvas-selection/radar-adapter'
+import { architectureCanvasCapabilities } from './canvas-selection/architecture-adapter'
 import type { CanvasCapabilities } from './canvas-selection/capabilities'
 import { treePartitions, type TreePartitions } from './structure-tree/partitions'
 import { DEFAULT_DIAGRAM_SOURCE } from './storage'
@@ -104,6 +110,7 @@ export interface ProjectionTypes {
   packet: PacketProjection
   xychart: XychartProjection
   radar: RadarProjection
+  architecture: ArchitectureProjection
 }
 
 /** 已注册图种的 id 集合（字面量联合，随 ProjectionTypes 增长） */
@@ -433,6 +440,25 @@ export const RADAR_TEMPLATE = `radar-beta
 `
 
 /**
+ * architecture 起步模板（more-diagrams 工单 17）：两个 group（其一嵌套）、三个 service
+ * （其一在组内）、一条直边一条带箭头边、一个 junction 中转边（工单定案构成）。
+ * 注意 mermaid 词法：id 是 `[\w]([-\w]*\w)?`（无中文）；标题在 `[]` 内（可中文）；
+ * service / group / junction 共享 id 命名空间（重名 mermaid 抛错）。
+ */
+export const ARCHITECTURE_TEMPLATE = `architecture-beta
+    group platform(cloud)[平台]
+    group private(cloud)[私有子网] in platform
+    service web(server)[Web 服务]
+    service db(database)[数据库] in private
+    service cache(disk)[缓存]
+    junction j1
+
+    web:R -- L:db
+    web:B --> T:j1
+    j1:R -- L:cache
+`
+
+/**
  * 注册表：数组是唯一权威（more-diagrams 工单 01），DIAGRAM_TYPES 由它推导。
  * detectDiagramType 按数组顺序显式遍历——不再维护手写的 if 分发链，
  * 新图种挂一条即可参与识别，无法识别时不再默认 flowchart（见下）。
@@ -628,6 +654,17 @@ export const DIAGRAM_TYPE_LIST: DiagramTypeRegistration[] = [
     buildProjection: (doc) => ({ type: 'radar', radar: buildRadarProjection(doc) }),
     tree: treePartitions.radar,
     canvas: radarCanvasCapabilities,
+  },
+  {
+    id: 'architecture',
+    parser: architectureParser,
+    template: ARCHITECTURE_TEMPLATE,
+    // `\b` 让关键字不被 `architectureX` 之类的更长词误认；声明行必须是裸关键字
+    //（mermaid 词法只有 `architecture-beta` 一个关键字，@mermaid-js/parser ArchitectureGrammar）
+    detect: (source) => /^architecture-beta[ \t\r]*$/i.test(firstStatementLine(source)),
+    buildProjection: (doc) => ({ type: 'architecture', architecture: buildArchitectureProjection(doc) }),
+    tree: treePartitions.architecture,
+    canvas: architectureCanvasCapabilities,
   },
 ]
 

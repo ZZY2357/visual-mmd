@@ -129,6 +129,14 @@ export const zhDict = {
         // radar（more-diagrams 工单 15）：空白菜单（画布 DOM 无 data-id，无元素级菜单项）
         'add-radar-axis': '添加轴',
         'add-radar-curve': '添加曲线',
+        // architecture（more-diagrams 工单 17）：空白加 service / group / junction；
+        // service = 改标题（内联）/ 图标与分组（D5）/ 从这里连线 / 删除；group = 改标题 / 删除；
+        // 边 = 改端口与箭头（D5）/ 删除
+        'add-architecture-service': '添加服务',
+        'add-architecture-group': '添加分组',
+        'add-architecture-junction': '添加接合点',
+        'edit-architecture-service': '在属性面板中编辑',
+        'edit-architecture-edge': '在属性面板中编辑',
         delete: '删除',
         styleName: '样式名称',
         styleNameInvalid: '名称不能为空，且不能含空格或逗号',
@@ -170,6 +178,7 @@ export const zhDict = {
       packet: '数据包图',
       xychart: 'XY 图表',
       radar: '雷达图',
+      architecture: '架构图',
     },
     library: {
       title: '图表库',
@@ -717,6 +726,41 @@ export const zhDict = {
       deletePacketField: '删除字段',
       invalidPacketFieldName: '名称不能为空，且不能含引号或换行',
       invalidPacketBit: '必须是 0 起的非负整数',
+      // ---- architecture（more-diagrams 工单 17） ----
+      architectureNodes: '节点（服务 / 分组 / 接合点）',
+      architectureEdges: '连线',
+      architectureAligns: '对齐（align）',
+      archServiceOwner: '服务 {{id}}',
+      archGroupOwner: '分组 {{id}}',
+      archJunctionOwner: '接合点 {{id}}',
+      archTitle: '标题（留空 = 显示 id）',
+      archTitleEmptyHint: '留空 = 去掉标题（显示回落到 id）',
+      archIcon: '图标',
+      archIconHint: '内置 cloud / database / disk / internet / server，或 pack:icon-name 自由串',
+      archIconNone: '（无图标）',
+      archInGroup: '所属分组（in）',
+      archNoGroup: '（顶层）',
+      archInGroupShort: 'in {{group}}',
+      archEdgeEnds: '{{from}} → {{to}}',
+      archEdgeEndsInvalid: '{{from}} → {{to}}（端点无效）',
+      archEndpointInvalidShort: '端点无效',
+      archFromPort: '起点端口',
+      archToPort: '终点端口',
+      archPortRequiredHint: '方向端口两侧必需（mermaid 词法）',
+      archArrow: '箭头',
+      archFrom: '起点',
+      archTo: '终点',
+      archAlignMembers: 'align {{members}}',
+      deleteArchService: '删除服务（含触及连线与对齐）',
+      deleteArchGroup: '删除分组（成员回到顶层）',
+      deleteArchJunction: '删除接合点（含触及连线）',
+      deleteArchEdge: '删除连线',
+      deleteArchAlign: '删除对齐',
+      architectureDiagramHint:
+        '架构图：service / group / junction 可在画布点选（双击改标题）；选中 service 后按 Tab 同组加服务、Enter 拉一条边、Delete 删除。边在结构树中选中后于属性表单改端口与箭头。',
+      invalidArchId: 'ID 只能包含字母、数字、下划线、连字符',
+      invalidArchTitle: '标题不能为空，且不能含方括号或换行',
+      invalidArchIcon: '图标只能是内置枚举或 pack:icon-name 形态',
     },
     shapes: {
       rectangle: '矩形',
@@ -783,6 +827,20 @@ export const zhDict = {
       identifying: '实线（identifying）',
       'non-identifying': '虚线（non-identifying）',
     },
+    // architecture 方向端口枚举（more-diagrams 工单 17）
+    archPorts: {
+      T: '顶部（T）',
+      B: '底部（B）',
+      L: '左侧（L）',
+      R: '右侧（R）',
+    },
+    // architecture 边箭头枚举（`<`/`>` 贴在 `--` 哪一侧就指向哪一端）
+    architectureArrows: {
+      none: '无箭头（--）',
+      target: '指向终点（-->）',
+      source: '指向起点（<--）',
+      both: '双向（<-->）',
+    },
     timelineDirections: {
       LR: '从左到右（LR）',
       TD: '从上到下（TD）',
@@ -824,8 +882,7 @@ export const zhDict = {
       traces: 'traces（追踪）',
     },
     // block 形状枚举（typeStr2Type 全表 + 裸 id 与块箭头；与 pipeline/block.BLOCK_SHAPES 同源）
-    blockShapes: {
-      none: '裸 id（无形状）',
+    blockShapes: {      none: '裸 id（无形状）',
       square: '方形 [ ]',
       round: '圆角 ( )',
       stadium: '体育场 ([ ])',

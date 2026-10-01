@@ -186,6 +186,14 @@ describe('MENU_ACTIONS 穷尽性（工单 05 → 工单 01）', () => {
       { kind: 'xychart-title' },
       // radar（more-diagrams 工单 15）：画布 DOM 无 data-id（实测降级），只有空白添加入口
       { kind: 'blank', diagramType: 'radar' },
+      // architecture（more-diagrams 工单 17）：空白加三类节点 + service（改标题/图标与分组/
+      // 连线/删除）/ group（改标题/删除）/ junction（删除）/ 边（改端口与箭头/删除——边目标
+      // 画布不可寻址，只能由程序构造）
+      { kind: 'blank', diagramType: 'architecture' },
+      { kind: 'architecture-service', name: 'web' },
+      { kind: 'architecture-group', name: 'platform' },
+      { kind: 'architecture-junction', name: 'j1' },
+      { kind: 'architecture-edge', elementId: 'edge:1' },
     ]
     const reachableIds = new Set(allTargets.flatMap((target) => contextMenuItems(target)))
     // apply-style 不经 onMenuItem 分发（CanvasPanel 渲染成子菜单开关，点样式名直接调

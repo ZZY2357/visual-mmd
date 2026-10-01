@@ -21,6 +21,7 @@ import { isValidRadarId, nextRadarId, type RadarIntent } from '../pipeline/radar
 import { isValidPacketFieldName, PACKET_DEFAULT_FIELD_COUNT, type PacketIntent } from '../pipeline/packet'
 import { isValidKanbanId } from '../pipeline/kanban'
 import { isValidBlockId } from '../pipeline/block'
+import { isValidArchId, type ArchitectureIntent } from '../pipeline/architecture'
 import { setRelationIntent, RELATION_KIND_OPTIONS } from './class-forms'
 import {
   setMessageIntent,
@@ -220,6 +221,11 @@ export function createElement(ctx: MenuActionContext, target: ContextMenuTarget 
       // add-gantt-section 动作（添加路径不做内联命名；改名走双击内联编辑/表单），不走 createElement
       return null
     }
+    if (proj.type === 'architecture') {
+      // architecture（more-diagrams 工单 17）：添加入口是独立的 add-architecture-* 动作
+      // （service / group 创建 + 内联命名标题），不走 createElement
+      return null
+    }
     if (proj.type === 'quadrant') {
       // quadrant（more-diagrams 工单 12）：添加入口是独立的 add-quadrant-point 动作
       //（坐标落 0.5, 0.5 + 内联命名文本），不走 createElement
@@ -335,6 +341,9 @@ function beginEditText(ctx: MenuActionContext, target: ContextMenuTarget | undef
   else if (target.kind === 'quadrant-point') ctx.beginInlineEdit({ kind: 'quadrant-point', elementId: target.elementId })
   // packet（more-diagrams 工单 16）：字段 = 改名（内联编辑显示文本）
   else if (target.kind === 'packet-field') ctx.beginInlineEdit({ kind: 'packet-field', elementId: target.elementId })
+  // architecture（more-diagrams 工单 17）：service / group = 改标题（内联编辑 set-*-title 落码）
+  else if (target.kind === 'architecture-service') ctx.beginInlineEdit({ kind: 'architecture', elementKind: 'service', id: target.name })
+  else if (target.kind === 'architecture-group') ctx.beginInlineEdit({ kind: 'architecture', elementKind: 'group', id: target.name })
   ctx.close()
 }
 
@@ -731,6 +740,46 @@ function addPacketField(ctx: MenuActionContext): void {
   }
 }
 
+// ---------- architecture（more-diagrams 工单 17） ----------
+
+/**
+ * 空白处加 service / group / junction（architecture）：自动避重命名（三类节点共享
+ * mermaid registeredIds 命名空间，一起避重），service / group 带缺省标题（= id，内联
+ * 命名承担改名），落码后选中新元素并进入内联编辑标题。锚点回退文档最后一个元素。
+ */
+function addArchitectureNode(
+  ctx: MenuActionContext,
+  kind: 'service' | 'group' | 'junction',
+): void {
+  const proj = ctx.projection
+  if (proj === null || proj.type !== 'architecture') return
+  const p = proj.architecture
+  const id = nextFreeName(kind, [...p.services.map((s) => s.id), ...p.groups.map((g) => g.id), ...p.junctions.map((j) => j.id)], { referential: false })
+  if (!isValidArchId(id)) return
+  const intent: ArchitectureIntent =
+    kind === 'junction'
+      ? { type: 'add-junction', id }
+      : kind === 'group'
+        ? { type: 'add-group', id, title: id }
+        : { type: 'add-service', id, title: id }
+  const selectionKind =
+    kind === 'service'
+      ? ({ kind: 'architecture-service', name: id } as const)
+      : kind === 'group'
+        ? ({ kind: 'architecture-group', name: id } as const)
+        : ({ kind: 'architecture-junction', name: id } as const)
+  const plan: KeyPlan = {
+    intents: [intent],
+    newElementTarget: {
+      selection: selectionKind,
+      inlineEdit: kind === 'junction' ? undefined : { kind: 'architecture', elementKind: kind, id },
+    },
+  }
+  if (applyPlan(plan, { commitIntent: ctx.commitIntent, select: ctx.select, beginInlineEdit: ctx.beginInlineEdit })) {
+    ctx.close()
+  }
+}
+
 export const MENU_ACTIONS: Record<Exclude<ContextMenuItemId, 'apply-style'>, MenuAction> = {
   // 「创建 + 选中 + 内联命名」五个入口共用 createElement（工单 01 收敛）
   'add-node': createElement,
@@ -744,10 +793,11 @@ export const MENU_ACTIONS: Record<Exclude<ContextMenuItemId, 'apply-style'>, Men
   // add-style（空白菜单项）= 打开「添加样式」小表单；apply-style（节点子菜单）才不经分发
   'add-style': (ctx) => ctx.openStyleForm(),
   'link-from-here': (ctx, target) => {
-    // narrow 到 flowchart / state / er 节点才能带预选起点进入连线模式
+    // narrow 到 flowchart / state / er / architecture 节点才能带预选起点进入连线模式
     if (target !== undefined && target.kind === 'flowchart-node') ctx.enterLinkMode(target.nodeId)
     else if (target !== undefined && target.kind === 'state-node') ctx.enterLinkMode(target.id)
     else if (target !== undefined && target.kind === 'er-entity') ctx.enterLinkMode(target.name)
+    else if (target !== undefined && target.kind === 'architecture-service') ctx.enterLinkMode(target.name)
   },
   'add-subgraph': addSubgraph,
   'add-member': openFormOf('member'),
@@ -857,4 +907,12 @@ export const MENU_ACTIONS: Record<Exclude<ContextMenuItemId, 'apply-style'>, Men
   // radar（more-diagrams 工单 15）：空白加轴 / 加曲线；元素级编辑降级到结构树 + 属性表单
   'add-radar-axis': addRadarAxis,
   'add-radar-curve': addRadarCurve,
+  // architecture（more-diagrams 工单 17）：空白加 service / group / junction（创建 +
+  // 内联命名标题）；service = 图标与分组 D5（选中 + 关菜单，右侧表单改）；边 = 端口与
+  // 箭头 D5（右侧 ArchitectureEdgeForm 改）；删除共用 deleteTarget
+  'add-architecture-service': (ctx) => addArchitectureNode(ctx, 'service'),
+  'add-architecture-group': (ctx) => addArchitectureNode(ctx, 'group'),
+  'add-architecture-junction': (ctx) => addArchitectureNode(ctx, 'junction'),
+  'edit-architecture-service': selectMenuTargetAndClose,
+  'edit-architecture-edge': selectMenuTargetAndClose,
 }

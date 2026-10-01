@@ -89,6 +89,13 @@ export type ContextMenuTarget =
   | { kind: 'xychart-series'; elementId: string }
   | { kind: 'xychart-axis'; axis: 'x' | 'y' }
   | { kind: 'xychart-title' }
+// architecture（more-diagrams 工单 17）：三类节点选中 id 即源码 id（DOM id 反注可寻址）；
+// 边 elementId 即投影位置序身份 `edge:N`——但边 DOM 不可寻址（计数器恒 0，见
+// architecture-adapter），边目标只由测试/程序构造，画布右键实际只产出三类节点与 blank
+  | { kind: 'architecture-service'; name: string }
+  | { kind: 'architecture-group'; name: string }
+  | { kind: 'architecture-junction'; name: string }
+  | { kind: 'architecture-edge'; elementId: string }
 
 export type ContextMenuItemId =
   | 'add-node'
@@ -204,6 +211,14 @@ export type ContextMenuItemId =
   // 轴与曲线的编辑不做元素级画布菜单（无 data-id 可命中），由结构树选中 + 属性表单承接。
   | 'add-radar-axis'
   | 'add-radar-curve'
+  // architecture（more-diagrams 工单 17）：空白 = 加 service / 加 group / 加 junction；
+  // service = 改标题（内联）/ 图标与分组（D5：选中 + 关菜单，右侧表单改）/ 从这里连线 /
+  // 删除；group = 改标题（内联）/ 删除；边 = 改端口与箭头（D5，右侧表单改）/ 删除
+  | 'add-architecture-service'
+  | 'add-architecture-group'
+  | 'add-architecture-junction'
+  | 'edit-architecture-service'
+  | 'edit-architecture-edge'
 
 /**
  * 画布选中 → 菜单目标（工单 03 起为 `canvas-selection/selection-codec.ts` 的
@@ -272,6 +287,10 @@ function blankMenuItems(diagramType: DiagramTypeId): ContextMenuItemId[] {
     case 'radar':
       // radar 的空白入口（工单 15 定案）：加轴与加曲线（占位 id 避重，右侧表单可改）
       return ['add-radar-axis', 'add-radar-curve']
+    case 'architecture':
+      // architecture 的空白入口（more-diagrams 工单 17）：加 service（创建 + 内联命名标题）/
+      // 加 group / 加 junction
+      return ['add-architecture-service', 'add-architecture-group', 'add-architecture-junction']
     // DiagramTypeId 是开放类型（more-diagrams 工单 01）：未接入画布能力包的图种
     // 没有空白右键入口（unsupported 态下画布右键整体停用，不会走到这里）
     default:
@@ -393,5 +412,16 @@ export function contextMenuItems(target: ContextMenuTarget): ContextMenuItemId[]
       return ['edit-xychart-axis']
     case 'xychart-title':
       return ['edit-label']
+    // architecture（more-diagrams 工单 17）：service = 改标题（内联编辑）/ 图标与分组
+    // （D5「选中 + 关菜单」，右侧 ArchitectureServiceForm 改）/ 从这里连线 / 删除；
+    // group = 改标题（内联编辑）/ 删除；junction = 删除；边 = 改端口与箭头（D5）/ 删除
+    case 'architecture-service':
+      return ['edit-text', 'edit-architecture-service', 'link-from-here', 'delete']
+    case 'architecture-group':
+      return ['edit-text', 'delete']
+    case 'architecture-junction':
+      return ['delete']
+    case 'architecture-edge':
+      return ['edit-architecture-edge', 'delete']
   }
 }

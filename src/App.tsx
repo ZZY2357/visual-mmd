@@ -241,6 +241,9 @@ export default function App() {
                 <Menu.Item onClick={() => newDiagram('radar', t('newDiagram.radar'))}>
                   {t('newDiagram.radar')}
                 </Menu.Item>
+                <Menu.Item onClick={() => newDiagram('architecture', t('newDiagram.architecture'))}>
+                  {t('newDiagram.architecture')}
+                </Menu.Item>
               </Menu.Dropdown>
             </Menu>
             <Button

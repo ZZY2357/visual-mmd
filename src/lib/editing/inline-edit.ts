@@ -15,6 +15,11 @@ import { isValidQuadrantPointText } from '../pipeline/quadrant'
 import { isValidPacketFieldName } from '../pipeline/packet'
 import { isValidXychartText } from '../pipeline/xychart'
 import { isValidRadarLabelText } from '../pipeline/radar'
+import { isValidArchTitle } from '../pipeline/architecture'
+import {
+  parseArchitectureGroupElementId,
+  parseArchitectureServiceElementId,
+} from '../pipeline/element-id'
 import type { ProjectionMindmapNode } from '../projection/mindmap-projection'
 import { selectionFromEventTarget, type CanvasSelection, type DataIdResolver } from '../canvas-selection/data-id'
 
@@ -91,6 +96,9 @@ export type CanvasInlineEditTarget =
    * elementId 是位置序身份（`axis:N`）。曲线标签不做双击（多条曲线标签文本可重复，
    * 文本匹配不可消歧——曲线编辑入口 = 结构树 + 属性表单） */
   | { kind: 'radar-axis'; elementId: string }
+  /** architecture（more-diagrams 工单 17）：双击 service / group 改标题（set-service-title /
+   * set-group-title 意图；id 是语法标识不在此改。junction 无标题、边不可寻址——不接双击） */
+  | { kind: 'architecture'; elementKind: 'service' | 'group'; id: string }
 
 export type InlineEditCommit =
   | { action: 'commit'; intent: EditIntent }
@@ -209,6 +217,7 @@ function targetFromRadarAxisText(
   }
   return null
 }
+  | 'architecture'
 
 /**
  * 双击目标 → 编辑对象；两边都匹配不上时返回 null（如点在空白处/边上），
@@ -278,6 +287,15 @@ export function inlineEditTargetFromEvent(
       return /^series:[1-9][0-9]*$/.test(byId.nodeId)
         ? { kind: 'xychart-series', elementId: byId.nodeId }
         : null
+    }
+    // architecture（more-diagrams 工单 17）：resolver 返回 node.id = 投影 elementId
+    // （`service:<id>` / `group:<gid>` / `junction:<jid>`，渲染后从 DOM id 反注）；
+    // 只有 service / group 可双击（改标题），junction 双击安静忽略
+    if (kind === 'architecture') {
+      const service = parseArchitectureServiceElementId(byId.nodeId)
+      if (service !== null) return { kind: 'architecture', elementKind: 'service', id: service.id }
+      const group = parseArchitectureGroupElementId(byId.nodeId)
+      return group !== null ? { kind: 'architecture', elementKind: 'group', id: group.id } : null
     }
     return byId
   }
@@ -375,6 +393,19 @@ export function inlineEditCommitOf(target: CanvasInlineEditTarget, text: string,
     // 这里到不了空串；无 label 轴双击预填 id，改完即创建 label）
     if (!isValidRadarLabelText(next)) return { action: 'invalid' }
     return { action: 'commit', intent: { type: 'set-axis-label', elementId: target.elementId, label: next } }
+  }
+  if (target.kind === 'architecture') {
+    // architecture（more-diagrams 工单 17）：非空改动 = set-service-title / set-group-title
+    //（标题含方括号/换行非法；清空 = 去掉 [title]（显示回落 id）——清空已被顶部守卫按
+    // unchanged 关闭，走属性表单而非双击）
+    if (!isValidArchTitle(next)) return { action: 'invalid' }
+    return {
+      action: 'commit',
+      intent:
+        target.elementKind === 'service'
+          ? { type: 'set-service-title', id: target.id, title: next }
+          : { type: 'set-group-title', id: target.id, title: next },
+    }
   }
   if (!isValidMindmapNodeText(next)) return { action: 'invalid' }
   return { action: 'commit', intent: { type: 'set-node-text', elementId: target.elementId, text: next } }

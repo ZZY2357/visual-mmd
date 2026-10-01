@@ -25,6 +25,7 @@ import { ganttDataIdResolver } from '../../canvas-selection/gantt-adapter'
 import { packetDataIdResolver } from '../../canvas-selection/packet-adapter'
 import { quadrantDataIdResolver } from '../../canvas-selection/quadrant-adapter'
 import { xychartDataIdResolver } from '../../canvas-selection/xychart-adapter'
+import { architectureDataIdResolver } from '../../canvas-selection/architecture-adapter'
 import { nodeDataIdResolver, elementDataIdResolver } from '../../canvas-selection/data-id'
 import type { AnyProjection } from '../../diagram-registry'
 import { useCanvasContextMenu, type NodeFormState } from '../use-canvas-context-menu'
@@ -130,6 +131,8 @@ function resolverOf(projection: AnyProjection) {
   if (projection.type === 'xychart') return xychartDataIdResolver(projection.xychart)
   // radar（more-diagrams 工单 15）：画布 DOM 无 data-id（实测降级），resolver 永不命中
   if (projection.type === 'radar') return () => null
+  // architecture（more-diagrams 工单 17）：三类节点 data-id 即源码 id（DOM id 反注，node.id = elementId）
+  if (projection.type === 'architecture') return architectureDataIdResolver(projection.architecture)
   const nodes = nodeDataIdResolver(projection.class.classes.map((c) => c.name))
   const edges = elementDataIdResolver(projection.class.relations.map((r) => r.elementId))
   return (dataId: string) => nodes(dataId) ?? edges(dataId)
@@ -170,6 +173,9 @@ function createdIdOf(target: CanvasInlineEditTarget): string {
     // radar（more-diagrams 工单 15）：双击轴标签可进内联编辑（文本匹配），目标带 elementId
     case 'radar-axis':
       return target.elementId
+    // architecture（more-diagrams 工单 17）：service / group 添加进内联命名标题（junction 不进）
+    case 'architecture':
+      return target.id
   }
 }
 

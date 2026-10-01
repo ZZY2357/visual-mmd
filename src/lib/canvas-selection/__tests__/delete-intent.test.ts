@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import {
   BLOCK_TEMPLATE,
+  ARCHITECTURE_TEMPLATE,
   CLASS_TEMPLATE,
   GANTT_TEMPLATE,
   PACKET_TEMPLATE,
@@ -24,6 +25,7 @@ import { sankeyParser } from '../../pipeline/sankey'
 import { ganttParser } from '../../pipeline/gantt'
 import { packetParser } from '../../pipeline/packet'
 import { xychartParser } from '../../pipeline/xychart'
+import { architectureParser } from '../../pipeline/architecture'
 import { buildClassProjection } from '../../projection/class-projection'
 import { buildFlowchartProjection } from '../../projection/flowchart-projection'
 import { buildMindmapProjection } from '../../projection/mindmap-projection'
@@ -35,6 +37,7 @@ import { buildSankeyProjection } from '../../projection/sankey-projection'
 import { buildGanttProjection } from '../../projection/gantt-projection'
 import { buildPacketProjection } from '../../projection/packet-projection'
 import { buildXychartProjection } from '../../projection/xychart-projection'
+import { buildArchitectureProjection } from '../../projection/architecture-projection'
 import type { Selection } from '../../projection/selection'
 import {
   blockDeleteIntent,
@@ -48,6 +51,7 @@ import {
   sequenceDeleteIntent,
   timelineDeleteIntent,
   xychartDeleteIntent,
+  architectureDeleteIntent,
 } from '../../editing/canvas-keyboard'
 import {
   deleteClassDefIntent,
@@ -405,6 +409,59 @@ function xychartCases(p: ReturnType<typeof xychartProjection>): DeleteCase[] {
   ]
 }
 
+/** architectureProjection：architecture 投影（more-diagrams 工单 17） */
+function architectureProjection(): Extract<AnyProjection, { type: 'architecture' }> {
+  const parsed = architectureParser.parse(ARCHITECTURE_TEMPLATE)
+  if (!parsed.ok) throw new Error(parsed.error.message)
+  return { type: 'architecture', architecture: buildArchitectureProjection(parsed.doc) }
+}
+
+/** architecture（more-diagrams 工单 17）：service / group / junction / 边 / align 五类
+ * 删除入口各一条（group 级联 = 成员摘回顶层；align 无画布菜单目标，只走能力包与表单） */
+function architectureCases(p: ReturnType<typeof architectureProjection>): DeleteCase[] {
+  const service = p.architecture.services[0]
+  const group = p.architecture.groups[0]
+  const junction = p.architecture.junctions[0]
+  const edge = p.architecture.edges[0]
+  const align = p.architecture.aligns[0]
+  const cases: DeleteCase[] = [
+    {
+      name: 'architecture-service',
+      selection: { kind: 'architecture-service', name: service.id },
+      panelIntent: { type: 'delete-service', id: service.id },
+      menuTarget: { kind: 'architecture-service', name: service.id },
+      menuItemId: 'delete',
+    },
+    {
+      name: 'architecture-group',
+      selection: { kind: 'architecture-group', name: group.id },
+      panelIntent: { type: 'delete-group', id: group.id },
+      menuTarget: { kind: 'architecture-group', name: group.id },
+      menuItemId: 'delete',
+    },
+    {
+      name: 'architecture-junction',
+      selection: { kind: 'architecture-junction', name: junction.id },
+      panelIntent: { type: 'delete-junction', id: junction.id },
+      menuTarget: { kind: 'architecture-junction', name: junction.id },
+      menuItemId: 'delete',
+    },
+    {
+      name: 'architecture-edge',
+      selection: { kind: 'architecture-edge', elementId: edge.elementId },
+      panelIntent: { type: 'delete-edge', elementId: edge.elementId },
+    },
+  ]
+  if (align !== undefined) {
+    cases.push({
+      name: 'architecture-align',
+      selection: { kind: 'architecture-align', elementId: align.elementId },
+      panelIntent: { type: 'delete-align', elementId: align.elementId },
+    })
+  }
+  return cases
+}
+
 const SUITES = [
   { type: 'flowchart' as const, projection: flowProjection, cases: flowchartCases },
   { type: 'class' as const, projection: classProjection, cases: classCases },
@@ -417,6 +474,7 @@ const SUITES = [
   { type: 'gantt' as const, projection: ganttProjection, cases: ganttCases },
   { type: 'packet' as const, projection: packetProjection, cases: packetCases },
   { type: 'xychart' as const, projection: xychartProjection, cases: xychartCases },
+  { type: 'architecture' as const, projection: architectureProjection, cases: architectureCases },
 ]
 
 describe('deleteIntent 等价性：三个删除入口对同一 selection 产出同一意图（工单 03）', () => {
@@ -465,6 +523,8 @@ describe('deleteIntent 等价性：三个删除入口对同一 selection 产出�
                 return packetDeleteIntent(projection.packet, sel)
               case 'xychart':
                 return xychartDeleteIntent(projection.xychart, sel)
+              case 'architecture':
+                return architectureDeleteIntent(projection.architecture, sel)
             }
           })()
           // 键盘按选中种类设门（flowchart/mindmap 只删节点）；门内的种类必须与能力包等价
@@ -479,7 +539,8 @@ describe('deleteIntent 等价性：三个删除入口对同一 selection 产出�
             suite.type === 'sankey' ||
             suite.type === 'gantt' ||
             suite.type === 'packet' ||
-            suite.type === 'xychart'
+            suite.type === 'xychart' ||
+            suite.type === 'architecture'
           if (!keyboardHandles) {
             expect(viaKeyboard).toBeNull() // 门外：键盘安静地不产出意图（零变化护栏）
             return
@@ -539,6 +600,7 @@ describe('deleteIntent 等价性：三个删除入口对同一 selection 产出�
           gantt: { kind: 'gantt-task', elementId: 'task:999' },
           packet: { kind: 'packet-field', elementId: 'field:999' },
           xychart: { kind: 'xychart-series', elementId: 'series:999' },
+          architecture: { kind: 'architecture-service', name: '__不存在__' },
         }
         expect(caps.deleteIntent(projection, gone[suite.type])).toBeNull()
 

@@ -157,6 +157,15 @@ function nodeFormForTarget(
     if (series === undefined) return null
     return { kind, anchorElementId: series.elementId, x, y }
   }
+  if (kind === 'architecture-edge') {
+    // architecture 加边表单（more-diagrams 工单 17）：service 右键 / Enter 键 → 锚点为该
+    // service 声明行，from 预选该 service；终点由表单选择
+    if (proj.type !== 'architecture') return null
+    if (target.kind !== 'architecture-service') return null
+    const service = proj.architecture.services.find((s) => s.id === target.name)
+    if (service === undefined) return null
+    return { kind, anchorElementId: service.elementId, from: service.id, x, y }
+  }
   if (kind === 'block') {
     // sequence 独有的添加逻辑块：参与者上右键 → 锚点为该参与者的声明；
     // 空白处右键 → 无锚点（管线回退到文档最后一个元素）
@@ -199,6 +208,8 @@ function formTargetOfSelection(selection: Selection): ContextMenuTarget | null {
   if (selection.kind === 'sankey-link') return { kind: 'sankey-link', elementId: selection.elementId }
   // xychart（more-diagrams 工单 14）：系列 → 加系列表单（Tab 键）的锚点
   if (selection.kind === 'xychart-series') return { kind: 'xychart-series', elementId: selection.elementId }
+  // architecture（more-diagrams 工单 17）：service → 加边表单（Enter 键）的锚点与预选起点
+  if (selection.kind === 'architecture-service') return { kind: 'architecture-service', name: selection.name }
   return null
 }
 
@@ -298,6 +309,12 @@ export function useCanvasContextMenu(
           if (commitIntent({ type: 'add-relation', from, to, cardLeft: '||', line: '--', cardRight: '|{' })) {
             select({ kind: 'er-relation', elementId: `relation:${proj.er.relations.length + 1}` })
           }
+        } else if (proj !== null && proj.type === 'architecture') {
+          // architecture 边默认带箭头指向终点（工单验收场景「连到另一 service 并带箭头」），
+          // 方向端口两侧必需（mermaid 词法，起点 R / 终点 L 缺省），落码后按位置序选中
+          if (commitIntent({ type: 'add-edge', from, to, fromPort: 'R', toPort: 'L', arrow: 'target' })) {
+            select({ kind: 'architecture-edge', elementId: `edge:${proj.architecture.edges.length + 1}` })
+          }
         } else if (commitIntent({ type: 'add-edge', from, to, lineStyle: 'solid', head: 'arrow' })) {
           select({ kind: 'edge', from, to, occurrence: 1 })
         }
@@ -384,7 +401,8 @@ export function useCanvasContextMenu(
         | 'block-edge'
         | 'sankey-link'
         | 'xychart-line'
-        | 'xychart-bar',
+        | 'xychart-bar'
+        | 'architecture-edge',
     ): void => {
       const proj = latest.current.projection
       const { selection } = useEditorStore.getState()

@@ -107,6 +107,13 @@ export function inlineEditTextOf(projection: AnyProjection | null, target: Canva
     const axis = projection.radar.axes.find((a) => a.elementId === target.elementId)
     return axis !== undefined ? (axis.label ?? axis.id) : ''
   }
+  if (projection.type === 'architecture' && target.kind === 'architecture') {
+    // architecture 双击编辑的是标题（more-diagrams 工单 17）：无标题预填 id 的回落由
+    // findMindmapElement 的回落路径承担不了——这里如实预填语法 id（与新块节点同口径）
+    return target.elementKind === 'service'
+      ? (projection.architecture.services.find((s) => s.id === target.id)?.title ?? target.id)
+      : (projection.architecture.groups.find((g) => g.id === target.id)?.title ?? target.id)
+  }
   return ''
 }
 
@@ -240,6 +247,14 @@ function findTargetElement(root: Element, target: CanvasInlineEditTarget, text: 
     // radar 的轴标签无 data-id：按展示文本在 `radarAxisLabel` class 内匹配（工单 15）
     return findRadarAxisLabelElement(root, text)
   }
+  if (target.kind === 'architecture') {
+    // architecture 的节点 data-id 即源码 id（渲染后处理从 `-service-` / `-node-` / `-group-`
+    // 词元的 DOM id 反注，more-diagrams 工单 17）
+    for (const el of root.querySelectorAll('[data-id]')) {
+      if (el.getAttribute('data-id') === target.id) return el
+    }
+    return null
+  }
   return findMindmapElement(root, target.elementId, text)
 }
 
@@ -329,7 +344,9 @@ export function useCanvasInlineEdit({ projection, resolver, svg, containerRef, v
                                 ? 'radar'
                                 : type === 'packet'
                                   ? 'packet'
-                                  : 'flowchart'
+                                  : type === 'architecture'
+                                    ? 'architecture'
+                                    : 'flowchart'
       const target = inlineEditTargetFromEvent(e.target, resolver, mindmapNodes, kind, radarAxes)
       if (target === null) return
       e.preventDefault()

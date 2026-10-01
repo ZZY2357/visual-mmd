@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import {
   BLOCK_TEMPLATE,
+  ARCHITECTURE_TEMPLATE,
   CLASS_TEMPLATE,
   DIAGRAM_TYPES,
   KANBAN_TEMPLATE,
@@ -37,6 +38,7 @@ const SOURCES = {
   block: BLOCK_TEMPLATE,
   sankey: SANKEY_TEMPLATE,
   xychart: XYCHART_TEMPLATE,
+  architecture: ARCHITECTURE_TEMPLATE,
 } as const
 
 function projectionOf(type: keyof typeof SOURCES): AnyProjection {
@@ -46,7 +48,7 @@ function projectionOf(type: keyof typeof SOURCES): AnyProjection {
   return registration.buildProjection(parsed.doc)
 }
 
-const TYPES = ['flowchart', 'sequence', 'class', 'mindmap', 'kanban', 'block', 'sankey', 'xychart'] as const
+const TYPES = ['flowchart', 'sequence', 'class', 'mindmap', 'kanban', 'block', 'sankey', 'xychart', 'architecture'] as const
 
 describe('capabilitiesOf：8 图种 × 8 能力查表（工单 04 + architecture-deepening-2 工单 03 + 工单 09/13/14）', () => {
   for (const type of TYPES) {
