@@ -14,6 +14,7 @@ import {
   ISHIKAWA_TEMPLATE,
   VENN_TEMPLATE,
   USECASE_TEMPLATE,
+  EVENT_MODELING_TEMPLATE,
   type AnyProjection,
 } from '../../diagram-registry'
 import type { EditIntent } from '../../pipeline/parser'
@@ -32,6 +33,7 @@ import { architectureParser } from '../../pipeline/architecture'
 import { ishikawaParser } from '../../pipeline/ishikawa'
 import { vennParser } from '../../pipeline/venn'
 import { usecaseParser } from '../../pipeline/usecase'
+import { eventModelingParser } from '../../pipeline/eventmodeling'
 import { buildClassProjection } from '../../projection/class-projection'
 import { buildFlowchartProjection } from '../../projection/flowchart-projection'
 import { buildMindmapProjection } from '../../projection/mindmap-projection'
@@ -47,6 +49,7 @@ import { buildArchitectureProjection } from '../../projection/architecture-proje
 import { buildIshikawaProjection } from '../../projection/ishikawa-projection'
 import { buildVennProjection } from '../../projection/venn-projection'
 import { buildUsecaseProjection } from '../../projection/usecase-projection'
+import { buildEventModelingProjection } from '../../projection/eventmodeling-projection'
 import type { Selection } from '../../projection/selection'
 import {
   blockDeleteIntent,
@@ -64,6 +67,7 @@ import {
   ishikawaDeleteIntent,
   vennDeleteIntent,
   usecaseDeleteIntent,
+  eventModelingDeleteIntent,
 } from '../../editing/canvas-keyboard'
 import {
   deleteClassDefIntent,
@@ -566,6 +570,39 @@ function usecaseCases(p: ReturnType<typeof usecaseProjection>): DeleteCase[] {
   ]
 }
 
+/** eventmodelingProjection：eventmodeling 投影（more-diagrams 工单 28） */
+function eventModelingProjection(): Extract<AnyProjection, { type: 'eventmodeling' }> {
+  const parsed = eventModelingParser.parse(EVENT_MODELING_TEMPLATE)
+  if (!parsed.ok) throw new Error(parsed.error.message)
+  return { type: 'eventmodeling', eventmodeling: buildEventModelingProjection(parsed.doc) }
+}
+
+/** eventmodeling（more-diagrams 工单 28）：帧 / 数据块两类删除入口各一条
+ *（派生连线无源码语句、只读 → 无删除入口） */
+function eventModelingCases(p: ReturnType<typeof eventModelingProjection>): DeleteCase[] {
+  const frame = p.eventmodeling.frames[0]
+  const data = p.eventmodeling.dataBlocks[0]
+  if (frame === undefined || data === undefined) {
+    throw new Error('EVENT_MODELING_TEMPLATE 必须含帧与数据块')
+  }
+  return [
+    {
+      name: 'em-frame',
+      selection: { kind: 'em-frame', elementId: frame.elementId },
+      panelIntent: { type: 'delete-em-frame', elementId: frame.elementId },
+      menuTarget: { kind: 'em-frame', elementId: frame.elementId },
+      menuItemId: 'delete',
+    },
+    {
+      name: 'em-data',
+      selection: { kind: 'em-data', elementId: data.elementId },
+      panelIntent: { type: 'delete-em-data', elementId: data.elementId },
+      menuTarget: { kind: 'em-data', elementId: data.elementId },
+      menuItemId: 'delete',
+    },
+  ]
+}
+
 const SUITES = [
   { type: 'flowchart' as const, projection: flowProjection, cases: flowchartCases },
   { type: 'class' as const, projection: classProjection, cases: classCases },
@@ -582,6 +619,7 @@ const SUITES = [
   { type: 'ishikawa' as const, projection: ishikawaProjection, cases: ishikawaCases },
   { type: 'venn' as const, projection: vennProjection, cases: vennCases },
   { type: 'usecase' as const, projection: usecaseProjection, cases: usecaseCases },
+  { type: 'eventmodeling' as const, projection: eventModelingProjection, cases: eventModelingCases },
 ]
 
 describe('deleteIntent 等价性：三个删除入口对同一 selection 产出同一意图（工单 03）', () => {
@@ -638,6 +676,8 @@ describe('deleteIntent 等价性：三个删除入口对同一 selection 产出�
                 return vennDeleteIntent(projection.venn, sel)
               case 'usecase':
                 return usecaseDeleteIntent(projection.usecase, sel)
+              case 'eventmodeling':
+                return eventModelingDeleteIntent(projection.eventmodeling, sel)
             }
           })()
           // 键盘按选中种类设门（flowchart/mindmap 只删节点）；门内的种类必须与能力包等价
@@ -656,7 +696,8 @@ describe('deleteIntent 等价性：三个删除入口对同一 selection 产出�
             suite.type === 'architecture' ||
             suite.type === 'ishikawa' ||
             suite.type === 'venn' ||
-            suite.type === 'usecase'
+            suite.type === 'usecase' ||
+            suite.type === 'eventmodeling'
           if (!keyboardHandles) {
             expect(viaKeyboard).toBeNull() // 门外：键盘安静地不产出意图（零变化护栏）
             return
@@ -720,6 +761,7 @@ describe('deleteIntent 等价性：三个删除入口对同一 selection 产出�
           ishikawa: { kind: 'ishikawa-node', elementId: 'ishikawa-node:999' },
           venn: { kind: 'venn-set', id: '__不存在__' },
           usecase: { kind: 'usecase-usecase', elementId: 'usecase:__不存在__' },
+          eventmodeling: { kind: 'em-frame', elementId: 'frame:999' },
         }
         expect(caps.deleteIntent(projection, gone[suite.type])).toBeNull()
 

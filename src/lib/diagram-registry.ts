@@ -25,6 +25,7 @@ import { wardleyParser } from './pipeline/wardley'
 import { vennParser } from './pipeline/venn'
 import { cynefinParser } from './pipeline/cynefin'
 import { usecaseParser } from './pipeline/usecase'
+import { eventModelingParser } from './pipeline/eventmodeling'
 import { frontmatterEnd } from './pipeline/frontmatter'
 import { buildFlowchartProjection, type FlowchartProjection } from './projection/flowchart-projection'
 import { buildSequenceProjection, type SequenceProjection } from './projection/sequence-projection'
@@ -63,6 +64,7 @@ import { buildWardleyProjection, type WardleyProjection } from './projection/war
 import { buildVennProjection, type VennProjection } from './projection/venn-projection'
 import { buildCynefinProjection, type CynefinProjection } from './projection/cynefin-projection'
 import { buildUsecaseProjection, type UsecaseProjection } from './projection/usecase-projection'
+import { buildEventModelingProjection, type EventModelingProjection } from './projection/eventmodeling-projection'
 import { flowchartCanvasCapabilities } from './canvas-selection/flowchart-adapter'
 import { sequenceCanvasCapabilities } from './canvas-selection/sequence-adapter'
 import { classCanvasCapabilities } from './canvas-selection/class-adapter'
@@ -88,6 +90,7 @@ import { wardleyCanvasCapabilities } from './canvas-selection/wardley-adapter'
 import { vennCanvasCapabilities } from './canvas-selection/venn-adapter'
 import { cynefinCanvasCapabilities } from './canvas-selection/cynefin-adapter'
 import { usecaseCanvasCapabilities } from './canvas-selection/usecase-adapter'
+import { eventModelingCanvasCapabilities } from './canvas-selection/eventmodeling-adapter'
 import type { CanvasCapabilities } from './canvas-selection/capabilities'
 import { treePartitions, type TreePartitions } from './structure-tree/partitions'
 import { DEFAULT_DIAGRAM_SOURCE } from './storage'
@@ -135,6 +138,7 @@ export interface ProjectionTypes {
   venn: VennProjection
   cynefin: CynefinProjection
   usecase: UsecaseProjection
+  eventmodeling: EventModelingProjection
 }
 
 /** 已注册图种的 id 集合（字面量联合，随 ProjectionTypes 增长） */
@@ -612,6 +616,25 @@ export const USECASE_TEMPLATE = `usecase-beta
 `
 
 /**
+ * eventmodeling 起步模板（more-diagrams 工单 28，research §7 草案）：声明关键字是
+ * **正文首行的裸 `eventmodeling`**（mermaid 探测器 `/^\s*eventmodeling/`，**无 `-beta`
+ * 后缀**，research §1/§8.1 实测）——不是 frontmatter 声明式（工单原假设作废）。
+ * 三条帧 ui→cmd→evt（跨三条泳道，默认推断出两条关系）+ 一个被事件帧引用的数据块；
+ * 帧号、实体类型、标识为语法核心，`data … { }` 的多行块体是 opaque 文本（逐字保留）。
+ */
+export const EVENT_MODELING_TEMPLATE = `eventmodeling
+
+tf 01 ui CartUI
+tf 02 cmd AddItem
+tf 03 evt ItemAdded [[ItemAdded]]
+
+data ItemAdded {
+  description: string
+  price: number
+}
+`
+
+/**
  * 注册表：数组是唯一权威（more-diagrams 工单 01），DIAGRAM_TYPES 由它推导。
  * detectDiagramType 按数组顺序显式遍历——不再维护手写的 if 分发链，
  * 新图种挂一条即可参与识别，无法识别时不再默认 flowchart（见下）。
@@ -892,6 +915,21 @@ export const DIAGRAM_TYPE_LIST: DiagramTypeRegistration[] = [
     buildProjection: (doc) => ({ type: 'usecase', usecase: buildUsecaseProjection(doc) }),
     tree: treePartitions.usecase,
     canvas: usecaseCanvasCapabilities,
+  },
+  {
+    id: 'eventmodeling',
+    parser: eventModelingParser,
+    template: EVENT_MODELING_TEMPLATE,
+    // eventmodeling 声明 = **正文首行的裸关键字 `eventmodeling`**（mermaid 探测器
+    // `/^\s*eventmodeling/`，research §1/§8.1 实测；**无 `-beta` 后缀**）——不是 frontmatter
+    // 声明式（工单原假设作废）。与 EventModelingParser.HEADER_RE 同口径：整行仅关键字 + 空白
+    detect: (source) => /^eventmodeling\b[ \t\r]*$/.test(firstStatementLine(source)),
+    buildProjection: (doc) => ({
+      type: 'eventmodeling',
+      eventmodeling: buildEventModelingProjection(doc),
+    }),
+    tree: treePartitions.eventmodeling,
+    canvas: eventModelingCanvasCapabilities,
   },
 ]
 

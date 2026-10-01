@@ -223,6 +223,11 @@ describe('MENU_ACTIONS 穷尽性（工单 05 → 工单 01）', () => {
       { kind: 'usecase-boundary', elementId: 'boundary:shop' },
       { kind: 'usecase-relation', elementId: 'relation:1' },
       { kind: 'usecase-note', elementId: 'note:1' },
+      // eventmodeling（more-diagrams 工单 28）：画布 DOM 无 data-id（实测降级），空白提供
+      // 加帧 / 加数据块；帧 / 数据块目标只能由程序构造
+      { kind: 'blank', diagramType: 'eventmodeling' },
+      { kind: 'em-frame', elementId: 'frame:1' },
+      { kind: 'em-data', elementId: 'data:1' },
     ]
     const reachableIds = new Set(allTargets.flatMap((target) => contextMenuItems(target)))
     // apply-style 不经 onMenuItem 分发（CanvasPanel 渲染成子菜单开关，点样式名直接调

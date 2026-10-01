@@ -298,6 +298,8 @@ describe('结构树分区描述（工单 06）', () => {
         'cynefin-beta\n  title 事件响应\n  complex\n    "排查根因"\n  clear\n    "重启服务"\n  complex --> clear : "模式已识别"',
       usecase:
         'usecase-beta\n    actor Customer\n    systemBoundary shop["商城"]\n        Login("登录")\n    end\n    Customer --> Login',
+      eventmodeling:
+        'eventmodeling\n\ntf 01 ui CartUI\ntf 02 cmd AddItem\ntf 03 evt ItemAdded [[ItemAdded]]\n\ndata ItemAdded {\n  price: number\n}',
     }
     for (const id of Object.keys(DIAGRAM_TYPES) as (keyof typeof DIAGRAM_TYPES)[]) {
       const registration = DIAGRAM_TYPES[id]

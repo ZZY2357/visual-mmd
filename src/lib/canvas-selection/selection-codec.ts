@@ -287,6 +287,12 @@ export function fromCanvasId(diagramType: DiagramTypeId, canvas: CanvasSelection
     // 归一），按前缀解回四类选中
     return usecaseSelectionOf(canvas)
   }
+  if (diagramType === 'eventmodeling') {
+    // eventmodeling（more-diagrams 工单 28）：画布 DOM 无 data-id（research §4/§8.3 实测：
+    // `em-box` / `em-swimlane` / `em-relation` 均无 data-id，唯一 id 是 `<defs>` 箭头
+    // marker），画布选中不产生
+    return null
+  }
   if (canvas.kind === 'element') return edgeSelectionOf(diagramType, canvas.elementId)
   if (canvas.kind === 'node') {
     return diagramType === 'sequence'
@@ -414,6 +420,11 @@ export function selectionOfMenuTarget(target: ContextMenuTarget): Selection | nu
       return { kind: 'usecase-relation', elementId: target.elementId }
     case 'usecase-note':
       return { kind: 'usecase-note', elementId: target.elementId }
+    // eventmodeling（more-diagrams 工单 28）：帧 / 数据块菜单目标一一对应各自 Selection kind
+    case 'em-frame':
+      return { kind: 'em-frame', elementId: target.elementId }
+    case 'em-data':
+      return { kind: 'em-data', elementId: target.elementId }
     case 'blank':
       return null
   }
@@ -566,6 +577,9 @@ export function menuTargetOfCanvas(
           return null
       }
     }
+    // eventmodeling（more-diagrams 工单 28）：画布 DOM 无 data-id（research §4/§8.3 实测），
+    // 画布节点不产生菜单目标
+    if (diagramType === 'eventmodeling') return null
     return { kind: 'sequence-participant', actorId: canvas.id }
   }
   if (canvas.kind === 'element') {

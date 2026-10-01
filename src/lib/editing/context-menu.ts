@@ -123,6 +123,12 @@ export type ContextMenuTarget =
   | { kind: 'usecase-boundary'; elementId: string }
   | { kind: 'usecase-relation'; elementId: string }
   | { kind: 'usecase-note'; elementId: string }
+// eventmodeling（more-diagrams 工单 28）：画布 DOM 无 data-id（research §4/§8.3 实测降级，
+// 见 eventmodeling-adapter），无元素级菜单目标——帧 / 数据块目标只由测试/程序构造，画布右键
+// 实际只产出 blank（空白菜单提供 加帧 / 加数据块 入口）。elementId 即投影位置序身份
+// （`frame:N` / `data:N`）；派生连线（`relation:N`）无源码语句、只读，无编辑目标。
+  | { kind: 'em-frame'; elementId: string }
+  | { kind: 'em-data'; elementId: string }
 
 export type ContextMenuItemId =
   | 'add-node'
@@ -283,6 +289,13 @@ export type ContextMenuItemId =
   | 'add-usecase-boundary'
   | 'edit-usecase-element'
   | 'edit-usecase-relation'
+  // eventmodeling（more-diagrams 工单 28）：空白 = 加帧（占位帧号 / 标识避重）/ 加数据块
+  // （名字避重，空块体）；帧 / 数据块的字段编辑不做元素级画布菜单（无 data-id 可命中，
+  // research §4/§8.3 实测降级），由结构树选中 + 属性表单承接
+  | 'add-em-frame'
+  | 'add-em-data'
+  | 'edit-em-frame'
+  | 'edit-em-data'
 
 /**
  * 画布选中 → 菜单目标（工单 03 起为 `canvas-selection/selection-codec.ts` 的
@@ -376,6 +389,10 @@ function blankMenuItems(diagramType: DiagramTypeId): ContextMenuItemId[] {
       // usecase 的空白入口（工单 26 定案）：加 actor / 加用例（占位 id 避重）/
       // 加系统边界（`systemBoundary … end` 两行）。关系从节点菜单「从这里连线」进入更省一步
       return ['add-usecase-actor', 'add-usecase-case', 'add-usecase-boundary']
+    case 'eventmodeling':
+      // eventmodeling 的空白入口（工单 28 定案）：加帧（占位帧号 / 标识避重）/
+      // 加数据块（名字避重，空块体）。画布无 data-id，元素级编辑降级到结构树 + 属性表单
+      return ['add-em-frame', 'add-em-data']
     // DiagramTypeId 是开放类型（more-diagrams 工单 01）：未接入画布能力包的图种
     // 没有空白右键入口（unsupported 态下画布右键整体停用，不会走到这里）
     default:
@@ -548,5 +565,13 @@ export function contextMenuItems(target: ContextMenuTarget): ContextMenuItemId[]
       return ['edit-usecase-relation', 'delete']
     case 'usecase-note':
       return ['delete']
+    // eventmodeling（more-diagrams 工单 28）：帧 = 编辑（D5「选中 + 关菜单」，右侧
+    // EventModelingFrameForm 改帧号 / 类型 / 标识 / 来源 / 数据块引用）/ 删除；
+    // 数据块 = 编辑（D5，右侧 EventModelingDataForm 改名）/ 删除。元素级目标只由
+    // 结构树选中构造（画布无 data-id）。派生连线无编辑目标（只读）
+    case 'em-frame':
+      return ['edit-em-frame', 'delete']
+    case 'em-data':
+      return ['edit-em-data', 'delete']
   }
 }

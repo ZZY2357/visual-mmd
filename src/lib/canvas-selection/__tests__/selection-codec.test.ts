@@ -46,6 +46,10 @@ const ALL_KINDS: readonly Selection[] = [
   { kind: 'usecase-boundary', elementId: 'boundary:shop' },
   { kind: 'usecase-relation', elementId: 'relation:1' },
   { kind: 'usecase-note', elementId: 'note:1' },
+  // eventmodeling（more-diagrams 工单 28）：帧 / 数据块位置序；画布 DOM 无 data-id
+  // （research §4/§8.3 实测），两类均不可寻址
+  { kind: 'em-frame', elementId: 'frame:1' },
+  { kind: 'em-data', elementId: 'data:1' },
 ]
 
 /**

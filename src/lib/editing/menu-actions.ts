@@ -28,6 +28,7 @@ import { isValidWardleyName, type WardleyIntent } from '../pipeline/wardley'
 import { isValidVennSetId, type VennIntent } from '../pipeline/venn'
 import { CYNEFIN_DOMAINS, type CynefinDomainName, type CynefinIntent } from '../pipeline/cynefin'
 import { isValidUsecaseId, type UsecaseIntent } from '../pipeline/usecase'
+import { type EventModelingIntent } from '../pipeline/eventmodeling'
 import { setRelationIntent, RELATION_KIND_OPTIONS } from './class-forms'
 import {
   setMessageIntent,
@@ -277,6 +278,11 @@ export function createElement(ctx: MenuActionContext, target: ContextMenuTarget 
       // usecase（more-diagrams 工单 26）：添加入口是独立的 add-usecase-actor /
       // add-usecase-case / add-usecase-boundary 动作（占位 id 避重，不做内联命名），
       // 不走 createElement
+      return null
+    }
+    if (proj.type === 'eventmodeling') {
+      // eventmodeling（more-diagrams 工单 28）：添加入口是独立的 add-em-frame /
+      // add-em-data 动作（画布无 data-id，不做内联命名），不走 createElement
       return null
     }
     // mindmap：节点目标 = 挂为其子节点；空白 / 无目标 = 建根（空文档）或挂到根节点下
@@ -1038,6 +1044,52 @@ function addUsecaseBoundary(ctx: MenuActionContext): void {
   if (applyPlan(plan, { commitIntent: ctx.commitIntent, select: ctx.select })) ctx.close()
 }
 
+// ---------- eventmodeling（more-diagrams 工单 28） ----------
+
+/** 空白处加帧（eventmodeling）：落一行 `tf <帧号> evt <标识>`（帧号取最小未占用十进制，
+ * 标识避重 base `NewEvent`），锚点回退文档末尾。画布无 data-id → 不做内联编辑，帧号 /
+ * 类型 / 标识在右侧 EventModelingFrameForm 改。选中新帧。 */
+function addEmFrame(ctx: MenuActionContext): void {
+  const proj = ctx.projection
+  if (proj === null || proj.type !== 'eventmodeling') return
+  const p = proj.eventmodeling
+  const usedFrames = new Set(p.frames.map((f) => f.frameId))
+  let frameId = '1'
+  for (let n = 1; ; n++) {
+    if (!usedFrames.has(String(n))) {
+      frameId = String(n)
+      break
+    }
+  }
+  const identifier = nextFreeName('NewEvent', p.frames.map((f) => f.name))
+  const plan: KeyPlan = {
+    intents: [
+      {
+        type: 'add-em-frame',
+        frameId,
+        entityType: 'evt',
+        entityIdentifier: identifier,
+      } satisfies EventModelingIntent,
+    ],
+    newElementTarget: { selection: { kind: 'em-frame', elementId: `frame:${p.nextFrameOrdinal}` } },
+  }
+  if (applyPlan(plan, { commitIntent: ctx.commitIntent, select: ctx.select })) ctx.close()
+}
+
+/** 空白处加数据块（eventmodeling）：落 `data <名字> {` … `}` 多行块（名字避重 base `Data`，
+ * 块体为空行占位），锚点回退文档末尾。块体是 opaque 文本，命名在右侧 EventModelingDataForm 改。 */
+function addEmData(ctx: MenuActionContext): void {
+  const proj = ctx.projection
+  if (proj === null || proj.type !== 'eventmodeling') return
+  const p = proj.eventmodeling
+  const name = nextFreeName('Data', p.dataBlocks.map((d) => d.name))
+  const plan: KeyPlan = {
+    intents: [{ type: 'add-em-data', name } satisfies EventModelingIntent],
+    newElementTarget: { selection: { kind: 'em-data', elementId: `data:${p.dataBlocks.length + 1}` } },
+  }
+  if (applyPlan(plan, { commitIntent: ctx.commitIntent, select: ctx.select })) ctx.close()
+}
+
 export const MENU_ACTIONS: Record<Exclude<ContextMenuItemId, 'apply-style'>, MenuAction> = {
   // 「创建 + 选中 + 内联命名」五个入口共用 createElement（工单 01 收敛）
   'add-node': createElement,
@@ -1211,4 +1263,11 @@ export const MENU_ACTIONS: Record<Exclude<ContextMenuItemId, 'apply-style'>, Men
   'add-usecase-boundary': addUsecaseBoundary,
   'edit-usecase-element': selectMenuTargetAndClose,
   'edit-usecase-relation': selectMenuTargetAndClose,
+  // eventmodeling（more-diagrams 工单 28）：空白加帧 / 加数据块（占位帧号 / 名字避重，
+  // 表单可改）；帧 / 数据块的字段编辑走 D5（选中 + 关菜单，右侧 EventModelingFrameForm /
+  // EventModelingDataForm 改）——画布无 data-id，元素级编辑全部降级到结构树 + 属性表单
+  'add-em-frame': addEmFrame,
+  'add-em-data': addEmData,
+  'edit-em-frame': selectMenuTargetAndClose,
+  'edit-em-data': selectMenuTargetAndClose,
 }
