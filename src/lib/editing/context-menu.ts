@@ -123,6 +123,13 @@ export type ContextMenuTarget =
   | { kind: 'usecase-boundary'; elementId: string }
   | { kind: 'usecase-relation'; elementId: string }
   | { kind: 'usecase-note'; elementId: string }
+// c4（more-diagrams 工单 18）：画布 DOM 无 data-id（实测降级，见 c4-adapter 顶注），
+// 无元素级菜单目标——元素/边界/关系目标只由结构树选中经键路径或测试/程序构造，画布右键
+// 实际只产出 blank（空白菜单提供 加元素 / 加边界 入口）。三类的 elementId 即投影 elementId
+// （元素/边界 `c4-element:<alias>` / `c4-boundary:<alias>` 名字即身份；关系 `relation:N` 位置序）。
+  | { kind: 'c4-element'; elementId: string }
+  | { kind: 'c4-boundary'; elementId: string }
+  | { kind: 'c4-relation'; elementId: string }
 
 export type ContextMenuItemId =
   | 'add-node'
@@ -283,6 +290,18 @@ export type ContextMenuItemId =
   | 'add-usecase-boundary'
   | 'edit-usecase-element'
   | 'edit-usecase-relation'
+  // c4（more-diagrams 工单 18）：空白 = 加元素（类型子菜单：Person / System / Container /
+  // Component 各家族，含 _Ext/Db/Queue 变体）/ 加边界（四类 Boundary + Deployment Node）。
+  // 元素 = 改字段（alias/label/techn/descr，D5「选中 + 关菜单」，右侧 C4ElementForm 改）/
+  // 从这里连线 / 删除；边界 = 改标题（D5，右侧 C4BoundaryForm 改）/ 删除；
+  // 关系 = 改字段（label/techn/descr/方向，D5，右侧 C4RelationForm 改）/ 删除。
+  // 「改 alias」不是独立菜单项——alias 与 label 分字段同在表单里改（改 alias 会同步改写
+  // 引用它的关系，见 menu-actions 的 c4-alias 处理）。
+  | 'add-c4-element'
+  | 'add-c4-boundary'
+  | 'edit-c4-element'
+  | 'edit-c4-boundary'
+  | 'edit-c4-relation'
 
 /**
  * 画布选中 → 菜单目标（工单 03 起为 `canvas-selection/selection-codec.ts` 的
@@ -376,6 +395,11 @@ function blankMenuItems(diagramType: DiagramTypeId): ContextMenuItemId[] {
       // usecase 的空白入口（工单 26 定案）：加 actor / 加用例（占位 id 避重）/
       // 加系统边界（`systemBoundary … end` 两行）。关系从节点菜单「从这里连线」进入更省一步
       return ['add-usecase-actor', 'add-usecase-case', 'add-usecase-boundary']
+    case 'c4':
+      // c4 的空白入口（工单 18 定案）：加元素（类型子菜单，见 menu-actions）/ 加边界
+      // （四类 Boundary + Deployment Node）。关系从元素菜单「从这里连线」进入更省一步。
+      // 注：画布无 data-id，空白菜单是画布侧唯一入口；元素/边界/关系的编辑走结构树 + 表单。
+      return ['add-c4-element', 'add-c4-boundary']
     // DiagramTypeId 是开放类型（more-diagrams 工单 01）：未接入画布能力包的图种
     // 没有空白右键入口（unsupported 态下画布右键整体停用，不会走到这里）
     default:
@@ -548,5 +572,15 @@ export function contextMenuItems(target: ContextMenuTarget): ContextMenuItemId[]
       return ['edit-usecase-relation', 'delete']
     case 'usecase-note':
       return ['delete']
+    // c4（more-diagrams 工单 18）：元素 = 改字段（alias/label/techn/descr，D5「选中 + 关菜单」，
+    // 右侧 C4ElementForm 改）/ 从这里连线 / 删除；边界 = 改标题（D5，右侧 C4BoundaryForm 改）/
+    // 删除；关系 = 改字段（label/techn/descr/方向，D5，右侧 C4RelationForm 改）/ 删除。
+    // 画布无 data-id，这些目标只由结构树选中构造。
+    case 'c4-element':
+      return ['edit-c4-element', 'link-from-here', 'delete']
+    case 'c4-boundary':
+      return ['edit-c4-boundary', 'delete']
+    case 'c4-relation':
+      return ['edit-c4-relation', 'delete']
   }
 }

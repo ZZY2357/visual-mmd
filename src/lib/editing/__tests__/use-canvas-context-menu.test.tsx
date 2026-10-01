@@ -149,6 +149,8 @@ function resolverOf(projection: AnyProjection) {
   // usecase（more-diagrams 工单 26）：data-id 由 nodeAnnotator 从渲染器 data-id 归一，
   // resolver 与真实能力包同源（usecaseDataIdResolver）
   if (projection.type === 'usecase') return usecaseDataIdResolver(projection.usecase)
+  // c4（more-diagrams 工单 18）：画布 DOM 无 data-id（实测降级），resolver 永不命中
+  if (projection.type === 'c4') return () => null
   const nodes = nodeDataIdResolver(projection.class.classes.map((c) => c.name))
   const edges = elementDataIdResolver(projection.class.relations.map((r) => r.elementId))
   return (dataId: string) => nodes(dataId) ?? edges(dataId)

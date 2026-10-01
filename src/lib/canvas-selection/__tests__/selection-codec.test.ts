@@ -46,6 +46,11 @@ const ALL_KINDS: readonly Selection[] = [
   { kind: 'usecase-boundary', elementId: 'boundary:shop' },
   { kind: 'usecase-relation', elementId: 'relation:1' },
   { kind: 'usecase-note', elementId: 'note:1' },
+  // c4（more-diagrams 工单 18）：元素/边界名字即身份、关系位置序；画布 DOM 无 data-id
+  // （实测降级），三类均不可寻址
+  { kind: 'c4-element', elementId: 'c4-element:banking' },
+  { kind: 'c4-boundary', elementId: 'c4-boundary:b0' },
+  { kind: 'c4-relation', elementId: 'relation:1' },
 ]
 
 /**
@@ -72,9 +77,11 @@ const ADDRESSABLE: Record<DiagramTypeId, ReadonlySet<string>> = {
     'usecase-relation',
     'usecase-note',
   ]),
+  // c4（more-diagrams 工单 18）：画布 DOM 无 data-id（实测降级），三类选中均不可寻址
+  c4: new Set([]),
 }
 
-const TYPES: readonly DiagramTypeId[] = ['flowchart', 'sequence', 'class', 'mindmap', 'sankey', 'xychart', 'venn', 'usecase']
+const TYPES: readonly DiagramTypeId[] = ['flowchart', 'sequence', 'class', 'mindmap', 'sankey', 'xychart', 'venn', 'usecase', 'c4']
 
 /** data-id → CanvasSelection（与各 resolver 的产出形态一致）：
  * 节点类 data-id 即节点 id；位置序连线 data-id 即 elementId；mindmap 的画布选中 id 是 elementId */
@@ -95,7 +102,11 @@ function canvasSelectionOf(sel: Selection, dataId: string): CanvasSelection {
     sel.kind === 'usecase-usecase' ||
     sel.kind === 'usecase-boundary' ||
     sel.kind === 'usecase-relation' ||
-    sel.kind === 'usecase-note'
+    sel.kind === 'usecase-note' ||
+    // c4（more-diagrams 工单 18）：三类选中画布无 data-id（降级），此处仅为形态完整
+    sel.kind === 'c4-element' ||
+    sel.kind === 'c4-boundary' ||
+    sel.kind === 'c4-relation'
   ) {
     return { kind: 'node', id: dataId }
   }
@@ -206,6 +217,10 @@ describe('selectionOfMenuTarget', () => {
         { kind: 'cynefin-transition', elementId: 'cynefin-transition:1' },
         { kind: 'cynefin-transition', elementId: 'cynefin-transition:1' },
       ],
+      // c4（more-diagrams 工单 18）：元素 / 边界 / 关系菜单目标一一对应各自 Selection kind
+      [{ kind: 'c4-element', elementId: 'c4-element:banking' }, { kind: 'c4-element', elementId: 'c4-element:banking' }],
+      [{ kind: 'c4-boundary', elementId: 'c4-boundary:b0' }, { kind: 'c4-boundary', elementId: 'c4-boundary:b0' }],
+      [{ kind: 'c4-relation', elementId: 'relation:1' }, { kind: 'c4-relation', elementId: 'relation:1' }],
     ]
     for (const [target, sel] of cases) {
       expect(selectionOfMenuTarget(target), target.kind).toEqual(sel)
@@ -275,6 +290,10 @@ describe('menuTargetOfCanvas（往返）', () => {
     expect(menuTargetOfCanvas('xychart', { kind: 'node', id: '__nope__' })).toBeNull()
     // mermaid 自己的连线 id 不是位置序身份 → null（安静地不弹菜单）
     expect(menuTargetOfCanvas('class', { kind: 'element', elementId: 'id_A_B_1' })).toBeNull()
+    // c4（more-diagrams 工单 18）：画布 DOM 无 data-id（实测降级），节点 / 元素目标不命中
+    expect(menuTargetOfCanvas('c4', { kind: 'node', id: 'c4-element:banking' })).toBeNull()
+    expect(menuTargetOfCanvas('c4', { kind: 'node', id: 'c4-boundary:b0' })).toBeNull()
+    expect(menuTargetOfCanvas('c4', { kind: 'element', elementId: 'relation:1' })).toBeNull()
   })
 
   it('menuTargetOfCanvas → selectionOfMenuTarget 与 fromCanvasId 同解（两套目标同一选中）', () => {

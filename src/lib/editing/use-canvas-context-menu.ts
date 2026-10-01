@@ -186,6 +186,15 @@ function nodeFormForTarget(
     if (t === undefined) return null
     return { kind, anchorElementId: t.elementId, from: t.from, x, y }
   }
+  if (kind === 'c4-relation') {
+    // c4 加关系表单（more-diagrams 工单 18）：元素右键 / Enter 键 → 锚点为该元素的声明行，
+    // from 预选该元素的 alias；终点由表单选择（画布无 data-id，Enter 键路径经结构树选中）
+    if (proj.type !== 'c4') return null
+    if (target.kind !== 'c4-element') return null
+    const el = proj.c4.elements.find((e) => e.elementId === target.elementId)
+    if (el === undefined) return null
+    return { kind, anchorElementId: el.elementId, from: el.alias, x, y }
+  }
   if (kind === 'block') {
     // sequence 独有的添加逻辑块：参与者上右键 → 锚点为该参与者的声明；
     // 空白处右键 → 无锚点（管线回退到文档最后一个元素）
@@ -234,6 +243,8 @@ function formTargetOfSelection(selection: Selection): ContextMenuTarget | null {
   if (selection.kind === 'wardley-link') return { kind: 'wardley-link', elementId: selection.elementId }
   // cynefin（more-diagrams 工单 25）：转移 → 加转移表单（Tab 键）的锚点与 from 预填
   if (selection.kind === 'cynefin-transition') return { kind: 'cynefin-transition', elementId: selection.elementId }
+  // c4（more-diagrams 工单 18）：元素 → 加关系表单（Enter 键）的锚点与 from 预选
+  if (selection.kind === 'c4-element') return { kind: 'c4-element', elementId: selection.elementId }
   return null
 }
 
@@ -428,7 +439,8 @@ export function useCanvasContextMenu(
         | 'xychart-bar'
         | 'architecture-edge'
         | 'wardley-link'
-        | 'cynefin-transition',
+        | 'cynefin-transition'
+        | 'c4-relation',
     ): void => {
       const proj = latest.current.projection
       const { selection } = useEditorStore.getState()

@@ -98,6 +98,8 @@ import { type VennProjection } from '../lib/projection/venn-projection'
 import { CynefinDiagramForm, CynefinDomainForm, CynefinItemForm, CynefinTransitionForm } from './cynefin-forms'
 import { type CynefinProjection } from '../lib/projection/cynefin-projection'
 import { type UsecaseProjection } from '../lib/projection/usecase-projection'
+import { C4BoundaryForm, C4DiagramForm, C4ElementForm, C4RelationForm } from './c4-forms'
+import { type C4Projection } from '../lib/projection/c4-projection'
 
 /**
  * 选中元素的属性表单，按投影图种分发（工单 04-bundle 自 PropertyPanel 迁出）：
@@ -1178,6 +1180,45 @@ function UsecaseSelectionForm({
   }
 }
 
+/**
+ * c4 选中表单（more-diagrams 工单 18）：图表级显示关键字与计数；元素 / 边界 / 关系各落到
+ * 各自的表单（按 elementId 在投影中寻回）。
+ */
+function C4SelectionForm({
+  projection,
+  selection,
+}: {
+  projection: C4Projection
+  selection: Selection | null
+}) {
+  const { t } = useTranslation()
+  if (selection === null) {
+    return (
+      <Text size="sm" c="dimmed" px="xs">
+        {t('app:propertyPanel.nothingSelected')}
+      </Text>
+    )
+  }
+  switch (selection.kind) {
+    case 'diagram':
+      return <C4DiagramForm projection={projection} />
+    case 'c4-element': {
+      const element = projection.elements.find((e) => e.elementId === selection.elementId)
+      return element !== undefined ? <C4ElementForm element={element} /> : null
+    }
+    case 'c4-boundary': {
+      const boundary = projection.boundaries.find((b) => b.elementId === selection.elementId)
+      return boundary !== undefined ? <C4BoundaryForm boundary={boundary} /> : null
+    }
+    case 'c4-relation': {
+      const relation = projection.relations.find((r) => r.elementId === selection.elementId)
+      return relation !== undefined ? <C4RelationForm relation={relation} /> : null
+    }
+    default:
+      return null
+  }
+}
+
 export function ProjectionSelectionForm({ projection, selection }: { projection: AnyProjection; selection: Selection | null }) {
   if (projection.type === 'flowchart') {
     return <FlowchartSelectionForm projection={projection.flowchart} selection={selection} />
@@ -1253,6 +1294,9 @@ export function ProjectionSelectionForm({ projection, selection }: { projection:
   }
   if (projection.type === 'usecase') {
     return <UsecaseSelectionForm projection={projection.usecase} selection={selection} />
+  }
+  if (projection.type === 'c4') {
+    return <C4SelectionForm projection={projection.c4} selection={selection} />
   }
   return <ClassSelectionForm projection={projection.class} selection={selection} />
 }

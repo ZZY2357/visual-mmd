@@ -14,6 +14,7 @@ import {
   ISHIKAWA_TEMPLATE,
   VENN_TEMPLATE,
   USECASE_TEMPLATE,
+  C4_TEMPLATE,
   type AnyProjection,
 } from '../../diagram-registry'
 import type { EditIntent } from '../../pipeline/parser'
@@ -32,6 +33,7 @@ import { architectureParser } from '../../pipeline/architecture'
 import { ishikawaParser } from '../../pipeline/ishikawa'
 import { vennParser } from '../../pipeline/venn'
 import { usecaseParser } from '../../pipeline/usecase'
+import { c4Parser } from '../../pipeline/c4'
 import { buildClassProjection } from '../../projection/class-projection'
 import { buildFlowchartProjection } from '../../projection/flowchart-projection'
 import { buildMindmapProjection } from '../../projection/mindmap-projection'
@@ -47,6 +49,7 @@ import { buildArchitectureProjection } from '../../projection/architecture-proje
 import { buildIshikawaProjection } from '../../projection/ishikawa-projection'
 import { buildVennProjection } from '../../projection/venn-projection'
 import { buildUsecaseProjection } from '../../projection/usecase-projection'
+import { buildC4Projection } from '../../projection/c4-projection'
 import type { Selection } from '../../projection/selection'
 import {
   blockDeleteIntent,
@@ -64,6 +67,7 @@ import {
   ishikawaDeleteIntent,
   vennDeleteIntent,
   usecaseDeleteIntent,
+  c4DeleteIntent,
 } from '../../editing/canvas-keyboard'
 import {
   deleteClassDefIntent,
@@ -566,6 +570,47 @@ function usecaseCases(p: ReturnType<typeof usecaseProjection>): DeleteCase[] {
   ]
 }
 
+/** c4Projection：c4 投影（more-diagrams 工单 18） */
+function c4Projection(): Extract<AnyProjection, { type: 'c4' }> {
+  const parsed = c4Parser.parse(C4_TEMPLATE)
+  if (!parsed.ok) throw new Error(parsed.error.message)
+  return { type: 'c4', c4: buildC4Projection(parsed.doc) }
+}
+
+/** c4（more-diagrams 工单 18）：元素（连带删引用它的关系）/ 边界（只删开行）/ 关系三类
+ * 删除入口各一条。画布 DOM 无 data-id（降级），元素 / 边界 / 关系目标均由结构树选中构造。 */
+function c4Cases(p: ReturnType<typeof c4Projection>): DeleteCase[] {
+  const element = p.c4.elements[0]
+  const boundary = p.c4.boundaries[0]
+  const relation = p.c4.relations[0]
+  if (element === undefined || boundary === undefined || relation === undefined) {
+    throw new Error('C4_TEMPLATE 必须含元素 / 边界 / 关系')
+  }
+  return [
+    {
+      name: 'c4-element',
+      selection: { kind: 'c4-element', elementId: element.elementId },
+      panelIntent: { type: 'delete-c4-element', elementId: element.elementId },
+      menuTarget: { kind: 'c4-element', elementId: element.elementId },
+      menuItemId: 'delete',
+    },
+    {
+      name: 'c4-boundary',
+      selection: { kind: 'c4-boundary', elementId: boundary.elementId },
+      panelIntent: { type: 'delete-c4-boundary', elementId: boundary.elementId },
+      menuTarget: { kind: 'c4-boundary', elementId: boundary.elementId },
+      menuItemId: 'delete',
+    },
+    {
+      name: 'c4-relation',
+      selection: { kind: 'c4-relation', elementId: relation.elementId },
+      panelIntent: { type: 'delete-rel', elementId: relation.elementId },
+      menuTarget: { kind: 'c4-relation', elementId: relation.elementId },
+      menuItemId: 'delete',
+    },
+  ]
+}
+
 const SUITES = [
   { type: 'flowchart' as const, projection: flowProjection, cases: flowchartCases },
   { type: 'class' as const, projection: classProjection, cases: classCases },
@@ -582,6 +627,7 @@ const SUITES = [
   { type: 'ishikawa' as const, projection: ishikawaProjection, cases: ishikawaCases },
   { type: 'venn' as const, projection: vennProjection, cases: vennCases },
   { type: 'usecase' as const, projection: usecaseProjection, cases: usecaseCases },
+  { type: 'c4' as const, projection: c4Projection, cases: c4Cases },
 ]
 
 describe('deleteIntent 等价性：三个删除入口对同一 selection 产出同一意图（工单 03）', () => {
@@ -638,6 +684,8 @@ describe('deleteIntent 等价性：三个删除入口对同一 selection 产出�
                 return vennDeleteIntent(projection.venn, sel)
               case 'usecase':
                 return usecaseDeleteIntent(projection.usecase, sel)
+              case 'c4':
+                return c4DeleteIntent(projection.c4, sel)
             }
           })()
           // 键盘按选中种类设门（flowchart/mindmap 只删节点）；门内的种类必须与能力包等价
@@ -656,7 +704,8 @@ describe('deleteIntent 等价性：三个删除入口对同一 selection 产出�
             suite.type === 'architecture' ||
             suite.type === 'ishikawa' ||
             suite.type === 'venn' ||
-            suite.type === 'usecase'
+            suite.type === 'usecase' ||
+            suite.type === 'c4'
           if (!keyboardHandles) {
             expect(viaKeyboard).toBeNull() // 门外：键盘安静地不产出意图（零变化护栏）
             return
@@ -720,6 +769,7 @@ describe('deleteIntent 等价性：三个删除入口对同一 selection 产出�
           ishikawa: { kind: 'ishikawa-node', elementId: 'ishikawa-node:999' },
           venn: { kind: 'venn-set', id: '__不存在__' },
           usecase: { kind: 'usecase-usecase', elementId: 'usecase:__不存在__' },
+          c4: { kind: 'c4-element', elementId: 'c4-element:__不存在__' },
         }
         expect(caps.deleteIntent(projection, gone[suite.type])).toBeNull()
 

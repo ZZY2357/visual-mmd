@@ -154,6 +154,43 @@ describe('金样合法性：默认图表模板能被 mermaid 渲染', () => {
     await expect(mermaid.parse(source)).resolves.toBeTruthy()
   })
 
+  it('c4 起步模板 parse 通过（more-diagrams 工单 18）', async () => {
+    const { C4_TEMPLATE } = await import('../diagram-registry')
+    await expect(mermaid.parse(C4_TEMPLATE)).resolves.toBeTruthy()
+  })
+
+  it('c4 端到端编辑场景（工单 18 验收：加 System → 连 Rel 写 label → 改 label → 改元素 alias（同步引用）→ 删元素）落在合法 mermaid 源码上', async () => {
+    const { C4_TEMPLATE } = await import('../diagram-registry')
+    const { c4Parser } = await import('../pipeline/c4')
+    const { reassemble } = await import('../pipeline/document')
+    const parse = (src: string) => {
+      const r = c4Parser.parse(src)
+      if (!r.ok) throw new Error(`解析失败：${r.error.message}`)
+      return r.doc
+    }
+    const apply = (doc: ReturnType<typeof parse>, intent: Parameters<typeof c4Parser.resolveRewrites>[1]) => {
+      const rewrites = c4Parser.resolveRewrites(doc, intent)
+      if (rewrites === null) throw new Error(`意图被拒绝：${JSON.stringify(intent)}`)
+      return parse(reassemble(doc, rewrites))
+    }
+
+    let doc = parse(C4_TEMPLATE)
+    doc = apply(doc, { type: 'add-c4-element', macro: 'System', alias: 'analytics', label: '分析服务' }) // 加 System
+    doc = apply(doc, { type: 'add-rel', from: 'banking', to: 'analytics', label: '推送数据', techn: 'gRPC' }) // 连 Rel + label + techn
+    doc = apply(doc, { type: 'set-rel', elementId: 'relation:3', changes: { label: '推送风控数据' } }) // 双击改 label
+    // 改某元素 alias（验证关系引用同步：banking → 关系端点一并改写）
+    doc = apply(doc, { type: 'rename-c4-alias', elementId: 'c4-element:banking', alias: 'coreBanking' })
+    doc = apply(doc, { type: 'delete-c4-element', elementId: 'c4-element:analytics' }) // 删元素（连带删引用它的关系）
+
+    const source = doc.source
+    // 改 alias 后：声明行与引用它的关系端点都已同步为 coreBanking
+    expect(source).toContain('System(coreBanking, "网银系统"')
+    expect(source).toContain('Rel(coreBanking, email')
+    expect(source).not.toContain('System(banking,')
+    expect(source).not.toContain('analytics')
+    await expect(mermaid.parse(source)).resolves.toBeTruthy()
+  })
+
   it('venn 端到端编辑场景（工单 21 验收：加集合 → 改标签 → 加交集 → 改尺寸 → 删集合）落在合法 mermaid 源码上', async () => {
     const { VENN_TEMPLATE } = await import('../diagram-registry')
     const { vennParser } = await import('../pipeline/venn')

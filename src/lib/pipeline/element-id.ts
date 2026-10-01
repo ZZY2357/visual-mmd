@@ -265,6 +265,33 @@ export function parseArchitectureJunctionElementId(elementId: string): { id: str
   return parsed === null ? null : { id: parsed.key, occurrence: parsed.occurrence }
 }
 
+// ---------- C4（more-diagrams 工单 18） ----------
+
+/**
+ * C4 的元素 / 边界声明（`c4-element:<alias>` / `c4-boundary:<alias>` / `#2`）。
+ * alias 是 C4 的语法标识（关系直接引用它），故**名字即身份**（ADR-0012）；
+ * mermaid 的 c4Db 允许同一 alias 重复声明（后者覆写前者），occurrence 是解析器对
+ * 这类源码的稳定兜底。关系（`relation:N`）是位置序字面量，不在此编码
+ * ——`relation:N` 与 class / er / usecase 关系共用同一前缀（图种先收窄，不会跨图种命中）。
+ */
+export function c4ElementElementId(alias: string, occurrence = 1): string {
+  return keyed('c4-element', alias, occurrence)
+}
+
+export function parseC4ElementElementId(elementId: string): { alias: string; occurrence: number } | null {
+  const parsed = parseKeyed('c4-element', elementId)
+  return parsed === null ? null : { alias: parsed.key, occurrence: parsed.occurrence }
+}
+
+export function c4BoundaryElementId(alias: string, occurrence = 1): string {
+  return keyed('c4-boundary', alias, occurrence)
+}
+
+export function parseC4BoundaryElementId(elementId: string): { alias: string; occurrence: number } | null {
+  const parsed = parseKeyed('c4-boundary', elementId)
+  return parsed === null ? null : { alias: parsed.key, occurrence: parsed.occurrence }
+}
+
 // ---------- 下一个可用名/ID（architecture-deepening-2 工单 04） ----------
 
 export interface NextFreeNameOptions {

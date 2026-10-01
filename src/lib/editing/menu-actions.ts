@@ -28,6 +28,7 @@ import { isValidWardleyName, type WardleyIntent } from '../pipeline/wardley'
 import { isValidVennSetId, type VennIntent } from '../pipeline/venn'
 import { CYNEFIN_DOMAINS, type CynefinDomainName, type CynefinIntent } from '../pipeline/cynefin'
 import { isValidUsecaseId, type UsecaseIntent } from '../pipeline/usecase'
+import { isValidC4Alias, type C4ElementKind, type C4Intent } from '../pipeline/c4'
 import { setRelationIntent, RELATION_KIND_OPTIONS } from './class-forms'
 import {
   setMessageIntent,
@@ -277,6 +278,11 @@ export function createElement(ctx: MenuActionContext, target: ContextMenuTarget 
       // usecase（more-diagrams 工单 26）：添加入口是独立的 add-usecase-actor /
       // add-usecase-case / add-usecase-boundary 动作（占位 id 避重，不做内联命名），
       // 不走 createElement
+      return null
+    }
+    if (proj.type === 'c4') {
+      // c4（more-diagrams 工单 18）：添加入口是独立的 add-c4-element / add-c4-boundary
+      // 动作（alias 避重，不做内联命名——画布无 data-id），不走 createElement
       return null
     }
     // mindmap：节点目标 = 挂为其子节点；空白 / 无目标 = 建根（空文档）或挂到根节点下
@@ -1038,6 +1044,65 @@ function addUsecaseBoundary(ctx: MenuActionContext): void {
   if (applyPlan(plan, { commitIntent: ctx.commitIntent, select: ctx.select })) ctx.close()
 }
 
+// ---------- c4（more-diagrams 工单 18） ----------
+
+/**
+ * 四种元素种类 → 空白「加元素」时落的**默认宏**（最基础变体，表单可改种类与字段）。
+ * 类型子菜单的每个具体宏（Person_Ext / SystemDb / ContainerQueue …）也经这里映射到
+ * 同一套「新建 + 选中」编排，只是 macro 不同——「加同类元素」的 Tab 语义沿用元素自身宏。
+ */
+const C4_MACRO_OF_KIND: Record<C4ElementKind, string> = {
+  person: 'Person',
+  system: 'System',
+  container: 'Container',
+  component: 'Component',
+}
+
+/** 全部已知 alias（元素 + 边界共享命名空间），供新增占位 alias 避重 */
+function c4KnownAliasList(proj: Extract<AnyProjection, { type: 'c4' }>): string[] {
+  return [...proj.c4.boundaries.map((b) => b.alias), ...proj.c4.elements.map((e) => e.alias)]
+}
+
+/** alias 的占位 base（宏名首段小写，如 SystemDb → system、Person_Ext → person） */
+function c4AliasBase(macro: string): string {
+  const head = macro.split('_')[0]
+  return head.length > 0 ? head.charAt(0).toLowerCase() + head.slice(1) : 'element'
+}
+
+/**
+ * 空白处加元素（c4）：按类型子菜单给的 macro 落一行元素声明（alias 避重占位），
+ * 锚点回退文档末尾。选中新元素——不做内联命名（画布无 data-id，命名交给右侧表单）。
+ * 未指定 macro（根菜单项 add-c4-element 落到这里）时默认落一个 System。
+ */
+function addC4Element(ctx: MenuActionContext, macro: string = C4_MACRO_OF_KIND.system): void {
+  const proj = ctx.projection
+  if (proj === null || proj.type !== 'c4') return
+  const alias = nextFreeName(c4AliasBase(macro), c4KnownAliasList(proj))
+  if (!isValidC4Alias(alias)) return
+  const plan: KeyPlan = {
+    intents: [{ type: 'add-c4-element', macro, alias, label: '新元素' } satisfies C4Intent],
+    newElementTarget: { selection: { kind: 'c4-element', elementId: `c4-element:${alias}` } },
+  }
+  if (applyPlan(plan, { commitIntent: ctx.commitIntent, select: ctx.select })) ctx.close()
+}
+
+/**
+ * 空白处加边界（c4）：落 `<macro>(<alias>, "<占位标题>") {` … `}` 两行（alias 避重 base
+ * `boundary`），锚点回退文档末尾。选中新边界。类型子菜单给的 macro 决定四类 Boundary 或
+ * Deployment Node 四类。
+ */
+function addC4Boundary(ctx: MenuActionContext, macro: string = 'Enterprise_Boundary'): void {
+  const proj = ctx.projection
+  if (proj === null || proj.type !== 'c4') return
+  const alias = nextFreeName('boundary', c4KnownAliasList(proj))
+  if (!isValidC4Alias(alias)) return
+  const plan: KeyPlan = {
+    intents: [{ type: 'add-c4-boundary', macro, alias, label: '新边界' } satisfies C4Intent],
+    newElementTarget: { selection: { kind: 'c4-boundary', elementId: `c4-boundary:${alias}` } },
+  }
+  if (applyPlan(plan, { commitIntent: ctx.commitIntent, select: ctx.select })) ctx.close()
+}
+
 export const MENU_ACTIONS: Record<Exclude<ContextMenuItemId, 'apply-style'>, MenuAction> = {
   // 「创建 + 选中 + 内联命名」五个入口共用 createElement（工单 01 收敛）
   'add-node': createElement,
@@ -1061,6 +1126,9 @@ export const MENU_ACTIONS: Record<Exclude<ContextMenuItemId, 'apply-style'>, Men
       ctx.enterLinkMode(target.elementId.slice('actor:'.length))
     } else if (target !== undefined && target.kind === 'usecase-usecase') {
       ctx.enterLinkMode(target.elementId.slice('usecase:'.length))
+    } else if (target !== undefined && target.kind === 'c4-element') {
+      // c4：起点用**源码 alias**（不是 elementId）——关系行的端点是 alias
+      ctx.enterLinkMode(target.elementId.slice('c4-element:'.length))
     }
   },
   'add-subgraph': addSubgraph,
@@ -1211,4 +1279,14 @@ export const MENU_ACTIONS: Record<Exclude<ContextMenuItemId, 'apply-style'>, Men
   'add-usecase-boundary': addUsecaseBoundary,
   'edit-usecase-element': selectMenuTargetAndClose,
   'edit-usecase-relation': selectMenuTargetAndClose,
+  // c4（more-diagrams 工单 18）：空白加元素（类型子菜单，根项默认 System）/ 加边界
+  // （根项默认 Enterprise_Boundary）；元素 = 改字段（alias/label/techn/descr）D5
+  // （选中 + 关菜单，右侧 C4ElementForm 改）/ 从这里连线（预设 alias 起点）/ 删除（共用
+  // deleteTarget）；边界 = 改标题 D5（右侧 C4BoundaryForm 改）/ 删除；关系 = 改字段
+  //（label/techn/descr/方向）D5（右侧 C4RelationForm 改）/ 删除
+  'add-c4-element': (ctx) => addC4Element(ctx),
+  'add-c4-boundary': (ctx) => addC4Boundary(ctx),
+  'edit-c4-element': selectMenuTargetAndClose,
+  'edit-c4-boundary': selectMenuTargetAndClose,
+  'edit-c4-relation': selectMenuTargetAndClose,
 }

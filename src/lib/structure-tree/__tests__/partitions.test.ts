@@ -298,6 +298,8 @@ describe('结构树分区描述（工单 06）', () => {
         'cynefin-beta\n  title 事件响应\n  complex\n    "排查根因"\n  clear\n    "重启服务"\n  complex --> clear : "模式已识别"',
       usecase:
         'usecase-beta\n    actor Customer\n    systemBoundary shop["商城"]\n        Login("登录")\n    end\n    Customer --> Login',
+      c4:
+        'C4Context\n    Person(customer, "客户")\n    System(banking, "网银")\n    Enterprise_Boundary(b0, "边界") {\n        SystemDb(db, "库")\n    }\n    Rel(customer, banking, "访问")',
     }
     for (const id of Object.keys(DIAGRAM_TYPES) as (keyof typeof DIAGRAM_TYPES)[]) {
       const registration = DIAGRAM_TYPES[id]

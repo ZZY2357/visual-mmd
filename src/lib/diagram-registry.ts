@@ -25,6 +25,7 @@ import { wardleyParser } from './pipeline/wardley'
 import { vennParser } from './pipeline/venn'
 import { cynefinParser } from './pipeline/cynefin'
 import { usecaseParser } from './pipeline/usecase'
+import { c4Parser } from './pipeline/c4'
 import { frontmatterEnd } from './pipeline/frontmatter'
 import { buildFlowchartProjection, type FlowchartProjection } from './projection/flowchart-projection'
 import { buildSequenceProjection, type SequenceProjection } from './projection/sequence-projection'
@@ -63,6 +64,7 @@ import { buildWardleyProjection, type WardleyProjection } from './projection/war
 import { buildVennProjection, type VennProjection } from './projection/venn-projection'
 import { buildCynefinProjection, type CynefinProjection } from './projection/cynefin-projection'
 import { buildUsecaseProjection, type UsecaseProjection } from './projection/usecase-projection'
+import { buildC4Projection, type C4Projection } from './projection/c4-projection'
 import { flowchartCanvasCapabilities } from './canvas-selection/flowchart-adapter'
 import { sequenceCanvasCapabilities } from './canvas-selection/sequence-adapter'
 import { classCanvasCapabilities } from './canvas-selection/class-adapter'
@@ -88,6 +90,7 @@ import { wardleyCanvasCapabilities } from './canvas-selection/wardley-adapter'
 import { vennCanvasCapabilities } from './canvas-selection/venn-adapter'
 import { cynefinCanvasCapabilities } from './canvas-selection/cynefin-adapter'
 import { usecaseCanvasCapabilities } from './canvas-selection/usecase-adapter'
+import { c4CanvasCapabilities } from './canvas-selection/c4-adapter'
 import type { CanvasCapabilities } from './canvas-selection/capabilities'
 import { treePartitions, type TreePartitions } from './structure-tree/partitions'
 import { DEFAULT_DIAGRAM_SOURCE } from './storage'
@@ -135,6 +138,7 @@ export interface ProjectionTypes {
   venn: VennProjection
   cynefin: CynefinProjection
   usecase: UsecaseProjection
+  c4: C4Projection
 }
 
 /** 已注册图种的 id 集合（字面量联合，随 ProjectionTypes 增长） */
@@ -612,6 +616,33 @@ export const USECASE_TEMPLATE = `usecase-beta
 `
 
 /**
+ * C4 起步模板（more-diagrams 工单 18）：`C4Context` 声明 + 一个 Person + 两个 System
+ * （其一 `_Ext` 外部系统）+ 一个 `Enterprise_Boundary`（含 SystemDb）+ 一条带 techn 的 Rel
+ * （同时示范命名参数 `$descr=` 形态）。
+ * 注意 mermaid c4 词法（research §9 实测）：
+ * - 关键字必须是大写 `C4Context` / `C4Container` / `C4Component` / `C4Dynamic` / `C4Deployment`；
+ * - 位置参数按元素种类固定（Person/System = alias, label, descr, sprite, tags, $link；
+ *   Container/Component = alias, label, techn, descr, sprite, tags, $link）；
+ * - 边界是**花括号块**（`Enterprise_Boundary(...) { … }`，裸 `}` 收尾）；
+ * - `Deployment_Node` / `Node` 家族同属块体构造（必须带 `{}`）；
+ * - 处理不了的宏（`Rel_S/Ne/B/T`、`Lay_*`、`Show/Hide`、`Update*`、`SHOW_LEGEND`）逐字保留。
+ */
+export const C4_TEMPLATE = `C4Context
+    title 网上银行系统
+
+    Person(customer, "个人客户", "使用网银的个人用户")
+    System(banking, "网银系统", "提供账户与转账能力")
+    System_Ext(email, "邮件系统", "发送通知邮件")
+
+    Enterprise_Boundary(b0, "银行边界") {
+        SystemDb(db, "核心账务库", "存放账户余额")
+    }
+
+    Rel(customer, banking, "访问", "HTTPS")
+    Rel(banking, email, "发送通知", "SMTP", $descr="通过邮件网关")
+`
+
+/**
  * 注册表：数组是唯一权威（more-diagrams 工单 01），DIAGRAM_TYPES 由它推导。
  * detectDiagramType 按数组顺序显式遍历——不再维护手写的 if 分发链，
  * 新图种挂一条即可参与识别，无法识别时不再默认 flowchart（见下）。
@@ -892,6 +923,19 @@ export const DIAGRAM_TYPE_LIST: DiagramTypeRegistration[] = [
     buildProjection: (doc) => ({ type: 'usecase', usecase: buildUsecaseProjection(doc) }),
     tree: treePartitions.usecase,
     canvas: usecaseCanvasCapabilities,
+  },
+  {
+    id: 'c4',
+    parser: c4Parser,
+    template: C4_TEMPLATE,
+    // more-diagrams 工单 18：mermaid c4 词法的五个关键字（research §9 实测 lexer 规则表
+    // 18-22）——**全部大写 C4**，`C4Context`/`C4Container`/`C4Component`/`C4Dynamic`/
+    // `C4Deployment`。声明行必须是裸关键字（行尾只允许空白；mermaid 自身探测器
+    // `/^\s*C4Context|C4Container|…/` 大小写敏感、无尾随内容分支）
+    detect: (source) => /^C4(Context|Container|Component|Dynamic|Deployment)[ \t\r]*$/.test(firstStatementLine(source)),
+    buildProjection: (doc) => ({ type: 'c4', c4: buildC4Projection(doc) }),
+    tree: treePartitions.c4,
+    canvas: c4CanvasCapabilities,
   },
 ]
 

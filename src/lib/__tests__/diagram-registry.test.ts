@@ -158,6 +158,18 @@ describe('detectDiagramType：无法识别 → unsupported（null），绝不默
     expect(DIAGRAM_TYPES.usecase.detect('usecase-betaX\n')).toBe(false)
   })
 
+  it('C4Context 识别（more-diagrams 工单 18）：五个声明关键字，裸关键字 + 可选尾随空白；小写不认领', () => {
+    for (const kw of ['C4Context', 'C4Container', 'C4Component', 'C4Dynamic', 'C4Deployment']) {
+      expect(detectDiagramType(`${kw}\n    Person(a, "L")\n`)?.id, kw).toBe('c4')
+      // 尾随空白（空格 / 制表）合法
+      expect(DIAGRAM_TYPES.c4.detect(`${kw}   \n`), kw).toBe(true)
+    }
+    // 大小写敏感（mermaid 词法为整词大写）：小写变体不认领
+    expect(detectDiagramType('c4context\n    Person(a, "L")\n')).toBeNull()
+    expect(DIAGRAM_TYPES.c4.detect('C4Context extra\n')).toBe(false)
+    expect(DIAGRAM_TYPES.c4.detect('C4ContextX\n')).toBe(false)
+  })
+
   it('双关键字 detect 例（后续图种工单的写法约定）：-beta 可选且不越界误判', () => {
     // 后续 block/packet/xychart 工单应采用 `^<kw>(-beta)?\b` 形态；这里把形态锁死：
     // 可选 -beta 不妨碍裸关键字的识别，也不把更长的词（如 block-chain）误吞。

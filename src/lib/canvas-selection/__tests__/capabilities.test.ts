@@ -11,10 +11,12 @@ import {
   SEQUENCE_TEMPLATE,
   VENN_TEMPLATE,
   USECASE_TEMPLATE,
+  C4_TEMPLATE,
   type AnyProjection,
 } from '../../diagram-registry'
 import { DEFAULT_DIAGRAM_SOURCE } from '../../storage'
 import { capabilitiesOf } from '../capabilities'
+import { c4CanvasCapabilities } from '../c4-adapter'
 import { classDataIdResolver } from '../class-adapter'
 import { sequenceDataIdResolver } from '../sequence-adapter'
 import { kanbanDataIdResolver } from '../kanban-adapter'
@@ -43,6 +45,7 @@ const SOURCES = {
   architecture: ARCHITECTURE_TEMPLATE,
   venn: VENN_TEMPLATE,
   usecase: USECASE_TEMPLATE,
+  c4: C4_TEMPLATE,
 } as const
 
 function projectionOf(type: keyof typeof SOURCES): AnyProjection {
@@ -196,5 +199,37 @@ describe('class/sequence adapter resolver 对照（与原 CanvasPanel.resolverOf
     // 渲染器根本没有 data-id / id 写入——任何别形 id 安静拒绝
     expect(resolve('line-plot-0')).toBeNull()
     expect(resolve('__nope__')).toBeNull()
+  })
+})
+
+describe('c4 能力包（more-diagrams 工单 18：画布 DOM 无 data-id 的诚实降级）', () => {
+  it('八项能力齐备、无 edgeAnnotator；导航 / 画布寻址整体降级（null / 空）', () => {
+    const projection = projectionOf('c4')
+    const caps = capabilitiesOf(projection)
+
+    // 查表命中注册表实例（registry 只持引用）
+    expect(caps).toBe(DIAGRAM_TYPES.c4.canvas)
+    expect(caps).toBe(c4CanvasCapabilities)
+
+    // 实测：渲染器 `data-*` 出现 0 次、8 处 id 全在 <defs> marker、class 只有 c4/c4-external/c4-shape
+    // → 画布无任何可寻址节点：navigationIds 空、resolver 永不命中、canvasIdOf 恒 null、toSelection 恒 null
+    expect(caps.navigationIds(projection)).toEqual([])
+    expect(caps.dataIdResolver(projection)('c4-element:banking')).toBeNull()
+    expect(caps.toSelection({ kind: 'node', id: 'banking' })).toBeNull()
+    // canvasIdOf 用 (*, *) 签名（工单 18 接口约定）——任何选中都不可寻址
+    expect(
+      caps.canvasIdOf(projection, { kind: 'c4-element', elementId: 'c4-element:banking' }),
+    ).toBeNull()
+    expect(caps.canvasIdOf(projection, { kind: 'c4-boundary', elementId: 'c4-boundary:b0' })).toBeNull()
+    expect(caps.canvasIdOf(projection, { kind: 'c4-relation', elementId: 'relation:1' })).toBeNull()
+
+    // edgeAnnotator 是可选成员，c4 不得实现（无位置序连线的画布注记）
+    expect(caps.edgeAnnotator).toBeUndefined()
+
+    // 键盘投影 / 选中回落 / 删除意图仍齐备（结构树 + 属性表单是唯一完整编辑入口）
+    expect(caps.keyboardProjection(projection).kind).toBe('c4')
+    expect(typeof caps.resolveSelection).toBe('function')
+    expect(typeof caps.deleteIntent).toBe('function')
+    expect(typeof caps.keyHandler).toBe('function')
   })
 })
