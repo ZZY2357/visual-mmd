@@ -183,6 +183,12 @@ export function fromCanvasId(diagramType: DiagramTypeId, canvas: CanvasSelection
     // 只有 class + d3 值降序索引），画布选中不产生
     return null
   }
+  if (diagramType === 'ishikawa') {
+    // ishikawa（more-diagrams 工单 22）：画布 DOM 无 data-id（research §4 实测：渲染器
+    // `data-` 出现 0 次，只有 class；且 flattenTree 按深度奇偶重排、渲染序 ≠ 源码序），
+    // 画布选中不产生
+    return null
+  }
   if (diagramType === 'gantt') {
     // gantt（more-diagrams 工单 11）：任务条 data-id = mermaid 渲染 id（渲染后处理
     // 反注），resolver 已把它映射回位置序 elementId（`task:N`）——node.id 即 elementId
@@ -388,6 +394,7 @@ export function menuTargetOfCanvas(
     if (diagramType === 'pie') return null // 无 data-id（实测降级），画布节点不可命中
     if (diagramType === 'radar') return null // 无 data-id（实测降级），画布节点不可命中
     if (diagramType === 'treemap') return null // 无 data-id（实测降级，research §4），画布节点不可命中
+    if (diagramType === 'ishikawa') return null // 无 data-id 且渲染序 ≠ 源码序（实测降级，research §4），画布节点不可命中
     if (diagramType === 'gantt') {
       // gantt（more-diagrams 工单 11）：任务条虽可寻址，但元素级菜单不做（与 journey/pie
       // 同口径），编辑由结构树选中 + 属性表单承接——画布节点不产生菜单目标

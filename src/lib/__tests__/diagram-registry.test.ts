@@ -107,6 +107,17 @@ describe('detectDiagramType：无法识别 → unsupported（null），绝不默
     expect(DIAGRAM_TYPES.treemap.detect('treemapX\n"甲": 1\n')).toBe(false)
   })
 
+  it('ishikawa(-beta) 识别（more-diagrams 工单 22）：两个关键字都认领且大小写不敏感；声明行必须是裸关键字', () => {
+    expect(detectDiagramType('ishikawa-beta\n    甲\n')?.id).toBe('ishikawa')
+    expect(detectDiagramType('ishikawa\n    甲\n')?.id).toBe('ishikawa')
+    // 词法带 /i（research §1：jison 词法规则 1/2 均带 /i）
+    expect(detectDiagramType('ISHIKAWA-BETA\n    甲\n')?.id).toBe('ishikawa')
+    expect(DIAGRAM_TYPES.ishikawa.detect('Ishikawa\n    甲\n')).toBe(true)
+    // 声明行必须是关键字本身（首行即关键字），带尾随内容或更长词不认领
+    expect(DIAGRAM_TYPES.ishikawa.detect('ishikawa extra\n    甲\n')).toBe(false)
+    expect(DIAGRAM_TYPES.ishikawa.detect('ishikawaX\n    甲\n')).toBe(false)
+  })
+
   it('双关键字 detect 例（后续图种工单的写法约定）：-beta 可选且不越界误判', () => {
     // 后续 block/packet/xychart 工单应采用 `^<kw>(-beta)?\b` 形态；这里把形态锁死：
     // 可选 -beta 不妨碍裸关键字的识别，也不把更长的词（如 block-chain）误吞。
