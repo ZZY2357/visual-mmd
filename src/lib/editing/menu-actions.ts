@@ -23,6 +23,7 @@ import { isValidKanbanId } from '../pipeline/kanban'
 import { isValidBlockId } from '../pipeline/block'
 import { isValidArchId, type ArchitectureIntent } from '../pipeline/architecture'
 import { isValidTreemapName, isValidTreemapValue, type TreemapIntent } from '../pipeline/treemap'
+import { isValidIshikawaText, type IshikawaIntent } from '../pipeline/ishikawa'
 import { setRelationIntent, RELATION_KIND_OPTIONS } from './class-forms'
 import {
   setMessageIntent,
@@ -245,6 +246,11 @@ export function createElement(ctx: MenuActionContext, target: ContextMenuTarget 
     if (proj.type === 'treemap') {
       // treemap（more-diagrams 工单 20）：添加入口是独立的 add-treemap-group /
       // add-treemap-leaf 动作（画布无 data-id，不做内联命名），不走 createElement
+      return null
+    }
+    if (proj.type === 'ishikawa') {
+      // ishikawa（more-diagrams 工单 22）：添加入口是独立的 add-ishikawa-cause 动作
+      //（画布无 data-id，不做内联命名），不走 createElement
       return null
     }
     // mindmap：节点目标 = 挂为其子节点；空白 / 无目标 = 建根（空文档）或挂到根节点下
@@ -770,6 +776,41 @@ function addTreemapRoot(ctx: MenuActionContext, kind: 'section' | 'leaf'): void 
   if (applyPlan(plan, { commitIntent: ctx.commitIntent, select: ctx.select })) ctx.close()
 }
 
+// ---------- ishikawa（more-diagrams 工单 22） ----------
+
+/**
+ * 空白处加主因（ishikawa）：插在最后一条主因（depth 1）之后；尚无主因时挂在鱼头下。
+ * 名字避重，锚点回退文档末元素（insertAfter 语义）。不做内联编辑（画布无 data-id，
+ * 工单降级定案）——文本在右侧表单改。
+ */
+function addIshikawaCause(ctx: MenuActionContext): void {
+  const proj = ctx.projection
+  if (proj === null || proj.type !== 'ishikawa') return
+  const p = proj.ishikawa
+  if (p.root === null) return // 无鱼头（空文档）：mermaid 此时也不渲染（research 坑 7）
+  const names = p.nodes.map((n) => n.text)
+  const text = nextFreeName('新原因', names)
+  if (!isValidIshikawaText(text)) return
+  // 最后一条主因（depth 1，文档序末位）；没有则在鱼头下建第一条主因
+  const causes = p.nodes.filter((n) => n.depth === 1)
+  const lastCause = causes[causes.length - 1]
+  const intents: IshikawaIntent[] =
+    lastCause !== undefined
+      ? [{ type: 'add-sibling', elementId: lastCause.elementId, text }]
+      : [{ type: 'add-child', parentElementId: p.root.elementId, text }]
+  // 新节点位置序 = 目标子树末尾（平铺下标）+ 2；子树末端已追加到文档末尾
+  const anchor = lastCause ?? p.root
+  const anchorIndex = p.nodes.indexOf(anchor)
+  let subtreeEnd = anchorIndex
+  for (let i = anchorIndex + 1; i < p.nodes.length && p.nodes[i].depth > anchor.depth; i++) subtreeEnd = i
+  const ordinal = subtreeEnd + 2
+  const plan: KeyPlan = {
+    intents,
+    newElementTarget: { selection: { kind: 'ishikawa-node', elementId: `ishikawa-node:${ordinal}` } },
+  }
+  if (applyPlan(plan, { commitIntent: ctx.commitIntent, select: ctx.select })) ctx.close()
+}
+
 // ---------- architecture（more-diagrams 工单 17） ----------
 
 /**
@@ -949,4 +990,7 @@ export const MENU_ACTIONS: Record<Exclude<ContextMenuItemId, 'apply-style'>, Men
   // 元素级编辑降级到结构树 + 属性表单
   'add-treemap-group': (ctx) => addTreemapRoot(ctx, 'section'),
   'add-treemap-leaf': (ctx) => addTreemapRoot(ctx, 'leaf'),
+  // ishikawa（more-diagrams 工单 22）：空白加主因（插在末条主因之后，无主因则挂鱼头下）；
+  // 元素级编辑降级到结构树 + 属性表单
+  'add-ishikawa-cause': addIshikawaCause,
 }

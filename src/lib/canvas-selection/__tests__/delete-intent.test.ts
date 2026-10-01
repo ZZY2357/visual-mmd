@@ -11,6 +11,7 @@ import {
   SEQUENCE_TEMPLATE,
   TIMELINE_TEMPLATE,
   XYCHART_TEMPLATE,
+  ISHIKAWA_TEMPLATE,
   type AnyProjection,
 } from '../../diagram-registry'
 import type { EditIntent } from '../../pipeline/parser'
@@ -26,6 +27,7 @@ import { ganttParser } from '../../pipeline/gantt'
 import { packetParser } from '../../pipeline/packet'
 import { xychartParser } from '../../pipeline/xychart'
 import { architectureParser } from '../../pipeline/architecture'
+import { ishikawaParser } from '../../pipeline/ishikawa'
 import { buildClassProjection } from '../../projection/class-projection'
 import { buildFlowchartProjection } from '../../projection/flowchart-projection'
 import { buildMindmapProjection } from '../../projection/mindmap-projection'
@@ -38,6 +40,7 @@ import { buildGanttProjection } from '../../projection/gantt-projection'
 import { buildPacketProjection } from '../../projection/packet-projection'
 import { buildXychartProjection } from '../../projection/xychart-projection'
 import { buildArchitectureProjection } from '../../projection/architecture-projection'
+import { buildIshikawaProjection } from '../../projection/ishikawa-projection'
 import type { Selection } from '../../projection/selection'
 import {
   blockDeleteIntent,
@@ -52,6 +55,7 @@ import {
   timelineDeleteIntent,
   xychartDeleteIntent,
   architectureDeleteIntent,
+  ishikawaDeleteIntent,
 } from '../../editing/canvas-keyboard'
 import {
   deleteClassDefIntent,
@@ -409,6 +413,28 @@ function xychartCases(p: ReturnType<typeof xychartProjection>): DeleteCase[] {
   ]
 }
 
+/** ishikawaProjection：ishikawa 投影（more-diagrams 工单 22） */
+function ishikawaProjection(): Extract<AnyProjection, { type: 'ishikawa' }> {
+  const parsed = ishikawaParser.parse(ISHIKAWA_TEMPLATE)
+  if (!parsed.ok) throw new Error(parsed.error.message)
+  return { type: 'ishikawa', ishikawa: buildIshikawaProjection(parsed.doc) }
+}
+
+/** ishikawa（more-diagrams 工单 22）：主因（一级因果，连同分支）一条删除入口。
+ * 鱼头（root）没有删除的语法动作（删掉会让整图失去问题本身，工单定案），不进 DeleteCase
+ * （能力包对鱼头恒返回 null，由「存在性重校验」用例的 foreign / gone 分支覆盖）。 */
+function ishikawaCases(p: ReturnType<typeof ishikawaProjection>): DeleteCase[] {
+  const cause = p.ishikawa.nodes.find((n) => n.depth === 1)
+  if (cause === undefined) throw new Error('模板必须含主因')
+  return [
+    {
+      name: 'ishikawa-node',
+      selection: { kind: 'ishikawa-node', elementId: cause.elementId },
+      panelIntent: { type: 'delete-node', elementId: cause.elementId },
+    },
+  ]
+}
+
 /** architectureProjection：architecture 投影（more-diagrams 工单 17） */
 function architectureProjection(): Extract<AnyProjection, { type: 'architecture' }> {
   const parsed = architectureParser.parse(ARCHITECTURE_TEMPLATE)
@@ -475,6 +501,7 @@ const SUITES = [
   { type: 'packet' as const, projection: packetProjection, cases: packetCases },
   { type: 'xychart' as const, projection: xychartProjection, cases: xychartCases },
   { type: 'architecture' as const, projection: architectureProjection, cases: architectureCases },
+  { type: 'ishikawa' as const, projection: ishikawaProjection, cases: ishikawaCases },
 ]
 
 describe('deleteIntent 等价性：三个删除入口对同一 selection 产出同一意图（工单 03）', () => {
@@ -525,6 +552,8 @@ describe('deleteIntent 等价性：三个删除入口对同一 selection 产出�
                 return xychartDeleteIntent(projection.xychart, sel)
               case 'architecture':
                 return architectureDeleteIntent(projection.architecture, sel)
+              case 'ishikawa':
+                return ishikawaDeleteIntent(projection.ishikawa, sel)
             }
           })()
           // 键盘按选中种类设门（flowchart/mindmap 只删节点）；门内的种类必须与能力包等价
@@ -540,7 +569,8 @@ describe('deleteIntent 等价性：三个删除入口对同一 selection 产出�
             suite.type === 'gantt' ||
             suite.type === 'packet' ||
             suite.type === 'xychart' ||
-            suite.type === 'architecture'
+            suite.type === 'architecture' ||
+            suite.type === 'ishikawa'
           if (!keyboardHandles) {
             expect(viaKeyboard).toBeNull() // 门外：键盘安静地不产出意图（零变化护栏）
             return
@@ -601,6 +631,7 @@ describe('deleteIntent 等价性：三个删除入口对同一 selection 产出�
           packet: { kind: 'packet-field', elementId: 'field:999' },
           xychart: { kind: 'xychart-series', elementId: 'series:999' },
           architecture: { kind: 'architecture-service', name: '__不存在__' },
+          ishikawa: { kind: 'ishikawa-node', elementId: 'ishikawa-node:999' },
         }
         expect(caps.deleteIntent(projection, gone[suite.type])).toBeNull()
 

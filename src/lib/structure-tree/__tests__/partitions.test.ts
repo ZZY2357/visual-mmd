@@ -235,6 +235,32 @@ describe('结构树分区描述（工单 06）', () => {
     expect(root?.children?.[1]?.detail).toContain('app:propertyPanel.treemapValueInvalidShort')
   })
 
+  it('ishikawa：图表级 + 因果树分区，鱼头为根、主因/分支递归展开；鱼头与主因带标注键', () => {
+    const source = 'ishikawa-beta\n    照片模糊\n    人\n        手抖\n        没按稳\n    设备\n        镜头脏\n'
+    const parsed = DIAGRAM_TYPES.ishikawa.parser.parse(source)
+    if (!parsed.ok) throw new Error('解析失败')
+    const sections = DIAGRAM_TYPES.ishikawa.tree(DIAGRAM_TYPES.ishikawa.buildProjection(parsed.doc), { t })
+    expect(sections.map((s) => s.key)).toEqual(['diagram', 'causes'])
+    expect(sections[1].heading).toBe('app:propertyPanel.ishikawaCauses')
+    expect(sections[1].count).toBe(6)
+    const root = sections[1].entries[0]
+    expect(root).toMatchObject({
+      depth: 1,
+      detail: 'app:propertyPanel.ishikawaRootShort',
+      selection: { kind: 'ishikawa-node', elementId: 'ishikawa-node:1' },
+    })
+    expect(root?.children?.[0]).toMatchObject({
+      depth: 2,
+      detail: 'app:propertyPanel.ishikawaCauseShort',
+      selection: { kind: 'ishikawa-node', elementId: 'ishikawa-node:2' },
+    })
+    expect(root?.children?.[0]?.children?.[0]).toMatchObject({
+      depth: 6, // depth = mermaid 原始 level（5）+ 1；分支缩进 8、baseLevel 4
+      selection: { kind: 'ishikawa-node', elementId: 'ishikawa-node:3' },
+    })
+    expect(root?.children?.[0]?.onKeyDown).toBeTypeOf('function')
+  })
+
   it('每个图种注册表的 tree 字段都能对自身的投影求值（穷尽性）', () => {
     const sources: Record<keyof typeof DIAGRAM_TYPES, string> = {
       flowchart: 'flowchart TB\nn1[甲]',
@@ -264,6 +290,7 @@ describe('结构树分区描述（工单 06）', () => {
       architecture:
         'architecture-beta\n    group platform(cloud)[平台]\n    service web(server)[Web]\n    service db(database)[数据库] in platform\n    web:R -- L:db',
       treemap: 'treemap\n"根"\n    "甲"\n        "叶1": 3\n    "乙": 2',
+      ishikawa: 'ishikawa-beta\n    照片模糊\n    人\n        手抖\n    设备\n        镜头脏',
     }
     for (const id of Object.keys(DIAGRAM_TYPES) as (keyof typeof DIAGRAM_TYPES)[]) {
       const registration = DIAGRAM_TYPES[id]

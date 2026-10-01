@@ -140,6 +140,8 @@ export const zhDict = {
         // treemap（more-diagrams 工单 20）：空白菜单（画布 DOM 无 data-id，无元素级菜单项）
         'add-treemap-group': '添加分组',
         'add-treemap-leaf': '添加叶子',
+        // ishikawa（more-diagrams 工单 22）：空白菜单（画布 DOM 无 data-id，无元素级菜单项）
+        'add-ishikawa-cause': '添加主因',
         delete: '删除',
         styleName: '样式名称',
         styleNameInvalid: '名称不能为空，且不能含空格或逗号',
@@ -183,6 +185,7 @@ export const zhDict = {
       radar: '雷达图',
       architecture: '架构图',
       treemap: '矩形树图',
+      ishikawa: '鱼骨图',
     },
     library: {
       title: '图表库',
@@ -778,6 +781,19 @@ export const zhDict = {
       treemapDiagramHint:
         '矩形树图：在结构树中选中节点编辑名称与数值；选中分组后按 Tab 加叶子子节点、Enter 加同级叶子、Delete 删除。画布不提供点选（mermaid 渲染无 data-id）。',
       deleteTreemapNode: '删除节点（连同子树）',
+      // ---- ishikawa（more-diagrams 工单 22） ----
+      ishikawaCauses: '因果树（鱼头 / 主因 / 分支）',
+      ishikawaRootShort: '鱼头（问题）',
+      ishikawaCauseShort: '主因',
+      ishikawaRootHint: '鱼头（问题/事件）：本图第一行，同时是图标题；可改名（改这一行即改标题），不可删除。',
+      ishikawaCauseHint: '主因（一级因果）：可在结构树中选中后按 Tab 加分支、Enter 加同级主因、Delete 删除。',
+      ishikawaBranchHint: '分支（二级及更深的因果）：在结构树中选中后按 Tab 加子分支、Enter 加同级分支、Delete 删除。',
+      ishikawaProblem: '问题 / 事件',
+      ishikawaText: '原因文本',
+      ishikawaTextInvalid: '文本不能为空，且不能含换行',
+      ishikawaDiagramHint:
+        '鱼骨图：第一行是鱼头（问题），后续行按缩进挂因果链。在结构树中选中节点编辑文本；选中后按 Tab 加子分支、Enter 加同级、Delete 删除。画布不提供点选（mermaid 渲染无 data-id）。',
+      deleteIshikawaNode: '删除节点（连同分支）',
     },
     shapes: {
       rectangle: '矩形',

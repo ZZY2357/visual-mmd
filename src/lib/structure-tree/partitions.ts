@@ -33,7 +33,8 @@ import {
   type ProjectionArchitectureService,
 } from '../projection/architecture-projection'
 import type { ProjectionTreemapNode, TreemapProjection } from '../projection/treemap-projection'
-import { treemapKeyPlan } from '../editing/canvas-keyboard'
+import type { ProjectionIshikawaNode, IshikawaProjection } from '../projection/ishikawa-projection'
+import { treemapKeyPlan, ishikawaKeyPlan } from '../editing/canvas-keyboard'
 import { DIAGRAM_SELECTION, type Selection } from '../projection/selection'
 import {
   applyPlan,
@@ -1618,6 +1619,70 @@ function treemapPartitions(projection: AnyProjection, { t }: TreePartitionsConte
   ]
 }
 
+// ---------- ishikawa（more-diagrams 工单 22） ----------
+
+/**
+ * ishikawa 结构树条目的键盘（工单 22 / ADR-0013）：焦点在节点条目上时
+ * Tab = 加子节点 / Enter = 加同级节点 / Delete = 删除该节点（连同子树；
+ * 鱼头不可删，preventDefault 压掉默认行为）。
+ * 键 → plan 走能力包同一份 ishikawaKeyPlan，执行交给唯一的 applyPlan。
+ * ishikawa 画布无 data-id（research §4 实测，见 ishikawa-adapter），
+ * 结构树是唯一的键盘入口（与 treemap/timeline/journey 同口径）。
+ */
+function ishikawaEntryKeyDown(
+  projection: IshikawaProjection,
+  elementId: string,
+): (e: KeyboardEvent) => void {
+  return (e: KeyboardEvent) => {
+    if (e.shiftKey) return
+    if (e.key !== 'Tab' && e.key !== 'Enter' && e.key !== 'Delete' && e.key !== 'Backspace') return
+    const selection: Selection = { kind: 'ishikawa-node', elementId }
+    const plan = ishikawaKeyPlan(projection, { key: e.key, mods: { shift: e.shiftKey }, selection })
+    if (plan === null) return
+    const { commitIntent, select } = useEditorStore.getState()
+    applyPlan(plan, { commitIntent, select, preventDefault: () => e.preventDefault() })
+  }
+}
+
+/**
+ * ishikawa 结构树（工单 22）：单一「因果树」分区，鱼头（问题）为根、主因（一级）挂其下、
+ * 分支（二级及更深）递归展开（与 mindmap/state 复合状态同一套树形渲染器）。
+ * 主因条目 detail 标注层级（主因）；鱼头不可删。
+ * ishikawa 画布无 data-id 且渲染序 ≠ 源码序（research §4），结构树 + 属性表单是
+ * 完整编辑入口。
+ */
+function ishikawaPartitions(projection: AnyProjection, { t }: TreePartitionsContext): TreeSection[] {
+  if (projection.type !== 'ishikawa') return []
+  const p: IshikawaProjection = projection.ishikawa
+
+  const nodeEntry = (node: ProjectionIshikawaNode): TreeEntry => {
+    const children = node.children.map(nodeEntry)
+    return {
+      key: node.elementId,
+      label: node.text,
+      detail: node.isRoot
+        ? t('app:propertyPanel.ishikawaRootShort')
+        : node.depth === 1
+          ? t('app:propertyPanel.ishikawaCauseShort')
+          : undefined,
+      depth: node.depth + 1,
+      selection: { kind: 'ishikawa-node', elementId: node.elementId },
+      onKeyDown: ishikawaEntryKeyDown(p, node.elementId),
+      children: children.length > 0 ? children : undefined,
+    }
+  }
+
+  return [
+    withDiagramLabel(diagramSection(p.root !== null ? 'ishikawa' : undefined), t('app:propertyPanel.diagram')),
+    {
+      key: 'causes',
+      heading: t('app:propertyPanel.ishikawaCauses'),
+      count: p.nodes.length,
+      entries: p.root !== null ? [nodeEntry(p.root)] : [],
+    },
+  ]
+}
+
 /** 图种 → 分区描述（注册表 `tree` 字段的实参，registry 只持引用） */
 export const treePartitions: Record<DiagramTypeId, TreePartitions> = {
   flowchart: flowchartPartitions,
@@ -1641,4 +1706,5 @@ export const treePartitions: Record<DiagramTypeId, TreePartitions> = {
   radar: radarPartitions,
   architecture: architecturePartitions,
   treemap: treemapPartitions,
+  ishikawa: ishikawaPartitions,
 }

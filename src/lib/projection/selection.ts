@@ -112,6 +112,10 @@ export type Selection =
   // （`treemap-node:N`，文档序——渲染序按值降序、≠ 文档序，画布 DOM 无 data-id，
   // 实测降级见 treemap-adapter；选中只来自结构树 / 表单 / 键盘）。
   | { kind: 'treemap-node'; elementId: string }
+  // ishikawa（more-diagrams 工单 22）：鱼头 / 主因 / 分支统一走位置序身份
+  // （`ishikawa-node:N`，文档序——渲染序按深度奇偶 pre/post-order 重排、≠ 文档序，
+  // 画布 DOM 无 data-id，实测降级见 ishikawa-adapter；选中只来自结构树 / 表单 / 键盘）。
+  | { kind: 'ishikawa-node'; elementId: string }
 
 export const DIAGRAM_SELECTION: Selection = { kind: 'diagram' }
 
@@ -237,6 +241,8 @@ export function selectionKey(sel: Selection): string {
       return `architecture-align:${sel.elementId}`
     case 'treemap-node':
       return `treemap-node:${sel.elementId}`
+    case 'ishikawa-node':
+      return `ishikawa-node:${sel.elementId}`
   }
 }
 

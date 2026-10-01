@@ -144,6 +144,42 @@ describe('金样合法性：默认图表模板能被 mermaid 渲染', () => {
     await expect(mermaid.parse(source)).resolves.toBeTruthy()
   })
 
+  it('ishikawa 起步模板 parse 通过（more-diagrams 工单 22）', async () => {
+    const { ISHIKAWA_TEMPLATE } = await import('../diagram-registry')
+    await expect(mermaid.parse(ISHIKAWA_TEMPLATE)).resolves.toBeTruthy()
+  })
+
+  it('ishikawa 端到端编辑场景（工单 22 验收：改鱼头问题 → 加主因 → 主因下加分支 → 改分支文本 → 删主因子树）落在合法 mermaid 源码上', async () => {
+    const { ISHIKAWA_TEMPLATE } = await import('../diagram-registry')
+    const { ishikawaParser } = await import('../pipeline/ishikawa')
+    const { reassemble } = await import('../pipeline/document')
+    const parse = (src: string) => {
+      const r = ishikawaParser.parse(src)
+      if (!r.ok) throw new Error(`解析失败：${r.error.message}`)
+      return r.doc
+    }
+    const apply = (doc: ReturnType<typeof parse>, intent: Parameters<typeof ishikawaParser.resolveRewrites>[1]) => {
+      const rewrites = ishikawaParser.resolveRewrites(doc, intent)
+      if (rewrites === null) throw new Error(`意图被拒绝：${JSON.stringify(intent)}`)
+      return parse(reassemble(doc, rewrites))
+    }
+
+    let doc = parse(ISHIKAWA_TEMPLATE)
+    // ishikawa-node:1 = 鱼头，2 = 人（主因），3/4 = 手抖/没按稳，5 = 设备……
+    doc = apply(doc, { type: 'set-node-text', elementId: 'ishikawa-node:1', text: '成片发虚' }) // 改鱼头（连带图标题）
+    doc = apply(doc, { type: 'add-sibling', elementId: 'ishikawa-node:5', text: '流程' }) // 加主因（文档序末位 = ishikawa-node:9）
+    doc = apply(doc, { type: 'add-child', parentElementId: 'ishikawa-node:9', text: '未校准' }) // 主因下加分支（ishikawa-node:10）
+    doc = apply(doc, { type: 'set-node-text', elementId: 'ishikawa-node:10', text: '未预对焦' }) // 改分支文本
+    doc = apply(doc, { type: 'delete-node', elementId: 'ishikawa-node:2' }) // 删「人」子树（含手抖/没按稳）
+
+    const source = doc.source
+    expect(source).toContain('    成片发虚')
+    expect(source).toContain('    流程')
+    expect(source).toContain('        未预对焦')
+    expect(source).not.toContain('手抖')
+    await expect(mermaid.parse(source)).resolves.toBeTruthy()
+  })
+
   it('architecture 端到端编辑场景（工单 17 验收：加 service → 连到另一 service 并带箭头 → 改标题 → 移入 group → 删除一条边）落在合法 mermaid 源码上', async () => {
     const { ARCHITECTURE_TEMPLATE } = await import('../diagram-registry')
     const { architectureParser } = await import('../pipeline/architecture')

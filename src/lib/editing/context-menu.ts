@@ -224,6 +224,9 @@ export type ContextMenuItemId =
   // 由结构树选中 + 属性表单承接。
   | 'add-treemap-group'
   | 'add-treemap-leaf'
+  // ishikawa（more-diagrams 工单 22）：空白 = 加主因（顶层因果节点）。节点的编辑不做
+  // 元素级画布菜单（无 data-id 可命中，research §4 实测降级），由结构树选中 + 属性表单承接。
+  | 'add-ishikawa-cause'
 
 /**
  * 画布选中 → 菜单目标（工单 03 起为 `canvas-selection/selection-codec.ts` 的
@@ -299,6 +302,9 @@ function blankMenuItems(diagramType: DiagramTypeId): ContextMenuItemId[] {
     case 'treemap':
       // treemap 的空白入口（工单 20 定案）：加分组（顶格 Section）/ 加叶子（顶格 Leaf，数值落 1）
       return ['add-treemap-group', 'add-treemap-leaf']
+    case 'ishikawa':
+      // ishikawa 的空白入口（工单 22 定案）：加主因（顶层因果节点，插在最后一条主因之后）
+      return ['add-ishikawa-cause']
     // DiagramTypeId 是开放类型（more-diagrams 工单 01）：未接入画布能力包的图种
     // 没有空白右键入口（unsupported 态下画布右键整体停用，不会走到这里）
     default:

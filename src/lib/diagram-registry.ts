@@ -20,6 +20,7 @@ import { xychartParser } from './pipeline/xychart'
 import { radarParser } from './pipeline/radar'
 import { architectureParser } from './pipeline/architecture'
 import { treemapParser } from './pipeline/treemap'
+import { ishikawaParser } from './pipeline/ishikawa'
 import { frontmatterEnd } from './pipeline/frontmatter'
 import { buildFlowchartProjection, type FlowchartProjection } from './projection/flowchart-projection'
 import { buildSequenceProjection, type SequenceProjection } from './projection/sequence-projection'
@@ -53,6 +54,7 @@ import {
   type ArchitectureProjection,
 } from './projection/architecture-projection'
 import { buildTreemapProjection, type TreemapProjection } from './projection/treemap-projection'
+import { buildIshikawaProjection, type IshikawaProjection } from './projection/ishikawa-projection'
 import { flowchartCanvasCapabilities } from './canvas-selection/flowchart-adapter'
 import { sequenceCanvasCapabilities } from './canvas-selection/sequence-adapter'
 import { classCanvasCapabilities } from './canvas-selection/class-adapter'
@@ -73,6 +75,7 @@ import { xychartCanvasCapabilities } from './canvas-selection/xychart-adapter'
 import { radarCanvasCapabilities } from './canvas-selection/radar-adapter'
 import { architectureCanvasCapabilities } from './canvas-selection/architecture-adapter'
 import { treemapCanvasCapabilities } from './canvas-selection/treemap-adapter'
+import { ishikawaCanvasCapabilities } from './canvas-selection/ishikawa-adapter'
 import type { CanvasCapabilities } from './canvas-selection/capabilities'
 import { treePartitions, type TreePartitions } from './structure-tree/partitions'
 import { DEFAULT_DIAGRAM_SOURCE } from './storage'
@@ -115,6 +118,7 @@ export interface ProjectionTypes {
   radar: RadarProjection
   architecture: ArchitectureProjection
   treemap: TreemapProjection
+  ishikawa: IshikawaProjection
 }
 
 /** 已注册图种的 id 集合（字面量联合，随 ProjectionTypes 增长） */
@@ -480,6 +484,23 @@ export const TREEMAP_TEMPLATE = `treemap
 `
 
 /**
+ * ishikawa 起步模板（more-diagrams 工单 22，research §7 草案）：一行鱼头（问题/事件）
+ * + 三个主因 + 三个二级因。缩进即层级（**相对缩进**，research 坑 1：第一条主因的缩进
+ * 定基准，宽度不必等距）；官方文档写 `ishikawa-beta`，此处与文档一致。
+ */
+export const ISHIKAWA_TEMPLATE = `ishikawa-beta
+    照片模糊
+    人
+        手抖
+        没按稳
+    设备
+        镜头脏
+        对焦不准
+    环境
+        光线太暗
+`
+
+/**
  * 注册表：数组是唯一权威（more-diagrams 工单 01），DIAGRAM_TYPES 由它推导。
  * detectDiagramType 按数组顺序显式遍历——不再维护手写的 if 分发链，
  * 新图种挂一条即可参与识别，无法识别时不再默认 flowchart（见下）。
@@ -699,6 +720,18 @@ export const DIAGRAM_TYPE_LIST: DiagramTypeRegistration[] = [
     buildProjection: (doc) => ({ type: 'treemap', treemap: buildTreemapProjection(doc) }),
     tree: treePartitions.treemap,
     canvas: treemapCanvasCapabilities,
+  },
+  {
+    id: 'ishikawa',
+    parser: ishikawaParser,
+    template: ISHIKAWA_TEMPLATE,
+    // `ishikawa` 与 `ishikawa-beta` 两个关键字 mermaid 都认（jison 词法规则 1/2 分别匹配
+    // `ishikawa-beta\b` / `ishikawa\b`，均带 `/i`；探测器 `/^\s*ishikawa(-beta)?\b/i`，
+    // research §1——**大小写不敏感**）。声明行必须是裸关键字（首行即关键字本身）
+    detect: (source) => /^ishikawa(-beta)?[ \t\r]*$/i.test(firstStatementLine(source)),
+    buildProjection: (doc) => ({ type: 'ishikawa', ishikawa: buildIshikawaProjection(doc) }),
+    tree: treePartitions.ishikawa,
+    canvas: ishikawaCanvasCapabilities,
   },
 ]
 

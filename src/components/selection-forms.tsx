@@ -84,6 +84,8 @@ import {
 import { type ArchitectureProjection } from '../lib/projection/architecture-projection'
 import { TreemapNodeForm } from './treemap-forms'
 import { type TreemapProjection } from '../lib/projection/treemap-projection'
+import { IshikawaNodeForm } from './ishikawa-forms'
+import { type IshikawaProjection } from '../lib/projection/ishikawa-projection'
 
 /**
  * 选中元素的属性表单，按投影图种分发（工单 04-bundle 自 PropertyPanel 迁出）：
@@ -968,6 +970,42 @@ function TreemapSelectionForm({
   }
 }
 
+/**
+ * ishikawa 属性表单（more-diagrams 工单 22）：图表级 = 提示文案（无 title/样式语句，
+ * 外观只能靠主题，research 坑 6——不做表单化编辑）；节点 = 改文本 / 删除（鱼头不可删）。
+ * ishikawa 画布无 data-id 寻址（见 ishikawa-adapter），这两张表单是唯一文本编辑入口。
+ */
+function IshikawaSelectionForm({
+  projection,
+  selection,
+}: {
+  projection: IshikawaProjection
+  selection: Selection | null
+}) {
+  const { t } = useTranslation()
+  if (selection === null) {
+    return (
+      <Text size="sm" c="dimmed" px="xs">
+        {t('app:propertyPanel.nothingSelected')}
+      </Text>
+    )
+  }
+  switch (selection.kind) {
+    case 'diagram':
+      return (
+        <Text size="sm" c="dimmed" px="xs">
+          {t('app:propertyPanel.ishikawaDiagramHint')}
+        </Text>
+      )
+    case 'ishikawa-node': {
+      const node = projection.nodes.find((n) => n.elementId === selection.elementId)
+      return node !== undefined ? <IshikawaNodeForm node={node} /> : null
+    }
+    default:
+      return null
+  }
+}
+
 export function ProjectionSelectionForm({ projection, selection }: { projection: AnyProjection; selection: Selection | null }) {
   if (projection.type === 'flowchart') {
     return <FlowchartSelectionForm projection={projection.flowchart} selection={selection} />
@@ -1028,6 +1066,9 @@ export function ProjectionSelectionForm({ projection, selection }: { projection:
   }
   if (projection.type === 'treemap') {
     return <TreemapSelectionForm projection={projection.treemap} selection={selection} />
+  }
+  if (projection.type === 'ishikawa') {
+    return <IshikawaSelectionForm projection={projection.ishikawa} selection={selection} />
   }
   return <ClassSelectionForm projection={projection.class} selection={selection} />
 }
