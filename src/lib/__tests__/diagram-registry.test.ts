@@ -158,6 +158,16 @@ describe('detectDiagramType：无法识别 → unsupported（null），绝不默
     expect(DIAGRAM_TYPES.usecase.detect('usecase-betaX\n')).toBe(false)
   })
 
+  it('zenuml 识别（more-diagrams 工单 19）：表头首非空行恰为 zenuml；大小写/尾随内容不认领', () => {
+    expect(detectDiagramType('zenuml\n    participant A\n')?.id).toBe('zenuml')
+    expect(detectDiagramType('  zenuml  \n    A->B.m()\n')?.id).toBe('zenuml')
+    // 与 mermaid 探测器同口径（表头关键字精确匹配，不接受大小写变体或尾随内容）
+    expect(DIAGRAM_TYPES.zenuml.detect('Zenuml\n')).toBe(false)
+    expect(DIAGRAM_TYPES.zenuml.detect('zenuml extra\n')).toBe(false)
+    // 首非空行不是 zenuml 就不认领（表头关键字必须打头）
+    expect(DIAGRAM_TYPES.zenuml.detect('title x\nzenuml\n')).toBe(false)
+  })
+
   it('双关键字 detect 例（后续图种工单的写法约定）：-beta 可选且不越界误判', () => {
     // 后续 block/packet/xychart 工单应采用 `^<kw>(-beta)?\b` 形态；这里把形态锁死：
     // 可选 -beta 不妨碍裸关键字的识别，也不把更长的词（如 block-chain）误吞。

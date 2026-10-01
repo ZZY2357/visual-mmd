@@ -155,6 +155,13 @@ export function canvasIdOf(selection: Selection): string | null {
     case 'usecase-relation':
     case 'usecase-note':
       return selection.elementId
+    // zenuml（more-diagrams 工单 19）：画布 DOM 无 data-id（任务 0 实测：渲染产物无
+    // data-id / 无 id，见 zenuml-adapter），三类选中都不可寻址——安静地不高亮
+    //（结构树选中仍在，属性表单可编）
+    case 'zenuml-participant':
+    case 'zenuml-message':
+    case 'zenuml-fragment':
+      return null
     default:
       return null
   }
@@ -287,6 +294,10 @@ export function fromCanvasId(diagramType: DiagramTypeId, canvas: CanvasSelection
     // 归一），按前缀解回四类选中
     return usecaseSelectionOf(canvas)
   }
+  if (diagramType === 'zenuml') {
+    // zenuml（more-diagrams 工单 19）：画布 DOM 无 data-id（任务 0 实测），画布选中不产生
+    return null
+  }
   if (canvas.kind === 'element') return edgeSelectionOf(diagramType, canvas.elementId)
   if (canvas.kind === 'node') {
     return diagramType === 'sequence'
@@ -414,6 +425,13 @@ export function selectionOfMenuTarget(target: ContextMenuTarget): Selection | nu
       return { kind: 'usecase-relation', elementId: target.elementId }
     case 'usecase-note':
       return { kind: 'usecase-note', elementId: target.elementId }
+    // zenuml（more-diagrams 工单 19）：参与者 / 消息 / 片段菜单目标一一对应各自 Selection kind
+    case 'zenuml-participant':
+      return { kind: 'zenuml-participant', elementId: target.elementId }
+    case 'zenuml-message':
+      return { kind: 'zenuml-message', elementId: target.elementId }
+    case 'zenuml-fragment':
+      return { kind: 'zenuml-fragment', elementId: target.elementId }
     case 'blank':
       return null
   }
@@ -466,6 +484,7 @@ export function menuTargetOfCanvas(
     if (diagramType === 'ishikawa') return null // 无 data-id 且渲染序 ≠ 源码序（实测降级，research §4），画布节点不可命中
     if (diagramType === 'wardley') return null // 无 data-id（实测降级，research §4），画布节点不可命中
     if (diagramType === 'cynefin') return null // 无 data-id（实测降级，research §4/§8.1），画布节点不可命中
+    if (diagramType === 'zenuml') return null // 无 data-id（任务 0 实测降级），画布节点不可命中
     if (diagramType === 'gantt') {
       // gantt（more-diagrams 工单 11）：任务条虽可寻址，但元素级菜单不做（与 journey/pie
       // 同口径），编辑由结构树选中 + 属性表单承接——画布节点不产生菜单目标

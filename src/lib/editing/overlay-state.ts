@@ -73,6 +73,9 @@ export type NodeFormKind =
   | 'wardley-link'
   // cynefin（more-diagrams 工单 25）：加转移（两端从固定五域下拉；空白/转移上均可）
   | 'cynefin-transition'
+  // zenuml（more-diagrams 工单 19）：加消息（from / to / method / args 四字段，提交才落码；
+  // 空白 / 消息上均可）
+  | 'zenuml-message'
 
 export interface NodeFormState {
   kind: NodeFormKind

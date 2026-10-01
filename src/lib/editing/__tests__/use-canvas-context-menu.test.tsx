@@ -149,6 +149,8 @@ function resolverOf(projection: AnyProjection) {
   // usecase（more-diagrams 工单 26）：data-id 由 nodeAnnotator 从渲染器 data-id 归一，
   // resolver 与真实能力包同源（usecaseDataIdResolver）
   if (projection.type === 'usecase') return usecaseDataIdResolver(projection.usecase)
+  // zenuml（more-diagrams 工单 19）：画布 DOM 无 data-id（任务 0 实测降级），resolver 永不命中
+  if (projection.type === 'zenuml') return () => null
   const nodes = nodeDataIdResolver(projection.class.classes.map((c) => c.name))
   const edges = elementDataIdResolver(projection.class.relations.map((r) => r.elementId))
   return (dataId: string) => nodes(dataId) ?? edges(dataId)
@@ -192,6 +194,10 @@ function createdIdOf(target: CanvasInlineEditTarget): string {
     // architecture（more-diagrams 工单 17）：service / group 添加进内联命名标题（junction 不进）
     case 'architecture':
       return target.id
+    // zenuml（more-diagrams 工单 19）：参与者「改别名」进内联编辑（画布无 data-id，
+    // 双击不产生该目标，只由菜单 / 结构树构造）
+    case 'zenuml-participant':
+      return target.elementId
   }
 }
 

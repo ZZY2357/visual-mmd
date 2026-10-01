@@ -186,6 +186,17 @@ function nodeFormForTarget(
     if (t === undefined) return null
     return { kind, anchorElementId: t.elementId, from: t.from, x, y }
   }
+  if (kind === 'zenuml-message') {
+    // zenuml 加消息表单（more-diagrams 工单 19）：空白右键 → 无锚点（管线回退文档末尾）；
+    // 消息上 Tab（经 formTargetOfSelection）→ 锚点为该消息行（新消息落在其后）。
+    // 画布无 data-id，右键元素级目标不可命中——空白与结构树选中两条入口
+    if (proj.type !== 'zenuml') return null
+    if (target.kind === 'blank') return { kind, x, y }
+    if (target.kind !== 'zenuml-message') return null
+    const message = proj.zenuml.messages.find((m) => m.elementId === target.elementId)
+    if (message === undefined) return null
+    return { kind, anchorElementId: message.elementId, from: message.from ?? undefined, x, y }
+  }
   if (kind === 'block') {
     // sequence 独有的添加逻辑块：参与者上右键 → 锚点为该参与者的声明；
     // 空白处右键 → 无锚点（管线回退到文档最后一个元素）
@@ -234,6 +245,8 @@ function formTargetOfSelection(selection: Selection): ContextMenuTarget | null {
   if (selection.kind === 'wardley-link') return { kind: 'wardley-link', elementId: selection.elementId }
   // cynefin（more-diagrams 工单 25）：转移 → 加转移表单（Tab 键）的锚点与 from 预填
   if (selection.kind === 'cynefin-transition') return { kind: 'cynefin-transition', elementId: selection.elementId }
+  // zenuml（more-diagrams 工单 19）：消息 → 加消息表单（Tab 键）的锚点与 from 预填
+  if (selection.kind === 'zenuml-message') return { kind: 'zenuml-message', elementId: selection.elementId }
   return null
 }
 
@@ -428,7 +441,8 @@ export function useCanvasContextMenu(
         | 'xychart-bar'
         | 'architecture-edge'
         | 'wardley-link'
-        | 'cynefin-transition',
+        | 'cynefin-transition'
+        | 'zenuml-message',
     ): void => {
       const proj = latest.current.projection
       const { selection } = useEditorStore.getState()

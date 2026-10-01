@@ -11,6 +11,7 @@ import {
   SEQUENCE_TEMPLATE,
   VENN_TEMPLATE,
   USECASE_TEMPLATE,
+  ZENUML_TEMPLATE,
   type AnyProjection,
 } from '../../diagram-registry'
 import { DEFAULT_DIAGRAM_SOURCE } from '../../storage'
@@ -196,5 +197,39 @@ describe('class/sequence adapter resolver 对照（与原 CanvasPanel.resolverOf
     // 渲染器根本没有 data-id / id 写入——任何别形 id 安静拒绝
     expect(resolve('line-plot-0')).toBeNull()
     expect(resolve('__nope__')).toBeNull()
+  })
+})
+
+describe('zenuml adapter（more-diagrams 工单 19）：画布寻址整体降级', () => {
+  it('八项能力齐备，但画布寻址四件套全部降级（无位置序连线 → 无 edgeAnnotator）', () => {
+    const registration = DIAGRAM_TYPES.zenuml
+    const parsed = registration.parser.parse(ZENUML_TEMPLATE)
+    if (!parsed.ok) throw new Error('模板必须可解析')
+    const projection = registration.buildProjection(parsed.doc)
+    const caps = capabilitiesOf(projection)
+    expect(caps).toBe(DIAGRAM_TYPES.zenuml.canvas)
+    // 画布 DOM 无 data-id（任务 0 实测）：resolver 永不命中 / 选中不可映射 / 不高亮 / 无导航锚点
+    expect(caps.dataIdResolver(projection)('participant:Client')).toBeNull()
+    expect(caps.dataIdResolver(projection)('__nope__')).toBeNull()
+    expect(caps.toSelection({ kind: 'node', id: 'Client' })).toBeNull()
+    expect(caps.canvasIdOf(projection, { kind: 'zenuml-participant', elementId: 'participant:Client' })).toBeNull()
+    expect(caps.navigationIds(projection)).toEqual([])
+    // keyboardProjection 字段名与图种 id 同名
+    expect(caps.keyboardProjection(projection).kind).toBe('zenuml')
+    // 无位置序连线：可选成员不得实现
+    expect(caps.edgeAnnotator).toBeUndefined()
+    expect(typeof caps.resolveSelection).toBe('function')
+    expect(typeof caps.deleteIntent).toBe('function')
+  })
+
+  it('canvasIdOf 用 (_projection, selection) 签名（工单 19 接口约定）', () => {
+    const registration = DIAGRAM_TYPES.zenuml
+    const parsed = registration.parser.parse(ZENUML_TEMPLATE)
+    if (!parsed.ok) throw new Error('模板必须可解析')
+    const projection = registration.buildProjection(parsed.doc)
+    const caps = capabilitiesOf(projection)
+    // 任意选中 / 任意投影都安静返回 null（不抛错）
+    expect(caps.canvasIdOf(projection, { kind: 'diagram' })).toBeNull()
+    expect(caps.canvasIdOf(projection, { kind: 'zenuml-message', elementId: 'message:1' })).toBeNull()
   })
 })

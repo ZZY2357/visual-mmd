@@ -14,6 +14,7 @@ import {
   ISHIKAWA_TEMPLATE,
   VENN_TEMPLATE,
   USECASE_TEMPLATE,
+  ZENUML_TEMPLATE,
   type AnyProjection,
 } from '../../diagram-registry'
 import type { EditIntent } from '../../pipeline/parser'
@@ -32,6 +33,7 @@ import { architectureParser } from '../../pipeline/architecture'
 import { ishikawaParser } from '../../pipeline/ishikawa'
 import { vennParser } from '../../pipeline/venn'
 import { usecaseParser } from '../../pipeline/usecase'
+import { zenumlParser } from '../../pipeline/zenuml'
 import { buildClassProjection } from '../../projection/class-projection'
 import { buildFlowchartProjection } from '../../projection/flowchart-projection'
 import { buildMindmapProjection } from '../../projection/mindmap-projection'
@@ -47,6 +49,7 @@ import { buildArchitectureProjection } from '../../projection/architecture-proje
 import { buildIshikawaProjection } from '../../projection/ishikawa-projection'
 import { buildVennProjection } from '../../projection/venn-projection'
 import { buildUsecaseProjection } from '../../projection/usecase-projection'
+import { buildZenumlProjection } from '../../projection/zenuml-projection'
 import type { Selection } from '../../projection/selection'
 import {
   blockDeleteIntent,
@@ -64,6 +67,7 @@ import {
   ishikawaDeleteIntent,
   vennDeleteIntent,
   usecaseDeleteIntent,
+  zenumlDeleteIntent,
 } from '../../editing/canvas-keyboard'
 import {
   deleteClassDefIntent,
@@ -566,8 +570,41 @@ function usecaseCases(p: ReturnType<typeof usecaseProjection>): DeleteCase[] {
   ]
 }
 
-const SUITES = [
-  { type: 'flowchart' as const, projection: flowProjection, cases: flowchartCases },
+/** zenumlProjection：zenuml 投影（more-diagrams 工单 19） */
+function zenumlProjection(): Extract<AnyProjection, { type: 'zenuml' }> {
+  const parsed = zenumlParser.parse(ZENUML_TEMPLATE)
+  if (!parsed.ok) throw new Error(parsed.error.message)
+  return { type: 'zenuml', zenuml: buildZenumlProjection(parsed.doc) }
+}
+
+/** zenuml（more-diagrams 工单 19）：消息 / 已声明参与者两类删除入口各一条。
+ * 未声明的隐式参与者（只出现在消息里）不产出删除意图——删它等于删消息，
+ * 归消息删除入口，避免歧义（见 canvas-keyboard.zenumlDeleteIntent）。 */
+function zenumlCases(p: ReturnType<typeof zenumlProjection>): DeleteCase[] {
+  const message = p.zenuml.messages[0]
+  const participant = p.zenuml.participants.find((q) => q.declared)
+  if (message === undefined || participant === undefined) {
+    throw new Error('ZENUML_TEMPLATE 必须含消息与已声明参与者')
+  }
+  return [
+    {
+      name: 'zenuml-message',
+      selection: { kind: 'zenuml-message', elementId: message.elementId },
+      panelIntent: { type: 'delete-zenuml-message', elementId: message.elementId },
+      menuTarget: { kind: 'zenuml-message', elementId: message.elementId },
+      menuItemId: 'delete',
+    },
+    {
+      name: 'zenuml-participant（已声明）',
+      selection: { kind: 'zenuml-participant', elementId: participant.elementId },
+      panelIntent: { type: 'delete-zenuml-participant', elementId: participant.elementId },
+      menuTarget: { kind: 'zenuml-participant', elementId: participant.elementId },
+      menuItemId: 'delete',
+    },
+  ]
+}
+
+const SUITES = [  { type: 'flowchart' as const, projection: flowProjection, cases: flowchartCases },
   { type: 'class' as const, projection: classProjection, cases: classCases },
   { type: 'sequence' as const, projection: seqProjection, cases: sequenceCases },
   { type: 'mindmap' as const, projection: mindProjection, cases: mindmapCases },
@@ -582,6 +619,7 @@ const SUITES = [
   { type: 'ishikawa' as const, projection: ishikawaProjection, cases: ishikawaCases },
   { type: 'venn' as const, projection: vennProjection, cases: vennCases },
   { type: 'usecase' as const, projection: usecaseProjection, cases: usecaseCases },
+  { type: 'zenuml' as const, projection: zenumlProjection, cases: zenumlCases },
 ]
 
 describe('deleteIntent 等价性：三个删除入口对同一 selection 产出同一意图（工单 03）', () => {
@@ -638,6 +676,8 @@ describe('deleteIntent 等价性：三个删除入口对同一 selection 产出�
                 return vennDeleteIntent(projection.venn, sel)
               case 'usecase':
                 return usecaseDeleteIntent(projection.usecase, sel)
+              case 'zenuml':
+                return zenumlDeleteIntent(projection.zenuml, sel)
             }
           })()
           // 键盘按选中种类设门（flowchart/mindmap 只删节点）；门内的种类必须与能力包等价
@@ -656,7 +696,8 @@ describe('deleteIntent 等价性：三个删除入口对同一 selection 产出�
             suite.type === 'architecture' ||
             suite.type === 'ishikawa' ||
             suite.type === 'venn' ||
-            suite.type === 'usecase'
+            suite.type === 'usecase' ||
+            suite.type === 'zenuml'
           if (!keyboardHandles) {
             expect(viaKeyboard).toBeNull() // 门外：键盘安静地不产出意图（零变化护栏）
             return
@@ -720,6 +761,7 @@ describe('deleteIntent 等价性：三个删除入口对同一 selection 产出�
           ishikawa: { kind: 'ishikawa-node', elementId: 'ishikawa-node:999' },
           venn: { kind: 'venn-set', id: '__不存在__' },
           usecase: { kind: 'usecase-usecase', elementId: 'usecase:__不存在__' },
+          zenuml: { kind: 'zenuml-message', elementId: 'message:999' },
         }
         expect(caps.deleteIntent(projection, gone[suite.type])).toBeNull()
 
