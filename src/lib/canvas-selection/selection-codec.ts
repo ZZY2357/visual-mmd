@@ -169,6 +169,13 @@ export function canvasIdOf(selection: Selection): string | null {
     case 'zenuml-message':
     case 'zenuml-fragment':
       return null
+    // c4（more-diagrams 工单 18）：画布 DOM 无 data-id（实测：渲染器 `data-*` 出现 0 次，
+    // 8 处 `.attr("id", ...)` 全在 `<defs>` marker 上，class 只有 c4/c4-external/c4-shape），
+    // 三类选中都不可寻址——安静地不高亮（结构树 + 属性表单是唯一完整编辑入口）
+    case 'c4-element':
+    case 'c4-boundary':
+    case 'c4-relation':
+      return null
     default:
       return null
   }
@@ -323,6 +330,11 @@ export function fromCanvasId(diagramType: DiagramTypeId, canvas: CanvasSelection
     // zenuml（more-diagrams 工单 19）：画布 DOM 无 data-id（任务 0 实测），画布选中不产生
     return null
   }
+  if (diagramType === 'c4') {
+    // c4（more-diagrams 工单 18）：画布 DOM 无 data-id（实测降级，见 c4-adapter 顶注），
+    // 画布选中不产生
+    return null
+  }
   if (canvas.kind === 'element') return edgeSelectionOf(diagramType, canvas.elementId)
   if (canvas.kind === 'node') {
     return diagramType === 'sequence'
@@ -472,6 +484,13 @@ export function selectionOfMenuTarget(target: ContextMenuTarget): Selection | nu
       return { kind: 'zenuml-message', elementId: target.elementId }
     case 'zenuml-fragment':
       return { kind: 'zenuml-fragment', elementId: target.elementId }
+    // c4（more-diagrams 工单 18）：元素 / 边界 / 关系菜单目标一一对应各自 Selection kind
+    case 'c4-element':
+      return { kind: 'c4-element', elementId: target.elementId }
+    case 'c4-boundary':
+      return { kind: 'c4-boundary', elementId: target.elementId }
+    case 'c4-relation':
+      return { kind: 'c4-relation', elementId: target.elementId }
     case 'blank':
       return null
   }
@@ -526,6 +545,7 @@ export function menuTargetOfCanvas(
     if (diagramType === 'cynefin') return null // 无 data-id（实测降级，research §4/§8.1），画布节点不可命中
     if (diagramType === 'treeview') return null // 无 data-id 且渲染布局与源码行序无对应（实测降级，research §4），画布节点不可命中
     if (diagramType === 'zenuml') return null // 无 data-id（任务 0 实测降级），画布节点不可命中
+    if (diagramType === 'c4') return null // 无 data-id（实测降级，见 c4-adapter 顶注），画布节点不可命中
     if (diagramType === 'gantt') {
       // gantt（more-diagrams 工单 11）：任务条虽可寻址，但元素级菜单不做（与 journey/pie
       // 同口径），编辑由结构树选中 + 属性表单承接——画布节点不产生菜单目标

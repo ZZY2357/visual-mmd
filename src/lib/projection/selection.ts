@@ -181,6 +181,12 @@ export type Selection =
   | { kind: 'zenuml-participant'; elementId: string }
   | { kind: 'zenuml-message'; elementId: string }
   | { kind: 'zenuml-fragment'; elementId: string }
+  // C4 系列（more-diagrams 工单 18）：元素 / 边界名字即身份（alias 是语法标识，关系引用它），
+  // 关系位置序；画布 DOM 无 data-id（渲染器源码 0 处 `data-*`，实测降级见 c4-adapter），
+  // 选中只来自结构树 / 表单 / 键盘。
+  | { kind: 'c4-element'; elementId: string }
+  | { kind: 'c4-boundary'; elementId: string }
+  | { kind: 'c4-relation'; elementId: string }
 
 export const DIAGRAM_SELECTION: Selection = { kind: 'diagram' }
 
@@ -356,6 +362,12 @@ export function selectionKey(sel: Selection): string {
       return `zenuml-message:${sel.elementId}`
     case 'zenuml-fragment':
       return `zenuml-fragment:${sel.elementId}`
+    case 'c4-element':
+      return `c4-element:${sel.elementId}`
+    case 'c4-boundary':
+      return `c4-boundary:${sel.elementId}`
+    case 'c4-relation':
+      return `c4-relation:${sel.elementId}`
   }
 }
 

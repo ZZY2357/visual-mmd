@@ -305,6 +305,8 @@ describe('结构树分区描述（工单 06）', () => {
         'agentflow-beta LR\n    a["检索"]@{ shape: task }\n    flow f["主流程"]\n        b["生成"]@{ shape: action }\n    end\n    a --> b\n    a -.- c\n    c["c"] --x a',
       zenuml:
         'zenuml\n    title 下单\n    participant Client as "客户端"\n    @Database Server\n    Client->Server.placeOrder(item)\n    if (ok) {\n        Server.check()\n    }',
+      c4:
+        'C4Context\n    Person(customer, "客户")\n    System(banking, "网银")\n    Enterprise_Boundary(b0, "边界") {\n        SystemDb(db, "库")\n    }\n    Rel(customer, banking, "访问")',
     }
     for (const id of Object.keys(DIAGRAM_TYPES) as (keyof typeof DIAGRAM_TYPES)[]) {
       const registration = DIAGRAM_TYPES[id]

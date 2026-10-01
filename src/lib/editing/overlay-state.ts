@@ -79,6 +79,8 @@ export type NodeFormKind =
   // zenuml（more-diagrams 工单 19）：加消息（from / to / method / args 四字段，提交才落码；
   // 空白 / 消息上均可）
   | 'zenuml-message'
+  // c4（more-diagrams 工单 18）：从选中元素拉一条关系（from 预选，提交才落码）
+  | 'c4-relation'
 
 export interface NodeFormState {
   kind: NodeFormKind

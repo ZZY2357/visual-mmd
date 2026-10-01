@@ -18,6 +18,7 @@ import {
   EVENT_MODELING_TEMPLATE,
   AGENTFLOW_TEMPLATE,
   ZENUML_TEMPLATE,
+  C4_TEMPLATE,
   type AnyProjection,
 } from '../../diagram-registry'
 import type { EditIntent } from '../../pipeline/parser'
@@ -40,6 +41,7 @@ import { treeviewParser } from '../../pipeline/treeview'
 import { eventModelingParser } from '../../pipeline/eventmodeling'
 import { agentflowParser } from '../../pipeline/agentflow'
 import { zenumlParser } from '../../pipeline/zenuml'
+import { c4Parser } from '../../pipeline/c4'
 import { buildClassProjection } from '../../projection/class-projection'
 import { buildFlowchartProjection } from '../../projection/flowchart-projection'
 import { buildMindmapProjection } from '../../projection/mindmap-projection'
@@ -59,6 +61,7 @@ import { buildTreeviewProjection } from '../../projection/treeview-projection'
 import { buildEventModelingProjection } from '../../projection/eventmodeling-projection'
 import { buildAgentflowProjection } from '../../projection/agentflow-projection'
 import { buildZenumlProjection } from '../../projection/zenuml-projection'
+import { buildC4Projection } from '../../projection/c4-projection'
 import type { Selection } from '../../projection/selection'
 import {
   blockDeleteIntent,
@@ -80,6 +83,7 @@ import {
   eventModelingDeleteIntent,
   agentflowDeleteIntent,
   zenumlDeleteIntent,
+  c4DeleteIntent,
 } from '../../editing/canvas-keyboard'
 import {
   deleteClassDefIntent,
@@ -718,6 +722,47 @@ function zenumlCases(p: ReturnType<typeof zenumlProjection>): DeleteCase[] {
   ]
 }
 
+/** c4Projection：c4 投影（more-diagrams 工单 18） */
+function c4Projection(): Extract<AnyProjection, { type: 'c4' }> {
+  const parsed = c4Parser.parse(C4_TEMPLATE)
+  if (!parsed.ok) throw new Error(parsed.error.message)
+  return { type: 'c4', c4: buildC4Projection(parsed.doc) }
+}
+
+/** c4（more-diagrams 工单 18）：元素（连带删引用它的关系）/ 边界（只删开行）/ 关系三类
+ * 删除入口各一条。画布 DOM 无 data-id（降级），元素 / 边界 / 关系目标均由结构树选中构造。 */
+function c4Cases(p: ReturnType<typeof c4Projection>): DeleteCase[] {
+  const element = p.c4.elements[0]
+  const boundary = p.c4.boundaries[0]
+  const relation = p.c4.relations[0]
+  if (element === undefined || boundary === undefined || relation === undefined) {
+    throw new Error('C4_TEMPLATE 必须含元素 / 边界 / 关系')
+  }
+  return [
+    {
+      name: 'c4-element',
+      selection: { kind: 'c4-element', elementId: element.elementId },
+      panelIntent: { type: 'delete-c4-element', elementId: element.elementId },
+      menuTarget: { kind: 'c4-element', elementId: element.elementId },
+      menuItemId: 'delete',
+    },
+    {
+      name: 'c4-boundary',
+      selection: { kind: 'c4-boundary', elementId: boundary.elementId },
+      panelIntent: { type: 'delete-c4-boundary', elementId: boundary.elementId },
+      menuTarget: { kind: 'c4-boundary', elementId: boundary.elementId },
+      menuItemId: 'delete',
+    },
+    {
+      name: 'c4-relation',
+      selection: { kind: 'c4-relation', elementId: relation.elementId },
+      panelIntent: { type: 'delete-rel', elementId: relation.elementId },
+      menuTarget: { kind: 'c4-relation', elementId: relation.elementId },
+      menuItemId: 'delete',
+    },
+  ]
+}
+
 const SUITES = [
   { type: 'flowchart' as const, projection: flowProjection, cases: flowchartCases },
   { type: 'class' as const, projection: classProjection, cases: classCases },
@@ -738,6 +783,7 @@ const SUITES = [
   { type: 'eventmodeling' as const, projection: eventModelingProjection, cases: eventModelingCases },
   { type: 'agentflow' as const, projection: agentflowProjection, cases: agentflowCases },
   { type: 'zenuml' as const, projection: zenumlProjection, cases: zenumlCases },
+  { type: 'c4' as const, projection: c4Projection, cases: c4Cases },
 ]
 
 describe('deleteIntent 等价性：三个删除入口对同一 selection 产出同一意图（工单 03）', () => {
@@ -802,6 +848,8 @@ describe('deleteIntent 等价性：三个删除入口对同一 selection 产出�
                 return agentflowDeleteIntent(projection.agentflow, sel)
               case 'zenuml':
                 return zenumlDeleteIntent(projection.zenuml, sel)
+              case 'c4':
+                return c4DeleteIntent(projection.c4, sel)
             }
           })()
           // 键盘按选中种类设门（flowchart/mindmap 只删节点）；门内的种类必须与能力包等价
@@ -824,7 +872,8 @@ describe('deleteIntent 等价性：三个删除入口对同一 selection 产出�
             suite.type === 'treeview' ||
             suite.type === 'eventmodeling' ||
             suite.type === 'agentflow' ||
-            suite.type === 'zenuml'
+            suite.type === 'zenuml' ||
+            suite.type === 'c4'
           if (!keyboardHandles) {
             expect(viaKeyboard).toBeNull() // 门外：键盘安静地不产出意图（零变化护栏）
             return
@@ -892,6 +941,7 @@ describe('deleteIntent 等价性：三个删除入口对同一 selection 产出�
           eventmodeling: { kind: 'em-frame', elementId: 'frame:999' },
           agentflow: { kind: 'agentflow-node', nodeId: '__不存在__' },
           zenuml: { kind: 'zenuml-message', elementId: 'message:999' },
+          c4: { kind: 'c4-element', elementId: 'c4-element:__不存在__' },
         }
         expect(caps.deleteIntent(projection, gone[suite.type])).toBeNull()
 

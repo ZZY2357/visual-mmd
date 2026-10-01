@@ -159,6 +159,8 @@ function resolverOf(projection: AnyProjection) {
   if (projection.type === 'agentflow') return agentflowDataIdResolver(projection.agentflow)
   // zenuml（more-diagrams 工单 19）：画布 DOM 无 data-id（任务 0 实测降级），resolver 永不命中
   if (projection.type === 'zenuml') return () => null
+  // c4（more-diagrams 工单 18）：画布 DOM 无 data-id（实测降级），resolver 永不命中
+  if (projection.type === 'c4') return () => null
   const nodes = nodeDataIdResolver(projection.class.classes.map((c) => c.name))
   const edges = elementDataIdResolver(projection.class.relations.map((r) => r.elementId))
   return (dataId: string) => nodes(dataId) ?? edges(dataId)

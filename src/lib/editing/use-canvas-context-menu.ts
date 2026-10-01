@@ -206,6 +206,15 @@ function nodeFormForTarget(
     if (message === undefined) return null
     return { kind, anchorElementId: message.elementId, from: message.from ?? undefined, x, y }
   }
+  if (kind === 'c4-relation') {
+    // c4 加关系表单（more-diagrams 工单 18）：元素右键 / Enter 键 → 锚点为该元素的声明行，
+    // from 预选该元素的 alias；终点由表单选择（画布无 data-id，Enter 键路径经结构树选中）
+    if (proj.type !== 'c4') return null
+    if (target.kind !== 'c4-element') return null
+    const el = proj.c4.elements.find((e) => e.elementId === target.elementId)
+    if (el === undefined) return null
+    return { kind, anchorElementId: el.elementId, from: el.alias, x, y }
+  }
   if (kind === 'block') {
     // sequence 独有的添加逻辑块：参与者上右键 → 锚点为该参与者的声明；
     // 空白处右键 → 无锚点（管线回退到文档最后一个元素）
@@ -258,6 +267,8 @@ function formTargetOfSelection(selection: Selection): ContextMenuTarget | null {
   if (selection.kind === 'agentflow-node') return { kind: 'agentflow-node', nodeId: selection.nodeId }
   // zenuml（more-diagrams 工单 19）：消息 → 加消息表单（Tab 键）的锚点与 from 预填
   if (selection.kind === 'zenuml-message') return { kind: 'zenuml-message', elementId: selection.elementId }
+  // c4（more-diagrams 工单 18）：元素 → 加关系表单（Enter 键）的锚点与 from 预选
+  if (selection.kind === 'c4-element') return { kind: 'c4-element', elementId: selection.elementId }
   return null
 }
 
@@ -466,7 +477,8 @@ export function useCanvasContextMenu(
         | 'wardley-link'
         | 'cynefin-transition'
         | 'agentflow-edge'
-        | 'zenuml-message',
+        | 'zenuml-message'
+        | 'c4-relation',
     ): void => {
       const proj = latest.current.projection
       const { selection } = useEditorStore.getState()

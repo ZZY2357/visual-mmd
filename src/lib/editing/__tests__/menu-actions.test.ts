@@ -244,6 +244,13 @@ describe('MENU_ACTIONS 穷尽性（工单 05 → 工单 01）', () => {
       { kind: 'zenuml-participant', elementId: 'participant:Client' },
       { kind: 'zenuml-message', elementId: 'message:1' },
       { kind: 'zenuml-fragment', elementId: 'fragment:1' },
+      // c4（more-diagrams 工单 18）：画布 DOM 无 data-id（实测降级），空白提供加元素 /
+      // 加边界；元素（改字段/连线/删除）/ 边界（改标题/删除）/ 关系（改字段/删除）
+      // 目标只能由结构树选中或程序构造
+      { kind: 'blank', diagramType: 'c4' },
+      { kind: 'c4-element', elementId: 'c4-element:banking' },
+      { kind: 'c4-boundary', elementId: 'c4-boundary:b0' },
+      { kind: 'c4-relation', elementId: 'relation:1' },
     ]
     const reachableIds = new Set(allTargets.flatMap((target) => contextMenuItems(target)))
     // apply-style 不经 onMenuItem 分发（CanvasPanel 渲染成子菜单开关，点样式名直接调
