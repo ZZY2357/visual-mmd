@@ -293,6 +293,8 @@ describe('结构树分区描述（工单 06）', () => {
       ishikawa: 'ishikawa-beta\n    照片模糊\n    人\n        手抖\n    设备\n        镜头脏',
       wardley:
         'wardley-beta\n    title 茶铺\n    anchor "顾客" [0.95, 0.63]\n    component "茶" [0.63, 0.81]\n    "顾客" -> "茶"\n    evolve "茶" 0.62',
+      cynefin:
+        'cynefin-beta\n  title 事件响应\n  complex\n    "排查根因"\n  clear\n    "重启服务"\n  complex --> clear : "模式已识别"',
     }
     for (const id of Object.keys(DIAGRAM_TYPES) as (keyof typeof DIAGRAM_TYPES)[]) {
       const registration = DIAGRAM_TYPES[id]

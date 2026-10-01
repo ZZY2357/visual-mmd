@@ -176,6 +176,16 @@ function nodeFormForTarget(
     if (link === undefined) return null
     return { kind, anchorElementId: link.elementId, from: link.from, x, y }
   }
+  if (kind === 'cynefin-transition') {
+    // cynefin 加转移表单（more-diagrams 工单 25）：空白右键 → 无锚点（管线回退文档末尾）；
+    // 转移上 Tab（经 formTargetOfSelection）→ 锚点为该转移行，from 预填同源域
+    if (proj.type !== 'cynefin') return null
+    if (target.kind === 'blank') return { kind, x, y }
+    if (target.kind !== 'cynefin-transition') return null
+    const t = proj.cynefin.transitions.find((x2) => x2.elementId === target.elementId)
+    if (t === undefined) return null
+    return { kind, anchorElementId: t.elementId, from: t.from, x, y }
+  }
   if (kind === 'block') {
     // sequence 独有的添加逻辑块：参与者上右键 → 锚点为该参与者的声明；
     // 空白处右键 → 无锚点（管线回退到文档最后一个元素）
@@ -222,6 +232,8 @@ function formTargetOfSelection(selection: Selection): ContextMenuTarget | null {
   if (selection.kind === 'architecture-service') return { kind: 'architecture-service', name: selection.name }
   // wardley（more-diagrams 工单 23）：连线 → 加连线表单（Tab 键）的锚点与 from 预填
   if (selection.kind === 'wardley-link') return { kind: 'wardley-link', elementId: selection.elementId }
+  // cynefin（more-diagrams 工单 25）：转移 → 加转移表单（Tab 键）的锚点与 from 预填
+  if (selection.kind === 'cynefin-transition') return { kind: 'cynefin-transition', elementId: selection.elementId }
   return null
 }
 
@@ -415,7 +427,8 @@ export function useCanvasContextMenu(
         | 'xychart-line'
         | 'xychart-bar'
         | 'architecture-edge'
-        | 'wardley-link',
+        | 'wardley-link'
+        | 'cynefin-transition',
     ): void => {
       const proj = latest.current.projection
       const { selection } = useEditorStore.getState()

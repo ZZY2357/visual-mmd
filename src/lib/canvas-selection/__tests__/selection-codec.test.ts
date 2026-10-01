@@ -32,6 +32,10 @@ const ALL_KINDS: readonly Selection[] = [
   { kind: 'wardley-node', name: '茶' },
   { kind: 'wardley-link', elementId: 'wardley-link:1' },
   { kind: 'wardley-evolve', elementId: 'wardley-evolve:1' },
+  // cynefin（more-diagrams 工单 25）：域名词行固定身份、条目/转移位置序；三类均不可寻址
+  { kind: 'cynefin-domain', name: 'complex' },
+  { kind: 'cynefin-item', elementId: 'cynefin-item:1' },
+  { kind: 'cynefin-transition', elementId: 'cynefin-transition:1' },
 ]
 
 /**
@@ -158,6 +162,13 @@ describe('selectionOfMenuTarget', () => {
       [{ kind: 'xychart-series', elementId: 'series:1' }, { kind: 'xychart-series', elementId: 'series:1' }],
       [{ kind: 'xychart-axis', axis: 'x' }, { kind: 'xychart-axis', axis: 'x' }],
       [{ kind: 'xychart-title' }, { kind: 'xychart-title' }],
+      // cynefin（more-diagrams 工单 25）：域 / 条目 / 转移菜单目标一一对应各自 Selection kind
+      [{ kind: 'cynefin-domain', name: 'complex' }, { kind: 'cynefin-domain', name: 'complex' }],
+      [{ kind: 'cynefin-item', elementId: 'cynefin-item:1' }, { kind: 'cynefin-item', elementId: 'cynefin-item:1' }],
+      [
+        { kind: 'cynefin-transition', elementId: 'cynefin-transition:1' },
+        { kind: 'cynefin-transition', elementId: 'cynefin-transition:1' },
+      ],
     ]
     for (const [target, sel] of cases) {
       expect(selectionOfMenuTarget(target), target.kind).toEqual(sel)

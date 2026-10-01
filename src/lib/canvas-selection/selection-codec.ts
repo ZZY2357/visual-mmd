@@ -196,6 +196,11 @@ export function fromCanvasId(diagramType: DiagramTypeId, canvas: CanvasSelection
     // 只写 class `wardley-node` + `<defs>` 箭头 marker），画布选中不产生
     return null
   }
+  if (diagramType === 'cynefin') {
+    // cynefin（more-diagrams 工单 25）：画布 DOM 无 data-id（research §4/§8.1 实测：
+    // 渲染器 `data-` 出现 0 次，仅 `<defs>` 箭头 marker 有 id），画布选中不产生
+    return null
+  }
   if (diagramType === 'gantt') {
     // gantt（more-diagrams 工单 11）：任务条 data-id = mermaid 渲染 id（渲染后处理
     // 反注），resolver 已把它映射回位置序 elementId（`task:N`）——node.id 即 elementId
@@ -359,6 +364,13 @@ export function selectionOfMenuTarget(target: ContextMenuTarget): Selection | nu
       return { kind: 'wardley-link', elementId: target.elementId }
     case 'wardley-evolve':
       return { kind: 'wardley-evolve', elementId: target.elementId }
+    // cynefin（more-diagrams 工单 25）：域 / 条目 / 转移菜单目标一一对应各自 Selection kind
+    case 'cynefin-domain':
+      return { kind: 'cynefin-domain', name: target.name }
+    case 'cynefin-item':
+      return { kind: 'cynefin-item', elementId: target.elementId }
+    case 'cynefin-transition':
+      return { kind: 'cynefin-transition', elementId: target.elementId }
     case 'blank':
       return null
   }
@@ -410,6 +422,7 @@ export function menuTargetOfCanvas(
     if (diagramType === 'treemap') return null // 无 data-id（实测降级，research §4），画布节点不可命中
     if (diagramType === 'ishikawa') return null // 无 data-id 且渲染序 ≠ 源码序（实测降级，research §4），画布节点不可命中
     if (diagramType === 'wardley') return null // 无 data-id（实测降级，research §4），画布节点不可命中
+    if (diagramType === 'cynefin') return null // 无 data-id（实测降级，research §4/§8.1），画布节点不可命中
     if (diagramType === 'gantt') {
       // gantt（more-diagrams 工单 11）：任务条虽可寻址，但元素级菜单不做（与 journey/pie
       // 同口径），编辑由结构树选中 + 属性表单承接——画布节点不产生菜单目标

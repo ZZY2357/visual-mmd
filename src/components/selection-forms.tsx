@@ -88,6 +88,8 @@ import { IshikawaNodeForm } from './ishikawa-forms'
 import { type IshikawaProjection } from '../lib/projection/ishikawa-projection'
 import { WardleyEvolveForm, WardleyLinkForm, WardleyNodeForm } from './wardley-forms'
 import { type WardleyProjection } from '../lib/projection/wardley-projection'
+import { CynefinDiagramForm, CynefinDomainForm, CynefinItemForm, CynefinTransitionForm } from './cynefin-forms'
+import { type CynefinProjection } from '../lib/projection/cynefin-projection'
 
 /**
  * 选中元素的属性表单，按投影图种分发（工单 04-bundle 自 PropertyPanel 迁出）：
@@ -1053,6 +1055,47 @@ function WardleySelectionForm({
   }
 }
 
+/**
+ * cynefin 属性表单（more-diagrams 工单 25）：图表级 = 提示文案 + 加转移（空白也可用）；
+ * 域名词行 = 展示条目数 + 加条目（域不可改名/删除，工单定案）；条目 = 改文本 / 删除；
+ * 转移 = 改 from/to（固定五域下拉）/ 改标签 / 删除（自环被管线拒绝，research 坑 5）。
+ * cynefin 画布无 data-id 寻址（见 cynefin-adapter），这些表单是唯一文本编辑入口。
+ */
+function CynefinSelectionForm({
+  projection,
+  selection,
+}: {
+  projection: CynefinProjection
+  selection: Selection | null
+}) {
+  const { t } = useTranslation()
+  if (selection === null) {
+    return (
+      <Text size="sm" c="dimmed" px="xs">
+        {t('app:propertyPanel.nothingSelected')}
+      </Text>
+    )
+  }
+  switch (selection.kind) {
+    case 'diagram':
+      return <CynefinDiagramForm projection={projection} />
+    case 'cynefin-domain': {
+      const domain = projection.domains.find((d) => d.name === selection.name)
+      return domain !== undefined ? <CynefinDomainForm domain={domain} /> : null
+    }
+    case 'cynefin-item': {
+      const item = projection.items.find((i) => i.elementId === selection.elementId)
+      return item !== undefined ? <CynefinItemForm item={item} /> : null
+    }
+    case 'cynefin-transition': {
+      const transition = projection.transitions.find((tr) => tr.elementId === selection.elementId)
+      return transition !== undefined ? <CynefinTransitionForm transition={transition} /> : null
+    }
+    default:
+      return null
+  }
+}
+
 export function ProjectionSelectionForm({ projection, selection }: { projection: AnyProjection; selection: Selection | null }) {
   if (projection.type === 'flowchart') {
     return <FlowchartSelectionForm projection={projection.flowchart} selection={selection} />
@@ -1119,6 +1162,9 @@ export function ProjectionSelectionForm({ projection, selection }: { projection:
   }
   if (projection.type === 'wardley') {
     return <WardleySelectionForm projection={projection.wardley} selection={selection} />
+  }
+  if (projection.type === 'cynefin') {
+    return <CynefinSelectionForm projection={projection.cynefin} selection={selection} />
   }
   return <ClassSelectionForm projection={projection.class} selection={selection} />
 }

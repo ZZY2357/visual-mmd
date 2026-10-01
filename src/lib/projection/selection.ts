@@ -124,6 +124,15 @@ export type Selection =
   | { kind: 'wardley-node'; name: string }
   | { kind: 'wardley-link'; elementId: string }
   | { kind: 'wardley-evolve'; elementId: string }
+  // cynefin-beta（more-diagrams 工单 25）：域是**固定五个的分组声明语句**（名字即身份
+  // `cynefin-domain:名`——五个域硬编码，无重名问题）；条目走位置序身份
+  // （`cynefin-item:N`，文档序；归属纯由「最近前序域名词行」决定，research §8.2——
+  // **没有 `in domain` 类锚点**）；转移走位置序身份（`cynefin-transition:N`）。
+  // 画布 DOM 无 data-id（research §4/§8.1 实测：渲染器 `data-` 出现 0 次，仅 <defs>
+  // 箭头 marker 有 id），实测降级见 cynefin-adapter；选中只来自结构树 / 表单 / 键盘。
+  | { kind: 'cynefin-domain'; name: string }
+  | { kind: 'cynefin-item'; elementId: string }
+  | { kind: 'cynefin-transition'; elementId: string }
 
 export const DIAGRAM_SELECTION: Selection = { kind: 'diagram' }
 
@@ -257,6 +266,12 @@ export function selectionKey(sel: Selection): string {
       return `wardley-link:${sel.elementId}`
     case 'wardley-evolve':
       return `wardley-evolve:${sel.elementId}`
+    case 'cynefin-domain':
+      return `cynefin-domain:${sel.name}`
+    case 'cynefin-item':
+      return `cynefin-item:${sel.elementId}`
+    case 'cynefin-transition':
+      return `cynefin-transition:${sel.elementId}`
   }
 }
 

@@ -25,6 +25,7 @@ import { isValidArchId, type ArchitectureIntent } from '../pipeline/architecture
 import { isValidTreemapName, isValidTreemapValue, type TreemapIntent } from '../pipeline/treemap'
 import { isValidIshikawaText, type IshikawaIntent } from '../pipeline/ishikawa'
 import { isValidWardleyName, type WardleyIntent } from '../pipeline/wardley'
+import { CYNEFIN_DOMAINS, type CynefinDomainName, type CynefinIntent } from '../pipeline/cynefin'
 import { setRelationIntent, RELATION_KIND_OPTIONS } from './class-forms'
 import {
   setMessageIntent,
@@ -258,6 +259,11 @@ export function createElement(ctx: MenuActionContext, target: ContextMenuTarget 
       // wardley（more-diagrams 工单 23）：添加入口是独立的 add-wardley-component /
       // add-wardley-anchor / add-wardley-link 动作（画布无 data-id，不做内联命名），
       // 不走 createElement
+      return null
+    }
+    if (proj.type === 'cynefin') {
+      // cynefin（more-diagrams 工单 25）：添加入口是独立的 add-cynefin-item /
+      // add-cynefin-transition 动作（画布无 data-id，不做内联命名），不走 createElement
       return null
     }
     // mindmap：节点目标 = 挂为其子节点；空白 / 无目标 = 建根（空文档）或挂到根节点下
@@ -846,6 +852,39 @@ function addWardleyNode(ctx: MenuActionContext, nodeKind: 'component' | 'anchor'
   if (applyPlan(plan, { commitIntent: ctx.commitIntent, select: ctx.select })) ctx.close()
 }
 
+// ---------- cynefin（more-diagrams 工单 25） ----------
+
+/**
+ * 加条目（cynefin）：归属「最后一个声明域」——条目归属纯按位置（research §8.2，无 `in domain`
+ * 锚点），投影里最后一个条目的 domain 即文档序最后一个声明域；无条目落 complex（第一个
+ * 固定域，research §1 域顺序）。落点域必须**已在源码中声明**（有域名词行）——条目必须紧随
+ * 域名词行，无域名词行时 mermaid 拒绝，落文档末尾会跑到转移行之后同样非法（research §8.3）；
+ * 未声明时回退第一个已声明域，一个都没有则安静不落码。锚点 = 该域末条目行（无则域名词行）。
+ * 文本避重（`新条目` 递推）。不做内联编辑（画布无 data-id，工单降级定案）——文本在右侧
+ * CynefinItemForm 改。
+ */
+function addCynefinItem(ctx: MenuActionContext): void {
+  const proj = ctx.projection
+  if (proj === null || proj.type !== 'cynefin') return
+  const p = proj.cynefin
+  const preferred: CynefinDomainName = p.items.length > 0 ? p.items[p.items.length - 1].domain : CYNEFIN_DOMAINS[0]
+  // 优先选归属域；未声明的域回退到第一个已声明域；一个都没有则安静不落码
+  const target =
+    p.domains.find((d) => d.name === preferred && d.declared) ?? p.domains.find((d) => d.declared)
+  if (target === undefined) return
+  // 锚点 = 该域末条目行（无则域名词行）——保证新条目留在域块内、转移行之前
+  const lastItem = target.items[target.items.length - 1]
+  const afterElementId = lastItem !== undefined ? lastItem.elementId : target.elementId
+  const text = nextFreeName('新条目', p.items.map((i) => i.text))
+  const plan: KeyPlan = {
+    intents: [{ type: 'add-item', domain: target.name, text, afterElementId } satisfies CynefinIntent],
+    newElementTarget: {
+      selection: { kind: 'cynefin-item', elementId: `cynefin-item:${p.nextItemOrdinal}` },
+    },
+  }
+  if (applyPlan(plan, { commitIntent: ctx.commitIntent, select: ctx.select })) ctx.close()
+}
+
 // ---------- architecture（more-diagrams 工单 17） ----------
 
 /**
@@ -1033,4 +1072,9 @@ export const MENU_ACTIONS: Record<Exclude<ContextMenuItemId, 'apply-style'>, Men
   'add-wardley-component': (ctx) => addWardleyNode(ctx, 'component'),
   'add-wardley-anchor': (ctx) => addWardleyNode(ctx, 'anchor'),
   'add-wardley-link': openFormOf('wardley-link'),
+  // cynefin（more-diagrams 工单 25）：add-cynefin-item 归属最后一个声明域（无则 complex，
+  // 文本避重，表单可改）；add-cynefin-transition 两端从固定五域下拉（提交才落码）。
+  // 元素级编辑降级到结构树 + 属性表单
+  'add-cynefin-item': addCynefinItem,
+  'add-cynefin-transition': openFormOf('cynefin-transition'),
 }

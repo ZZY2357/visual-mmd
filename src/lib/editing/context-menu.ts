@@ -103,6 +103,13 @@ export type ContextMenuTarget =
   | { kind: 'wardley-node'; name: string }
   | { kind: 'wardley-link'; elementId: string }
   | { kind: 'wardley-evolve'; elementId: string }
+// cynefin（more-diagrams 工单 25）：画布 DOM 无 data-id（research §4/§8.1 实测降级，见
+// cynefin-adapter），无元素级菜单目标——域/条目/转移目标只由测试/程序构造，画布右键实际
+// 只产出 blank（空白菜单提供 加条目 / 加转移 入口）。域选中 id 即域名词（固定五域）；
+// 条目 / 转移 elementId 即投影位置序身份。
+  | { kind: 'cynefin-domain'; name: string }
+  | { kind: 'cynefin-item'; elementId: string }
+  | { kind: 'cynefin-transition'; elementId: string }
 
 export type ContextMenuItemId =
   | 'add-node'
@@ -241,6 +248,12 @@ export type ContextMenuItemId =
   | 'add-wardley-component'
   | 'add-wardley-anchor'
   | 'add-wardley-link'
+  // cynefin（more-diagrams 工单 25）：空白 = 加条目（归属最后一个声明域；无声明域时落
+  // complex，文本避重）/ 加转移（两端从固定五域下拉，提交才落码）。域/条目/转移的编辑
+  // 不做元素级画布菜单（无 data-id 可命中，research §4/§8.1 实测降级），
+  // 由结构树选中 + 属性表单承接。
+  | 'add-cynefin-item'
+  | 'add-cynefin-transition'
 
 /**
  * 画布选中 → 菜单目标（工单 03 起为 `canvas-selection/selection-codec.ts` 的
@@ -323,6 +336,10 @@ function blankMenuItems(diagramType: DiagramTypeId): ContextMenuItemId[] {
       // wardley 的空白入口（工单 23 定案）：加 component / 加 anchor（坐标落图正中，
       // 名字避重）/ 加连线（两端从既有节点名下选，提交才落码）
       return ['add-wardley-component', 'add-wardley-anchor', 'add-wardley-link']
+    case 'cynefin':
+      // cynefin 的空白入口（工单 25 定案）：加条目（归属最后一个声明域，无则 complex）/
+      // 加转移（两端从固定五域下拉，提交才落码）
+      return ['add-cynefin-item', 'add-cynefin-transition']
     // DiagramTypeId 是开放类型（more-diagrams 工单 01）：未接入画布能力包的图种
     // 没有空白右键入口（unsupported 态下画布右键整体停用，不会走到这里）
     default:
@@ -464,6 +481,16 @@ export function contextMenuItems(target: ContextMenuTarget): ContextMenuItemId[]
     case 'wardley-link':
       return ['add-wardley-link', 'edit-label', 'delete']
     case 'wardley-evolve':
+      return ['edit-label', 'delete']
+    // cynefin（more-diagrams 工单 25）：域名词行 = 加条目（该域下；域不可改名/删除，
+    // 工单定案——与 ishikawa 鱼头同口径）；条目 = 加条目（同域内该条目之后）/ 编辑
+    // （选中 + 关菜单，右侧 CynefinItemForm 改文本）/ 删除；转移 = 编辑（选中 + 关菜单，
+    // 右侧 CynefinTransitionForm 改端点与标签）/ 删除
+    case 'cynefin-domain':
+      return ['add-cynefin-item']
+    case 'cynefin-item':
+      return ['add-cynefin-item', 'edit-text', 'delete']
+    case 'cynefin-transition':
       return ['edit-label', 'delete']
   }
 }

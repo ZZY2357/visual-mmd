@@ -126,6 +126,18 @@ describe('detectDiagramType：无法识别 → unsupported（null），绝不默
     expect(DIAGRAM_TYPES.wardley.detect('flowchart TB\n A-->B')).toBe(false)
   })
 
+  it('cynefin-beta 识别（more-diagrams 工单 25）：**大小写敏感**（与 ishikawa/wardley 的 /i 不同，research §1）', () => {
+    expect(detectDiagramType('cynefin-beta\ncomplex\n')?.id).toBe('cynefin')
+    // 尾冒号可选（research §1：`cynefin-beta:` 亦合法）
+    expect(detectDiagramType('cynefin-beta:\ncomplex\n')?.id).toBe('cynefin')
+    // 大小写敏感：大写不认领（mermaid 词法无 /i，research §1 命令级实测）
+    expect(detectDiagramType('Cynefin-Beta\ncomplex\n')).toBeNull()
+    expect(DIAGRAM_TYPES.cynefin.detect('CYNEFIN-BETA\n')).toBe(false)
+    // 声明行必须是裸关键字（首行即关键字），带尾随内容不认领
+    expect(DIAGRAM_TYPES.cynefin.detect('cynefin-beta extra\ncomplex\n')).toBe(false)
+    expect(DIAGRAM_TYPES.cynefin.detect('cynefin\ncomplex\n')).toBe(false)
+  })
+
   it('双关键字 detect 例（后续图种工单的写法约定）：-beta 可选且不越界误判', () => {
     // 后续 block/packet/xychart 工单应采用 `^<kw>(-beta)?\b` 形态；这里把形态锁死：
     // 可选 -beta 不妨碍裸关键字的识别，也不把更长的词（如 block-chain）误吞。

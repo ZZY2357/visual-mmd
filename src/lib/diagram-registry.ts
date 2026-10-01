@@ -22,6 +22,7 @@ import { architectureParser } from './pipeline/architecture'
 import { treemapParser } from './pipeline/treemap'
 import { ishikawaParser } from './pipeline/ishikawa'
 import { wardleyParser } from './pipeline/wardley'
+import { cynefinParser } from './pipeline/cynefin'
 import { frontmatterEnd } from './pipeline/frontmatter'
 import { buildFlowchartProjection, type FlowchartProjection } from './projection/flowchart-projection'
 import { buildSequenceProjection, type SequenceProjection } from './projection/sequence-projection'
@@ -57,6 +58,7 @@ import {
 import { buildTreemapProjection, type TreemapProjection } from './projection/treemap-projection'
 import { buildIshikawaProjection, type IshikawaProjection } from './projection/ishikawa-projection'
 import { buildWardleyProjection, type WardleyProjection } from './projection/wardley-projection'
+import { buildCynefinProjection, type CynefinProjection } from './projection/cynefin-projection'
 import { flowchartCanvasCapabilities } from './canvas-selection/flowchart-adapter'
 import { sequenceCanvasCapabilities } from './canvas-selection/sequence-adapter'
 import { classCanvasCapabilities } from './canvas-selection/class-adapter'
@@ -79,6 +81,7 @@ import { architectureCanvasCapabilities } from './canvas-selection/architecture-
 import { treemapCanvasCapabilities } from './canvas-selection/treemap-adapter'
 import { ishikawaCanvasCapabilities } from './canvas-selection/ishikawa-adapter'
 import { wardleyCanvasCapabilities } from './canvas-selection/wardley-adapter'
+import { cynefinCanvasCapabilities } from './canvas-selection/cynefin-adapter'
 import type { CanvasCapabilities } from './canvas-selection/capabilities'
 import { treePartitions, type TreePartitions } from './structure-tree/partitions'
 import { DEFAULT_DIAGRAM_SOURCE } from './storage'
@@ -123,6 +126,7 @@ export interface ProjectionTypes {
   treemap: TreemapProjection
   ishikawa: IshikawaProjection
   wardley: WardleyProjection
+  cynefin: CynefinProjection
 }
 
 /** 已注册图种的 id 集合（字面量联合，随 ProjectionTypes 增长） */
@@ -532,6 +536,38 @@ evolve "水壶" 0.62
 `
 
 /**
+ * cynefin 起步模板（more-diagrams 工单 25，research §7 草案）：`cynefin-beta` 声明 +
+ * title + 五个固定域（complex / complicated / clear / chaotic / confusion）+ 6 个引号条目
+ * + 2 条带标签转移。注意词法（research §2）：
+ * - 五个域名词是**硬编码关键字**，独占一行（可缩进），大小写敏感；
+ * - 条目**必须引号**（`DomainItem = label: STRING`，双/单引号皆可），裸词解析失败；
+ * - 条目归属**纯由位置决定**——紧跟最近前序域名词行（**没有 `in domain` 类锚点**，research §8.2）；
+ * - 转移 `域A --> 域B : "标签"`，端点只能是域名词，一条一行、顶层。
+ */
+export const CYNEFIN_TEMPLATE = `cynefin-beta
+  title 事件响应分类
+
+  complex
+    "排查根因"
+    "运行混沌实验"
+
+  complicated
+    "分析性能数据"
+
+  clear
+    "重启服务"
+
+  chaotic
+    "立即呼叫值班"
+
+  confusion
+    "未知故障模式"
+
+  complex --> complicated : "模式已识别"
+  clear --> chaotic : "自满"
+`
+
+/**
  * 注册表：数组是唯一权威（more-diagrams 工单 01），DIAGRAM_TYPES 由它推导。
  * detectDiagramType 按数组顺序显式遍历——不再维护手写的 if 分发链，
  * 新图种挂一条即可参与识别，无法识别时不再默认 flowchart（见下）。
@@ -775,6 +811,18 @@ export const DIAGRAM_TYPE_LIST: DiagramTypeRegistration[] = [
     buildProjection: (doc) => ({ type: 'wardley', wardley: buildWardleyProjection(doc) }),
     tree: treePartitions.wardley,
     canvas: wardleyCanvasCapabilities,
+  },
+  {
+    id: 'cynefin',
+    parser: cynefinParser,
+    template: CYNEFIN_TEMPLATE,
+    // mermaid 12 只有 `cynefin-beta` 一个关键字（Langium 语法勘察，research §1）：
+    // 无裸名 `cynefin`；语法允许尾冒号变体 `cynefin-beta:`；**检测与语法均大小写敏感**
+    // （research §8.3：`Cynefin-Beta` 解析失败）——故不像 ishikawa/wardley 那样放宽为 i
+    detect: (source) => /^cynefin-beta:?[ \t\r]*$/.test(firstStatementLine(source)),
+    buildProjection: (doc) => ({ type: 'cynefin', cynefin: buildCynefinProjection(doc) }),
+    tree: treePartitions.cynefin,
+    canvas: cynefinCanvasCapabilities,
   },
 ]
 

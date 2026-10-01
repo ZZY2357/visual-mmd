@@ -257,6 +257,46 @@ describe('金样合法性：默认图表模板能被 mermaid 渲染', () => {
     await expect(mermaid.parse(source)).resolves.toBeTruthy()
   })
 
+  it('cynefin 起步模板 parse 通过（more-diagrams 工单 25）', async () => {
+    const { CYNEFIN_TEMPLATE } = await import('../diagram-registry')
+    await expect(mermaid.parse(CYNEFIN_TEMPLATE)).resolves.toBeTruthy()
+  })
+
+  it('cynefin 端到端编辑场景（工单 25 验收：加条目 → 改文本 → 加转移 → 改转移端点 → 删条目 → 删转移 → 删文档行）落在合法 mermaid 源码上', async () => {
+    const { CYNEFIN_TEMPLATE } = await import('../diagram-registry')
+    const { cynefinParser } = await import('../pipeline/cynefin')
+    const { reassemble } = await import('../pipeline/document')
+    const parse = (src: string) => {
+      const r = cynefinParser.parse(src)
+      if (!r.ok) throw new Error(`解析失败：${r.error.message}`)
+      return r.doc
+    }
+    const apply = (doc: ReturnType<typeof parse>, intent: Parameters<typeof cynefinParser.resolveRewrites>[1]) => {
+      const rewrites = cynefinParser.resolveRewrites(doc, intent)
+      if (rewrites === null) throw new Error(`意图被拒绝：${JSON.stringify(intent)}`)
+      return parse(reassemble(doc, rewrites))
+    }
+
+    let doc = parse(CYNEFIN_TEMPLATE)
+    // 加条目（归属 complex）；锚点必须落在域块内（complex 末条目之后），
+    // 否则落文档末尾会跑到转移行之后，mermaid 拒绝（research §8.3）
+    doc = apply(doc, { type: 'add-item', domain: 'complex', text: '访谈用户', afterElementId: 'cynefin-item:2' })
+    doc = apply(doc, { type: 'set-item-text', elementId: 'cynefin-item:1', text: '深挖根因' }) // 改条目文本
+    doc = apply(doc, { type: 'add-transition', from: 'complicated', to: 'chaotic', label: '突发事件' }) // 加转移（带标签）
+    doc = apply(doc, { type: 'set-transition', elementId: 'cynefin-transition:1', to: 'clear' }) // 改转移终点
+    doc = apply(doc, { type: 'delete-item', elementId: 'cynefin-item:3' }) // 删刚加的条目（访谈用户）
+    doc = apply(doc, { type: 'delete-transition', elementId: 'cynefin-transition:2' }) // 删转移
+    doc = apply(doc, { type: 'delete-doc-line', elementId: 'cynefin-doc:1' }) // 删 title 行
+
+    const source = doc.source
+    expect(source).toContain('"深挖根因"')
+    expect(source).toContain('complicated --> chaotic : "突发事件"')
+    expect(source).toContain('complex --> clear : "模式已识别"')
+    expect(source).not.toContain('"访谈用户"')
+    expect(source).not.toContain('clear --> chaotic : "自满"')
+    await expect(mermaid.parse(source)).resolves.toBeTruthy()
+  })
+
   it('sequence 源码 parse 通过', async () => {
     const src = `sequenceDiagram
     Alice->>Bob: 你好
