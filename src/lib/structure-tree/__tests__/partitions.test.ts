@@ -294,6 +294,8 @@ describe('结构树分区描述（工单 06）', () => {
       wardley:
         'wardley-beta\n    title 茶铺\n    anchor "顾客" [0.95, 0.63]\n    component "茶" [0.63, 0.81]\n    "顾客" -> "茶"\n    evolve "茶" 0.62',
       venn: 'venn-beta\n    title 技能\n    set frontend["前端"]\n    set backend["后端"]\n    union frontend,backend["全栈"]',
+      usecase:
+        'usecase-beta\n    actor Customer\n    systemBoundary shop["商城"]\n        Login("登录")\n    end\n    Customer --> Login',
     }
     for (const id of Object.keys(DIAGRAM_TYPES) as (keyof typeof DIAGRAM_TYPES)[]) {
       const registration = DIAGRAM_TYPES[id]

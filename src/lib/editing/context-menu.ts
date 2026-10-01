@@ -108,6 +108,14 @@ export type ContextMenuTarget =
 // 身份 `venn-union:N`。两者都有画布菜单；text 节点与 style 行无 data-* 整体降级。
   | { kind: 'venn-set'; id: string }
   | { kind: 'venn-union'; elementId: string }
+// usecase（more-diagrams 工单 26）：节点（actor / 用例 / 边界）经渲染器 data-id 归一可寻址
+// （见 usecase-adapter），elementId 即投影 elementId（`actor:<id>` / `usecase:<id>` /
+// `boundary:<id>` / `relation:N`）。四类都有画布菜单；关系是唯一连线语句。
+  | { kind: 'usecase-actor'; elementId: string }
+  | { kind: 'usecase-usecase'; elementId: string }
+  | { kind: 'usecase-boundary'; elementId: string }
+  | { kind: 'usecase-relation'; elementId: string }
+  | { kind: 'usecase-note'; elementId: string }
 
 export type ContextMenuItemId =
   | 'add-node'
@@ -253,6 +261,15 @@ export type ContextMenuItemId =
   | 'add-venn-union'
   | 'edit-venn-area'
   | 'add-venn-union-here'
+  // usecase（more-diagrams 工单 26）：空白 = 加 actor / 加用例（占位 id 避重）/ 加系统边界；
+  // actor / 用例 = 改标签（D5「选中 + 关菜单」，右侧 UsecaseNodeForm 改）/ 从这里连线 /
+  // 删除（级联删引用它的关系与 note）；边界 = 改标题（D5，右侧表单改）/ 删除（级联删 end）；
+  // 关系 = 改标签与种类（D5，右侧 UsecaseRelationForm 改）/ 删除
+  | 'add-usecase-actor'
+  | 'add-usecase-case'
+  | 'add-usecase-boundary'
+  | 'edit-usecase-element'
+  | 'edit-usecase-relation'
 
 /**
  * 画布选中 → 菜单目标（工单 03 起为 `canvas-selection/selection-codec.ts` 的
@@ -338,6 +355,10 @@ function blankMenuItems(diagramType: DiagramTypeId): ContextMenuItemId[] {
     case 'venn':
       // venn 的空白入口（工单 21 定案）：加集合（占位 id 避重）/ 加交集（两个集合组二元交集）
       return ['add-venn-set', 'add-venn-union']
+    case 'usecase':
+      // usecase 的空白入口（工单 26 定案）：加 actor / 加用例（占位 id 避重）/
+      // 加系统边界（`systemBoundary … end` 两行）。关系从节点菜单「从这里连线」进入更省一步
+      return ['add-usecase-actor', 'add-usecase-case', 'add-usecase-boundary']
     // DiagramTypeId 是开放类型（more-diagrams 工单 01）：未接入画布能力包的图种
     // 没有空白右键入口（unsupported 态下画布右键整体停用，不会走到这里）
     default:
@@ -487,5 +508,18 @@ export function contextMenuItems(target: ContextMenuTarget): ContextMenuItemId[]
       return ['edit-venn-area', 'add-venn-set', 'add-venn-union-here', 'delete']
     case 'venn-union':
       return ['edit-venn-area', 'delete']
+    // usecase（more-diagrams 工单 26）：actor / 用例 = 改标签与形状（D5「选中 + 关菜单」，
+    // 右侧 UsecaseNodeForm 改）/ 从这里连线 / 删除（级联删引用它的关系与 note）；
+    // 边界 = 改标题（D5，右侧表单改）/ 删除（级联删 end）；关系 = 改标签与种类（D5，右侧
+    // UsecaseRelationForm 改）/ 删除
+    case 'usecase-actor':
+    case 'usecase-usecase':
+      return ['edit-usecase-element', 'link-from-here', 'delete']
+    case 'usecase-boundary':
+      return ['edit-usecase-element', 'delete']
+    case 'usecase-relation':
+      return ['edit-usecase-relation', 'delete']
+    case 'usecase-note':
+      return ['delete']
   }
 }

@@ -265,6 +265,34 @@ export function annotateVennDataIds(
   }
 }
 
+/**
+ * mermaid v12 usecase-beta（more-diagrams 工单 26）：渲染器 `annotateUsecaseElements` 渲染后
+ * **已给每个元素写 `data-id`**（= mermaid 模型 id，research §4 实测）——节点 id 是源码
+ * 标识符（引号声明无 id 时为推导串，如 `Reset_password`），关系 id 是 `edge-${匿名序号}`
+ * （0 基，只对匿名边自增；显式边 id 时为该 id）。既有 data-id 选中链路要求值是**投影
+ * elementId**，故此处按投影给的 `trueDataId → elementId` 表把值**归一**（加前缀
+ * `actor:` / `usecase:` / `boundary:` / `note:`，关系 `edge-k` → `relation:N`）。
+ *
+ * 与 venn 的「从无到有反注」不同：usecase 是「改写既有 data-id 的值」。门卫（绝不误归属）：
+ * 只改写表中能命中的值，表外值（渲染器补的悬空引用端点、合成元素）原样保留——resolver
+ * 只认投影已知 elementId，故表外值点选安静不命中（如实降级）。idempotent（表外 / 已归一
+ * 的值不再命中——归一后的值本身不在 `trueDataId` 键集合里，二次调用找不到匹配即不动）。
+ * 作用域严格限定在 svg 内带 data-id 的元素（usecase 渲染产物专属——注册图种中只有它
+ * 由渲染器预写 data-id，其余图种的反注在各自专属函数里先完成，幂等跳过已标注者）。
+ */
+export function annotateUsecaseDataIds(
+  root: ParentNode,
+  ids: ReadonlyMap<string, string>,
+): void {
+  if (root.querySelector('svg') === null) return
+  for (const el of root.querySelectorAll('svg [data-id]')) {
+    const current = el.getAttribute('data-id')
+    if (current === null) continue
+    const normalized = ids.get(current)
+    if (normalized !== undefined) el.setAttribute('data-id', normalized)
+  }
+}
+
 export function annotateNodeDataIds(root: ParentNode): void {
   for (const g of root.querySelectorAll('g.node')) {
     if (g.getAttribute('data-id') !== null) continue

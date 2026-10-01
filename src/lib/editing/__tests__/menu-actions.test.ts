@@ -209,6 +209,14 @@ describe('MENU_ACTIONS 穷尽性（工单 05 → 工单 01）', () => {
       { kind: 'blank', diagramType: 'venn' },
       { kind: 'venn-set', id: 'frontend' },
       { kind: 'venn-union', elementId: 'venn-union:1' },
+      // usecase（more-diagrams 工单 26）：空白加 actor / 加用例 / 加系统边界 + actor / 用例
+      // （改标签/连线/删除）+ 边界（改标题/删除）+ 关系（改标签与种类/删除）+ 注释（删除）
+      { kind: 'blank', diagramType: 'usecase' },
+      { kind: 'usecase-actor', elementId: 'actor:Customer' },
+      { kind: 'usecase-usecase', elementId: 'usecase:Login' },
+      { kind: 'usecase-boundary', elementId: 'boundary:shop' },
+      { kind: 'usecase-relation', elementId: 'relation:1' },
+      { kind: 'usecase-note', elementId: 'note:1' },
     ]
     const reachableIds = new Set(allTargets.flatMap((target) => contextMenuItems(target)))
     // apply-style 不经 onMenuItem 分发（CanvasPanel 渲染成子菜单开关，点样式名直接调

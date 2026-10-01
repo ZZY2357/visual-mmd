@@ -15,6 +15,7 @@ import {
 import { blockSelectionOf } from './block-adapter'
 import { xychartSelectionOf } from './xychart-adapter'
 import { vennSelectionOf } from './venn-adapter'
+import { usecaseSelectionOf } from './usecase-adapter'
 import {
   parseArchitectureGroupElementId,
   parseArchitectureJunctionElementId,
@@ -146,6 +147,14 @@ export function canvasIdOf(selection: Selection): string | null {
       return `venn-set:${selection.id}`
     case 'venn-union':
       return selection.elementId
+    // usecase（more-diagrams 工单 26）：节点 / 关系的 data-id 即投影 elementId
+    // （渲染器已写 data-id，由 nodeAnnotator 归一为 elementId，见 usecase-adapter）
+    case 'usecase-actor':
+    case 'usecase-usecase':
+    case 'usecase-boundary':
+    case 'usecase-relation':
+    case 'usecase-note':
+      return selection.elementId
     default:
       return null
   }
@@ -267,6 +276,12 @@ export function fromCanvasId(diagramType: DiagramTypeId, canvas: CanvasSelection
     // `venn-union:N`，渲染后从 `data-venn-sets` 反注），按前缀解回两类选中
     return vennSelectionOf(canvas)
   }
+  if (diagramType === 'usecase') {
+    // usecase（more-diagrams 工单 26）：node.id = 投影 elementId（`actor:<id>` /
+    // `usecase:<id>` / `boundary:<id>` / `relation:N`，渲染器已写 data-id 由 nodeAnnotator
+    // 归一），按前缀解回四类选中
+    return usecaseSelectionOf(canvas)
+  }
   if (canvas.kind === 'element') return edgeSelectionOf(diagramType, canvas.elementId)
   if (canvas.kind === 'node') {
     return diagramType === 'sequence'
@@ -376,6 +391,17 @@ export function selectionOfMenuTarget(target: ContextMenuTarget): Selection | nu
       return { kind: 'venn-set', id: target.id }
     case 'venn-union':
       return { kind: 'venn-union', elementId: target.elementId }
+    // usecase（more-diagrams 工单 26）：actor / 用例 / 边界 / 关系菜单目标一一对应
+    case 'usecase-actor':
+      return { kind: 'usecase-actor', elementId: target.elementId }
+    case 'usecase-usecase':
+      return { kind: 'usecase-usecase', elementId: target.elementId }
+    case 'usecase-boundary':
+      return { kind: 'usecase-boundary', elementId: target.elementId }
+    case 'usecase-relation':
+      return { kind: 'usecase-relation', elementId: target.elementId }
+    case 'usecase-note':
+      return { kind: 'usecase-note', elementId: target.elementId }
     case 'blank':
       return null
   }
@@ -504,6 +530,25 @@ export function menuTargetOfCanvas(
           return { kind: 'venn-set', id: selection.id }
         case 'venn-union':
           return { kind: 'venn-union', elementId: selection.elementId }
+        default:
+          return null
+      }
+    }
+    // usecase（more-diagrams 工单 26）：node.id = 投影 elementId（`actor:` / `usecase:` /
+    // `boundary:` / `relation:`，渲染器已写 data-id 由 nodeAnnotator 归一），四类都有菜单
+    if (diagramType === 'usecase') {
+      const selection = usecaseSelectionOf(canvas)
+      switch (selection?.kind) {
+        case 'usecase-actor':
+          return { kind: 'usecase-actor', elementId: selection.elementId }
+        case 'usecase-usecase':
+          return { kind: 'usecase-usecase', elementId: selection.elementId }
+        case 'usecase-boundary':
+          return { kind: 'usecase-boundary', elementId: selection.elementId }
+        case 'usecase-relation':
+          return { kind: 'usecase-relation', elementId: selection.elementId }
+        case 'usecase-note':
+          return { kind: 'usecase-note', elementId: selection.elementId }
         default:
           return null
       }

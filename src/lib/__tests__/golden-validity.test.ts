@@ -118,6 +118,42 @@ describe('金样合法性：默认图表模板能被 mermaid 渲染', () => {
     await expect(mermaid.parse(VENN_TEMPLATE)).resolves.toBeTruthy()
   })
 
+  it('usecase 起步模板 parse 通过（more-diagrams 工单 26）', async () => {
+    const { USECASE_TEMPLATE } = await import('../diagram-registry')
+    await expect(mermaid.parse(USECASE_TEMPLATE)).resolves.toBeTruthy()
+  })
+
+  it('usecase 端到端编辑场景（工单 26 验收：加 actor → 加用例 → 改标签 → 改名 → 加边界 → 删用例）落在合法 mermaid 源码上', async () => {
+    const { USECASE_TEMPLATE } = await import('../diagram-registry')
+    const { usecaseParser } = await import('../pipeline/usecase')
+    const { reassemble } = await import('../pipeline/document')
+    const parse = (src: string) => {
+      const r = usecaseParser.parse(src)
+      if (!r.ok) throw new Error(`解析失败：${r.error.message}`)
+      return r.doc
+    }
+    const apply = (doc: ReturnType<typeof parse>, intent: Parameters<typeof usecaseParser.resolveRewrites>[1]) => {
+      const rewrites = usecaseParser.resolveRewrites(doc, intent)
+      if (rewrites === null) throw new Error(`意图被拒绝：${JSON.stringify(intent)}`)
+      return parse(reassemble(doc, rewrites))
+    }
+
+    let doc = parse(USECASE_TEMPLATE)
+    doc = apply(doc, { type: 'add-actor', id: 'Guest', label: '访客' }) // 加参与者
+    doc = apply(doc, { type: 'add-usecase', id: 'Browse', label: '浏览商品' }) // 加用例
+    doc = apply(doc, { type: 'set-usecase-label', elementId: 'usecase:Browse', label: '浏览' }) // 改标签
+    doc = apply(doc, { type: 'rename-usecase-id', elementId: 'usecase:Browse', id: 'Browsing' }) // 改名（连带重写引用）
+    doc = apply(doc, { type: 'set-usecase-title', text: '商城用例' }) // 加标题
+    doc = apply(doc, { type: 'delete-usecase-element', elementId: 'actor:Admin' }) // 删参与者（级联删引用）
+
+    const source = doc.source
+    expect(source).toContain('actor Guest("访客")')
+    expect(source).toContain('Browsing("浏览")')
+    expect(source).toContain('accTitle: 商城用例')
+    expect(source).not.toContain('actor Admin')
+    await expect(mermaid.parse(source)).resolves.toBeTruthy()
+  })
+
   it('venn 端到端编辑场景（工单 21 验收：加集合 → 改标签 → 加交集 → 改尺寸 → 删集合）落在合法 mermaid 源码上', async () => {
     const { VENN_TEMPLATE } = await import('../diagram-registry')
     const { vennParser } = await import('../pipeline/venn')

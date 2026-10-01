@@ -131,6 +131,18 @@ export type Selection =
   // （见 venn-adapter）；text 节点与单条 style 无 data-* 降级（结构树 + 表单为入口）。
   | { kind: 'venn-set'; id: string }
   | { kind: 'venn-union'; elementId: string }
+  // usecase-beta（more-diagrams 工单 26）：actor / 用例 / 系统边界 / 注释是**名字即身份**
+  // （`actor:<id>` / `usecase:<id>` / `boundary:<id>`——mermaid 内部 actor/用例/边界/json
+  // 共享同一命名空间，引号声明无 id 时按推导串 `Reset_password` 定身份）；关系走位置序身份
+  // （`relation:N`——显式边 id 可省略/可重复）。画布 DOM **可寻址**（research §4 实测：
+  // 节点 `data-id` = 源码标识符、关系 `data-id` = `edge-${匿名序号}`，见 usecase-adapter）。
+  // 注释节点（note for）可选中；其内部虚线连接边（internal）不作独立选中。
+  | { kind: 'usecase-actor'; elementId: string }
+  | { kind: 'usecase-usecase'; elementId: string }
+  | { kind: 'usecase-boundary'; elementId: string }
+  | { kind: 'usecase-relation'; elementId: string }
+  // usecase 注释节点（`note for X "…"`）：名字即身份 `note:<n>`（位置序计数）。
+  | { kind: 'usecase-note'; elementId: string }
 
 export const DIAGRAM_SELECTION: Selection = { kind: 'diagram' }
 
@@ -268,6 +280,16 @@ export function selectionKey(sel: Selection): string {
       return `venn-set:${sel.id}`
     case 'venn-union':
       return `venn-union:${sel.elementId}`
+    case 'usecase-actor':
+      return `usecase-actor:${sel.elementId}`
+    case 'usecase-usecase':
+      return `usecase-usecase:${sel.elementId}`
+    case 'usecase-boundary':
+      return `usecase-boundary:${sel.elementId}`
+    case 'usecase-relation':
+      return `usecase-relation:${sel.elementId}`
+    case 'usecase-note':
+      return `usecase-note:${sel.elementId}`
   }
 }
 
