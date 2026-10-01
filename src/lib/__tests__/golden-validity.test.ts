@@ -409,6 +409,52 @@ describe('金样合法性：默认图表模板能被 mermaid 渲染', () => {
     await expect(mermaid.parse(source)).resolves.toBeTruthy()
   })
 
+  it('agentflow 起步模板 parse 通过（more-diagrams 工单 27）', async () => {
+    const { AGENTFLOW_TEMPLATE } = await import('../diagram-registry')
+    await expect(mermaid.parse(AGENTFLOW_TEMPLATE)).resolves.toBeTruthy()
+  })
+
+  it('agentflow 端到端编辑场景（工单 27 验收：改方向 → 加节点 → 改文本 → 改形状 → 改名 → 加边 → 加标签 → 加 flow → 改 flow 标题 → 删 flow → 删节点 → 删边）落在合法 mermaid 源码上', async () => {
+    const { AGENTFLOW_TEMPLATE } = await import('../diagram-registry')
+    const { agentflowParser } = await import('../pipeline/agentflow')
+    const { reassemble } = await import('../pipeline/document')
+    const parse = (src: string) => {
+      const r = agentflowParser.parse(src)
+      if (!r.ok) throw new Error(`解析失败：${r.error.message}`)
+      return r.doc
+    }
+    const apply = (doc: ReturnType<typeof parse>, intent: Parameters<typeof agentflowParser.resolveRewrites>[1]) => {
+      const rewrites = agentflowParser.resolveRewrites(doc, intent)
+      if (rewrites === null) throw new Error(`意图被拒绝：${JSON.stringify(intent)}`)
+      return parse(reassemble(doc, rewrites))
+    }
+
+    let doc = parse(AGENTFLOW_TEMPLATE)
+    doc = apply(doc, { type: 'set-direction', direction: 'LR' }) // 改方向 TB → LR
+    doc = apply(doc, { type: 'add-node', nodeId: 'archive', text: '归档', shape: 'action' }) // 加节点（文档末尾）
+    doc = apply(doc, { type: 'set-node-text', nodeId: 'archive', text: '归档产物' }) // 改节点文本
+    doc = apply(doc, { type: 'set-node-shape', nodeId: 'archive', shape: 'task' }) // 改节点形状
+    doc = apply(doc, { type: 'rename-node', nodeId: 'archive', newId: 'store' }) // 改节点 id（全图引用改写）
+    doc = apply(doc, { type: 'add-edge', from: 'publish', to: 'store', edgeKind: 'failure', label: '失败' }) // 加 failure 边
+    doc = apply(doc, { type: 'set-edge-label', elementId: 'edge:publish->store', label: '再次失败' }) // 改边标签
+    doc = apply(doc, { type: 'add-flow', id: 'auditor', title: '审计 Agent' }) // 加空 flow 块（落文档末尾）
+    // 容器 elementId 是**文档级条目序号**（`container:flow:{entries.length}`）——插入后全文档
+    // 条目重排，故此处用插入后投影实测值（结构树/表单侧也只以投影值寻址，不做跨次预测）
+    doc = apply(doc, { type: 'set-flow-title', elementId: 'container:flow:34', title: '审计流程' }) // 改 flow 标题
+    doc = apply(doc, { type: 'delete-flow', elementId: 'container:flow:34' }) // 删刚加的 flow 块
+    doc = apply(doc, { type: 'delete-node', nodeId: 'lookup' }) // 删节点（连带删触及边）
+    doc = apply(doc, { type: 'delete-edge', elementId: 'edge:draft->guide' }) // 删 reference 边
+
+    const source = doc.source
+    expect(source).toContain('agentflow-beta LR')
+    expect(source).toContain('store["归档产物"]@{ shape: task }')
+    expect(source).toContain('publish -- 再次失败 --x store')
+    expect(source).not.toContain('auditor')
+    expect(source).not.toContain('changelog_search')
+    expect(source).not.toContain('draft -.- guide')
+    await expect(mermaid.parse(source)).resolves.toBeTruthy()
+  })
+
   it('sequence 源码 parse 通过', async () => {
     const src = `sequenceDiagram
     Alice->>Bob: 你好

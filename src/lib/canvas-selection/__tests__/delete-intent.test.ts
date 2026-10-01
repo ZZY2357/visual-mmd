@@ -16,6 +16,7 @@ import {
   USECASE_TEMPLATE,
   TREEVIEW_TEMPLATE,
   EVENT_MODELING_TEMPLATE,
+  AGENTFLOW_TEMPLATE,
   type AnyProjection,
 } from '../../diagram-registry'
 import type { EditIntent } from '../../pipeline/parser'
@@ -36,6 +37,7 @@ import { vennParser } from '../../pipeline/venn'
 import { usecaseParser } from '../../pipeline/usecase'
 import { treeviewParser } from '../../pipeline/treeview'
 import { eventModelingParser } from '../../pipeline/eventmodeling'
+import { agentflowParser } from '../../pipeline/agentflow'
 import { buildClassProjection } from '../../projection/class-projection'
 import { buildFlowchartProjection } from '../../projection/flowchart-projection'
 import { buildMindmapProjection } from '../../projection/mindmap-projection'
@@ -53,6 +55,7 @@ import { buildVennProjection } from '../../projection/venn-projection'
 import { buildUsecaseProjection } from '../../projection/usecase-projection'
 import { buildTreeviewProjection } from '../../projection/treeview-projection'
 import { buildEventModelingProjection } from '../../projection/eventmodeling-projection'
+import { buildAgentflowProjection } from '../../projection/agentflow-projection'
 import type { Selection } from '../../projection/selection'
 import {
   blockDeleteIntent,
@@ -72,6 +75,7 @@ import {
   usecaseDeleteIntent,
   treeviewDeleteIntent,
   eventModelingDeleteIntent,
+  agentflowDeleteIntent,
 } from '../../editing/canvas-keyboard'
 import {
   deleteClassDefIntent,
@@ -627,6 +631,55 @@ function eventModelingCases(p: ReturnType<typeof eventModelingProjection>): Dele
   ]
 }
 
+/** agentflowProjection：agentflow 投影（more-diagrams 工单 27） */
+function agentflowProjection(): Extract<AnyProjection, { type: 'agentflow' }> {
+  const parsed = agentflowParser.parse(AGENTFLOW_TEMPLATE)
+  if (!parsed.ok) throw new Error(parsed.error.message)
+  return { type: 'agentflow', agentflow: buildAgentflowProjection(parsed.doc) }
+}
+
+/** agentflow（more-diagrams 工单 27）：节点（级联触及边）、边、flow 容器、文档行四类删除入口。
+ * 容器无画布菜单目标（无 data-id，走结构树），但走能力包与结构树删除键。 */
+function agentflowCases(p: ReturnType<typeof agentflowProjection>): DeleteCase[] {
+  const node = p.agentflow.nodes[0]
+  const edge = p.agentflow.edges[0]
+  const container = p.agentflow.containers[0]
+  const cases: DeleteCase[] = [
+    {
+      name: 'agentflow-node',
+      selection: { kind: 'agentflow-node', nodeId: node.nodeId },
+      panelIntent: { type: 'delete-node', nodeId: node.nodeId },
+      menuTarget: { kind: 'agentflow-node', nodeId: node.nodeId },
+      menuItemId: 'delete',
+    },
+    {
+      name: 'agentflow-edge',
+      selection: { kind: 'agentflow-edge', elementId: edge.elementId },
+      panelIntent: { type: 'delete-edge', elementId: edge.elementId },
+      menuTarget: { kind: 'agentflow-edge', elementId: edge.elementId },
+      menuItemId: 'delete',
+    },
+    {
+      name: 'agentflow-flow',
+      selection: { kind: 'agentflow-flow', elementId: container.elementId },
+      panelIntent: { type: 'delete-flow', elementId: container.elementId },
+      menuTarget: { kind: 'agentflow-flow', elementId: container.elementId },
+      menuItemId: 'delete',
+    },
+  ]
+  const docLine = p.agentflow.docLines[0]
+  if (docLine !== undefined) {
+    cases.push({
+      name: 'agentflow-doc',
+      selection: { kind: 'agentflow-doc', elementId: docLine.elementId },
+      panelIntent: { type: 'delete-doc-line', elementId: docLine.elementId },
+      menuTarget: { kind: 'agentflow-doc', elementId: docLine.elementId },
+      menuItemId: 'delete',
+    })
+  }
+  return cases
+}
+
 const SUITES = [
   { type: 'flowchart' as const, projection: flowProjection, cases: flowchartCases },
   { type: 'class' as const, projection: classProjection, cases: classCases },
@@ -645,6 +698,7 @@ const SUITES = [
   { type: 'usecase' as const, projection: usecaseProjection, cases: usecaseCases },
   { type: 'treeview' as const, projection: treeviewProjection, cases: treeviewCases },
   { type: 'eventmodeling' as const, projection: eventModelingProjection, cases: eventModelingCases },
+  { type: 'agentflow' as const, projection: agentflowProjection, cases: agentflowCases },
 ]
 
 describe('deleteIntent 等价性：三个删除入口对同一 selection 产出同一意图（工单 03）', () => {
@@ -705,6 +759,8 @@ describe('deleteIntent 等价性：三个删除入口对同一 selection 产出�
                 return treeviewDeleteIntent(projection.treeview, sel)
               case 'eventmodeling':
                 return eventModelingDeleteIntent(projection.eventmodeling, sel)
+              case 'agentflow':
+                return agentflowDeleteIntent(projection.agentflow, sel)
             }
           })()
           // 键盘按选中种类设门（flowchart/mindmap 只删节点）；门内的种类必须与能力包等价
@@ -725,7 +781,8 @@ describe('deleteIntent 等价性：三个删除入口对同一 selection 产出�
             suite.type === 'venn' ||
             suite.type === 'usecase' ||
             suite.type === 'treeview' ||
-            suite.type === 'eventmodeling'
+            suite.type === 'eventmodeling' ||
+            suite.type === 'agentflow'
           if (!keyboardHandles) {
             expect(viaKeyboard).toBeNull() // 门外：键盘安静地不产出意图（零变化护栏）
             return
@@ -791,6 +848,7 @@ describe('deleteIntent 等价性：三个删除入口对同一 selection 产出�
           usecase: { kind: 'usecase-usecase', elementId: 'usecase:__不存在__' },
           treeview: { kind: 'treeview-node', elementId: 'treeview-node:999' },
           eventmodeling: { kind: 'em-frame', elementId: 'frame:999' },
+          agentflow: { kind: 'agentflow-node', nodeId: '__不存在__' },
         }
         expect(caps.deleteIntent(projection, gone[suite.type])).toBeNull()
 

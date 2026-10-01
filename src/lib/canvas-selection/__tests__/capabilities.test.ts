@@ -11,6 +11,7 @@ import {
   SEQUENCE_TEMPLATE,
   VENN_TEMPLATE,
   USECASE_TEMPLATE,
+  AGENTFLOW_TEMPLATE,
   type AnyProjection,
 } from '../../diagram-registry'
 import { DEFAULT_DIAGRAM_SOURCE } from '../../storage'
@@ -21,6 +22,7 @@ import { kanbanDataIdResolver } from '../kanban-adapter'
 import { blockDataIdResolver } from '../block-adapter'
 import { sankeyDataIdResolver } from '../sankey-adapter'
 import { xychartDataIdResolver } from '../xychart-adapter'
+import { agentflowDataIdResolver } from '../agentflow-adapter'
 import type { Selection } from '../../projection/selection'
 
 /**
@@ -43,6 +45,7 @@ const SOURCES = {
   architecture: ARCHITECTURE_TEMPLATE,
   venn: VENN_TEMPLATE,
   usecase: USECASE_TEMPLATE,
+  agentflow: AGENTFLOW_TEMPLATE,
 } as const
 
 function projectionOf(type: keyof typeof SOURCES): AnyProjection {
@@ -52,7 +55,20 @@ function projectionOf(type: keyof typeof SOURCES): AnyProjection {
   return registration.buildProjection(parsed.doc)
 }
 
-const TYPES = ['flowchart', 'sequence', 'class', 'mindmap', 'kanban', 'block', 'sankey', 'xychart', 'architecture', 'venn', 'usecase'] as const
+const TYPES = [
+  'flowchart',
+  'sequence',
+  'class',
+  'mindmap',
+  'kanban',
+  'block',
+  'sankey',
+  'xychart',
+  'architecture',
+  'venn',
+  'usecase',
+  'agentflow',
+] as const
 
 describe('capabilitiesOf：8 图种 × 8 能力查表（工单 04 + architecture-deepening-2 工单 03 + 工单 09/13/14）', () => {
   for (const type of TYPES) {
@@ -195,6 +211,19 @@ describe('class/sequence adapter resolver 对照（与原 CanvasPanel.resolverOf
     expect(resolve('xychart-y-axis')).toEqual({ kind: 'node', id: 'xychart-y-axis' })
     // 渲染器根本没有 data-id / id 写入——任何别形 id 安静拒绝
     expect(resolve('line-plot-0')).toBeNull()
+    expect(resolve('__nope__')).toBeNull()
+  })
+
+  it('agentflow（more-diagrams 工单 27）：节点 id → 节点选中（反注后 data-id 即节点 id），边 `L_{from}_{to}_{n}` → 位置序选中，未知 → null', () => {
+    const projection = projectionOf('agentflow') as Extract<AnyProjection, { type: 'agentflow' }>
+    const resolve = agentflowDataIdResolver(projection.agentflow)
+    // 节点：反注后 data-id 即源码节点 id（DOM id `{svgId}-agentflow-{id}-{n}` 经 nodeIdOfDomId 剥离前缀）
+    const node = projection.agentflow.nodes[0]
+    expect(resolve(node.nodeId)).toEqual({ kind: 'node', id: node.nodeId })
+    // 边：走 flowchart 口径的 `L_{from}_{to}_{n}`（n 从 0 起，与 edgeDataIdResolver 约定一致）
+    const edge = projection.agentflow.edges[0]
+    expect(resolve(`L_${edge.from}_${edge.to}_0`)).toEqual({ kind: 'edge', from: edge.from, to: edge.to, occurrence: 1 })
+    // 无匹配 → null（best-effort，ADR-0007）
     expect(resolve('__nope__')).toBeNull()
   })
 })

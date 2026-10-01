@@ -129,6 +129,14 @@ export type ContextMenuTarget =
 // （`frame:N` / `data:N`）；派生连线（`relation:N`）无源码语句、只读，无编辑目标。
   | { kind: 'em-frame'; elementId: string }
   | { kind: 'em-data'; elementId: string }
+// agentflow（more-diagrams 工单 27）：节点 data-id 即源码节点 id（渲染后从
+// `{svgId}-agentflow-{id}-{n}` DOM id 反注可寻址），节点有画布菜单；边有原生
+// `L_{from}_{to}_{n}` data-id（尽力而为）；容器（`flow` 分组）无 data-id（research §8.2
+// 实测降级），容器 / 文档行目标只由测试/程序构造，画布右键实际只产出节点、边与 blank。
+  | { kind: 'agentflow-node'; nodeId: string }
+  | { kind: 'agentflow-edge'; elementId: string }
+  | { kind: 'agentflow-flow'; elementId: string }
+  | { kind: 'agentflow-doc'; elementId: string }
 
 export type ContextMenuItemId =
   | 'add-node'
@@ -299,6 +307,15 @@ export type ContextMenuItemId =
   | 'add-em-data'
   | 'edit-em-frame'
   | 'edit-em-data'
+  // agentflow（more-diagrams 工单 27）：空白 = 加节点（创建 + 落码，不做内联命名——节点
+  // 身份即源码 id）/ 加 flow 容器（空标题，右侧表单可改）。节点 = 改文本（D5「选中 + 关菜单」，
+  // 右侧 AgentflowNodeForm 改）/ 从这里连线（加边表单，提交才落码）/ 删除；边 = 改标签
+  //（D5「选中 + 关菜单」，右侧表单改）/ 删除；容器 = 改标题（D5，右侧表单改）/ 删除；
+  // 文档行 = 删除。
+  | 'add-agentflow-node'
+  | 'add-agentflow-flow'
+  | 'edit-agentflow-node'
+  | 'edit-agentflow-flow'
 
 /**
  * 画布选中 → 菜单目标（工单 03 起为 `canvas-selection/selection-codec.ts` 的
@@ -399,6 +416,10 @@ function blankMenuItems(diagramType: DiagramTypeId): ContextMenuItemId[] {
       // eventmodeling 的空白入口（工单 28 定案）：加帧（占位帧号 / 标识避重）/
       // 加数据块（名字避重，空块体）。画布无 data-id，元素级编辑降级到结构树 + 属性表单
       return ['add-em-frame', 'add-em-data']
+    case 'agentflow':
+      // agentflow 的空白入口（工单 27 定案）：加节点（缺省 `n{N}` id + task 形状）/
+      // 加 flow 容器（空标题）
+      return ['add-agentflow-node', 'add-agentflow-flow']
     // DiagramTypeId 是开放类型（more-diagrams 工单 01）：未接入画布能力包的图种
     // 没有空白右键入口（unsupported 态下画布右键整体停用，不会走到这里）
     default:
@@ -579,5 +600,18 @@ export function contextMenuItems(target: ContextMenuTarget): ContextMenuItemId[]
       return ['edit-em-frame', 'delete']
     case 'em-data':
       return ['edit-em-data', 'delete']
+    // agentflow（more-diagrams 工单 27）：节点 = 改文本（D5「选中 + 关菜单」，右侧
+    // AgentflowNodeForm 改形状与文本）/ 从这里连线（加边表单，from 预选）/ 删除；
+    // 边 = 改标签（D5「选中 + 关菜单」，右侧 AgentflowEdgeForm 改）/ 删除；
+    // 容器 = 改标题（D5，右侧 AgentflowContainerForm 改）/ 删除（连带块内元素）；
+    // 文档行 = 删除（编辑入口 = 图表级表单）
+    case 'agentflow-node':
+      return ['edit-agentflow-node', 'link-from-here', 'delete']
+    case 'agentflow-edge':
+      return ['edit-label', 'delete']
+    case 'agentflow-flow':
+      return ['edit-agentflow-flow', 'delete']
+    case 'agentflow-doc':
+      return ['delete']
   }
 }
