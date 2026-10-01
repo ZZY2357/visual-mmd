@@ -221,3 +221,59 @@ export function annotateNodeDataIds(root: ParentNode): void {
   annotateBlockDataIds(root)
   annotateGanttDataIds(root)
 }
+
+/**
+ * mermaid v12 packetChart（more-diagrams 工单 16）：渲染器（`diagram-MLGK6HIB.mjs` 的
+ * draw/drawWord）**不写任何 id / data-id**（全文件 0 处），但块级结构专属且稳定：
+ * 每行一个 `g`（无类名），行内每块依次 `rect.packetBlock` + `text.packetLabel` +
+ * `text.packetByte.start`（+ 非单 bit 块的 `text.packetByte.end`，showBits 关闭时
+ * 两者皆无）。故在此按 **start-bit 映射**反注（ADR-0012 位置序的精确形态），作用域
+ * 严格限定在 packet 专属结构内——绝不进 `nodeIdOfDomId` 通用循环（工单 06 约定）。
+ * 走专责 `nodeAnnotator`（需投影的绝对区间做归属门卫），不进无参 `annotateNodeDataIds`。
+ *
+ * DOM 序证据（离线核查渲染器源码，已记入工单 Comments）：
+ * - `draw` 按行序（words.entries()）逐行 append `g`；行内块按位序 append。
+ *   字段绝对区间连续时，块 DOM 序 = 起始位升序 = 源码字段序。
+ * - `text.packetByte.start` 的文本 = 该块的绝对起始位（block.start）——据此把块
+ *   归属到投影字段（start ∈ [absStart, absEnd]），**不依赖 bitsPerRow**（字段跨行
+ *   拆块也能归属）。任一块归属失败（DOM 与投影不符 / showBits 关闭 / 手写非法源码）
+ *   → 整体不标，绝不误归属——与 er/quadrant 位置序反注同门卫。
+ */
+export function annotatePacketDataIds(
+  root: ParentNode,
+  fields: ReadonlyArray<{ elementId: string; absStart: number; absEnd: number }>,
+): void {
+  // 门卫：rect.packetBlock 是 packet 渲染器专属类名（其余图种的产物不含）
+  const rects = root.querySelectorAll('rect.packetBlock')
+  if (rects.length === 0) return
+  const startTexts = root.querySelectorAll('text.packetByte.start')
+  // showBits 关闭（手写 config）时 start 位号文本缺失 → 无法归属，整体不标
+  if (startTexts.length !== rects.length) return
+  // 先整体归属、再统一落标（两趟）：任一块归属失败 → 整体不标（绝不留下部分标注，
+  // 与 er/quadrant 位置序反注的「绝不误归属」同门卫）
+  const assigned: Array<string | null> = new Array(rects.length).fill(null)
+  let fieldIndex = 0
+  for (let i = 0; i < rects.length; i++) {
+    // start 位号文本必须是十进制非负整数（Number('') = 0 会把空文本误归到 bit 0）
+    const raw = startTexts[i].textContent?.trim() ?? ''
+    if (!/^[0-9]+$/.test(raw)) return
+    const startBit = Number(raw)
+    // 块起始位升序（DOM 序），字段区间按序推进；落不到任何字段区间 → 整体不标
+    while (fieldIndex < fields.length && fields[fieldIndex].absEnd < startBit) fieldIndex++
+    const field = fields[fieldIndex]
+    if (field === undefined || field.absStart > startBit) return
+    assigned[i] = field.elementId
+  }
+  for (let i = 0; i < rects.length; i++) {
+    const elementId = assigned[i]
+    if (elementId === null) continue
+    const rect = rects[i]
+    if (rect.getAttribute('data-id') !== null) continue
+    rect.setAttribute('data-id', elementId)
+    // 块标签紧跟块矩形（drawWord 的 append 序），同属一个源码字段——同亮
+    const label = rect.nextElementSibling
+    if (label !== null && label.classList.contains('packetLabel')) {
+      label.setAttribute('data-id', elementId)
+    }
+  }
+}

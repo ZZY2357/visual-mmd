@@ -41,6 +41,9 @@ import {
   buildQuadrantProjection,
   type QuadrantProjection,
 } from './projection/quadrant-projection'
+import { buildPacketProjection, type PacketProjection } from './projection/packet-projection'
+import { packetParser } from './pipeline/packet'
+import { packetCanvasCapabilities } from './canvas-selection/packet-adapter'
 import { buildXychartProjection, type XychartProjection } from './projection/xychart-projection'
 import { buildRadarProjection, type RadarProjection } from './projection/radar-projection'
 import { flowchartCanvasCapabilities } from './canvas-selection/flowchart-adapter'
@@ -98,6 +101,7 @@ export interface ProjectionTypes {
   sankey: SankeyProjection
   gantt: GanttProjection
   quadrant: QuadrantProjection
+  packet: PacketProjection
   xychart: XychartProjection
   radar: RadarProjection
 }
@@ -387,6 +391,18 @@ export const QUADRANT_TEMPLATE = `quadrantChart
 `
 
 /**
+ * packet 起步模板（more-diagrams 工单 16）：`0-15` / `16-31` 两个字段 + 一个 `+count`
+ * 字段（自动衔接前序结束位，工单定案）。字段行语法 `位前缀: "名称"`——名称必须带引号
+ * （mermaid langium 词法 STRING，实测裸名报错）；位区间连续性由校验层负责
+ * （research：mermaid 12 populate 对间隙/重叠/回退整图抛错）。
+ */
+export const PACKET_TEMPLATE = `packet
+    0-15: "Source Port"
+    16-31: "Destination Port"
+    +16: "Flags"
+`
+
+/**
  * xychart 起步模板（more-diagrams 工单 14）：`xychart-beta` 声明 + title、类别 x 轴
  * （3 类）、y 轴 range、一条 bar 与一条带名 line 系列（工单定案构成）。
  * 注意 mermaid xychart 词法：裸文本限 ASCII 词形——**中文标题/类别/系列名必须引号
@@ -578,6 +594,17 @@ export const DIAGRAM_TYPE_LIST: DiagramTypeRegistration[] = [
     buildProjection: (doc) => ({ type: 'quadrant', quadrant: buildQuadrantProjection(doc) }),
     tree: treePartitions.quadrant,
     canvas: quadrantCanvasCapabilities,
+  },
+  {
+    id: 'packet',
+    parser: packetParser,
+    template: PACKET_TEMPLATE,
+    // `packet` 与 `packet-beta` 两个关键字 mermaid 都渲染（工单定案同认）；`\b` 防止
+    // `packetXxx` 之类的更长词被误吞
+    detect: (source) => /^packet(-beta)?\b/i.test(firstStatementLine(source)),
+    buildProjection: (doc) => ({ type: 'packet', packet: buildPacketProjection(doc) }),
+    tree: treePartitions.packet,
+    canvas: packetCanvasCapabilities,
   },
   {
     id: 'xychart',

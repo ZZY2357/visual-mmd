@@ -40,6 +40,13 @@ describe('detectDiagramType：已注册图种识别不变（回归）', () => {
     const source = `---\ntitle: 示例\n---\n%% 注释\n\nsequenceDiagram\n    A->>B: 你好\n`
     expect(detectDiagramType(source)?.id).toBe('sequence')
   })
+
+  it('packet 与 packet-beta 双关键字同认（more-diagrams 工单 16）', () => {
+    expect(detectDiagramType('packet\n    0-7: "x"\n')?.id).toBe('packet')
+    expect(detectDiagramType('packet-beta\n    0-7: "x"\n')?.id).toBe('packet')
+    // \b 防误吞：更长词根不落 packet
+    expect(detectDiagramType('packetXxx\n')).toBeNull()
+  })
 })
 
 describe('detectDiagramType：无法识别 → unsupported（null），绝不默认 flowchart', () => {
@@ -47,10 +54,9 @@ describe('detectDiagramType：无法识别 → unsupported（null），绝不默
     ['冷门图种 venn-beta', 'venn-beta\n    A o B\n'],
     ['纯文本', '这不是 Mermaid 源码\n'],
     ['空源码', ''],
-    // block / block-beta 已注册（more-diagrams 工单 09），移入下方「返回 block」的用例
-    ['裸 packet', 'packet\n    0-7: "x"\n'],
-    ['packet-beta', 'packet-beta\n    0-7: "x"\n'],
-    // xychart / xychart-beta 已注册（more-diagrams 工单 14），移入下方「返回 xychart」的用例
+    // block / block-beta 已注册（more-diagrams 工单 09）、packet / packet-beta 已注册
+    //（more-diagrams 工单 16）、xychart / xychart-beta 已注册（more-diagrams 工单 14），
+    // 均移入各自「返回 X」的用例，不再落 null 清单
   ])('%s 返回 null', (_name, source) => {
     expect(detectDiagramType(source)).toBeNull()
   })

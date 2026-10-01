@@ -61,6 +61,11 @@ describe('金样合法性：默认图表模板能被 mermaid 渲染', () => {
     await expect(mermaid.parse(QUADRANT_TEMPLATE)).resolves.toBeTruthy()
   })
 
+  it('packet 起步模板 parse 通过（more-diagrams 工单 16）', async () => {
+    const { PACKET_TEMPLATE } = await import('../diagram-registry')
+    await expect(mermaid.parse(PACKET_TEMPLATE)).resolves.toBeTruthy()
+  })
+
   it('quadrant 端到端编辑场景（工单 12）落在合法 mermaid 源码上', async () => {
     const { QUADRANT_TEMPLATE } = await import('../diagram-registry')
     const { quadrantParser } = await import('../pipeline/quadrant')
@@ -229,6 +234,37 @@ describe('金样合法性：默认图表模板能被 mermaid 渲染', () => {
     await expect(mermaid.parse(source)).resolves.toBeTruthy()
   })
 
+  it('packet 端到端编辑场景（工单 16 验收：加字段 → 改字段名 → 改位区间 → 删字段）落在合法 mermaid 源码上', async () => {
+    const { PACKET_TEMPLATE } = await import('../diagram-registry')
+    const { packetParser } = await import('../pipeline/packet')
+    const { reassemble } = await import('../pipeline/document')
+    const parse = (src: string) => {
+      const r = packetParser.parse(src)
+      if (!r.ok) throw new Error(`解析失败：${r.error.message}`)
+      return r.doc
+    }
+    const apply = (doc: ReturnType<typeof parse>, intent: Parameters<typeof packetParser.resolveRewrites>[1]) => {
+      const rewrites = packetParser.resolveRewrites(doc, intent)
+      if (rewrites === null) throw new Error(`意图被拒绝：${JSON.stringify(intent)}`)
+      return parse(reassemble(doc, rewrites))
+    }
+
+    let doc = parse(PACKET_TEMPLATE)
+    doc = apply(doc, { type: 'add-field', name: '新字段', count: '8' }) // 加字段（+count 衔接前序）
+    expect(doc.source).toContain('+8: "新字段"')
+    doc = apply(doc, { type: 'set-field-name', elementId: 'field:4', name: '重点项' }) // 改名（原形态保留）
+    expect(doc.source).toContain('+8: "重点项"')
+    doc = apply(doc, { type: 'set-field-range', elementId: 'field:4', start: '48', end: '62' }) // 改位区间（绝对形态落码）
+    expect(doc.source).toContain('48-62: "重点项"')
+    doc = apply(doc, { type: 'delete-field', elementId: 'field:4' }) // 删末字段
+    doc = apply(doc, { type: 'delete-field', elementId: 'field:2' }) // 删中间字段（后续 +count 自动衔接）
+
+    const packetSource = doc.source
+    expect(packetSource).not.toContain('Destination Port')
+    expect(packetSource).toContain('+16: "Flags"')
+    await expect(mermaid.parse(packetSource)).resolves.toBeTruthy()
+  })
+
   it('xychart 端到端编辑场景（工单 14 验收：加 bar 系列 → 加数值 → 改系列名 → y 轴 range 改 0-->100 → 删除一条系列）落在合法 mermaid 源码上', async () => {
     const { XYCHART_TEMPLATE } = await import('../diagram-registry')
     const { xychartParser } = await import('../pipeline/xychart')
@@ -251,10 +287,10 @@ describe('金样合法性：默认图表模板能被 mermaid 渲染', () => {
     doc = apply(doc, { type: 'set-axis-range', axis: 'y', min: '0', max: '100' }) // y 轴 range 改 0-->100
     doc = apply(doc, { type: 'delete-series', elementId: 'series:1' }) // 删除一条系列
 
-    const source = doc.source
-    expect(source).toContain('bar "预估" [120, 180, 300]')
-    expect(source).toContain('y-axis "销售额" 0 --> 100')
-    expect(source).not.toContain('bar [200, 350, 150]')
-    await expect(mermaid.parse(source)).resolves.toBeTruthy()
+    const xychartSource = doc.source
+    expect(xychartSource).toContain('bar "预估" [120, 180, 300]')
+    expect(xychartSource).toContain('y-axis "销售额" 0 --> 100')
+    expect(xychartSource).not.toContain('bar [200, 350, 150]')
+    await expect(mermaid.parse(xychartSource)).resolves.toBeTruthy()
   })
 })

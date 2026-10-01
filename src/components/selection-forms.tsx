@@ -70,6 +70,8 @@ import {
   QuadrantQuadrantForm,
 } from './quadrant-forms'
 import { type QuadrantProjection } from '../lib/projection/quadrant-projection'
+import { PacketDiagramForm, PacketFieldForm } from './packet-forms'
+import { type PacketProjection } from '../lib/projection/packet-projection'
 import { XychartAxisForm, XychartSeriesForm, XychartTitleForm } from './xychart-forms'
 import { type XychartProjection } from '../lib/projection/xychart-projection'
 
@@ -800,6 +802,36 @@ function QuadrantSelectionForm({
 }
 
 /**
+ * packet（more-diagrams 工单 16）：选中字段时渲染字段表单；图表级 = 只读提示。
+ */
+function PacketSelectionForm({
+  projection,
+  selection,
+}: {
+  projection: PacketProjection
+  selection: Selection | null
+}) {
+  const { t } = useTranslation()
+  if (selection === null) {
+    return (
+      <Text size="sm" c="dimmed" px="xs">
+        {t('app:propertyPanel.nothingSelected')}
+      </Text>
+    )
+  }
+  switch (selection.kind) {
+    case 'diagram':
+      return <PacketDiagramForm projection={projection} />
+    case 'packet-field': {
+      const field = projection.fields.find((f) => f.elementId === selection.elementId)
+      return field !== undefined ? <PacketFieldForm field={field} /> : null
+    }
+    default:
+      return null
+  }
+}
+
+/**
  * xychart 属性表单（more-diagrams 工单 14）：图表级 = 提示文案（frontmatter config
  * 不做编辑——工单定案）；标题 / 轴 = 文档级属性表单；系列 = 名字/类型/数值行编辑。
  */
@@ -883,6 +915,9 @@ export function ProjectionSelectionForm({ projection, selection }: { projection:
   }
   if (projection.type === 'quadrant') {
     return <QuadrantSelectionForm projection={projection.quadrant} selection={selection} />
+  }
+  if (projection.type === 'packet') {
+    return <PacketSelectionForm projection={projection.packet} selection={selection} />
   }
   if (projection.type === 'xychart') {
     return <XychartSelectionForm projection={projection.xychart} selection={selection} />

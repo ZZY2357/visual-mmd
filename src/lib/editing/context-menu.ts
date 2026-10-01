@@ -81,6 +81,9 @@ export type ContextMenuTarget =
   | { kind: 'quadrant-point'; elementId: string }
   | { kind: 'quadrant-axis'; elementId: string }
   | { kind: 'quadrant-quadrant'; elementId: string }
+// packet（more-diagrams 工单 16）：字段经 start-bit 映射反注可寻址（见 packet-adapter），
+// 改名 / 改位区间 / 删除都有画布菜单
+  | { kind: 'packet-field'; elementId: string }
 // xychart（more-diagrams 工单 14）：系列 elementId 即投影位置序身份 `series:N`（经类名组
 // 位置序反注可寻址）；轴与标题是文档级属性元素（固定身份，经类名组反注可寻址）
   | { kind: 'xychart-series'; elementId: string }
@@ -185,6 +188,10 @@ export type ContextMenuItemId =
   | 'edit-quadrant-coords'
   | 'edit-quadrant-style'
   | 'edit-quadrant-text'
+  // packet（more-diagrams 工单 16）：空白 = 加字段（+count 形态衔接前序，创建 + 内联命名）；
+  // 字段 = 改名（内联编辑）/ 改位区间（D5：选中 + 关菜单，右侧 PacketFieldForm 改）/ 删除
+  | 'add-packet-field'
+  | 'edit-packet-range'
   // xychart（more-diagrams 工单 14）：空白 = 加 line / 加 bar（表单浮出，提交才落码）；
   // 系列 = 改名（选中 + 关菜单，属性表单）/ 改类型（直接落码切换 line↔bar）/
   // 编辑数值（选中 + 关菜单，数组行编辑在属性表单）/ 删除；轴 = 改形态/字段（选中 + 关菜单）
@@ -255,6 +262,10 @@ function blankMenuItems(diagramType: DiagramTypeId): ContextMenuItemId[] {
     case 'quadrant':
       // quadrant 的空白入口（工单 12 定案）：加点（坐标落 0.5, 0.5，文本避重，右侧表单可改）
       return ['add-quadrant-point']
+    case 'packet':
+      // packet 的空白入口（工单 16 定案）：加字段（+count 形态衔接前序，位宽缺省 8，
+      // 名称避重，落码后内联命名）
+      return ['add-packet-field']
     case 'xychart':
       // xychart 的空白入口（more-diagrams 工单 14）：加 line / 加 bar（表单，提交才落码）
       return ['add-xychart-line', 'add-xychart-bar']
@@ -369,6 +380,10 @@ export function contextMenuItems(target: ContextMenuTarget): ContextMenuItemId[]
     case 'quadrant-axis':
     case 'quadrant-quadrant':
       return ['edit-quadrant-text']
+    // packet（more-diagrams 工单 16）：字段 = 改名（内联编辑）/ 改位区间（D5「选中 +
+    // 关菜单」，start/end 在右侧 PacketFieldForm 改，绝对形态落码）/ 删除
+    case 'packet-field':
+      return ['edit-text', 'edit-packet-range', 'delete']
     // xychart（more-diagrams 工单 14）：系列 = 改名（选中 + 关菜单，属性表单）/
     // 改类型（直接落码切换 line↔bar）/ 编辑数值（选中 + 关菜单，数组行编辑在属性表单）/
     // 删除；轴 = 改形态/字段（选中 + 关菜单，属性表单承接）；标题 = 改标题（选中 + 关菜单）

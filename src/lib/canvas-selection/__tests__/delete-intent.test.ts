@@ -3,6 +3,7 @@ import {
   BLOCK_TEMPLATE,
   CLASS_TEMPLATE,
   GANTT_TEMPLATE,
+  PACKET_TEMPLATE,
   KANBAN_TEMPLATE,
   MINDMAP_TEMPLATE,
   SANKEY_TEMPLATE,
@@ -21,6 +22,7 @@ import { kanbanParser } from '../../pipeline/kanban'
 import { blockParser } from '../../pipeline/block'
 import { sankeyParser } from '../../pipeline/sankey'
 import { ganttParser } from '../../pipeline/gantt'
+import { packetParser } from '../../pipeline/packet'
 import { xychartParser } from '../../pipeline/xychart'
 import { buildClassProjection } from '../../projection/class-projection'
 import { buildFlowchartProjection } from '../../projection/flowchart-projection'
@@ -31,12 +33,14 @@ import { buildKanbanProjection } from '../../projection/kanban-projection'
 import { buildBlockProjection } from '../../projection/block-projection'
 import { buildSankeyProjection } from '../../projection/sankey-projection'
 import { buildGanttProjection } from '../../projection/gantt-projection'
+import { buildPacketProjection } from '../../projection/packet-projection'
 import { buildXychartProjection } from '../../projection/xychart-projection'
 import type { Selection } from '../../projection/selection'
 import {
   blockDeleteIntent,
   classDeleteIntent,
   ganttDeleteIntent,
+  packetDeleteIntent,
   kanbanDeleteIntent,
   mindmapActionIntents,
   nodeActionIntents,
@@ -136,6 +140,11 @@ function ganttProjection(): Extract<AnyProjection, { type: 'gantt' }> {
   const parsed = ganttParser.parse(GANTT_TEMPLATE)
   if (!parsed.ok) throw new Error(parsed.error.message)
   return { type: 'gantt', gantt: buildGanttProjection(parsed.doc) }
+}
+function packetProjection(): Extract<AnyProjection, { type: 'packet' }> {
+  const parsed = packetParser.parse(PACKET_TEMPLATE)
+  if (!parsed.ok) throw new Error(parsed.error.message)
+  return { type: 'packet', packet: buildPacketProjection(parsed.doc) }
 }
 
 /** 每个图种的一组「selection → 属性面板删除按钮会提交的意图」用例 */
@@ -358,6 +367,21 @@ function ganttCases(p: ReturnType<typeof ganttProjection>): DeleteCase[] {
   ]
 }
 
+/** packet（more-diagrams 工单 16）：字段一条删除入口，字段有画布菜单目标
+ *（start-bit 映射反注 data-id）；显式起点字段的删除由管线连续性校验拒绝落码（安静无动作） */
+function packetCases(p: ReturnType<typeof packetProjection>): DeleteCase[] {
+  const field = p.packet.fields[0]
+  return [
+    {
+      name: 'packet-field',
+      selection: { kind: 'packet-field', elementId: field.elementId },
+      panelIntent: { type: 'delete-field', elementId: field.elementId },
+      menuTarget: { kind: 'packet-field', elementId: field.elementId },
+      menuItemId: 'delete',
+    },
+  ]
+}
+
 /** xychartProjection：xychart 投影（工单 14） */
 function xychartProjection(): Extract<AnyProjection, { type: 'xychart' }> {
   const parsed = xychartParser.parse(XYCHART_TEMPLATE)
@@ -391,6 +415,7 @@ const SUITES = [
   { type: 'block' as const, projection: blockProjection, cases: blockCases },
   { type: 'sankey' as const, projection: sankeyProjection, cases: sankeyCases },
   { type: 'gantt' as const, projection: ganttProjection, cases: ganttCases },
+  { type: 'packet' as const, projection: packetProjection, cases: packetCases },
   { type: 'xychart' as const, projection: xychartProjection, cases: xychartCases },
 ]
 
@@ -436,6 +461,8 @@ describe('deleteIntent 等价性：三个删除入口对同一 selection 产出�
                 return sankeyDeleteIntent(projection.sankey, sel)
               case 'gantt':
                 return ganttDeleteIntent(projection.gantt, sel)
+              case 'packet':
+                return packetDeleteIntent(projection.packet, sel)
               case 'xychart':
                 return xychartDeleteIntent(projection.xychart, sel)
             }
@@ -451,6 +478,7 @@ describe('deleteIntent 等价性：三个删除入口对同一 selection 产出�
             suite.type === 'block' ||
             suite.type === 'sankey' ||
             suite.type === 'gantt' ||
+            suite.type === 'packet' ||
             suite.type === 'xychart'
           if (!keyboardHandles) {
             expect(viaKeyboard).toBeNull() // 门外：键盘安静地不产出意图（零变化护栏）
@@ -509,6 +537,7 @@ describe('deleteIntent 等价性：三个删除入口对同一 selection 产出�
           block: { kind: 'block-node', id: '__不存在__' },
           sankey: { kind: 'sankey-link', elementId: 'link:999' },
           gantt: { kind: 'gantt-task', elementId: 'task:999' },
+          packet: { kind: 'packet-field', elementId: 'field:999' },
           xychart: { kind: 'xychart-series', elementId: 'series:999' },
         }
         expect(caps.deleteIntent(projection, gone[suite.type])).toBeNull()

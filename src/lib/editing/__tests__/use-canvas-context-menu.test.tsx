@@ -22,6 +22,7 @@ import { requirementDataIdResolver } from '../../canvas-selection/requirement-ad
 import { blockDataIdResolver } from '../../canvas-selection/block-adapter'
 import { sankeyDataIdResolver } from '../../canvas-selection/sankey-adapter'
 import { ganttDataIdResolver } from '../../canvas-selection/gantt-adapter'
+import { packetDataIdResolver } from '../../canvas-selection/packet-adapter'
 import { quadrantDataIdResolver } from '../../canvas-selection/quadrant-adapter'
 import { xychartDataIdResolver } from '../../canvas-selection/xychart-adapter'
 import { nodeDataIdResolver, elementDataIdResolver } from '../../canvas-selection/data-id'
@@ -122,6 +123,9 @@ function resolverOf(projection: AnyProjection) {
   // quadrant：data-id 由 nodeAnnotator 按位置序反注，resolver 与真实能力包同源
   // （quadrantDataIdResolver，more-diagrams 工单 12）
   if (projection.type === 'quadrant') return quadrantDataIdResolver(projection.quadrant)
+  // packet：data-id 由 nodeAnnotator 按 start-bit 映射反注，resolver 与真实能力包同源
+  // （packetDataIdResolver，more-diagrams 工单 16）
+  if (projection.type === 'packet') return packetDataIdResolver(projection.packet)
   // xychart（more-diagrams 工单 14）：系列/标题/轴（类名组反注，node.id = elementId 或固定身份）
   if (projection.type === 'xychart') return xychartDataIdResolver(projection.xychart)
   // radar（more-diagrams 工单 15）：画布 DOM 无 data-id（实测降级），resolver 永不命中
@@ -160,6 +164,7 @@ function createdIdOf(target: CanvasInlineEditTarget): string {
       return target.elementId
     case 'quadrant-point':
       return target.elementId
+    case 'packet-field':
     case 'xychart-series':
       return target.elementId
     // radar（more-diagrams 工单 15）：双击轴标签可进内联编辑（文本匹配），目标带 elementId

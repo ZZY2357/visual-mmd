@@ -12,6 +12,7 @@ import { isValidBlockLabel } from '../pipeline/block'
 import { parseBlockNodeElementId } from '../pipeline/element-id'
 import { isValidGanttTaskName } from '../pipeline/gantt'
 import { isValidQuadrantPointText } from '../pipeline/quadrant'
+import { isValidPacketFieldName } from '../pipeline/packet'
 import { isValidXychartText } from '../pipeline/xychart'
 import { isValidRadarLabelText } from '../pipeline/radar'
 import type { ProjectionMindmapNode } from '../projection/mindmap-projection'
@@ -78,6 +79,9 @@ export type CanvasInlineEditTarget =
   /** quadrant（more-diagrams 工单 12）：双击点改文本（set-point-text 意图）。
    * 点有 data-id 寻址（渲染后位置序反注）；轴/象限标题不做双击（右侧表单改） */
   | { kind: 'quadrant-point'; elementId: string }
+  /** packet（more-diagrams 工单 16）：双击字段改名（set-field-name 意图）。
+   * 字段有 data-id 寻址（渲染后 start-bit 映射反注） */
+  | { kind: 'packet-field'; elementId: string }
   /** xychart（more-diagrams 工单 14）：双击系列改名字（set-series-name 意图；位置序
    * elementId 寻址。轴/标题无双击——文档级属性元素，走右侧属性表单） */
   | { kind: 'xychart-series'; elementId: string }
@@ -171,6 +175,7 @@ export type InlineEditDiagramKind =
   | 'block'
   | 'gantt'
   | 'quadrant'
+  | 'packet'
   | 'xychart'
   | 'radar'
 
@@ -262,6 +267,11 @@ export function inlineEditTargetFromEvent(
     if (kind === 'quadrant') {
       return byId.nodeId.startsWith('point:') ? { kind: 'quadrant-point', elementId: byId.nodeId } : null
     }
+    // packet（more-diagrams 工单 16）：data-id = 投影 elementId（渲染后 start-bit 映射
+    // 反注），双击改字段名
+    if (kind === 'packet') {
+      return byId.nodeId.startsWith('field:') ? { kind: 'packet-field', elementId: byId.nodeId } : null
+    }
     // xychart（more-diagrams 工单 14）：resolver 返回 node.id = `series:N` / 固定身份；
     // 只有系列可双击（改名字），轴/标题双击安静忽略（文档级属性，走右侧表单）
     if (kind === 'xychart') {
@@ -345,6 +355,12 @@ export function inlineEditCommitOf(target: CanvasInlineEditTarget, text: string,
     // 关键字前缀等非法输入拒绝落码，见 isValidQuadrantPointText）
     if (!isValidQuadrantPointText(next)) return { action: 'invalid' }
     return { action: 'commit', intent: { type: 'set-point-text', elementId: target.elementId, text: next } }
+  }
+  if (target.kind === 'packet-field') {
+    // packet（more-diagrams 工单 16）：非空改动 = set-field-name（含引号/换行的名称
+    // 拒绝落码，见 isValidPacketFieldName）
+    if (!isValidPacketFieldName(next)) return { action: 'invalid' }
+    return { action: 'commit', intent: { type: 'set-field-name', elementId: target.elementId, name: next } }
   }
   if (target.kind === 'xychart-series') {
     // xychart（more-diagrams 工单 14）：非空改动 = set-series-name（名字含引号/换行非法；

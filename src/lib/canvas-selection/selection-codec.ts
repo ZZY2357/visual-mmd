@@ -7,6 +7,7 @@ import { mindmapDomIdOf } from './mindmap-adapter'
 import { parseKanbanCardElementId, parseKanbanColumnElementId } from '../pipeline/element-id'
 import { requirementSelectionOf } from './requirement-adapter'
 import { quadrantSelectionOf } from './quadrant-adapter'
+import { packetSelectionOf } from './packet-adapter'
 import {
   parseRequirementBlockElementId,
   parseRequirementElemBlockElementId,
@@ -113,6 +114,10 @@ export function canvasIdOf(selection: Selection): string | null {
     case 'quadrant-axis':
     case 'quadrant-quadrant':
       return selection.elementId
+    // packet（more-diagrams 工单 16）：字段的 data-id 即投影 elementId
+    // （渲染后按 start-bit 映射反注，见 packet-adapter / node-data-ids）
+    case 'packet-field':
+      return selection.elementId
     // xychart（more-diagrams 工单 14）：系列 data-id = 位置序 `series:N`（渲染后从
     // `g.plot` 内按类名序号反注）；标题/轴 data-id 固定（渲染后按类名组反注）
     case 'xychart-series':
@@ -172,6 +177,11 @@ export function fromCanvasId(diagramType: DiagramTypeId, canvas: CanvasSelection
     // quadrant（more-diagrams 工单 12）：node.id 即投影 elementId（`point:N` / `x-axis` /
     // `y-axis` / `quadrant:N`，渲染后按位置序反注），按形态解回三类选中
     return quadrantSelectionOf(canvas)
+  }
+  if (diagramType === 'packet') {
+    // packet（more-diagrams 工单 16）：node.id 即投影 elementId（`field:N`，渲染后按
+    // start-bit 映射反注），按形态解回字段选中
+    return packetSelectionOf(canvas)
   }
   if (diagramType === 'kanban') {
     // resolver 返回的 node.id 即 elementId（`kanban-card:<id>` / `kanban-column:<id>`），按前缀判种类
@@ -281,6 +291,9 @@ export function selectionOfMenuTarget(target: ContextMenuTarget): Selection | nu
       return { kind: 'quadrant-axis', elementId: target.elementId }
     case 'quadrant-quadrant':
       return { kind: 'quadrant-quadrant', elementId: target.elementId }
+    // packet（more-diagrams 工单 16）：字段菜单目标一一对应 Selection kind
+    case 'packet-field':
+      return { kind: 'packet-field', elementId: target.elementId }
     // xychart（more-diagrams 工单 14）：系列 / 轴 / 标题菜单目标一一对应各自 Selection kind
     case 'xychart-series':
       return { kind: 'xychart-series', elementId: target.elementId }
@@ -356,6 +369,14 @@ export function menuTargetOfCanvas(
         default:
           return null
       }
+    }
+    // packet（more-diagrams 工单 16）：node.id = 投影 elementId（渲染后 start-bit 映射
+    // 反注），字段有画布菜单
+    if (diagramType === 'packet') {
+      const selection = packetSelectionOf(canvas)
+      return selection !== null && selection.kind === 'packet-field'
+        ? { kind: 'packet-field', elementId: selection.elementId }
+        : null
     }
     if (diagramType === 'kanban') {
       // 列 / 卡片都渲染成 `g.node` / `g.cluster`，反注后的 canvas.id 带 elementId 前缀，
