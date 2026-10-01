@@ -237,6 +237,7 @@ describe('结构树分区描述（工单 06）', () => {
         'gantt\n    dateFormat YYYY-MM-DD\n    section 调研\n        需求梳理 :done, 2026-01-05, 3d',
       quadrant:
         'quadrantChart\n    title 优先级\n    x-axis 低 --> 高\n    y-axis 低 --> 高\n    quadrant-1 甲\n    quadrant-2 乙\n    quadrant-3 丙\n    quadrant-4 丁\n    A: [0.3, 0.6]',
+      packet: 'packet\n    0-15: "甲"\n    16-31: "乙"\n    +16: "丙"',
     }
     for (const id of Object.keys(DIAGRAM_TYPES) as (keyof typeof DIAGRAM_TYPES)[]) {
       const registration = DIAGRAM_TYPES[id]

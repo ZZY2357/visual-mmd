@@ -39,6 +39,9 @@ import {
   buildQuadrantProjection,
   type QuadrantProjection,
 } from './projection/quadrant-projection'
+import { buildPacketProjection, type PacketProjection } from './projection/packet-projection'
+import { packetParser } from './pipeline/packet'
+import { packetCanvasCapabilities } from './canvas-selection/packet-adapter'
 import { flowchartCanvasCapabilities } from './canvas-selection/flowchart-adapter'
 import { sequenceCanvasCapabilities } from './canvas-selection/sequence-adapter'
 import { classCanvasCapabilities } from './canvas-selection/class-adapter'
@@ -92,6 +95,7 @@ export interface ProjectionTypes {
   sankey: SankeyProjection
   gantt: GanttProjection
   quadrant: QuadrantProjection
+  packet: PacketProjection
 }
 
 /** 已注册图种的 id 集合（字面量联合，随 ProjectionTypes 增长） */
@@ -379,6 +383,18 @@ export const QUADRANT_TEMPLATE = `quadrantChart
 `
 
 /**
+ * packet 起步模板（more-diagrams 工单 16）：`0-15` / `16-31` 两个字段 + 一个 `+count`
+ * 字段（自动衔接前序结束位，工单定案）。字段行语法 `位前缀: "名称"`——名称必须带引号
+ * （mermaid langium 词法 STRING，实测裸名报错）；位区间连续性由校验层负责
+ * （research：mermaid 12 populate 对间隙/重叠/回退整图抛错）。
+ */
+export const PACKET_TEMPLATE = `packet
+    0-15: "Source Port"
+    16-31: "Destination Port"
+    +16: "Flags"
+`
+
+/**
  * 注册表：数组是唯一权威（more-diagrams 工单 01），DIAGRAM_TYPES 由它推导。
  * detectDiagramType 按数组顺序显式遍历——不再维护手写的 if 分发链，
  * 新图种挂一条即可参与识别，无法识别时不再默认 flowchart（见下）。
@@ -540,6 +556,17 @@ export const DIAGRAM_TYPE_LIST: DiagramTypeRegistration[] = [
     buildProjection: (doc) => ({ type: 'quadrant', quadrant: buildQuadrantProjection(doc) }),
     tree: treePartitions.quadrant,
     canvas: quadrantCanvasCapabilities,
+  },
+  {
+    id: 'packet',
+    parser: packetParser,
+    template: PACKET_TEMPLATE,
+    // `packet` 与 `packet-beta` 两个关键字 mermaid 都渲染（工单定案同认）；`\b` 防止
+    // `packetXxx` 之类的更长词被误吞
+    detect: (source) => /^packet(-beta)?\b/i.test(firstStatementLine(source)),
+    buildProjection: (doc) => ({ type: 'packet', packet: buildPacketProjection(doc) }),
+    tree: treePartitions.packet,
+    canvas: packetCanvasCapabilities,
   },
 ]
 

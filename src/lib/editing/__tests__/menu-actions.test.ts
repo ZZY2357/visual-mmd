@@ -176,6 +176,9 @@ describe('MENU_ACTIONS 穷尽性（工单 05 → 工单 01）', () => {
       { kind: 'quadrant-point', elementId: 'point:1' },
       { kind: 'quadrant-axis', elementId: 'x-axis' },
       { kind: 'quadrant-quadrant', elementId: 'quadrant:2' },
+      // packet（more-diagrams 工单 16）：空白加字段（+count 衔接前序）+ 字段（改名/改位区间/删除）
+      { kind: 'blank', diagramType: 'packet' },
+      { kind: 'packet-field', elementId: 'field:1' },
     ]
     const reachableIds = new Set(allTargets.flatMap((target) => contextMenuItems(target)))
     // apply-style 不经 onMenuItem 分发（CanvasPanel 渲染成子菜单开关，点样式名直接调

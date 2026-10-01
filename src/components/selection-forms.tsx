@@ -68,6 +68,8 @@ import {
   QuadrantQuadrantForm,
 } from './quadrant-forms'
 import { type QuadrantProjection } from '../lib/projection/quadrant-projection'
+import { PacketDiagramForm, PacketFieldForm } from './packet-forms'
+import { type PacketProjection } from '../lib/projection/packet-projection'
 
 /**
  * 选中元素的属性表单，按投影图种分发（工单 04-bundle 自 PropertyPanel 迁出）：
@@ -759,6 +761,36 @@ function QuadrantSelectionForm({
   }
 }
 
+/**
+ * packet（more-diagrams 工单 16）：选中字段时渲染字段表单；图表级 = 只读提示。
+ */
+function PacketSelectionForm({
+  projection,
+  selection,
+}: {
+  projection: PacketProjection
+  selection: Selection | null
+}) {
+  const { t } = useTranslation()
+  if (selection === null) {
+    return (
+      <Text size="sm" c="dimmed" px="xs">
+        {t('app:propertyPanel.nothingSelected')}
+      </Text>
+    )
+  }
+  switch (selection.kind) {
+    case 'diagram':
+      return <PacketDiagramForm projection={projection} />
+    case 'packet-field': {
+      const field = projection.fields.find((f) => f.elementId === selection.elementId)
+      return field !== undefined ? <PacketFieldForm field={field} /> : null
+    }
+    default:
+      return null
+  }
+}
+
 export function ProjectionSelectionForm({ projection, selection }: { projection: AnyProjection; selection: Selection | null }) {
   if (projection.type === 'flowchart') {
     return <FlowchartSelectionForm projection={projection.flowchart} selection={selection} />
@@ -804,6 +836,9 @@ export function ProjectionSelectionForm({ projection, selection }: { projection:
   }
   if (projection.type === 'quadrant') {
     return <QuadrantSelectionForm projection={projection.quadrant} selection={selection} />
+  }
+  if (projection.type === 'packet') {
+    return <PacketSelectionForm projection={projection.packet} selection={selection} />
   }
   return <ClassSelectionForm projection={projection.class} selection={selection} />
 }

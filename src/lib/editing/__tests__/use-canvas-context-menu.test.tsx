@@ -22,6 +22,7 @@ import { requirementDataIdResolver } from '../../canvas-selection/requirement-ad
 import { blockDataIdResolver } from '../../canvas-selection/block-adapter'
 import { sankeyDataIdResolver } from '../../canvas-selection/sankey-adapter'
 import { ganttDataIdResolver } from '../../canvas-selection/gantt-adapter'
+import { packetDataIdResolver } from '../../canvas-selection/packet-adapter'
 import { quadrantDataIdResolver } from '../../canvas-selection/quadrant-adapter'
 import { nodeDataIdResolver, elementDataIdResolver } from '../../canvas-selection/data-id'
 import type { AnyProjection } from '../../diagram-registry'
@@ -121,6 +122,9 @@ function resolverOf(projection: AnyProjection) {
   // quadrant：data-id 由 nodeAnnotator 按位置序反注，resolver 与真实能力包同源
   // （quadrantDataIdResolver，more-diagrams 工单 12）
   if (projection.type === 'quadrant') return quadrantDataIdResolver(projection.quadrant)
+  // packet：data-id 由 nodeAnnotator 按 start-bit 映射反注，resolver 与真实能力包同源
+  // （packetDataIdResolver，more-diagrams 工单 16）
+  if (projection.type === 'packet') return packetDataIdResolver(projection.packet)
   const nodes = nodeDataIdResolver(projection.class.classes.map((c) => c.name))
   const edges = elementDataIdResolver(projection.class.relations.map((r) => r.elementId))
   return (dataId: string) => nodes(dataId) ?? edges(dataId)
@@ -154,6 +158,8 @@ function createdIdOf(target: CanvasInlineEditTarget): string {
     case 'gantt-task':
       return target.elementId
     case 'quadrant-point':
+      return target.elementId
+    case 'packet-field':
       return target.elementId
   }
 }

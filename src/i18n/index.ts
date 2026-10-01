@@ -116,6 +116,10 @@ export const zhDict = {
         'edit-quadrant-coords': '在属性面板中编辑',
         'edit-quadrant-style': '在属性面板中编辑',
         'edit-quadrant-text': '在属性面板中编辑',
+        // packet（more-diagrams 工单 16）：空白 = 加字段（+count 形态衔接前序）；
+        // 字段 = 改名（内联）/ 改位区间（右侧表单，绝对形态落码）/ 删除
+        'add-packet-field': '添加字段',
+        'edit-packet-range': '在属性面板中编辑',
         delete: '删除',
         styleName: '样式名称',
         styleNameInvalid: '名称不能为空，且不能含空格或逗号',
@@ -154,6 +158,7 @@ export const zhDict = {
       sankey: '桑基图',
       gantt: '甘特图',
       quadrant: '象限图',
+      packet: '数据包图',
     },
     library: {
       title: '图表库',
@@ -627,6 +632,18 @@ export const zhDict = {
       invalidQuadrantPointText: '文本不能为空，且不能含引号、冒号、方括号',
       invalidQuadrantCoord: '坐标必须是 0–1 之间的数字（如 0.5）',
       invalidQuadrantStyleValue: '值格式非法（色值 #rgb/#rrggbb、radius/stroke-width 为数字或数字+px）',
+      // ---- packet（more-diagrams 工单 16） ----
+      packetFields: '字段',
+      packetFieldName: '字段名',
+      packetFieldStart: '起始位',
+      packetFieldEnd: '结束位',
+      packetNotContiguous: '位区间不衔接（渲染会失败）',
+      packetDiagramFields: '共 {{count}} 个字段',
+      packetDiagramHint:
+        '数据包图：在结构树或画布中选中字段改名称与位区间；选中字段后按 Tab 加字段（衔接前序）、Delete 删除。',
+      deletePacketField: '删除字段',
+      invalidPacketFieldName: '名称不能为空，且不能含引号或换行',
+      invalidPacketBit: '必须是 0 起的非负整数',
     },
     shapes: {
       rectangle: '矩形',

@@ -17,6 +17,7 @@ import { isValidJourneySectionName, isValidJourneyTaskName, type JourneyIntent }
 import { isValidPieLabel, type PieIntent } from '../pipeline/pie'
 import { isValidGanttSectionName, isValidGanttTaskName, type GanttIntent } from '../pipeline/gantt'
 import { isValidQuadrantPointText, type QuadrantIntent } from '../pipeline/quadrant'
+import { isValidPacketFieldName, PACKET_DEFAULT_FIELD_COUNT, type PacketIntent } from '../pipeline/packet'
 import { isValidKanbanId } from '../pipeline/kanban'
 import { isValidBlockId } from '../pipeline/block'
 import { setRelationIntent, RELATION_KIND_OPTIONS } from './class-forms'
@@ -218,6 +219,11 @@ export function createElement(ctx: MenuActionContext, target: ContextMenuTarget 
       //（坐标落 0.5, 0.5 + 内联命名文本），不走 createElement
       return null
     }
+    if (proj.type === 'packet') {
+      // packet（more-diagrams 工单 16）：添加入口是独立的 add-packet-field 动作
+      //（+count 形态衔接前序 + 内联命名文本），不走 createElement
+      return null
+    }
     // mindmap：节点目标 = 挂为其子节点；空白 / 无目标 = 建根（空文档）或挂到根节点下
     const text = ctx.newNodeText
     let mindPlan: MindmapActionPlan | null
@@ -316,6 +322,8 @@ function beginEditText(ctx: MenuActionContext, target: ContextMenuTarget | undef
   else if (target.kind === 'block-node') ctx.beginInlineEdit({ kind: 'block-node', id: target.id })
   // quadrant（more-diagrams 工单 12）：点 = 改文本（内联编辑显示文本）
   else if (target.kind === 'quadrant-point') ctx.beginInlineEdit({ kind: 'quadrant-point', elementId: target.elementId })
+  // packet（more-diagrams 工单 16）：字段 = 改名（内联编辑显示文本）
+  else if (target.kind === 'packet-field') ctx.beginInlineEdit({ kind: 'packet-field', elementId: target.elementId })
   ctx.close()
 }
 
@@ -616,6 +624,38 @@ function addQuadrantPoint(ctx: MenuActionContext): void {
   }
 }
 
+/**
+ * 空白处加字段（packet，more-diagrams 工单 16）：以 +count 形态衔接前序（缺省位宽 8
+ * ——一个字节，工单场景「+count 形态」的合理缺省，右侧表单可改位区间），名称避重；
+ * 字段有 data-id 寻址（工单 16 实测 start-bit 映射反注可行），落码成功后进入内联命名
+ * （与 kanban/quadrant 同形态）。
+ */
+function addPacketField(ctx: MenuActionContext): void {
+  const proj = ctx.projection
+  if (proj === null || proj.type !== 'packet') return
+  const name = nextFreeName('新字段', proj.packet.fields.map((f) => f.name))
+  if (!isValidPacketFieldName(name)) return
+  const elementId = `field:${proj.packet.nextFieldOrdinal}`
+  const plan: KeyPlan = {
+    intents: [
+      { type: 'add-field', name, count: `${PACKET_DEFAULT_FIELD_COUNT}` } satisfies PacketIntent,
+    ],
+    newElementTarget: {
+      selection: { kind: 'packet-field', elementId },
+      inlineEdit: { kind: 'packet-field', elementId },
+    },
+  }
+  if (
+    applyPlan(plan, {
+      commitIntent: ctx.commitIntent,
+      select: ctx.select,
+      beginInlineEdit: ctx.beginInlineEdit,
+    })
+  ) {
+    ctx.close()
+  }
+}
+
 export const MENU_ACTIONS: Record<Exclude<ContextMenuItemId, 'apply-style'>, MenuAction> = {
   // 「创建 + 选中 + 内联命名」五个入口共用 createElement（工单 01 收敛）
   'add-node': createElement,
@@ -727,4 +767,8 @@ export const MENU_ACTIONS: Record<Exclude<ContextMenuItemId, 'apply-style'>, Men
   'edit-quadrant-coords': selectMenuTargetAndClose,
   'edit-quadrant-style': selectMenuTargetAndClose,
   'edit-quadrant-text': selectMenuTargetAndClose,
+  // packet（more-diagrams 工单 16）：空白加字段（内联命名）；字段 = 改名 / 改位区间
+  //（D5：选中 + 关菜单）/ 删除（deleteTarget）
+  'add-packet-field': addPacketField,
+  'edit-packet-range': selectMenuTargetAndClose,
 }

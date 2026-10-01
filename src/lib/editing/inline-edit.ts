@@ -12,6 +12,7 @@ import { isValidBlockLabel } from '../pipeline/block'
 import { parseBlockNodeElementId } from '../pipeline/element-id'
 import { isValidGanttTaskName } from '../pipeline/gantt'
 import { isValidQuadrantPointText } from '../pipeline/quadrant'
+import { isValidPacketFieldName } from '../pipeline/packet'
 import type { ProjectionMindmapNode } from '../projection/mindmap-projection'
 import { selectionFromEventTarget, type CanvasSelection, type DataIdResolver } from '../canvas-selection/data-id'
 
@@ -76,6 +77,9 @@ export type CanvasInlineEditTarget =
   /** quadrant（more-diagrams 工单 12）：双击点改文本（set-point-text 意图）。
    * 点有 data-id 寻址（渲染后位置序反注）；轴/象限标题不做双击（右侧表单改） */
   | { kind: 'quadrant-point'; elementId: string }
+  /** packet（more-diagrams 工单 16）：双击字段改名（set-field-name 意图）。
+   * 字段有 data-id 寻址（渲染后 start-bit 映射反注） */
+  | { kind: 'packet-field'; elementId: string }
 
 export type InlineEditCommit =
   | { action: 'commit'; intent: EditIntent }
@@ -160,6 +164,7 @@ export type InlineEditDiagramKind =
   | 'block'
   | 'gantt'
   | 'quadrant'
+  | 'packet'
 
 /**
  * 双击目标 → 编辑对象；两边都匹配不上时返回 null（如点在空白处/边上），
@@ -215,6 +220,11 @@ export function inlineEditTargetFromEvent(
     // 只有点可双击（改文本）；轴/象限标题双击安静忽略（右侧表单改）
     if (kind === 'quadrant') {
       return byId.nodeId.startsWith('point:') ? { kind: 'quadrant-point', elementId: byId.nodeId } : null
+    }
+    // packet（more-diagrams 工单 16）：data-id = 投影 elementId（渲染后 start-bit 映射
+    // 反注），双击改字段名
+    if (kind === 'packet') {
+      return byId.nodeId.startsWith('field:') ? { kind: 'packet-field', elementId: byId.nodeId } : null
     }
     return byId
   }
@@ -288,6 +298,12 @@ export function inlineEditCommitOf(target: CanvasInlineEditTarget, text: string,
     // 关键字前缀等非法输入拒绝落码，见 isValidQuadrantPointText）
     if (!isValidQuadrantPointText(next)) return { action: 'invalid' }
     return { action: 'commit', intent: { type: 'set-point-text', elementId: target.elementId, text: next } }
+  }
+  if (target.kind === 'packet-field') {
+    // packet（more-diagrams 工单 16）：非空改动 = set-field-name（含引号/换行的名称
+    // 拒绝落码，见 isValidPacketFieldName）
+    if (!isValidPacketFieldName(next)) return { action: 'invalid' }
+    return { action: 'commit', intent: { type: 'set-field-name', elementId: target.elementId, name: next } }
   }
   if (!isValidMindmapNodeText(next)) return { action: 'invalid' }
   return { action: 'commit', intent: { type: 'set-node-text', elementId: target.elementId, text: next } }

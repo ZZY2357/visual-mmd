@@ -85,6 +85,9 @@ export type Selection =
   | { kind: 'quadrant-point'; elementId: string }
   | { kind: 'quadrant-axis'; elementId: string }
   | { kind: 'quadrant-quadrant'; elementId: string }
+  // packet（more-diagrams 工单 16）：字段走位置序身份（`field:N`，packet 语法无字段 id）。
+  // 画布 DOM 的 data-id 由渲染后处理按 start-bit 映射反注（见 packet-adapter / node-data-ids）。
+  | { kind: 'packet-field'; elementId: string }
 
 export const DIAGRAM_SELECTION: Selection = { kind: 'diagram' }
 
@@ -186,6 +189,8 @@ export function selectionKey(sel: Selection): string {
       return `quadrant-axis:${sel.elementId}`
     case 'quadrant-quadrant':
       return `quadrant-quadrant:${sel.elementId}`
+    case 'packet-field':
+      return `packet-field:${sel.elementId}`
   }
 }
 
