@@ -90,6 +90,12 @@ export type Selection =
   | { kind: 'xychart-series'; elementId: string }
   | { kind: 'xychart-axis'; axis: 'x' | 'y' }
   | { kind: 'xychart-title' }
+  // radar-beta（more-diagrams 工单 15）：轴 / 曲线虽有语法 id 但 id 可改名，
+  // 走位置序身份（`axis:N` / `curve:N`）。画布 DOM 无 data-id（实测降级——渲染器
+  // 全程只有 class），选中只来自结构树 / 表单 / 键盘；轴 label 另有双击文本匹配
+  // 内联编辑（inline-edit.ts，与 mindmap 同范式）。
+  | { kind: 'radar-axis'; elementId: string }
+  | { kind: 'radar-curve'; elementId: string }
 
 export const DIAGRAM_SELECTION: Selection = { kind: 'diagram' }
 
@@ -197,6 +203,10 @@ export function selectionKey(sel: Selection): string {
       return `xychart-axis:${sel.axis}`
     case 'xychart-title':
       return 'xychart-title'
+    case 'radar-axis':
+      return `radar-axis:${sel.elementId}`
+    case 'radar-curve':
+      return `radar-curve:${sel.elementId}`
   }
 }
 

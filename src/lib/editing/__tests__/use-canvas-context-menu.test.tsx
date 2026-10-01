@@ -124,6 +124,8 @@ function resolverOf(projection: AnyProjection) {
   if (projection.type === 'quadrant') return quadrantDataIdResolver(projection.quadrant)
   // xychart（more-diagrams 工单 14）：系列/标题/轴（类名组反注，node.id = elementId 或固定身份）
   if (projection.type === 'xychart') return xychartDataIdResolver(projection.xychart)
+  // radar（more-diagrams 工单 15）：画布 DOM 无 data-id（实测降级），resolver 永不命中
+  if (projection.type === 'radar') return () => null
   const nodes = nodeDataIdResolver(projection.class.classes.map((c) => c.name))
   const edges = elementDataIdResolver(projection.class.relations.map((r) => r.elementId))
   return (dataId: string) => nodes(dataId) ?? edges(dataId)
@@ -159,6 +161,9 @@ function createdIdOf(target: CanvasInlineEditTarget): string {
     case 'quadrant-point':
       return target.elementId
     case 'xychart-series':
+      return target.elementId
+    // radar（more-diagrams 工单 15）：双击轴标签可进内联编辑（文本匹配），目标带 elementId
+    case 'radar-axis':
       return target.elementId
   }
 }
