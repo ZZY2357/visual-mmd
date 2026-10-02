@@ -2,30 +2,14 @@ import { Box, Button, Group, Stack } from '@mantine/core'
 import { useTranslation } from 'react-i18next'
 import type { AnyProjection } from '../lib/diagram-registry'
 import type { NodeFormState } from '../lib/editing/use-canvas-context-menu'
-import { AddMemberInlineForm, AddRelationInlineForm, AddClassNoteInlineForm } from './class-forms'
-import { AddMessageInlineForm, AddNoteInlineForm, AddBlockInlineForm } from './sequence-forms'
-import { AddTransitionInlineForm } from './state-forms'
-import { AddErAttributeInlineForm, AddErRelationInlineForm } from './er-forms'
-import {
-  AddRequirementElementInlineForm,
-  AddRequirementInlineForm,
-  AddRequirementRelationInlineForm,
-} from './requirement-forms'
-import { AddBlockEdgeInlineForm } from './block-forms'
-import { AddSankeyLinkInlineForm } from './sankey-forms'
-import { AddXychartSeriesInlineForm } from './xychart-forms'
-import { AddArchitectureEdgeInlineForm } from './architecture-forms'
-import { AddWardleyLinkInlineForm } from './wardley-forms'
-import { AddCynefinTransitionInlineForm } from './cynefin-forms'
-import { AddAgentflowEdgeInlineForm } from './agentflow-forms'
-import { AddZenumlMessageInlineForm } from './zenuml-forms'
+import { renderNodeForm } from './node-form-popup-routes'
 
 /**
  * class/sequence 节点菜单的表单浮层（工单 06/04；工单 04-canvas-bundle 自 CanvasPanel 迁出）：
- * 与「添加样式」同款定位/外观，内容按表单种类 × 图种选择添加型小表单
- * （'note' 同时服务 sequence 与 class，由投影图种决定渲染哪个表单），另有取消按钮
- * （提交由表单自身的按钮负责）。`state` 由 useCanvasContextMenu 生成，
- * 其 kind 与投影图种的对应关系由该 hook 保证，此处检查同时是类型收窄。
+ * 与「添加样式」同款定位/外观，内容按表单种类 × 图种渲染添加型小表单，另有取消按钮
+ * （提交由表单自身的按钮负责）。路由本体（图种 → kind → 表单的声明式表）见
+ * node-form-popup-routes.tsx（architecture-deepening-3 工单 05 收敛，此处只剩壳）。
+ * `state` 由 useCanvasContextMenu 生成，其 kind 与投影图种的对应关系由该 hook 保证。
  */
 export function NodeFormPopup(props: { state: NodeFormState; projection: AnyProjection; onClose: () => void }) {
   const { t } = useTranslation()
@@ -50,152 +34,7 @@ export function NodeFormPopup(props: { state: NodeFormState; projection: AnyProj
       onContextMenu={(e) => e.preventDefault()}
     >
       <Stack gap={6}>
-        {state.kind === 'member' && projection.type === 'class' && (
-          <AddMemberInlineForm
-            classes={projection.class.classes}
-            initialClassName={state.className}
-            afterElementId={state.anchorElementId}
-            onDone={props.onClose}
-          />
-        )}
-        {state.kind === 'relation' && projection.type === 'class' && (
-          <AddRelationInlineForm
-            classes={projection.class.classes}
-            initialFrom={state.className}
-            afterElementId={state.anchorElementId}
-            onDone={props.onClose}
-          />
-        )}
-        {state.kind === 'message' && projection.type === 'sequence' && (
-          <AddMessageInlineForm
-            participants={projection.sequence.participants}
-            initialFrom={state.from}
-            afterElementId={state.anchorElementId}
-            onDone={props.onClose}
-          />
-        )}
-        {state.kind === 'note' && projection.type === 'sequence' && (
-          <AddNoteInlineForm
-            participants={projection.sequence.participants}
-            afterElementId={state.anchorElementId}
-            onDone={props.onClose}
-          />
-        )}
-        {state.kind === 'block' && projection.type === 'sequence' && (
-          <AddBlockInlineForm afterElementId={state.anchorElementId} onDone={props.onClose} />
-        )}
-        {state.kind === 'transition' && projection.type === 'state' && (
-          <AddTransitionInlineForm
-            states={projection.state.states}
-            initialFrom={state.from}
-            afterElementId={state.anchorElementId}
-            onDone={props.onClose}
-          />
-        )}
-        {state.kind === 'er-attribute' && projection.type === 'er' && state.entity !== undefined && (
-          <AddErAttributeInlineForm
-            entity={state.entity}
-            afterElementId={state.anchorElementId}
-            onDone={props.onClose}
-          />
-        )}
-        {state.kind === 'er-relation' && projection.type === 'er' && (
-          <AddErRelationInlineForm
-            entities={projection.er.entities}
-            initialFrom={state.from}
-            afterElementId={state.anchorElementId}
-            onDone={props.onClose}
-          />
-        )}
-        {state.kind === 'requirement-node' && projection.type === 'requirement' && (
-          <AddRequirementInlineForm afterElementId={state.anchorElementId} onDone={props.onClose} />
-        )}
-        {state.kind === 'requirement-element' && projection.type === 'requirement' && (
-          <AddRequirementElementInlineForm afterElementId={state.anchorElementId} onDone={props.onClose} />
-        )}
-        {state.kind === 'requirement-relation' && projection.type === 'requirement' && (
-          <AddRequirementRelationInlineForm
-            requirements={projection.requirement.requirements}
-            elements={projection.requirement.elements}
-            initialFrom={state.from}
-            afterElementId={state.anchorElementId}
-            onDone={props.onClose}
-          />
-        )}
-        {state.kind === 'block-edge' && projection.type === 'block' && (
-          <AddBlockEdgeInlineForm
-            nodeIds={projection.block.nodes.map((n) => n.id)}
-            groupIds={projection.block.groups.map((g) => g.id)}
-            initialFrom={state.from}
-            afterElementId={state.anchorElementId}
-            onDone={props.onClose}
-          />
-        )}
-        {state.kind === 'sankey-link' && projection.type === 'sankey' && (
-          <AddSankeyLinkInlineForm
-            nodeNames={projection.sankey.nodes.map((n) => n.name)}
-            initialSource={state.from}
-            afterElementId={state.anchorElementId}
-            onDone={props.onClose}
-          />
-        )}
-        {(state.kind === 'xychart-line' || state.kind === 'xychart-bar') && projection.type === 'xychart' && (
-          <AddXychartSeriesInlineForm
-            seriesType={state.kind === 'xychart-line' ? 'line' : 'bar'}
-            afterElementId={state.anchorElementId}
-            onDone={props.onClose}
-          />
-        )}
-        {state.kind === 'architecture-edge' && projection.type === 'architecture' && (
-          <AddArchitectureEdgeInlineForm
-            serviceIds={[
-              ...projection.architecture.services.map((s) => s.id),
-              ...projection.architecture.junctions.map((j) => j.id),
-            ]}
-            initialFrom={state.from}
-            afterElementId={state.anchorElementId}
-            onDone={props.onClose}
-          />
-        )}
-        {state.kind === 'wardley-link' && projection.type === 'wardley' && (
-          <AddWardleyLinkInlineForm
-            nodeNames={projection.wardley.nodes.map((n) => n.name)}
-            initialFrom={state.from}
-            afterElementId={state.anchorElementId}
-            onDone={props.onClose}
-          />
-        )}
-        {state.kind === 'cynefin-transition' && projection.type === 'cynefin' && (
-          <AddCynefinTransitionInlineForm
-            initialFrom={state.from}
-            afterElementId={state.anchorElementId}
-            onDone={props.onClose}
-          />
-        )}
-        {state.kind === 'agentflow-edge' && projection.type === 'agentflow' && (
-          <AddAgentflowEdgeInlineForm
-            projection={projection.agentflow}
-            initialFrom={state.from}
-            afterElementId={state.anchorElementId}
-            onDone={props.onClose}
-          />
-        )}
-        {state.kind === 'zenuml-message' && projection.type === 'zenuml' && (
-          <AddZenumlMessageInlineForm
-            participants={projection.zenuml.participants}
-            initialFrom={state.from}
-            afterElementId={state.anchorElementId}
-            onDone={props.onClose}
-          />
-        )}
-        {state.kind === 'note' && projection.type === 'class' && (
-          <AddClassNoteInlineForm
-            classes={projection.class.classes}
-            initialClassName={state.className}
-            afterElementId={state.anchorElementId}
-            onDone={props.onClose}
-          />
-        )}
+        {renderNodeForm(projection, state, props.onClose)}
         <Group gap="xs" justify="flex-end">
           <Button size="compact-xs" variant="default" onClick={props.onClose}>
             {t('app:propertyPanel.cancel')}
