@@ -7,11 +7,10 @@ import { buildBlockProjection, type BlockProjection } from '../../projection/blo
 import type { EditIntent } from '../../pipeline/parser'
 import {
   applyPlan,
-  blockDeleteIntent,
-  blockKeyPlan,
   type KeyInput,
   type KeyPlan,
 } from '../canvas-keyboard'
+import { blockDeleteIntent, blockKeyPlan } from '../../pipeline/block-keyboard'
 import { inlineEditCommitOf } from '../inline-edit'
 import { MENU_ACTIONS, type MenuActionContext } from '../menu-actions'
 

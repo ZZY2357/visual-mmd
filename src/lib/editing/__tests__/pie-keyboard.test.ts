@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest'
 import { pieParser } from '../../pipeline/pie'
 import { buildPieProjection } from '../../projection/pie-projection'
 import { DIAGRAM_TYPES } from '../../diagram-registry'
-import { pieDeleteIntent, pieKeyPlan } from '../canvas-keyboard'
+import { pieDeleteIntent, pieKeyPlan } from '../../pipeline/pie-keyboard'
 import { contextMenuItems, contextMenuTargetFromSelection } from '../context-menu'
 
 /**

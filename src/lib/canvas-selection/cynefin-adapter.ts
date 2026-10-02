@@ -1,5 +1,5 @@
 import { resolveCynefinSelection } from '../projection/cynefin-projection'
-import { cynefinDeleteIntent, cynefinKeyPlan } from '../editing/canvas-keyboard'
+import { cynefinDeleteIntent, cynefinKeyPlan } from '../pipeline/cynefin-keyboard'
 import type { CanvasCapabilities, ProjectionOf } from './capabilities'
 
 /**
@@ -41,8 +41,8 @@ export const cynefinCanvasCapabilities: CanvasCapabilities<ProjectionOf<'cynefin
   navigationIds: () => [],
   keyboardProjection: (projection) => ({ kind: 'cynefin', projection: projection.cynefin }),
   resolveSelection: (projection, selection) => resolveCynefinSelection(projection.cynefin, selection),
-  // 删除意图：唯一映射在 canvas-keyboard.cynefinDeleteIntent
+  // 删除意图：唯一映射在 pipeline/cynefin-keyboard 的 cynefinDeleteIntent
   deleteIntent: (projection, selection) => cynefinDeleteIntent(projection.cynefin, selection),
-  // 键位语义：唯一映射在 canvas-keyboard.cynefinKeyPlan
+  // 键位语义：唯一映射在 pipeline/cynefin-keyboard 的 cynefinKeyPlan
   keyHandler: (projection) => (input) => cynefinKeyPlan(projection.cynefin, input),
 }

@@ -1,6 +1,6 @@
 import { parseKanbanCardElementId, parseKanbanColumnElementId } from '../pipeline/element-id'
 import { resolveKanbanSelection, type KanbanProjection } from '../projection/kanban-projection'
-import { kanbanDeleteIntent, kanbanKeyPlan } from '../editing/canvas-keyboard'
+import { kanbanDeleteIntent, kanbanKeyPlan } from '../pipeline/kanban-keyboard'
 import type { CanvasSelection, DataIdResolver } from './data-id'
 import type { CanvasCapabilities, ProjectionOf } from './capabilities'
 
@@ -66,8 +66,8 @@ export const kanbanCanvasCapabilities: CanvasCapabilities<ProjectionOf<'kanban'>
   },
   keyboardProjection: (projection) => ({ kind: 'kanban', projection: projection.kanban }),
   resolveSelection: (projection, selection) => resolveKanbanSelection(projection.kanban, selection),
-  // 删除意图：唯一映射在 canvas-keyboard.kanbanDeleteIntent
+  // 删除意图：唯一映射在 pipeline/kanban-keyboard 的 kanbanDeleteIntent
   deleteIntent: (projection, selection) => kanbanDeleteIntent(projection.kanban, selection),
-  // 键位语义：唯一映射在 canvas-keyboard.kanbanKeyPlan
+  // 键位语义：唯一映射在 pipeline/kanban-keyboard 的 kanbanKeyPlan
   keyHandler: (projection) => (input) => kanbanKeyPlan(projection.kanban, input),
 }

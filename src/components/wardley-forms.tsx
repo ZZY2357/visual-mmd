@@ -8,7 +8,7 @@ import type {
   WardleyProjection,
 } from '../lib/projection/wardley-projection'
 import { isValidWardleyName, type WardleyIntent } from '../lib/pipeline/wardley'
-import { isWardleyCoordsValid, isWardleyTargetValid } from '../lib/editing/canvas-keyboard'
+import { isWardleyCoordsValid, isWardleyTargetValid } from '../lib/pipeline/wardley-keyboard'
 import { useEditorStore } from '../store/editor'
 import { useDraft } from './property-forms'
 

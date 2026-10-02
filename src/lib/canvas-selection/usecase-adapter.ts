@@ -1,6 +1,6 @@
 import { resolveUsecaseSelection, type UsecaseProjection } from '../projection/usecase-projection'
 import type { Selection } from '../projection/selection'
-import { usecaseDeleteIntent, usecaseKeyPlan } from '../editing/canvas-keyboard'
+import { usecaseDeleteIntent, usecaseKeyPlan } from '../pipeline/usecase-keyboard'
 import { annotateUsecaseDataIds } from './node-data-ids'
 import type { CanvasSelection, DataIdResolver } from './data-id'
 import type { CanvasCapabilities, ProjectionOf } from './capabilities'
@@ -92,8 +92,8 @@ export const usecaseCanvasCapabilities: CanvasCapabilities<ProjectionOf<'usecase
   // 节点/关系反注：渲染器已写 data-id（= 模型 id），归一为投影 elementId
   nodeAnnotator: (projection) => (root) => annotateUsecaseDataIds(root, usecaseDataIdMap(projection.usecase)),
   resolveSelection: (projection, selection) => resolveUsecaseSelection(projection.usecase, selection),
-  // 删除意图：唯一映射在 canvas-keyboard.usecaseDeleteIntent
+  // 删除意图：唯一映射在 pipeline/usecase-keyboard 的 usecaseDeleteIntent
   deleteIntent: (projection, selection) => usecaseDeleteIntent(projection.usecase, selection),
-  // 键位语义：唯一映射在 canvas-keyboard.usecaseKeyPlan
+  // 键位语义：唯一映射在 pipeline/usecase-keyboard 的 usecaseKeyPlan
   keyHandler: (projection) => (input) => usecaseKeyPlan(projection.usecase, input),
 }

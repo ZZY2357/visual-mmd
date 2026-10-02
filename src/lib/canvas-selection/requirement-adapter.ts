@@ -7,7 +7,7 @@ import {
   type RequirementProjection,
 } from '../projection/requirement-projection'
 import type { Selection } from '../projection/selection'
-import { requirementDeleteIntent, requirementKeyPlan } from '../editing/canvas-keyboard'
+import { requirementDeleteIntent, requirementKeyPlan } from '../pipeline/requirement-keyboard'
 import type { CanvasSelection, DataIdResolver } from './data-id'
 import { edgeSelectionOf } from './edge-adapter'
 import { annotateRequirementRelationIdentities } from './edge-locate'
@@ -82,8 +82,8 @@ export const requirementCanvasCapabilities: CanvasCapabilities<ProjectionOf<'req
   edgeAnnotator: (projection) => (root) =>
     annotateRequirementRelationIdentities(root, projection.requirement.relations.length),
   resolveSelection: (projection, selection) => resolveRequirementSelection(projection.requirement, selection),
-  // 删除意图：唯一映射在 canvas-keyboard.requirementDeleteIntent
+  // 删除意图：唯一映射在 pipeline/requirement-keyboard 的 requirementDeleteIntent
   deleteIntent: (projection, selection) => requirementDeleteIntent(projection.requirement, selection),
-  // 键位语义：唯一映射在 canvas-keyboard.requirementKeyPlan
+  // 键位语义：唯一映射在 pipeline/requirement-keyboard 的 requirementKeyPlan
   keyHandler: (projection) => (input) => requirementKeyPlan(projection.requirement, input),
 }

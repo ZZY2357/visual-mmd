@@ -4,7 +4,7 @@ import {
   type Selection,
 } from '../projection/flowchart-projection'
 import type { CanvasCapabilities, ProjectionOf } from './capabilities'
-import { flowchartDeleteIntent, flowchartKeyPlan } from '../editing/canvas-keyboard'
+import { flowchartDeleteIntent, flowchartKeyPlan } from '../pipeline/flowchart-keyboard'
 import {
   edgeDataIdResolver,
   nodeDataIdResolver,
@@ -48,8 +48,8 @@ export const flowchartCanvasCapabilities: CanvasCapabilities<ProjectionOf<'flowc
   navigationIds: (projection) => projection.flowchart.nodes.map((n) => n.nodeId),
   keyboardProjection: (projection) => ({ kind: 'flowchart', projection: projection.flowchart }),
   resolveSelection: (projection, selection) => resolveFlowchartSelection(projection.flowchart, selection),
-  // 删除意图（architecture-deepening-2 工单 03）：唯一映射在 canvas-keyboard.flowchartDeleteIntent
+  // 删除意图（architecture-deepening-2 工单 03）：唯一映射在 pipeline/flowchart-keyboard 的 flowchartDeleteIntent
   deleteIntent: (projection, selection) => flowchartDeleteIntent(projection.flowchart, selection),
-  // 键位语义（architecture-deepening-2 工单 02）：唯一映射在 canvas-keyboard.flowchartKeyPlan
+  // 键位语义（architecture-deepening-2 工单 02）：唯一映射在 pipeline/flowchart-keyboard 的 flowchartKeyPlan
   keyHandler: (projection) => (input) => flowchartKeyPlan(projection.flowchart, input),
 }

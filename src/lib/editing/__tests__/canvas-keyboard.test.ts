@@ -6,19 +6,15 @@ import { classParser } from '../../pipeline/class'
 import { sequenceParser } from '../../pipeline/sequence'
 import {
   applyPlan,
-  classDeleteIntent,
-  classKeyPlan,
-  flowchartKeyPlan,
   isNavigationKey,
   keyToNodeAction,
-  mindmapActionIntents,
-  mindmapKeyPlan,
   nextNodeId,
-  nodeActionIntents,
-  sequenceDeleteIntent,
-  sequenceKeyPlan,
 } from '../canvas-keyboard'
 import type { KeyPlan } from '../canvas-keyboard'
+import { flowchartKeyPlan, nodeActionIntents } from '../../pipeline/flowchart-keyboard'
+import { mindmapKeyPlan, mindmapActionIntents } from '../../pipeline/mindmap-keyboard'
+import { classKeyPlan, classDeleteIntent } from '../../pipeline/class-keyboard'
+import { sequenceKeyPlan, sequenceDeleteIntent } from '../../pipeline/sequence-keyboard'
 import type { Selection } from '../../projection/selection'
 import { buildFlowchartProjection, type FlowchartProjection } from '../../projection/flowchart-projection'
 import { buildMindmapProjection, type MindmapProjection } from '../../projection/mindmap-projection'

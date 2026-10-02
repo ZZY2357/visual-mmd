@@ -1,5 +1,5 @@
 import { resolveStateSelection, type StateProjection } from '../projection/state-projection'
-import { stateDeleteIntent, stateKeyPlan } from '../editing/canvas-keyboard'
+import { stateDeleteIntent, stateKeyPlan } from '../pipeline/state-keyboard'
 import { elementDataIdResolver, nodeDataIdResolver, type DataIdResolver } from './data-id'
 import { edgeSelectionOf } from './edge-adapter'
 import { annotateStateTransitionIdentities } from './edge-locate'
@@ -41,8 +41,8 @@ export const stateCanvasCapabilities: CanvasCapabilities<ProjectionOf<'state'>> 
   keyboardProjection: (projection) => ({ kind: 'state', projection: projection.state }),
   edgeAnnotator: (projection) => (root) => annotateStateTransitionIdentities(root, projection.state.transitions.length),
   resolveSelection: (projection, selection) => resolveStateSelection(projection.state, selection),
-  // 删除意图：唯一映射在 canvas-keyboard.stateDeleteIntent
+  // 删除意图：唯一映射在 pipeline/state-keyboard 的 stateDeleteIntent
   deleteIntent: (projection, selection) => stateDeleteIntent(projection.state, selection),
-  // 键位语义：唯一映射在 canvas-keyboard.stateKeyPlan
+  // 键位语义：唯一映射在 pipeline/state-keyboard 的 stateKeyPlan
   keyHandler: (projection) => (input) => stateKeyPlan(projection.state, input),
 }

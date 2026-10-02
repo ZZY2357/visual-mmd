@@ -1,5 +1,5 @@
 import { resolveIshikawaSelection } from '../projection/ishikawa-projection'
-import { ishikawaDeleteIntent, ishikawaKeyPlan } from '../editing/canvas-keyboard'
+import { ishikawaDeleteIntent, ishikawaKeyPlan } from '../pipeline/ishikawa-keyboard'
 import type { CanvasCapabilities, ProjectionOf } from './capabilities'
 
 /**
@@ -32,8 +32,8 @@ export const ishikawaCanvasCapabilities: CanvasCapabilities<ProjectionOf<'ishika
   navigationIds: () => [],
   keyboardProjection: (projection) => ({ kind: 'ishikawa', projection: projection.ishikawa }),
   resolveSelection: (projection, selection) => resolveIshikawaSelection(projection.ishikawa, selection),
-  // 删除意图：唯一映射在 canvas-keyboard.ishikawaDeleteIntent
+  // 删除意图：唯一映射在 pipeline/ishikawa-keyboard 的 ishikawaDeleteIntent
   deleteIntent: (projection, selection) => ishikawaDeleteIntent(projection.ishikawa, selection),
-  // 键位语义：唯一映射在 canvas-keyboard.ishikawaKeyPlan
+  // 键位语义：唯一映射在 pipeline/ishikawa-keyboard 的 ishikawaKeyPlan
   keyHandler: (projection) => (input) => ishikawaKeyPlan(projection.ishikawa, input),
 }

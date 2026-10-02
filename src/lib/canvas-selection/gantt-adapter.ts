@@ -1,5 +1,5 @@
 import { resolveGanttSelection, type GanttProjection } from '../projection/gantt-projection'
-import { ganttDeleteIntent, ganttKeyPlan } from '../editing/canvas-keyboard'
+import { ganttDeleteIntent, ganttKeyPlan } from '../pipeline/gantt-keyboard'
 import type { CanvasSelection, DataIdResolver } from './data-id'
 import type { CanvasCapabilities, ProjectionOf } from './capabilities'
 
@@ -65,9 +65,9 @@ export const ganttCanvasCapabilities: CanvasCapabilities<ProjectionOf<'gantt'>> 
   },
   keyboardProjection: (projection) => ({ kind: 'gantt', projection: projection.gantt }),
   resolveSelection: (projection, selection) => resolveGanttSelection(projection.gantt, selection),
-  // 删除意图：唯一映射在 canvas-keyboard.ganttDeleteIntent
+  // 删除意图：唯一映射在 pipeline/gantt-keyboard 的 ganttDeleteIntent
   deleteIntent: (projection, selection) => ganttDeleteIntent(projection.gantt, selection),
-  // 键位语义：唯一映射在 canvas-keyboard.ganttKeyPlan（Tab 同 section 加任务 /
+  // 键位语义：唯一映射在 pipeline/gantt-keyboard 的 ganttKeyPlan（Tab 同 section 加任务 /
   // Enter 加 section / Delete 删除，工单定案）
   keyHandler: (projection) => (input) => ganttKeyPlan(projection.gantt, input),
 }

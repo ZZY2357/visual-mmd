@@ -1,5 +1,5 @@
 import { resolveZenumlSelection } from '../projection/zenuml-projection'
-import { zenumlDeleteIntent, zenumlKeyPlan } from '../editing/canvas-keyboard'
+import { zenumlDeleteIntent, zenumlKeyPlan } from '../pipeline/zenuml-keyboard'
 import type { CanvasCapabilities, ProjectionOf } from './capabilities'
 
 /**
@@ -41,8 +41,8 @@ export const zenumlCanvasCapabilities: CanvasCapabilities<ProjectionOf<'zenuml'>
   navigationIds: () => [],
   keyboardProjection: (projection) => ({ kind: 'zenuml', projection: projection.zenuml }),
   resolveSelection: (projection, selection) => resolveZenumlSelection(projection.zenuml, selection),
-  // 删除意图：唯一映射在 canvas-keyboard.zenumlDeleteIntent
+  // 删除意图：唯一映射在 pipeline/zenuml-keyboard 的 zenumlDeleteIntent
   deleteIntent: (projection, selection) => zenumlDeleteIntent(projection.zenuml, selection),
-  // 键位语义：唯一映射在 canvas-keyboard.zenumlKeyPlan
+  // 键位语义：唯一映射在 pipeline/zenuml-keyboard 的 zenumlKeyPlan
   keyHandler: (projection) => (input) => zenumlKeyPlan(projection.zenuml, input),
 }

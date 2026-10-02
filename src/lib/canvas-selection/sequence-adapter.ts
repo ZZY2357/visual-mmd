@@ -2,7 +2,7 @@ import {
   resolveSequenceSelection,
   type SequenceProjection,
 } from '../projection/sequence-projection'
-import { sequenceDeleteIntent, sequenceKeyPlan } from '../editing/canvas-keyboard'
+import { sequenceDeleteIntent, sequenceKeyPlan } from '../pipeline/sequence-keyboard'
 import { elementDataIdResolver, nodeDataIdResolver, type DataIdResolver } from './data-id'
 import { edgeSelectionOf } from './edge-adapter'
 import { annotateSequenceIdentities } from './edge-locate'
@@ -60,8 +60,8 @@ export const sequenceCanvasCapabilities: CanvasCapabilities<ProjectionOf<'sequen
   keyboardProjection: (projection) => ({ kind: 'sequence', projection: projection.sequence }),
   edgeAnnotator: (projection) => (root) => annotateSequenceIdentities(root, sequenceEdgeCounts(projection.sequence)),
   resolveSelection: (projection, selection) => resolveSequenceSelection(projection.sequence, selection),
-  // 删除意图（architecture-deepening-2 工单 03）：唯一映射在 canvas-keyboard.sequenceDeleteIntent
+  // 删除意图（architecture-deepening-2 工单 03）：唯一映射在 pipeline/sequence-keyboard 的 sequenceDeleteIntent
   deleteIntent: (projection, selection) => sequenceDeleteIntent(projection.sequence, selection),
-  // 键位语义（architecture-deepening-2 工单 02）：唯一映射在 canvas-keyboard.sequenceKeyPlan
+  // 键位语义（architecture-deepening-2 工单 02）：唯一映射在 pipeline/sequence-keyboard 的 sequenceKeyPlan
   keyHandler: (projection) => (input) => sequenceKeyPlan(projection.sequence, input),
 }

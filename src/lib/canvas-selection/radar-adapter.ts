@@ -1,5 +1,5 @@
 import { resolveRadarSelection } from '../projection/radar-projection'
-import { radarDeleteIntent, radarKeyPlan } from '../editing/canvas-keyboard'
+import { radarDeleteIntent, radarKeyPlan } from '../pipeline/radar-keyboard'
 import type { CanvasCapabilities, ProjectionOf } from './capabilities'
 
 /**
@@ -31,9 +31,9 @@ export const radarCanvasCapabilities: CanvasCapabilities<ProjectionOf<'radar'>> 
   navigationIds: () => [],
   keyboardProjection: (projection) => ({ kind: 'radar', projection: projection.radar }),
   resolveSelection: (projection, selection) => resolveRadarSelection(projection.radar, selection),
-  // 删除意图：唯一映射在 canvas-keyboard.radarDeleteIntent
+  // 删除意图：唯一映射在 pipeline/radar-keyboard 的 radarDeleteIntent
   deleteIntent: (projection, selection) => radarDeleteIntent(projection.radar, selection),
-  // 键位语义：唯一映射在 canvas-keyboard.radarKeyPlan（轴上 Tab 加轴 / 曲线上 Tab 加曲线 /
+  // 键位语义：唯一映射在 pipeline/radar-keyboard 的 radarKeyPlan（轴上 Tab 加轴 / 曲线上 Tab 加曲线 /
   // Delete 删除；Enter 无自然类比，工单定案不做）
   keyHandler: (projection) => (input) => radarKeyPlan(projection.radar, input),
 }

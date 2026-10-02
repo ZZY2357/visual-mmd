@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest'
 import { agentflowParser } from '../../pipeline/agentflow'
 import { buildAgentflowProjection } from '../../projection/agentflow-projection'
 import { agentflowCanvasCapabilities } from '../../canvas-selection/agentflow-adapter'
-import { agentflowDeleteIntent, agentflowKeyPlan } from '../../editing/canvas-keyboard'
+import { agentflowDeleteIntent, agentflowKeyPlan } from '../../pipeline/agentflow-keyboard'
 import { contextMenuItems, contextMenuTargetFromSelection } from '../../editing/context-menu'
 import { MENU_ACTIONS, type MenuActionContext } from '../../editing/menu-actions'
 import {

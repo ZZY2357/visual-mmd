@@ -10,7 +10,7 @@ import {
 } from '../sankey'
 import { reassemble } from '../document'
 import { buildSankeyProjection, resolveSankeySelection } from '../../projection/sankey-projection'
-import { sankeyDeleteIntent, sankeyKeyPlan } from '../../editing/canvas-keyboard'
+import { sankeyDeleteIntent, sankeyKeyPlan } from '../../pipeline/sankey-keyboard'
 import { annotateNodeDataIds } from '../../canvas-selection/node-data-ids'
 import { annotateSankeyIdentities } from '../../canvas-selection/edge-locate'
 import { DIAGRAM_TYPES } from '../../diagram-registry'

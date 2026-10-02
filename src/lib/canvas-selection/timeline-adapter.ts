@@ -1,5 +1,5 @@
 import { resolveTimelineSelection } from '../projection/timeline-projection'
-import { timelineDeleteIntent, timelineKeyPlan } from '../editing/canvas-keyboard'
+import { timelineDeleteIntent, timelineKeyPlan } from '../pipeline/timeline-keyboard'
 import type { CanvasCapabilities, ProjectionOf } from './capabilities'
 
 /**
@@ -27,8 +27,8 @@ export const timelineCanvasCapabilities: CanvasCapabilities<ProjectionOf<'timeli
   navigationIds: () => [],
   keyboardProjection: (projection) => ({ kind: 'timeline', projection: projection.timeline }),
   resolveSelection: (projection, selection) => resolveTimelineSelection(projection.timeline, selection),
-  // 删除意图：唯一映射在 canvas-keyboard.timelineDeleteIntent
+  // 删除意图：唯一映射在 pipeline/timeline-keyboard 的 timelineDeleteIntent
   deleteIntent: (projection, selection) => timelineDeleteIntent(projection.timeline, selection),
-  // 键位语义：唯一映射在 canvas-keyboard.timelineKeyPlan（Tab 加事件 / Enter 加时期 / Delete）
+  // 键位语义：唯一映射在 pipeline/timeline-keyboard 的 timelineKeyPlan（Tab 加事件 / Enter 加时期 / Delete）
   keyHandler: (projection) => (input) => timelineKeyPlan(projection.timeline, input),
 }

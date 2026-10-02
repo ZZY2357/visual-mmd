@@ -1,5 +1,5 @@
 import { resolveJourneySelection } from '../projection/journey-projection'
-import { journeyDeleteIntent, journeyKeyPlan } from '../editing/canvas-keyboard'
+import { journeyDeleteIntent, journeyKeyPlan } from '../pipeline/journey-keyboard'
 import type { CanvasCapabilities, ProjectionOf } from './capabilities'
 
 /**
@@ -29,8 +29,8 @@ export const journeyCanvasCapabilities: CanvasCapabilities<ProjectionOf<'journey
   navigationIds: () => [],
   keyboardProjection: (projection) => ({ kind: 'journey', projection: projection.journey }),
   resolveSelection: (projection, selection) => resolveJourneySelection(projection.journey, selection),
-  // 删除意图：唯一映射在 canvas-keyboard.journeyDeleteIntent
+  // 删除意图：唯一映射在 pipeline/journey-keyboard 的 journeyDeleteIntent
   deleteIntent: (projection, selection) => journeyDeleteIntent(projection.journey, selection),
-  // 键位语义：唯一映射在 canvas-keyboard.journeyKeyPlan（Tab 同 section 加任务 / Enter 加 section / Delete）
+  // 键位语义：唯一映射在 pipeline/journey-keyboard 的 journeyKeyPlan（Tab 同 section 加任务 / Enter 加 section / Delete）
   keyHandler: (projection) => (input) => journeyKeyPlan(projection.journey, input),
 }

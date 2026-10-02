@@ -1,5 +1,5 @@
 import { resolveErSelection, type ErProjection } from '../projection/er-projection'
-import { erDeleteIntent, erKeyPlan } from '../editing/canvas-keyboard'
+import { erDeleteIntent, erKeyPlan } from '../pipeline/er-keyboard'
 import { elementDataIdResolver, nodeDataIdResolver, type DataIdResolver } from './data-id'
 import { edgeSelectionOf } from './edge-adapter'
 import { annotateErRelationIdentities } from './edge-locate'
@@ -42,8 +42,8 @@ export const erCanvasCapabilities: CanvasCapabilities<ProjectionOf<'er'>> = {
   keyboardProjection: (projection) => ({ kind: 'er', projection: projection.er }),
   edgeAnnotator: (projection) => (root) => annotateErRelationIdentities(root, projection.er.relations.length),
   resolveSelection: (projection, selection) => resolveErSelection(projection.er, selection),
-  // 删除意图：唯一映射在 canvas-keyboard.erDeleteIntent
+  // 删除意图：唯一映射在 pipeline/er-keyboard 的 erDeleteIntent
   deleteIntent: (projection, selection) => erDeleteIntent(projection.er, selection),
-  // 键位语义：唯一映射在 canvas-keyboard.erKeyPlan
+  // 键位语义：唯一映射在 pipeline/er-keyboard 的 erKeyPlan
   keyHandler: (projection) => (input) => erKeyPlan(projection.er, input),
 }

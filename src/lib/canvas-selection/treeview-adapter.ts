@@ -1,5 +1,5 @@
 import { resolveTreeviewSelection } from '../projection/treeview-projection'
-import { treeviewDeleteIntent, treeviewKeyPlan } from '../editing/canvas-keyboard'
+import { treeviewDeleteIntent, treeviewKeyPlan } from '../pipeline/treeview-keyboard'
 import type { CanvasCapabilities, ProjectionOf } from './capabilities'
 
 /**
@@ -32,8 +32,8 @@ export const treeviewCanvasCapabilities: CanvasCapabilities<ProjectionOf<'treevi
   navigationIds: () => [],
   keyboardProjection: (projection) => ({ kind: 'treeview', projection: projection.treeview }),
   resolveSelection: (projection, selection) => resolveTreeviewSelection(projection.treeview, selection),
-  // 删除意图：唯一映射在 canvas-keyboard.treeviewDeleteIntent
+  // 删除意图：唯一映射在 pipeline/treeview-keyboard 的 treeviewDeleteIntent
   deleteIntent: (projection, selection) => treeviewDeleteIntent(projection.treeview, selection),
-  // 键位语义：唯一映射在 canvas-keyboard.treeviewKeyPlan
+  // 键位语义：唯一映射在 pipeline/treeview-keyboard 的 treeviewKeyPlan
   keyHandler: (projection) => (input) => treeviewKeyPlan(projection.treeview, input),
 }

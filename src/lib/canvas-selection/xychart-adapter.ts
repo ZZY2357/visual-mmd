@@ -1,5 +1,5 @@
 import { resolveXychartSelection, type XychartProjection } from '../projection/xychart-projection'
-import { xychartDeleteIntent, xychartKeyPlan } from '../editing/canvas-keyboard'
+import { xychartDeleteIntent, xychartKeyPlan } from '../pipeline/xychart-keyboard'
 import type { Selection } from '../projection/selection'
 import type { CanvasCapabilities, ProjectionOf } from './capabilities'
 import type { DataIdResolver } from './data-id'
@@ -54,8 +54,8 @@ export const xychartCanvasCapabilities: CanvasCapabilities<ProjectionOf<'xychart
       orientation: projection.xychart.orientation,
     }),
   resolveSelection: (projection, selection) => resolveXychartSelection(projection.xychart, selection),
-  // 删除意图：唯一映射在 canvas-keyboard.xychartDeleteIntent（仅系列可删）
+  // 删除意图：唯一映射在 pipeline/xychart-keyboard 的 xychartDeleteIntent（仅系列可删）
   deleteIntent: (projection, selection) => xychartDeleteIntent(projection.xychart, selection),
-  // 键位语义：唯一映射在 canvas-keyboard.xychartKeyPlan（系列 Tab 加系列 / Delete 删除）
+  // 键位语义：唯一映射在 pipeline/xychart-keyboard 的 xychartKeyPlan（系列 Tab 加系列 / Delete 删除）
   keyHandler: (projection) => (input) => xychartKeyPlan(projection.xychart, input),
 }

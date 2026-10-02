@@ -7,7 +7,7 @@ import {
   usecaseDataIdResolver,
   usecaseSelectionOf,
 } from '../../canvas-selection/usecase-adapter'
-import { usecaseDeleteIntent, usecaseKeyPlan } from '../../editing/canvas-keyboard'
+import { usecaseDeleteIntent, usecaseKeyPlan } from '../../pipeline/usecase-keyboard'
 import { contextMenuItems, contextMenuTargetFromSelection } from '../../editing/context-menu'
 import { MENU_ACTIONS, type MenuActionContext } from '../../editing/menu-actions'
 import { menuTargetOfCanvas, fromCanvasId, canvasIdOf } from '../../canvas-selection/selection-codec'

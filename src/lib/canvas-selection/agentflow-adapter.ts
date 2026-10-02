@@ -1,5 +1,5 @@
 import { resolveAgentflowSelection, type AgentflowProjection } from '../projection/agentflow-projection'
-import { agentflowDeleteIntent, agentflowKeyPlan } from '../editing/canvas-keyboard'
+import { agentflowDeleteIntent, agentflowKeyPlan } from '../pipeline/agentflow-keyboard'
 import type { Selection } from '../projection/selection'
 import type { CanvasSelection, DataIdResolver } from './data-id'
 import { edgeDataIdResolver, nodeDataIdResolver } from './data-id'
@@ -78,8 +78,8 @@ export const agentflowCanvasCapabilities: CanvasCapabilities<ProjectionOf<'agent
   // nodeIdOfDomId，与 flowchart/class/state/er 同一条链路）——故无需 nodeAnnotator。
   resolveSelection: (projection, selection) =>
     resolveAgentflowSelection(projection.agentflow, selection),
-  // 删除意图：唯一映射在 canvas-keyboard.agentflowDeleteIntent
+  // 删除意图：唯一映射在 pipeline/agentflow-keyboard 的 agentflowDeleteIntent
   deleteIntent: (projection, selection) => agentflowDeleteIntent(projection.agentflow, selection),
-  // 键位语义：唯一映射在 canvas-keyboard.agentflowKeyPlan
+  // 键位语义：唯一映射在 pipeline/agentflow-keyboard 的 agentflowKeyPlan
   keyHandler: (projection) => (input) => agentflowKeyPlan(projection.agentflow, input),
 }

@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest'
 import { ganttParser } from '../../pipeline/gantt'
 import { buildGanttProjection } from '../../projection/gantt-projection'
 import { DIAGRAM_TYPES } from '../../diagram-registry'
-import { ganttDeleteIntent, ganttKeyPlan } from '../canvas-keyboard'
+import { ganttDeleteIntent, ganttKeyPlan } from '../../pipeline/gantt-keyboard'
 import { contextMenuItems, contextMenuTargetFromSelection } from '../context-menu'
 
 /**

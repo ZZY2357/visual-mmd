@@ -1,5 +1,5 @@
 import { resolveSankeySelection, type SankeyProjection } from '../projection/sankey-projection'
-import { sankeyDeleteIntent, sankeyKeyPlan } from '../editing/canvas-keyboard'
+import { sankeyDeleteIntent, sankeyKeyPlan } from '../pipeline/sankey-keyboard'
 import type { Selection } from '../projection/selection'
 import type { CanvasSelection, DataIdResolver } from './data-id'
 import { edgeSelectionOf } from './edge-adapter'
@@ -61,9 +61,9 @@ export const sankeyCanvasCapabilities: CanvasCapabilities<ProjectionOf<'sankey'>
       links: projection.sankey.links.length,
     }),
   resolveSelection: (projection, selection) => resolveSankeySelection(projection.sankey, selection),
-  // 删除意图：唯一映射在 canvas-keyboard.sankeyDeleteIntent
+  // 删除意图：唯一映射在 pipeline/sankey-keyboard 的 sankeyDeleteIntent
   deleteIntent: (projection, selection) => sankeyDeleteIntent(projection.sankey, selection),
-  // 键位语义：唯一映射在 canvas-keyboard.sankeyKeyPlan（链路上 Tab 加链路 / Delete 删除；
+  // 键位语义：唯一映射在 pipeline/sankey-keyboard 的 sankeyKeyPlan（链路上 Tab 加链路 / Delete 删除；
   // Enter 无自然类比，工单定案不做）
   keyHandler: (projection) => (input) => sankeyKeyPlan(projection.sankey, input),
 }

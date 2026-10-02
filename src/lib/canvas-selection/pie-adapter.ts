@@ -1,5 +1,5 @@
 import { resolvePieSelection } from '../projection/pie-projection'
-import { pieDeleteIntent, pieKeyPlan } from '../editing/canvas-keyboard'
+import { pieDeleteIntent, pieKeyPlan } from '../pipeline/pie-keyboard'
 import type { CanvasCapabilities, ProjectionOf } from './capabilities'
 
 /**
@@ -32,9 +32,9 @@ export const pieCanvasCapabilities: CanvasCapabilities<ProjectionOf<'pie'>> = {
   navigationIds: () => [],
   keyboardProjection: (projection) => ({ kind: 'pie', projection: projection.pie }),
   resolveSelection: (projection, selection) => resolvePieSelection(projection.pie, selection),
-  // 删除意图：唯一映射在 canvas-keyboard.pieDeleteIntent
+  // 删除意图：唯一映射在 pipeline/pie-keyboard 的 pieDeleteIntent
   deleteIntent: (projection, selection) => pieDeleteIntent(projection.pie, selection),
-  // 键位语义：唯一映射在 canvas-keyboard.pieKeyPlan（Tab 加扇区 / Delete 删除；
+  // 键位语义：唯一映射在 pipeline/pie-keyboard 的 pieKeyPlan（Tab 加扇区 / Delete 删除；
   // Enter 无自然类比，工单定案不做）
   keyHandler: (projection) => (input) => pieKeyPlan(projection.pie, input),
 }

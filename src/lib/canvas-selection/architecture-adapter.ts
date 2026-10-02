@@ -4,7 +4,7 @@ import {
   parseArchitectureJunctionElementId,
   parseArchitectureServiceElementId,
 } from '../pipeline/element-id'
-import { architectureDeleteIntent, architectureKeyPlan } from '../editing/canvas-keyboard'
+import { architectureDeleteIntent, architectureKeyPlan } from '../pipeline/architecture-keyboard'
 import { nodeDataIdResolver, type DataIdResolver } from './data-id'
 import { annotateArchitectureDataIds } from './node-data-ids'
 import type { CanvasCapabilities, ProjectionOf } from './capabilities'
@@ -82,8 +82,8 @@ export const architectureCanvasCapabilities: CanvasCapabilities<ProjectionOf<'ar
   // 节点 data-id 反注（渲染后处理；身份来自 DOM id，无需投影信息，绑定只为成员形状一致）
   nodeAnnotator: () => (root) => annotateArchitectureDataIds(root),
   resolveSelection: (projection, selection) => resolveArchitectureSelection(projection.architecture, selection),
-  // 删除意图：唯一映射在 canvas-keyboard.architectureDeleteIntent
+  // 删除意图：唯一映射在 pipeline/architecture-keyboard 的 architectureDeleteIntent
   deleteIntent: (projection, selection) => architectureDeleteIntent(projection.architecture, selection),
-  // 键位语义：唯一映射在 canvas-keyboard.architectureKeyPlan
+  // 键位语义：唯一映射在 pipeline/architecture-keyboard 的 architectureKeyPlan
   keyHandler: (projection) => (input) => architectureKeyPlan(projection.architecture, input),
 }

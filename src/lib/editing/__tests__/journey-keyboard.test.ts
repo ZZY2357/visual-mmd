@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest'
 import { journeyParser } from '../../pipeline/journey'
 import { buildJourneyProjection } from '../../projection/journey-projection'
 import { DIAGRAM_TYPES } from '../../diagram-registry'
-import { journeyDeleteIntent, journeyKeyPlan } from '../canvas-keyboard'
+import { journeyDeleteIntent, journeyKeyPlan } from '../../pipeline/journey-keyboard'
 import { contextMenuItems, contextMenuTargetFromSelection } from '../context-menu'
 
 /**

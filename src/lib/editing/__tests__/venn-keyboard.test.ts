@@ -7,7 +7,7 @@ import {
   vennKeyMap,
   vennSelectionOf,
 } from '../../canvas-selection/venn-adapter'
-import { vennDeleteIntent, vennKeyPlan } from '../../editing/canvas-keyboard'
+import { vennDeleteIntent, vennKeyPlan } from '../../pipeline/venn-keyboard'
 import { contextMenuItems, contextMenuTargetFromSelection } from '../../editing/context-menu'
 import { MENU_ACTIONS, type MenuActionContext } from '../../editing/menu-actions'
 import { menuTargetOfCanvas, fromCanvasId, canvasIdOf } from '../../canvas-selection/selection-codec'

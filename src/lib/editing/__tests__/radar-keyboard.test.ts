@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest'
 import { radarParser } from '../../pipeline/radar'
 import { buildRadarProjection } from '../../projection/radar-projection'
 import { DIAGRAM_TYPES } from '../../diagram-registry'
-import { radarDeleteIntent, radarKeyPlan } from '../canvas-keyboard'
+import { radarDeleteIntent, radarKeyPlan } from '../../pipeline/radar-keyboard'
 import { contextMenuItems, contextMenuTargetFromSelection } from '../context-menu'
 
 /**

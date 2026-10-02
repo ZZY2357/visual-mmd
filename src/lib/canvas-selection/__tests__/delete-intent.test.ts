@@ -63,28 +63,26 @@ import { buildAgentflowProjection } from '../../projection/agentflow-projection'
 import { buildZenumlProjection } from '../../projection/zenuml-projection'
 import { buildC4Projection } from '../../projection/c4-projection'
 import type { Selection } from '../../projection/selection'
-import {
-  blockDeleteIntent,
-  classDeleteIntent,
-  ganttDeleteIntent,
-  packetDeleteIntent,
-  kanbanDeleteIntent,
-  mindmapActionIntents,
-  nodeActionIntents,
-  sankeyDeleteIntent,
-  sequenceDeleteIntent,
-  timelineDeleteIntent,
-  xychartDeleteIntent,
-  architectureDeleteIntent,
-  ishikawaDeleteIntent,
-  vennDeleteIntent,
-  usecaseDeleteIntent,
-  treeviewDeleteIntent,
-  eventModelingDeleteIntent,
-  agentflowDeleteIntent,
-  zenumlDeleteIntent,
-  c4DeleteIntent,
-} from '../../editing/canvas-keyboard'
+import { nodeActionIntents } from '../../pipeline/flowchart-keyboard'
+import { mindmapActionIntents } from '../../pipeline/mindmap-keyboard'
+import { classDeleteIntent } from '../../pipeline/class-keyboard'
+import { sequenceDeleteIntent } from '../../pipeline/sequence-keyboard'
+import { blockDeleteIntent } from '../../pipeline/block-keyboard'
+import { ganttDeleteIntent } from '../../pipeline/gantt-keyboard'
+import { packetDeleteIntent } from '../../pipeline/packet-keyboard'
+import { kanbanDeleteIntent } from '../../pipeline/kanban-keyboard'
+import { sankeyDeleteIntent } from '../../pipeline/sankey-keyboard'
+import { timelineDeleteIntent } from '../../pipeline/timeline-keyboard'
+import { xychartDeleteIntent } from '../../pipeline/xychart-keyboard'
+import { architectureDeleteIntent } from '../../pipeline/architecture-keyboard'
+import { ishikawaDeleteIntent } from '../../pipeline/ishikawa-keyboard'
+import { vennDeleteIntent } from '../../pipeline/venn-keyboard'
+import { usecaseDeleteIntent } from '../../pipeline/usecase-keyboard'
+import { treeviewDeleteIntent } from '../../pipeline/treeview-keyboard'
+import { eventModelingDeleteIntent } from '../../pipeline/eventmodeling-keyboard'
+import { agentflowDeleteIntent } from '../../pipeline/agentflow-keyboard'
+import { zenumlDeleteIntent } from '../../pipeline/zenuml-keyboard'
+import { c4DeleteIntent } from '../../pipeline/c4-keyboard'
 import {
   deleteClassDefIntent,
   deleteEdgeIntent,

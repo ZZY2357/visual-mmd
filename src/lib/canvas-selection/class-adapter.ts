@@ -1,5 +1,5 @@
 import { resolveClassSelection, type ClassProjection } from '../projection/class-projection'
-import { classDeleteIntent, classKeyPlan } from '../editing/canvas-keyboard'
+import { classDeleteIntent, classKeyPlan } from '../pipeline/class-keyboard'
 import { elementDataIdResolver, nodeDataIdResolver, type DataIdResolver } from './data-id'
 import { edgeSelectionOf } from './edge-adapter'
 import { annotateClassRelationIdentities, relationShapesOf } from './edge-locate'
@@ -41,8 +41,8 @@ export const classCanvasCapabilities: CanvasCapabilities<ProjectionOf<'class'>> 
   keyboardProjection: (projection) => ({ kind: 'class', projection: projection.class }),
   edgeAnnotator: (projection) => (root) => annotateClassRelationIdentities(root, relationShapesOf(projection.class.relations)),
   resolveSelection: (projection, selection) => resolveClassSelection(projection.class, selection),
-  // 删除意图（architecture-deepening-2 工单 03）：唯一映射在 canvas-keyboard.classDeleteIntent
+  // 删除意图（architecture-deepening-2 工单 03）：唯一映射在 pipeline/class-keyboard 的 classDeleteIntent
   deleteIntent: (projection, selection) => classDeleteIntent(projection.class, selection),
-  // 键位语义（architecture-deepening-2 工单 02）：唯一映射在 canvas-keyboard.classKeyPlan
+  // 键位语义（architecture-deepening-2 工单 02）：唯一映射在 pipeline/class-keyboard 的 classKeyPlan
   keyHandler: (projection) => (input) => classKeyPlan(projection.class, input),
 }

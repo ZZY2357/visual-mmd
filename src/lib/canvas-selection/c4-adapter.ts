@@ -1,5 +1,5 @@
 import { resolveC4Selection } from '../projection/c4-projection'
-import { c4DeleteIntent, c4KeyPlan } from '../editing/canvas-keyboard'
+import { c4DeleteIntent, c4KeyPlan } from '../pipeline/c4-keyboard'
 import type { CanvasCapabilities, ProjectionOf } from './capabilities'
 
 /**
@@ -28,8 +28,8 @@ export const c4CanvasCapabilities: CanvasCapabilities<ProjectionOf<'c4'>> = {
   navigationIds: () => [],
   keyboardProjection: (projection) => ({ kind: 'c4', projection: projection.c4 }),
   resolveSelection: (projection, selection) => resolveC4Selection(projection.c4, selection),
-  // 删除意图：唯一映射在 canvas-keyboard.c4DeleteIntent
+  // 删除意图：唯一映射在 pipeline/c4-keyboard 的 c4DeleteIntent
   deleteIntent: (projection, selection) => c4DeleteIntent(projection.c4, selection),
-  // 键位语义：唯一映射在 canvas-keyboard.c4KeyPlan
+  // 键位语义：唯一映射在 pipeline/c4-keyboard 的 c4KeyPlan
   keyHandler: (projection) => (input) => c4KeyPlan(projection.c4, input),
 }

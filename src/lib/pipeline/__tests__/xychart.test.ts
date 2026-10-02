@@ -12,7 +12,7 @@ import {
 } from '../xychart'
 import { reassemble } from '../document'
 import { buildXychartProjection, resolveXychartSelection } from '../../projection/xychart-projection'
-import { xychartDeleteIntent, xychartKeyPlan } from '../../editing/canvas-keyboard'
+import { xychartDeleteIntent, xychartKeyPlan } from '../../pipeline/xychart-keyboard'
 import { annotateNodeDataIds } from '../../canvas-selection/node-data-ids'
 import { annotateXychartIdentities } from '../../canvas-selection/edge-locate'
 import { DIAGRAM_TYPES } from '../../diagram-registry'

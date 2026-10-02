@@ -1,5 +1,5 @@
 import { resolveEventModelingSelection } from '../projection/eventmodeling-projection'
-import { eventModelingDeleteIntent, eventModelingKeyPlan } from '../editing/canvas-keyboard'
+import { eventModelingDeleteIntent, eventModelingKeyPlan } from '../pipeline/eventmodeling-keyboard'
 import type { CanvasCapabilities, ProjectionOf } from './capabilities'
 
 /**
@@ -31,10 +31,10 @@ export const eventModelingCanvasCapabilities: CanvasCapabilities<ProjectionOf<'e
   keyboardProjection: (projection) => ({ kind: 'eventmodeling', projection: projection.eventmodeling }),
   resolveSelection: (projection, selection) =>
     resolveEventModelingSelection(projection.eventmodeling, selection),
-  // 删除意图：唯一映射在 canvas-keyboard.eventModelingDeleteIntent
+  // 删除意图：唯一映射在 pipeline/eventmodeling-keyboard 的 eventModelingDeleteIntent
   deleteIntent: (projection, selection) =>
     eventModelingDeleteIntent(projection.eventmodeling, selection),
-  // 键位语义：唯一映射在 canvas-keyboard.eventModelingKeyPlan（帧上 Tab 加同泳道帧 /
+  // 键位语义：唯一映射在 pipeline/eventmodeling-keyboard 的 eventModelingKeyPlan（帧上 Tab 加同泳道帧 /
   // Enter 加事件帧 / Delete 删除；数据块上无 Tab/Enter 语义）
   keyHandler: (projection) => (input) => eventModelingKeyPlan(projection.eventmodeling, input),
 }

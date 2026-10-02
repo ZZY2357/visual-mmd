@@ -1,6 +1,6 @@
 import { resolvePacketSelection, type PacketProjection } from '../projection/packet-projection'
 import type { Selection } from '../projection/selection'
-import { packetDeleteIntent, packetKeyPlan } from '../editing/canvas-keyboard'
+import { packetDeleteIntent, packetKeyPlan } from '../pipeline/packet-keyboard'
 import { annotatePacketDataIds } from './node-data-ids'
 import type { CanvasSelection, DataIdResolver } from './data-id'
 import type { CanvasCapabilities, ProjectionOf } from './capabilities'
@@ -57,9 +57,9 @@ export const packetCanvasCapabilities: CanvasCapabilities<ProjectionOf<'packet'>
       })),
     ),
   resolveSelection: (projection, selection) => resolvePacketSelection(projection.packet, selection),
-  // 删除意图：唯一映射在 canvas-keyboard.packetDeleteIntent（结果序列不连续时管线拒绝）
+  // 删除意图：唯一映射在 pipeline/packet-keyboard 的 packetDeleteIntent（结果序列不连续时管线拒绝）
   deleteIntent: (projection, selection) => packetDeleteIntent(projection.packet, selection),
-  // 键位语义：唯一映射在 canvas-keyboard.packetKeyPlan（Tab 加字段 +count 衔接前序 /
+  // 键位语义：唯一映射在 pipeline/packet-keyboard 的 packetKeyPlan（Tab 加字段 +count 衔接前序 /
   // Delete 删字段；Enter 无自然类比，工单定案不做）
   keyHandler: (projection) => (input) => packetKeyPlan(projection.packet, input),
 }

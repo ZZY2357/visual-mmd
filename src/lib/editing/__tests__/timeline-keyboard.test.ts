@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest'
 import { timelineParser } from '../../pipeline/timeline'
 import { buildTimelineProjection } from '../../projection/timeline-projection'
 import { DIAGRAM_TYPES } from '../../diagram-registry'
-import { timelineDeleteIntent, timelineKeyPlan } from '../canvas-keyboard'
+import { timelineDeleteIntent, timelineKeyPlan } from '../../pipeline/timeline-keyboard'
 import { contextMenuItems } from '../context-menu'
 import { timelineCanvasCapabilities } from '../../canvas-selection/timeline-adapter'
 

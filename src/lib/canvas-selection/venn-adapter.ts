@@ -1,6 +1,6 @@
 import { resolveVennSelection, type VennProjection } from '../projection/venn-projection'
 import type { Selection } from '../projection/selection'
-import { vennDeleteIntent, vennKeyPlan } from '../editing/canvas-keyboard'
+import { vennDeleteIntent, vennKeyPlan } from '../pipeline/venn-keyboard'
 import { annotateVennDataIds } from './node-data-ids'
 import type { CanvasSelection, DataIdResolver } from './data-id'
 import type { CanvasCapabilities, ProjectionOf } from './capabilities'
@@ -66,8 +66,8 @@ export const vennCanvasCapabilities: CanvasCapabilities<ProjectionOf<'venn'>> = 
   keyboardProjection: (projection) => ({ kind: 'venn', projection: projection.venn }),
   nodeAnnotator: (projection) => (root) => annotateVennDataIds(root, vennKeyMap(projection.venn)),
   resolveSelection: (projection, selection) => resolveVennSelection(projection.venn, selection),
-  // 删除意图：唯一映射在 canvas-keyboard.vennDeleteIntent
+  // 删除意图：唯一映射在 pipeline/venn-keyboard 的 vennDeleteIntent
   deleteIntent: (projection, selection) => vennDeleteIntent(projection.venn, selection),
-  // 键位语义：唯一映射在 canvas-keyboard.vennKeyPlan
+  // 键位语义：唯一映射在 pipeline/venn-keyboard 的 vennKeyPlan
   keyHandler: (projection) => (input) => vennKeyPlan(projection.venn, input),
 }

@@ -4,7 +4,7 @@ import {
 } from '../pipeline/element-id'
 import { resolveBlockSelection, type BlockProjection } from '../projection/block-projection'
 import type { Selection } from '../projection/selection'
-import { blockDeleteIntent, blockKeyPlan } from '../editing/canvas-keyboard'
+import { blockDeleteIntent, blockKeyPlan } from '../pipeline/block-keyboard'
 import type { CanvasSelection, DataIdResolver } from './data-id'
 import { edgeSelectionOf } from './edge-adapter'
 import { annotateBlockEdgeIdentities } from './edge-locate'
@@ -75,8 +75,8 @@ export const blockCanvasCapabilities: CanvasCapabilities<ProjectionOf<'block'>> 
   edgeAnnotator: (projection) => (root) =>
     annotateBlockEdgeIdentities(root, projection.block.edges.length),
   resolveSelection: (projection, selection) => resolveBlockSelection(projection.block, selection),
-  // 删除意图：唯一映射在 canvas-keyboard.blockDeleteIntent
+  // 删除意图：唯一映射在 pipeline/block-keyboard 的 blockDeleteIntent
   deleteIntent: (projection, selection) => blockDeleteIntent(projection.block, selection),
-  // 键位语义：唯一映射在 canvas-keyboard.blockKeyPlan
+  // 键位语义：唯一映射在 pipeline/block-keyboard 的 blockKeyPlan
   keyHandler: (projection) => (input) => blockKeyPlan(projection.block, input),
 }

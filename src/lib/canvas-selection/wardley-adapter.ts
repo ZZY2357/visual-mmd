@@ -1,5 +1,5 @@
 import { resolveWardleySelection } from '../projection/wardley-projection'
-import { wardleyDeleteIntent, wardleyKeyPlan } from '../editing/canvas-keyboard'
+import { wardleyDeleteIntent, wardleyKeyPlan } from '../pipeline/wardley-keyboard'
 import type { CanvasCapabilities, ProjectionOf } from './capabilities'
 
 /**
@@ -31,8 +31,8 @@ export const wardleyCanvasCapabilities: CanvasCapabilities<ProjectionOf<'wardley
   navigationIds: () => [],
   keyboardProjection: (projection) => ({ kind: 'wardley', projection: projection.wardley }),
   resolveSelection: (projection, selection) => resolveWardleySelection(projection.wardley, selection),
-  // 删除意图：唯一映射在 canvas-keyboard.wardleyDeleteIntent
+  // 删除意图：唯一映射在 pipeline/wardley-keyboard 的 wardleyDeleteIntent
   deleteIntent: (projection, selection) => wardleyDeleteIntent(projection.wardley, selection),
-  // 键位语义：唯一映射在 canvas-keyboard.wardleyKeyPlan
+  // 键位语义：唯一映射在 pipeline/wardley-keyboard 的 wardleyKeyPlan
   keyHandler: (projection) => (input) => wardleyKeyPlan(projection.wardley, input),
 }

@@ -1,5 +1,5 @@
 import { resolveGitgraphSelection } from '../projection/gitgraph-projection'
-import { gitgraphDeleteIntent, gitgraphKeyPlan } from '../editing/canvas-keyboard'
+import { gitgraphDeleteIntent, gitgraphKeyPlan } from '../pipeline/gitgraph-keyboard'
 import type { CanvasCapabilities, ProjectionOf } from './capabilities'
 
 /**
@@ -26,8 +26,8 @@ export const gitgraphCanvasCapabilities: CanvasCapabilities<ProjectionOf<'gitgra
   navigationIds: () => [],
   keyboardProjection: (projection) => ({ kind: 'gitgraph', projection: projection.gitgraph }),
   resolveSelection: (projection, selection) => resolveGitgraphSelection(projection.gitgraph, selection),
-  // 删除意图：唯一映射在 canvas-keyboard.gitgraphDeleteIntent
+  // 删除意图：唯一映射在 pipeline/gitgraph-keyboard 的 gitgraphDeleteIntent
   deleteIntent: (projection, selection) => gitgraphDeleteIntent(projection.gitgraph, selection),
-  // 键位语义：唯一映射在 canvas-keyboard.gitgraphKeyPlan
+  // 键位语义：唯一映射在 pipeline/gitgraph-keyboard 的 gitgraphKeyPlan
   keyHandler: (projection) => (input) => gitgraphKeyPlan(projection.gitgraph, input),
 }

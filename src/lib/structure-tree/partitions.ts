@@ -51,30 +51,26 @@ import type {
   ZenumlProjection,
 } from '../projection/zenuml-projection'
 import type { C4Projection, ProjectionC4Relation } from '../projection/c4-projection'
-import {
-  treemapKeyPlan,
-  ishikawaKeyPlan,
-  wardleyKeyPlan,
-  vennKeyPlan,
-  cynefinKeyPlan,
-  usecaseKeyPlan,
-  treeviewKeyPlan,
-  eventModelingKeyPlan,
-  zenumlKeyPlan,
-  c4KeyPlan,
-} from '../editing/canvas-keyboard'
+import { treemapKeyPlan } from '../pipeline/treemap-keyboard'
+import { ishikawaKeyPlan } from '../pipeline/ishikawa-keyboard'
+import { wardleyKeyPlan } from '../pipeline/wardley-keyboard'
+import { vennKeyPlan } from '../pipeline/venn-keyboard'
+import { cynefinKeyPlan } from '../pipeline/cynefin-keyboard'
+import { usecaseKeyPlan } from '../pipeline/usecase-keyboard'
+import { treeviewKeyPlan } from '../pipeline/treeview-keyboard'
+import { eventModelingKeyPlan } from '../pipeline/eventmodeling-keyboard'
+import { zenumlKeyPlan } from '../pipeline/zenuml-keyboard'
+import { c4KeyPlan } from '../pipeline/c4-keyboard'
+import { ganttKeyPlan } from '../pipeline/gantt-keyboard'
+import { journeyKeyPlan } from '../pipeline/journey-keyboard'
+import { mindmapKeyPlan } from '../pipeline/mindmap-keyboard'
+import { packetKeyPlan } from '../pipeline/packet-keyboard'
+import { pieKeyPlan } from '../pipeline/pie-keyboard'
+import { quadrantKeyPlan } from '../pipeline/quadrant-keyboard'
+import { radarKeyPlan } from '../pipeline/radar-keyboard'
+import { timelineKeyPlan } from '../pipeline/timeline-keyboard'
 import { DIAGRAM_SELECTION, type Selection } from '../projection/selection'
-import {
-  applyPlan,
-  ganttKeyPlan,
-  journeyKeyPlan,
-  mindmapKeyPlan,
-  packetKeyPlan,
-  pieKeyPlan,
-  quadrantKeyPlan,
-  radarKeyPlan,
-  timelineKeyPlan,
-} from '../editing/canvas-keyboard'
+import { applyPlan } from '../editing/canvas-keyboard'
 import { useEditorStore } from '../../store/editor'
 
 /**

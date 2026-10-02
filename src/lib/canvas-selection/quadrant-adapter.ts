@@ -1,6 +1,6 @@
 import { resolveQuadrantSelection, type QuadrantProjection } from '../projection/quadrant-projection'
 import type { Selection } from '../projection/selection'
-import { quadrantDeleteIntent, quadrantKeyPlan } from '../editing/canvas-keyboard'
+import { quadrantDeleteIntent, quadrantKeyPlan } from '../pipeline/quadrant-keyboard'
 import { annotateQuadrantDataIds } from './node-data-ids'
 import type { CanvasSelection, DataIdResolver } from './data-id'
 import type { CanvasCapabilities, ProjectionOf } from './capabilities'
@@ -93,9 +93,9 @@ export const quadrantCanvasCapabilities: CanvasCapabilities<ProjectionOf<'quadra
       axisLabels: quadrantAxisLabelIds(projection.quadrant),
     }),
   resolveSelection: (projection, selection) => resolveQuadrantSelection(projection.quadrant, selection),
-  // 删除意图：唯一映射在 canvas-keyboard.quadrantDeleteIntent（仅点可删；轴/象限无删除语义）
+  // 删除意图：唯一映射在 pipeline/quadrant-keyboard 的 quadrantDeleteIntent（仅点可删；轴/象限无删除语义）
   deleteIntent: (projection, selection) => quadrantDeleteIntent(projection.quadrant, selection),
-  // 键位语义：唯一映射在 canvas-keyboard.quadrantKeyPlan（Tab 加点 / Delete 删点；
+  // 键位语义：唯一映射在 pipeline/quadrant-keyboard 的 quadrantKeyPlan（Tab 加点 / Delete 删点；
   // Enter 无自然类比，工单定案不做）
   keyHandler: (projection) => (input) => quadrantKeyPlan(projection.quadrant, input),
 }
