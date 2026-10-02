@@ -106,6 +106,9 @@ import { c4CanvasCapabilities } from './canvas-selection/c4-adapter'
 import type { CanvasCapabilities } from './canvas-selection/capabilities'
 import { treePartitions, type TreePartitions } from './structure-tree/partitions'
 import { DEFAULT_DIAGRAM_SOURCE } from './storage'
+import type { ReactNode } from 'react'
+import type { ComponentType } from 'react'
+import type { Selection } from './projection/selection'
 
 /**
  * 图种注册表（工单 06 建立，供 07/08 复用）：
@@ -168,6 +171,50 @@ export type AnyProjection = {
   [K in RegisteredDiagramTypeId]: ProjectionWrapper<K>
 }[RegisteredDiagramTypeId]
 
+/** 各图种**去包装**投影（ProjectionTypes 值）的并集——表单路由条目消费的形状 */
+export type AnyDiagramProjection = {
+  [K in RegisteredDiagramTypeId]: ProjectionTypes[K]
+}[RegisteredDiagramTypeId]
+
+/** 去掉投影包装：`{ type, [type]: projection }` → projection（表单路由壳用） */
+export function unwrapProjection(projection: AnyProjection): AnyDiagramProjection {
+  // 投影包装与其承载字段同名（ProjectionWrapper 的恒等式，注册表自洽性测试钉住）；
+  // 联合类型不能直接按联合键索引，这里经同名字段表转发
+  return (projection as unknown as Record<RegisteredDiagramTypeId, AnyDiagramProjection>)[
+    projection.type
+  ]
+}
+
+/**
+ * 表单路由条目的 props（architecture-deepening-3 工单 05）：图种投影 + 已按 kind 收窄的选中。
+ * 条目是小函数组件——在投影中寻回元素（原各 case 的 find）与渲染表单都收在条目里。
+ */
+export interface SelectionFormEntryProps<P, K extends Selection['kind']> {
+  projection: P
+  selection: Extract<Selection, { kind: K }>
+}
+
+/**
+ * 每图种的表单路由表（工单 05）：selection.kind → 表单条目。条目缺省 = 该图种不响应
+ * 此 kind（原 switch 的 default 分支，渲染 null）。
+ */
+export type SelectionFormTable<P> = {
+  [K in Selection['kind']]?: ComponentType<SelectionFormEntryProps<P, K>>
+}
+
+/**
+ * 表单路由挂点（工单 05）：注册表只持引用、不含实现——每图种的路由表由
+ * components/selection-form-routes.tsx 定义（表单组件在 components 层），并在该模块
+ * 加载时挂到各注册项的 forms 槽位（注册表在 lib 层，不能反向 import 组件层——
+ * 会成 store → registry → 路由表 → store 的环）。
+ */
+export interface DiagramSelectionForms {
+  /** 壳（selection-forms.tsx）的唯一入口：按 selection.kind 查表渲染；
+   * 未收录的 kind 返回 null（与原 default 分支同口径）。
+   * 接收**已去包装**的图种投影（`projection[projection.type]`，即 ProjectionTypes[id]）。 */
+  render(projection: AnyDiagramProjection, selection: Selection): ReactNode
+}
+
 export interface DiagramTypeRegistration {
   id: RegisteredDiagramTypeId
   parser: DiagramParser
@@ -183,6 +230,9 @@ export interface DiagramTypeRegistration {
   /** 画布能力包（工单 04，ADR-0015）：该图种接入画布所需的全部静态图种知识。
    * registry 只持引用、不含实现——「加一种图」= 新建一个 adapter + 在这里挂一行。 */
   canvas: CanvasCapabilities
+  /** 表单路由（architecture-deepening-3 工单 05）：selection.kind → 属性表单的路由表。
+   * registry 只声明槽位；实现见 DiagramSelectionForms 注释（组件层模块加载时挂入）。 */
+  forms?: DiagramSelectionForms
 }
 
 /** 跳过 frontmatter 块、空行与注释后的首个语句行 */
