@@ -93,19 +93,19 @@ describe('requirementDeleteIntent', () => {
 describe('requirement 菜单（工单 07 定案）', () => {
   it('空白 = 加 requirement / 加 element；节点 = 改字段 / 从这里连线 / 删除；关系 = 切类型 / 反转 / 删除', () => {
     expect(contextMenuItems({ kind: 'blank', diagramType: 'requirement' })).toEqual(['add-requirement', 'add-requirement-element'])
-    expect(contextMenuItems({ kind: 'requirement-node', name: 'login' })).toEqual(['edit-requirement-field', 'link-from-here', 'delete'])
-    expect(contextMenuItems({ kind: 'requirement-element', name: 'ui' })).toEqual(['edit-requirement-field', 'link-from-here', 'delete'])
-    expect(contextMenuItems({ kind: 'requirement-relation', elementId: 'relation:1' })).toEqual(['cycle-requirement-kind', 'invert-requirement-relation', 'delete'])
+    expect(contextMenuItems({ kind: 'element', selection: { kind: 'requirement', name: 'login' } })).toEqual(['edit-requirement-field', 'link-from-here', 'delete'])
+    expect(contextMenuItems({ kind: 'element', selection: { kind: 'requirement-element', name: 'ui' } })).toEqual(['edit-requirement-field', 'link-from-here', 'delete'])
+    expect(contextMenuItems({ kind: 'element', selection: { kind: 'requirement-relation', elementId: 'relation:1' } })).toEqual(['cycle-requirement-kind', 'invert-requirement-relation', 'delete'])
   })
 
   it('画布选中 → 菜单目标（经 selection-codec 唯一映射）', () => {
     expect(contextMenuTargetFromSelection({ kind: 'node', id: 'requirement:login' }, 'requirement')).toEqual({
-      kind: 'requirement-node',
-      name: 'login',
+      kind: 'element',
+      selection: { kind: 'requirement', name: 'login' },
     })
     expect(contextMenuTargetFromSelection({ kind: 'node', id: 'requirement-element:loginUI' }, 'requirement')).toEqual({
-      kind: 'requirement-element',
-      name: 'loginUI',
+      kind: 'element',
+      selection: { kind: 'requirement-element', name: 'loginUI' },
     })
   })
 })

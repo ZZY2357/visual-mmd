@@ -104,15 +104,15 @@ describe('architecture 右键菜单', () => {
       'add-architecture-group',
       'add-architecture-junction',
     ])
-    expect(contextMenuItems({ kind: 'architecture-service', name: 'web' })).toEqual([
+    expect(contextMenuItems({ kind: 'element', selection: { kind: 'architecture-service', name: 'web' } })).toEqual([
       'edit-text',
       'edit-architecture-service',
       'link-from-here',
       'delete',
     ])
-    expect(contextMenuItems({ kind: 'architecture-group', name: 'platform' })).toEqual(['edit-text', 'delete'])
-    expect(contextMenuItems({ kind: 'architecture-junction', name: 'j1' })).toEqual(['delete'])
-    expect(contextMenuItems({ kind: 'architecture-edge', elementId: 'edge:1' })).toEqual([
+    expect(contextMenuItems({ kind: 'element', selection: { kind: 'architecture-group', name: 'platform' } })).toEqual(['edit-text', 'delete'])
+    expect(contextMenuItems({ kind: 'element', selection: { kind: 'architecture-junction', name: 'j1' } })).toEqual(['delete'])
+    expect(contextMenuItems({ kind: 'element', selection: { kind: 'architecture-edge', elementId: 'edge:1' } })).toEqual([
       'edit-architecture-edge',
       'delete',
     ])
@@ -120,21 +120,21 @@ describe('architecture 右键菜单', () => {
 
   it('画布节点选中（DOM id 反注）→ 菜单目标；边 element 不可命中（降级）', () => {
     expect(menuTargetOfCanvas('architecture', { kind: 'node', id: 'service:web' })).toEqual({
-      kind: 'architecture-service',
-      name: 'web',
+      kind: 'element',
+      selection: { kind: 'architecture-service', name: 'web' },
     })
     expect(menuTargetOfCanvas('architecture', { kind: 'node', id: 'group:platform' })).toEqual({
-      kind: 'architecture-group',
-      name: 'platform',
+      kind: 'element',
+      selection: { kind: 'architecture-group', name: 'platform' },
     })
     expect(menuTargetOfCanvas('architecture', { kind: 'node', id: 'junction:j1' })).toEqual({
-      kind: 'architecture-junction',
-      name: 'j1',
+      kind: 'element',
+      selection: { kind: 'architecture-junction', name: 'j1' },
     })
     expect(menuTargetOfCanvas('architecture', { kind: 'element', elementId: 'edge:1' })).toBeNull()
     expect(contextMenuTargetFromSelection({ kind: 'node', id: 'service:web' }, 'architecture')).toEqual({
-      kind: 'architecture-service',
-      name: 'web',
+      kind: 'element',
+      selection: { kind: 'architecture-service', name: 'web' },
     })
   })
 
@@ -143,7 +143,7 @@ describe('architecture 右键菜单', () => {
       kind: 'architecture-service',
       name: 'web',
     })
-    expect(selectionOfMenuTarget({ kind: 'architecture-service', name: 'web' })).toEqual({
+    expect(selectionOfMenuTarget({ kind: 'element', selection: { kind: 'architecture-service', name: 'web' } })).toEqual({
       kind: 'architecture-service',
       name: 'web',
     })

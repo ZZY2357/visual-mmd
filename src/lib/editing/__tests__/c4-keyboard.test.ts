@@ -182,9 +182,9 @@ describe('C4 画布寻址（research §9 实测：无 data-id → ADR-0007 诚�
     expect(contextMenuTargetFromSelection({ kind: 'node', id: 'c4-element:banking' }, 'c4')).toBeNull()
     expect(contextMenuTargetFromSelection({ kind: 'element', elementId: 'relation:1' }, 'c4')).toBeNull()
     // 菜单目标 → 选中（menu-actions 的 edit-c4-* / delete 都经这一份映射）
-    expect(selectionOfMenuTarget({ kind: 'c4-element', elementId: 'c4-element:banking' })).toEqual(ELEMENT_SEL)
-    expect(selectionOfMenuTarget({ kind: 'c4-boundary', elementId: 'c4-boundary:b0' })).toEqual(BOUNDARY_SEL)
-    expect(selectionOfMenuTarget({ kind: 'c4-relation', elementId: 'relation:1' })).toEqual(RELATION_SEL)
+    expect(selectionOfMenuTarget({ kind: 'element', selection: { kind: 'c4-element', elementId: 'c4-element:banking' } })).toEqual(ELEMENT_SEL)
+    expect(selectionOfMenuTarget({ kind: 'element', selection: { kind: 'c4-boundary', elementId: 'c4-boundary:b0' } })).toEqual(BOUNDARY_SEL)
+    expect(selectionOfMenuTarget({ kind: 'element', selection: { kind: 'c4-relation', elementId: 'relation:1' } })).toEqual(RELATION_SEL)
   })
 })
 
@@ -196,16 +196,16 @@ describe('C4 菜单（more-diagrams 工单 18）', () => {
   })
 
   it('元素 = 编辑 / 起点连线 / 删除；边界 = 编辑 / 删除；关系 = 编辑 / 删除', () => {
-    expect(contextMenuItems({ kind: 'c4-element', elementId: 'c4-element:banking' })).toEqual([
+    expect(contextMenuItems({ kind: 'element', selection: { kind: 'c4-element', elementId: 'c4-element:banking' } })).toEqual([
       'edit-c4-element',
       'link-from-here',
       'delete',
     ])
-    expect(contextMenuItems({ kind: 'c4-boundary', elementId: 'c4-boundary:b0' })).toEqual([
+    expect(contextMenuItems({ kind: 'element', selection: { kind: 'c4-boundary', elementId: 'c4-boundary:b0' } })).toEqual([
       'edit-c4-boundary',
       'delete',
     ])
-    expect(contextMenuItems({ kind: 'c4-relation', elementId: 'relation:1' })).toEqual([
+    expect(contextMenuItems({ kind: 'element', selection: { kind: 'c4-relation', elementId: 'relation:1' } })).toEqual([
       'edit-c4-relation',
       'delete',
     ])
@@ -268,19 +268,19 @@ describe('C4 菜单（more-diagrams 工单 18）', () => {
 
   it('edit-c4-element / edit-c4-boundary / edit-c4-relation：选中目标后关闭（不改码）', () => {
     const h = makeCtx()
-    MENU_ACTIONS['edit-c4-element'](h.ctx, { kind: 'c4-element', elementId: 'c4-element:banking' })
+    MENU_ACTIONS['edit-c4-element'](h.ctx, { kind: 'element', selection: { kind: 'c4-element', elementId: 'c4-element:banking' } })
     expect(h.intents).toEqual([])
     expect(h.selected()).toEqual({ kind: 'c4-element', elementId: 'c4-element:banking' })
-    MENU_ACTIONS['edit-c4-boundary'](h.ctx, { kind: 'c4-boundary', elementId: 'c4-boundary:b0' })
+    MENU_ACTIONS['edit-c4-boundary'](h.ctx, { kind: 'element', selection: { kind: 'c4-boundary', elementId: 'c4-boundary:b0' } })
     expect(h.selected()).toEqual({ kind: 'c4-boundary', elementId: 'c4-boundary:b0' })
-    MENU_ACTIONS['edit-c4-relation'](h.ctx, { kind: 'c4-relation', elementId: 'relation:1' })
+    MENU_ACTIONS['edit-c4-relation'](h.ctx, { kind: 'element', selection: { kind: 'c4-relation', elementId: 'relation:1' } })
     expect(h.selected()).toEqual({ kind: 'c4-relation', elementId: 'relation:1' })
     expect(h.closed()).toBe(3)
   })
 
   it('link-from-here：以该元素的 alias 进入连线模式（关系引用语法标识）', () => {
     const h = makeCtx()
-    MENU_ACTIONS['link-from-here'](h.ctx, { kind: 'c4-element', elementId: 'c4-element:banking' })
+    MENU_ACTIONS['link-from-here'](h.ctx, { kind: 'element', selection: { kind: 'c4-element', elementId: 'c4-element:banking' } })
     expect(h.linked()).toBe('banking')
     expect(h.intents).toEqual([])
   })

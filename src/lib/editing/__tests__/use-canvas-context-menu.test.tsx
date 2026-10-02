@@ -418,7 +418,7 @@ describe('useCanvasContextMenu（工单 07 右键菜单）', () => {
     expect(contextMenuOn(container, '[data-id="A"]')).toBe(true)
 
     const last = snapshots.at(-1)!
-    expect(last.menu?.target).toEqual({ kind: 'flowchart-node', nodeId: 'A' })
+    expect(last.menu?.target).toEqual({ kind: 'element', selection: { kind: 'node', nodeId: 'A' } })
     expect(last.menu?.items).toEqual(['link-from-here', 'edit-text', 'apply-style', 'delete'])
     expect(useEditorStore.getState().selection).toEqual({ kind: 'node', nodeId: 'A' })
   })
@@ -429,7 +429,7 @@ describe('useCanvasContextMenu（工单 07 右键菜单）', () => {
     expect(contextMenuOn(container, 'path[data-id="L_A_B_0"]')).toBe(true)
 
     const last = snapshots.at(-1)!
-    expect(last.menu?.target).toEqual({ kind: 'flowchart-edge', from: 'A', to: 'B', occurrence: 1 })
+    expect(last.menu?.target).toEqual({ kind: 'element', selection: { kind: 'edge', from: 'A', to: 'B', occurrence: 1 } })
     expect(last.menu?.items).toEqual(['edit-label', 'delete'])
     expect(useEditorStore.getState().selection).toEqual({ kind: 'edge', from: 'A', to: 'B', occurrence: 1 })
   })
@@ -604,7 +604,7 @@ describe('useCanvasContextMenu（工单 07 mindmap 节点菜单）', () => {
     })
 
     const last = snapshots.at(-1)!
-    expect(last.menu?.target).toEqual({ kind: 'mindmap-node', elementId: 'mindmap-node:2' })
+    expect(last.menu?.target).toEqual({ kind: 'element', selection: { kind: 'mindmap-node', elementId: 'mindmap-node:2' } })
     expect(last.menu?.items).toEqual(['add-child', 'edit-text', 'delete'])
   })
 
@@ -941,7 +941,7 @@ describe('useCanvasContextMenu（工单 06 class/sequence 节点菜单）', () =
     expect(contextMenuOn(container, '[data-id="Foo"]')).toBe(true)
 
     const last = snapshots.at(-1)!
-    expect(last.menu?.target).toEqual({ kind: 'class-node', name: 'Foo' })
+    expect(last.menu?.target).toEqual({ kind: 'element', selection: { kind: 'class', name: 'Foo' } })
     expect(last.menu?.items).toEqual(['add-member', 'add-relation', 'add-note', 'delete-class'])
     expect(useEditorStore.getState().selection).toEqual({ kind: 'class', name: 'Foo' })
   })
@@ -952,7 +952,7 @@ describe('useCanvasContextMenu（工单 06 class/sequence 节点菜单）', () =
     expect(contextMenuOn(container, '[data-id="甲"]')).toBe(true)
 
     const last = snapshots.at(-1)!
-    expect(last.menu?.target).toEqual({ kind: 'sequence-participant', actorId: '甲' })
+    expect(last.menu?.target).toEqual({ kind: 'element', selection: { kind: 'participant', actorId: '甲' } })
     expect(last.menu?.items).toEqual(['add-message', 'add-block', 'delete-participant'])
     expect(useEditorStore.getState().selection).toEqual({ kind: 'participant', actorId: '甲' })
   })
@@ -1226,7 +1226,7 @@ describe('useCanvasContextMenu（工单 03 连线菜单）', () => {
     expect(contextMenuOn(container, 'path[data-id="relation:1"]')).toBe(true)
 
     const last = snapshots.at(-1)!
-    expect(last.menu?.target).toEqual({ kind: 'class-relation', elementId: 'relation:1' })
+    expect(last.menu?.target).toEqual({ kind: 'element', selection: { kind: 'class-relation', elementId: 'relation:1' } })
     expect(last.menu?.items).toEqual(['cycle-relation-kind', 'edit-relation', 'delete-relation'])
     expect(useEditorStore.getState().selection).toEqual({ kind: 'class-relation', elementId: 'relation:1' })
   })
@@ -1286,7 +1286,7 @@ describe('useCanvasContextMenu（工单 03 连线菜单）', () => {
     expect(contextMenuOn(container, 'line[data-id="message:1"]')).toBe(true)
 
     const last = snapshots.at(-1)!
-    expect(last.menu?.target).toEqual({ kind: 'sequence-message', elementId: 'message:1' })
+    expect(last.menu?.target).toEqual({ kind: 'element', selection: { kind: 'message', elementId: 'message:1' } })
     expect(last.menu?.items).toEqual(['cycle-message-arrow', 'edit-message', 'delete-message'])
     expect(useEditorStore.getState().selection).toEqual({ kind: 'message', elementId: 'message:1' })
   })

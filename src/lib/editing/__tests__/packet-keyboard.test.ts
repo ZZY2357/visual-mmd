@@ -96,7 +96,7 @@ describe('packetDeleteIntent', () => {
 describe('packet 菜单（工单 16：空白加字段；字段 = 改名/改位区间/删除）', () => {
   it('空白 = 添加字段（+count 衔接前序）；字段的元素级菜单项', () => {
     expect(contextMenuItems({ kind: 'blank', diagramType: 'packet' })).toEqual(['add-packet-field'])
-    expect(contextMenuItems({ kind: 'packet-field', elementId: 'field:1' })).toEqual([
+    expect(contextMenuItems({ kind: 'element', selection: { kind: 'packet-field', elementId: 'field:1' } })).toEqual([
       'edit-text',
       'edit-packet-range',
       'delete',
@@ -105,8 +105,8 @@ describe('packet 菜单（工单 16：空白加字段；字段 = 改名/改位�
 
   it('画布选中（反注 data-id）→ 菜单目标（contextMenuTargetFromSelection）一一对应', () => {
     expect(contextMenuTargetFromSelection({ kind: 'node', id: 'field:2' }, 'packet')).toEqual({
-      kind: 'packet-field',
-      elementId: 'field:2',
+      kind: 'element',
+      selection: { kind: 'packet-field', elementId: 'field:2' },
     })
     // 不认识的 data-id 不给菜单
     expect(contextMenuTargetFromSelection({ kind: 'node', id: '别的' }, 'packet')).toBeNull()

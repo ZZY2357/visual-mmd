@@ -199,16 +199,16 @@ describe('usecase 画布寻址（research §4 实测：渲染器 data-id → 投
       elementId: 'relation:1',
     })
     expect(menuTargetOfCanvas('usecase', { kind: 'node', id: 'usecase:Browse' })).toEqual({
-      kind: 'usecase-usecase',
-      elementId: 'usecase:Browse',
+      kind: 'element',
+      selection: { kind: 'usecase-usecase', elementId: 'usecase:Browse' },
     })
     expect(menuTargetOfCanvas('usecase', { kind: 'node', id: 'boundary:shop' })).toEqual({
-      kind: 'usecase-boundary',
-      elementId: 'boundary:shop',
+      kind: 'element',
+      selection: { kind: 'usecase-boundary', elementId: 'boundary:shop' },
     })
     expect(contextMenuTargetFromSelection({ kind: 'node', id: 'relation:1' }, 'usecase')).toEqual({
-      kind: 'usecase-relation',
-      elementId: 'relation:1',
+      kind: 'element',
+      selection: { kind: 'usecase-relation', elementId: 'relation:1' },
     })
   })
 
@@ -255,25 +255,25 @@ describe('usecase 菜单（more-diagrams 工单 26）', () => {
   })
 
   it('actor / 用例菜单 = 编辑 / 起点连线 / 删除；边界 = 编辑 / 删除；关系 = 编辑 / 删除；note 只删除', () => {
-    expect(contextMenuItems({ kind: 'usecase-actor', elementId: 'actor:Customer' })).toEqual([
+    expect(contextMenuItems({ kind: 'element', selection: { kind: 'usecase-actor', elementId: 'actor:Customer' } })).toEqual([
       'edit-usecase-element',
       'link-from-here',
       'delete',
     ])
-    expect(contextMenuItems({ kind: 'usecase-usecase', elementId: 'usecase:Browse' })).toEqual([
+    expect(contextMenuItems({ kind: 'element', selection: { kind: 'usecase-usecase', elementId: 'usecase:Browse' } })).toEqual([
       'edit-usecase-element',
       'link-from-here',
       'delete',
     ])
-    expect(contextMenuItems({ kind: 'usecase-boundary', elementId: 'boundary:shop' })).toEqual([
+    expect(contextMenuItems({ kind: 'element', selection: { kind: 'usecase-boundary', elementId: 'boundary:shop' } })).toEqual([
       'edit-usecase-element',
       'delete',
     ])
-    expect(contextMenuItems({ kind: 'usecase-relation', elementId: 'relation:1' })).toEqual([
+    expect(contextMenuItems({ kind: 'element', selection: { kind: 'usecase-relation', elementId: 'relation:1' } })).toEqual([
       'edit-usecase-relation',
       'delete',
     ])
-    expect(contextMenuItems({ kind: 'usecase-note', elementId: 'note:1' })).toEqual(['delete'])
+    expect(contextMenuItems({ kind: 'element', selection: { kind: 'usecase-note', elementId: 'note:1' } })).toEqual(['delete'])
   })
 
   function makeCtx() {
@@ -328,7 +328,7 @@ describe('usecase 菜单（more-diagrams 工单 26）', () => {
 
   it('edit-usecase-element：选中目标后关闭（不改码）', () => {
     const h = makeCtx()
-    MENU_ACTIONS['edit-usecase-element'](h.ctx, { kind: 'usecase-usecase', elementId: 'usecase:Browse' })
+    MENU_ACTIONS['edit-usecase-element'](h.ctx, { kind: 'element', selection: { kind: 'usecase-usecase', elementId: 'usecase:Browse' } })
     expect(h.intents).toEqual([])
     expect(h.selected()).toEqual({ kind: 'usecase-usecase', elementId: 'usecase:Browse' })
     expect(h.closed()).toBe(1)

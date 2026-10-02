@@ -187,8 +187,8 @@ describe('eventmodeling 菜单（more-diagrams 工单 28）', () => {
   })
 
   it('帧 = 编辑 / 删除；数据块 = 编辑 / 删除（元素级目标只由结构树构造）', () => {
-    expect(contextMenuItems({ kind: 'em-frame', elementId: 'frame:1' })).toEqual(['edit-em-frame', 'delete'])
-    expect(contextMenuItems({ kind: 'em-data', elementId: 'data:1' })).toEqual(['edit-em-data', 'delete'])
+    expect(contextMenuItems({ kind: 'element', selection: { kind: 'em-frame', elementId: 'frame:1' } })).toEqual(['edit-em-frame', 'delete'])
+    expect(contextMenuItems({ kind: 'element', selection: { kind: 'em-data', elementId: 'data:1' } })).toEqual(['edit-em-data', 'delete'])
   })
 
   function makeCtx() {
@@ -237,7 +237,7 @@ describe('eventmodeling 菜单（more-diagrams 工单 28）', () => {
 
   it('edit-em-frame：选中目标后关闭（不改码）', () => {
     const h = makeCtx()
-    MENU_ACTIONS['edit-em-frame'](h.ctx, { kind: 'em-frame', elementId: 'frame:1' })
+    MENU_ACTIONS['edit-em-frame'](h.ctx, { kind: 'element', selection: { kind: 'em-frame', elementId: 'frame:1' } })
     expect(h.intents).toEqual([])
     expect(h.selected()).toEqual({ kind: 'em-frame', elementId: 'frame:1' })
     expect(h.closed()).toBe(1)

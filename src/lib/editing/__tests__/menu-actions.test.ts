@@ -124,76 +124,76 @@ describe('MENU_ACTIONS 穷尽性（工单 05 → 工单 01）', () => {
       { kind: 'blank', diagramType: 'sequence' },
       { kind: 'blank', diagramType: 'class' },
       { kind: 'blank', diagramType: 'mindmap' },
-      { kind: 'flowchart-node', nodeId: 'n1' },
-      { kind: 'flowchart-edge', from: 'a', to: 'b', occurrence: 0 },
-      { kind: 'mindmap-node', elementId: 'm1' },
-      { kind: 'class-node', name: 'A' },
-      { kind: 'sequence-participant', actorId: 'p1' },
-      { kind: 'class-relation', elementId: 'relation:1' },
-      { kind: 'sequence-message', elementId: 'message:1' },
-      { kind: 'sequence-note', elementId: 'note:1' },
-      { kind: 'sequence-block', elementId: 'block:1' },
+      { kind: 'element', selection: { kind: 'node', nodeId: 'n1' } },
+      { kind: 'element', selection: { kind: 'edge', from: 'a', to: 'b', occurrence: 0 } },
+      { kind: 'element', selection: { kind: 'mindmap-node', elementId: 'm1' } },
+      { kind: 'element', selection: { kind: 'class', name: 'A' } },
+      { kind: 'element', selection: { kind: 'participant', actorId: 'p1' } },
+      { kind: 'element', selection: { kind: 'class-relation', elementId: 'relation:1' } },
+      { kind: 'element', selection: { kind: 'message', elementId: 'message:1' } },
+      { kind: 'element', selection: { kind: 'note', elementId: 'note:1' } },
+      { kind: 'element', selection: { kind: 'block', elementId: 'block:1' } },
       { kind: 'blank', diagramType: 'state' },
-      { kind: 'state-node', id: 's1', composite: false },
-      { kind: 'state-node', id: 'comp', composite: true },
-      { kind: 'state-transition', elementId: 'transition:1' },
+      { kind: 'element', selection: { kind: 'state', id: 's1' }, composite: false },
+      { kind: 'element', selection: { kind: 'state', id: 'comp' }, composite: true },
+      { kind: 'element', selection: { kind: 'state-transition', elementId: 'transition:1' } },
       { kind: 'blank', diagramType: 'er' },
-      { kind: 'er-entity', name: 'E1' },
-      { kind: 'er-relation', elementId: 'relation:1' },
-      { kind: 'er-attribute', elementId: 'attr:1' },
+      { kind: 'element', selection: { kind: 'er-entity', name: 'E1' } },
+      { kind: 'element', selection: { kind: 'er-relation', elementId: 'relation:1' } },
+      { kind: 'element', selection: { kind: 'er-attribute', elementId: 'attr:1' } },
       // gitGraph（more-diagrams 工单 04）：画布 DOM 无 data-id（实测降级），只有空白添加入口
       { kind: 'blank', diagramType: 'gitgraph' },
       { kind: 'blank', diagramType: 'timeline' },
-      { kind: 'timeline-period', elementId: 'period:1' },
-      { kind: 'timeline-event', elementId: 'event:1' },
+      { kind: 'element', selection: { kind: 'timeline-period', elementId: 'period:1' } },
+      { kind: 'element', selection: { kind: 'timeline-event', elementId: 'event:1' } },
       // kanban（more-diagrams 工单 06）：空白加列、列上加卡片 / 改标题、卡片改描述 / 改元数据
       { kind: 'blank', diagramType: 'kanban' },
-      { kind: 'kanban-column', elementId: 'kanban-column:Todo' },
-      { kind: 'kanban-card', elementId: 'kanban-card:t1' },
+      { kind: 'element', selection: { kind: 'kanban-column', elementId: 'kanban-column:Todo' } },
+      { kind: 'element', selection: { kind: 'kanban-card', elementId: 'kanban-card:t1' } },
       // requirement（more-diagrams 工单 07）：空白添加入口 + 两类节点 + 关系边
       { kind: 'blank', diagramType: 'requirement' },
-      { kind: 'requirement-node', name: 'login' },
-      { kind: 'requirement-element', name: 'ui' },
-      { kind: 'requirement-relation', elementId: 'relation:0' },
+      { kind: 'element', selection: { kind: 'requirement', name: 'login' } },
+      { kind: 'element', selection: { kind: 'requirement-element', name: 'ui' } },
+      { kind: 'element', selection: { kind: 'requirement-relation', elementId: 'relation:0' } },
       // journey（more-diagrams 工单 08）：画布 DOM 无 data-id（实测降级），只有空白添加入口
       { kind: 'blank', diagramType: 'journey' },
       // pie（more-diagrams 工单 10）：画布 DOM 无 data-id（实测降级），只有空白添加入口
       { kind: 'blank', diagramType: 'pie' },
       // block（more-diagrams 工单 09）：空白添加入口 + 节点 / 嵌套块 / 边
       { kind: 'blank', diagramType: 'block' },
-      { kind: 'block-node', id: 'a' },
-      { kind: 'block-group', id: 'g1' },
-      { kind: 'block-edge', elementId: 'edge:1' },
+      { kind: 'element', selection: { kind: 'block-node', id: 'a' } },
+      { kind: 'element', selection: { kind: 'block-group', id: 'g1' } },
+      { kind: 'element', selection: { kind: 'block-edge', elementId: 'edge:1' } },
       // sankey（more-diagrams 工单 13）：空白加链路 + 节点重命名 / 链路编辑
       { kind: 'blank', diagramType: 'sankey' },
-      { kind: 'sankey-node', name: 'a' },
-      { kind: 'sankey-link', elementId: 'link:1' },
+      { kind: 'element', selection: { kind: 'sankey-node', name: 'a' } },
+      { kind: 'element', selection: { kind: 'sankey-link', elementId: 'link:1' } },
       // gantt（more-diagrams 工单 11）：任务条可寻址但元素级菜单不做（与 journey/pie 同口径），
       // 只有空白添加入口
       { kind: 'blank', diagramType: 'gantt' },
       // quadrant（more-diagrams 工单 12）：空白加点 + 点（改文本/坐标/样式/删除）+ 轴/象限标题（改文本）
       { kind: 'blank', diagramType: 'quadrant' },
-      { kind: 'quadrant-point', elementId: 'point:1' },
-      { kind: 'quadrant-axis', elementId: 'x-axis' },
-      { kind: 'quadrant-quadrant', elementId: 'quadrant:2' },
+      { kind: 'element', selection: { kind: 'quadrant-point', elementId: 'point:1' } },
+      { kind: 'element', selection: { kind: 'quadrant-axis', elementId: 'x-axis' } },
+      { kind: 'element', selection: { kind: 'quadrant-quadrant', elementId: 'quadrant:2' } },
       // packet（more-diagrams 工单 16）：空白加字段（+count 衔接前序）+ 字段（改名/改位区间/删除）
       { kind: 'blank', diagramType: 'packet' },
-      { kind: 'packet-field', elementId: 'field:1' },
+      { kind: 'element', selection: { kind: 'packet-field', elementId: 'field:1' } },
       // xychart（more-diagrams 工单 14）：空白加系列 + 系列 / 轴 / 标题
       { kind: 'blank', diagramType: 'xychart' },
-      { kind: 'xychart-series', elementId: 'series:1' },
-      { kind: 'xychart-axis', axis: 'x' },
-      { kind: 'xychart-title' },
+      { kind: 'element', selection: { kind: 'xychart-series', elementId: 'series:1' } },
+      { kind: 'element', selection: { kind: 'xychart-axis', axis: 'x' } },
+      { kind: 'element', selection: { kind: 'xychart-title' } },
       // radar（more-diagrams 工单 15）：画布 DOM 无 data-id（实测降级），只有空白添加入口
       { kind: 'blank', diagramType: 'radar' },
       // architecture（more-diagrams 工单 17）：空白加三类节点 + service（改标题/图标与分组/
       // 连线/删除）/ group（改标题/删除）/ junction（删除）/ 边（改端口与箭头/删除——边目标
       // 画布不可寻址，只能由程序构造）
       { kind: 'blank', diagramType: 'architecture' },
-      { kind: 'architecture-service', name: 'web' },
-      { kind: 'architecture-group', name: 'platform' },
-      { kind: 'architecture-junction', name: 'j1' },
-      { kind: 'architecture-edge', elementId: 'edge:1' },
+      { kind: 'element', selection: { kind: 'architecture-service', name: 'web' } },
+      { kind: 'element', selection: { kind: 'architecture-group', name: 'platform' } },
+      { kind: 'element', selection: { kind: 'architecture-junction', name: 'j1' } },
+      { kind: 'element', selection: { kind: 'architecture-edge', elementId: 'edge:1' } },
       // treemap（more-diagrams 工单 20）：画布 DOM 无 data-id（实测降级），只有空白添加入口
       { kind: 'blank', diagramType: 'treemap' },
       // ishikawa（more-diagrams 工单 22）：画布 DOM 无 data-id（实测降级），只有空白添加入口
@@ -201,56 +201,56 @@ describe('MENU_ACTIONS 穷尽性（工单 05 → 工单 01）', () => {
       // wardley（more-diagrams 工单 23）：画布 DOM 无 data-id（实测降级），空白提供
       // 加 component / anchor / 连线；节点 / 连线 / evolve 目标只能由程序构造
       { kind: 'blank', diagramType: 'wardley' },
-      { kind: 'wardley-node', name: '茶' },
-      { kind: 'wardley-link', elementId: 'wardley-link:1' },
-      { kind: 'wardley-evolve', elementId: 'wardley-evolve:1' },
+      { kind: 'element', selection: { kind: 'wardley-node', name: '茶' } },
+      { kind: 'element', selection: { kind: 'wardley-link', elementId: 'wardley-link:1' } },
+      { kind: 'element', selection: { kind: 'wardley-evolve', elementId: 'wardley-evolve:1' } },
       // venn（more-diagrams 工单 21）：空白加集合 / 加交集 + 集合（改标签尺寸/加集合/加交集/删除）
       // + 交集（改标签尺寸/删除）
       { kind: 'blank', diagramType: 'venn' },
-      { kind: 'venn-set', id: 'frontend' },
-      { kind: 'venn-union', elementId: 'venn-union:1' },
+      { kind: 'element', selection: { kind: 'venn-set', id: 'frontend' } },
+      { kind: 'element', selection: { kind: 'venn-union', elementId: 'venn-union:1' } },
       // cynefin（more-diagrams 工单 25）：画布 DOM 无 data-id（实测降级），空白提供
       // 加条目 / 加转移；域 / 条目 / 转移目标只能由程序构造
       { kind: 'blank', diagramType: 'cynefin' },
-      { kind: 'cynefin-domain', name: 'complex' },
-      { kind: 'cynefin-item', elementId: 'cynefin-item:1' },
-      { kind: 'cynefin-transition', elementId: 'cynefin-transition:1' },
+      { kind: 'element', selection: { kind: 'cynefin-domain', name: 'complex' } },
+      { kind: 'element', selection: { kind: 'cynefin-item', elementId: 'cynefin-item:1' } },
+      { kind: 'element', selection: { kind: 'cynefin-transition', elementId: 'cynefin-transition:1' } },
       // usecase（more-diagrams 工单 26）：空白加 actor / 加用例 / 加系统边界 + actor / 用例
       // （改标签/连线/删除）+ 边界（改标题/删除）+ 关系（改标签与种类/删除）+ 注释（删除）
       { kind: 'blank', diagramType: 'usecase' },
-      { kind: 'usecase-actor', elementId: 'actor:Customer' },
-      { kind: 'usecase-usecase', elementId: 'usecase:Login' },
-      { kind: 'usecase-boundary', elementId: 'boundary:shop' },
-      { kind: 'usecase-relation', elementId: 'relation:1' },
-      { kind: 'usecase-note', elementId: 'note:1' },
+      { kind: 'element', selection: { kind: 'usecase-actor', elementId: 'actor:Customer' } },
+      { kind: 'element', selection: { kind: 'usecase-usecase', elementId: 'usecase:Login' } },
+      { kind: 'element', selection: { kind: 'usecase-boundary', elementId: 'boundary:shop' } },
+      { kind: 'element', selection: { kind: 'usecase-relation', elementId: 'relation:1' } },
+      { kind: 'element', selection: { kind: 'usecase-note', elementId: 'note:1' } },
       // treeView（more-diagrams 工单 24）：画布 DOM 无 data-id（实测降级），只有空白添加入口
       { kind: 'blank', diagramType: 'treeview' },
       // eventmodeling（more-diagrams 工单 28）：画布 DOM 无 data-id（实测降级），空白提供
       // 加帧 / 加数据块；帧 / 数据块目标只能由程序构造
       { kind: 'blank', diagramType: 'eventmodeling' },
-      { kind: 'em-frame', elementId: 'frame:1' },
-      { kind: 'em-data', elementId: 'data:1' },
+      { kind: 'element', selection: { kind: 'em-frame', elementId: 'frame:1' } },
+      { kind: 'element', selection: { kind: 'em-data', elementId: 'data:1' } },
       // agentflow（more-diagrams 工单 27）：节点画布可寻址（DOM id 反注）、边有原生 data-id；
       // 空白提供 加节点 / 加 flow；节点 = 改文本 / 从这里连线 / 删除；边 = 改标签 / 删除；
       // 容器（画布无 data-id）/ 文档行目标只能由程序构造
       { kind: 'blank', diagramType: 'agentflow' },
-      { kind: 'agentflow-node', nodeId: 'a' },
-      { kind: 'agentflow-edge', elementId: 'edge:a->b' },
-      { kind: 'agentflow-flow', elementId: 'container:flow:1' },
-      { kind: 'agentflow-doc', elementId: 'agentflow-doc:1' },
+      { kind: 'element', selection: { kind: 'agentflow-node', nodeId: 'a' } },
+      { kind: 'element', selection: { kind: 'agentflow-edge', elementId: 'edge:a->b' } },
+      { kind: 'element', selection: { kind: 'agentflow-flow', elementId: 'container:flow:1' } },
+      { kind: 'element', selection: { kind: 'agentflow-doc', elementId: 'agentflow-doc:1' } },
       // zenuml（more-diagrams 工单 19）：画布 DOM 无 data-id（任务 0 实测降级），空白提供
       // 加参与者 / 加消息；参与者（改别名/删除）/ 消息（改文本/删除）目标只能由程序构造
       { kind: 'blank', diagramType: 'zenuml' },
-      { kind: 'zenuml-participant', elementId: 'participant:Client' },
-      { kind: 'zenuml-message', elementId: 'message:1' },
-      { kind: 'zenuml-fragment', elementId: 'fragment:1' },
+      { kind: 'element', selection: { kind: 'zenuml-participant', elementId: 'participant:Client' } },
+      { kind: 'element', selection: { kind: 'zenuml-message', elementId: 'message:1' } },
+      { kind: 'element', selection: { kind: 'zenuml-fragment', elementId: 'fragment:1' } },
       // c4（more-diagrams 工单 18）：画布 DOM 无 data-id（实测降级），空白提供加元素 /
       // 加边界；元素（改字段/连线/删除）/ 边界（改标题/删除）/ 关系（改字段/删除）
       // 目标只能由结构树选中或程序构造
       { kind: 'blank', diagramType: 'c4' },
-      { kind: 'c4-element', elementId: 'c4-element:banking' },
-      { kind: 'c4-boundary', elementId: 'c4-boundary:b0' },
-      { kind: 'c4-relation', elementId: 'relation:1' },
+      { kind: 'element', selection: { kind: 'c4-element', elementId: 'c4-element:banking' } },
+      { kind: 'element', selection: { kind: 'c4-boundary', elementId: 'c4-boundary:b0' } },
+      { kind: 'element', selection: { kind: 'c4-relation', elementId: 'relation:1' } },
     ]
     const reachableIds = new Set(allTargets.flatMap((target) => contextMenuItems(target)))
     // apply-style 不经 onMenuItem 分发（CanvasPanel 渲染成子菜单开关，点样式名直接调
@@ -318,7 +318,7 @@ describe('createElement（工单 01：五个「创建 + 选中 + 内联命名」
     expect(branch).toBeDefined()
     const ctx = fakeCtx({ projection: proj })
 
-    MENU_ACTIONS['add-child'](ctx, { kind: 'mindmap-node', elementId: 'mindmap-node:2' })
+    MENU_ACTIONS['add-child'](ctx, { kind: 'element', selection: { kind: 'mindmap-node', elementId: 'mindmap-node:2' } })
 
     // 意图由 mindmapActionIntents 产出（锚点回退约定在 pipeline 层）；此处只验「三步编排」
     expect(ctx.intents[0]).toMatchObject({ type: 'add-child', text: '新节点' })
@@ -357,55 +357,55 @@ describe('删除组与连线菜单（分发语义）', () => {
     }> = [
       {
         id: 'delete',
-        target: { kind: 'flowchart-node', nodeId: 'A' },
+        target: { kind: 'element', selection: { kind: 'node', nodeId: 'A' } },
         intent: { type: 'delete-node', nodeId: 'A' },
         projection: flowProjectionOf(FLOW),
       },
       {
         id: 'delete',
-        target: { kind: 'flowchart-edge', from: 'A', to: 'B', occurrence: 1 },
+        target: { kind: 'element', selection: { kind: 'edge', from: 'A', to: 'B', occurrence: 1 } },
         intent: { type: 'delete-edge', from: 'A', to: 'B', occurrence: 1 },
         projection: flowProjectionOf(FLOW),
       },
       {
         id: 'delete',
-        target: { kind: 'mindmap-node', elementId: 'mindmap-node:2' },
+        target: { kind: 'element', selection: { kind: 'mindmap-node', elementId: 'mindmap-node:2' } },
         intent: { type: 'delete-node', elementId: 'mindmap-node:2' },
         projection: mindProjectionOf(MINDMAP),
       },
       {
         id: 'delete-class',
-        target: { kind: 'class-node', name: 'Foo' },
+        target: { kind: 'element', selection: { kind: 'class', name: 'Foo' } },
         intent: { type: 'delete-class', name: 'Foo' },
         projection: classProjectionOf(CLASS),
       },
       {
         id: 'delete-participant',
-        target: { kind: 'sequence-participant', actorId: '甲' },
+        target: { kind: 'element', selection: { kind: 'participant', actorId: '甲' } },
         intent: { type: 'delete-participant', actorId: '甲' },
         projection: seqProjectionOf(SEQUENCE),
       },
       {
         id: 'delete-relation',
-        target: { kind: 'class-relation', elementId: 'relation:1' },
+        target: { kind: 'element', selection: { kind: 'class-relation', elementId: 'relation:1' } },
         intent: { type: 'delete-relation', elementId: 'relation:1' },
         projection: classProjectionOf(CLASS),
       },
       {
         id: 'delete-message',
-        target: { kind: 'sequence-message', elementId: 'message:1' },
+        target: { kind: 'element', selection: { kind: 'message', elementId: 'message:1' } },
         intent: { type: 'delete-message', elementId: 'message:1' },
         projection: seqProjectionOf(SEQUENCE),
       },
       {
         id: 'delete-note',
-        target: { kind: 'sequence-note', elementId: 'note:1' },
+        target: { kind: 'element', selection: { kind: 'note', elementId: 'note:1' } },
         intent: { type: 'delete-note', elementId: 'note:1' },
         projection: seqProjectionOf(SEQUENCE),
       },
       {
         id: 'delete-block',
-        target: { kind: 'sequence-block', elementId: 'block:1' },
+        target: { kind: 'element', selection: { kind: 'block', elementId: 'block:1' } },
         intent: { type: 'delete-block', elementId: 'block:1' },
         projection: seqProjectionOf(SEQUENCE),
       },
@@ -423,7 +423,7 @@ describe('删除组与连线菜单（分发语义）', () => {
 
   it('目标已不在投影（能力包 deleteIntent → null）时安静地不落码，仍清空选中并关菜单', () => {
     const ctx = fakeCtx({ projection: classProjectionOf(CLASS) })
-    MENU_ACTIONS['delete-class'](ctx, { kind: 'class-node', name: '__不存在__' })
+    MENU_ACTIONS['delete-class'](ctx, { kind: 'element', selection: { kind: 'class', name: '__不存在__' } })
     expect(ctx.intents).toEqual([])
     expect(ctx.selections).toEqual([null])
     expect(ctx.closed).toBe(1)
@@ -439,7 +439,7 @@ describe('删除组与连线菜单（分发语义）', () => {
   it('cycle-relation-kind：取 RELATION_KIND_OPTIONS 中当前的下一项直接落码，菜单保持打开', () => {
     const ctx = fakeCtx({ projection: classProjectionOf(CLASS) })
 
-    MENU_ACTIONS['cycle-relation-kind'](ctx, { kind: 'class-relation', elementId: 'relation:1' })
+    MENU_ACTIONS['cycle-relation-kind'](ctx, { kind: 'element', selection: { kind: 'class-relation', elementId: 'relation:1' } })
 
     expect(ctx.intents).toEqual([{ type: 'set-relation', elementId: 'relation:1', kind: '..>' }])
     expect(ctx.closed).toBe(0)
@@ -448,7 +448,7 @@ describe('删除组与连线菜单（分发语义）', () => {
   it('cycle-message-arrow：取 MESSAGE_ARROW_OPTIONS 中当前的下一项直接落码，菜单保持打开', () => {
     const ctx = fakeCtx({ projection: seqProjectionOf(SEQUENCE) })
 
-    MENU_ACTIONS['cycle-message-arrow'](ctx, { kind: 'sequence-message', elementId: 'message:1' })
+    MENU_ACTIONS['cycle-message-arrow'](ctx, { kind: 'element', selection: { kind: 'message', elementId: 'message:1' } })
 
     expect(ctx.intents).toEqual([{ type: 'set-message', elementId: 'message:1', arrow: '-->' }])
     expect(ctx.closed).toBe(0)
@@ -461,10 +461,10 @@ describe('编辑类与添加表单类菜单项（分发语义）', () => {
       const ctx = fakeCtx()
       const target: ContextMenuTarget =
         id === 'edit-label'
-          ? { kind: 'flowchart-edge', from: 'A', to: 'B', occurrence: 1 }
+          ? { kind: 'element', selection: { kind: 'edge', from: 'A', to: 'B', occurrence: 1 } }
           : id === 'edit-relation'
-            ? { kind: 'class-relation', elementId: 'relation:1' }
-            : { kind: 'sequence-message', elementId: 'message:1' }
+            ? { kind: 'element', selection: { kind: 'class-relation', elementId: 'relation:1' } }
+            : { kind: 'element', selection: { kind: 'message', elementId: 'message:1' } }
 
       MENU_ACTIONS[id](ctx, target)
 
@@ -477,17 +477,17 @@ describe('编辑类与添加表单类菜单项（分发语义）', () => {
 
   it('edit-text：flowchart 节点 / mindmap 节点进入内联编辑并关菜单；其余目标只关菜单', () => {
     const flowCtx = fakeCtx()
-    MENU_ACTIONS['edit-text'](flowCtx, { kind: 'flowchart-node', nodeId: 'A' })
+    MENU_ACTIONS['edit-text'](flowCtx, { kind: 'element', selection: { kind: 'node', nodeId: 'A' } })
     expect(flowCtx.inlineEdits).toEqual([{ kind: 'flowchart', nodeId: 'A' }])
     expect(flowCtx.intents).toEqual([])
     expect(flowCtx.closed).toBe(1)
 
     const mindCtx = fakeCtx()
-    MENU_ACTIONS['edit-text'](mindCtx, { kind: 'mindmap-node', elementId: 'mindmap-node:2' })
+    MENU_ACTIONS['edit-text'](mindCtx, { kind: 'element', selection: { kind: 'mindmap-node', elementId: 'mindmap-node:2' } })
     expect(mindCtx.inlineEdits).toEqual([{ kind: 'mindmap', elementId: 'mindmap-node:2' }])
 
     const otherCtx = fakeCtx()
-    MENU_ACTIONS['edit-text'](otherCtx, { kind: 'class-node', name: 'Foo' })
+    MENU_ACTIONS['edit-text'](otherCtx, { kind: 'element', selection: { kind: 'class', name: 'Foo' } })
     expect(otherCtx.inlineEdits).toEqual([])
     expect(otherCtx.closed).toBe(1)
   })
@@ -503,7 +503,7 @@ describe('编辑类与添加表单类菜单项（分发语义）', () => {
       const openForm = vi.fn()
       const ctx = fakeCtx({ openForm })
 
-      MENU_ACTIONS[id](ctx, { kind: 'class-node', name: 'Foo' })
+      MENU_ACTIONS[id](ctx, { kind: 'element', selection: { kind: 'class', name: 'Foo' } })
 
       expect(openForm).toHaveBeenCalledWith(kind)
       expect(ctx.intents).toEqual([])
@@ -523,11 +523,11 @@ describe('编辑类与添加表单类菜单项（分发语义）', () => {
     expect(blankCtx.enterLinkMode).toHaveBeenCalled()
 
     const nodeCtx = fakeCtx()
-    MENU_ACTIONS['link-from-here'](nodeCtx, { kind: 'flowchart-node', nodeId: 'A' })
+    MENU_ACTIONS['link-from-here'](nodeCtx, { kind: 'element', selection: { kind: 'node', nodeId: 'A' } })
     expect(nodeCtx.enterLinkMode).toHaveBeenCalledWith('A')
 
     const edgeCtx = fakeCtx()
-    MENU_ACTIONS['link-from-here'](edgeCtx, { kind: 'flowchart-edge', from: 'A', to: 'B', occurrence: 1 })
+    MENU_ACTIONS['link-from-here'](edgeCtx, { kind: 'element', selection: { kind: 'edge', from: 'A', to: 'B', occurrence: 1 } })
     expect(edgeCtx.enterLinkMode).not.toHaveBeenCalled()
   })
 })
@@ -605,7 +605,7 @@ describe('timeline 菜单动作（more-diagrams 工单 05）', () => {
   it('add-event（时期目标）：落 add-event 意图到该时期、选中新事件的预测 elementId', () => {
     const ctx = fakeCtx({ projection: timelineProjectionOf(TIMELINE) })
 
-    MENU_ACTIONS['add-event'](ctx, { kind: 'timeline-period', elementId: 'period:2' })
+    MENU_ACTIONS['add-event'](ctx, { kind: 'element', selection: { kind: 'timeline-period', elementId: 'period:2' } })
 
     expect(ctx.intents[0]).toMatchObject({ type: 'add-event', periodElementId: 'period:2' })
     // period:2 之后事件总数 = 3（period:1 的 2 个 + period:2 的 1 个）→ 新事件 event:4
@@ -615,13 +615,13 @@ describe('timeline 菜单动作（more-diagrams 工单 05）', () => {
 
   it('edit-period-text / edit-event-text：选中目标 + 关菜单，自身不落码（文本在属性表单改）', () => {
     const periodCtx = fakeCtx()
-    MENU_ACTIONS['edit-period-text'](periodCtx, { kind: 'timeline-period', elementId: 'period:1' })
+    MENU_ACTIONS['edit-period-text'](periodCtx, { kind: 'element', selection: { kind: 'timeline-period', elementId: 'period:1' } })
     expect(periodCtx.intents).toEqual([])
     expect(periodCtx.selections).toEqual([{ kind: 'timeline-period', elementId: 'period:1' }])
     expect(periodCtx.closed).toBe(1)
 
     const eventCtx = fakeCtx()
-    MENU_ACTIONS['edit-event-text'](eventCtx, { kind: 'timeline-event', elementId: 'event:2' })
+    MENU_ACTIONS['edit-event-text'](eventCtx, { kind: 'element', selection: { kind: 'timeline-event', elementId: 'event:2' } })
     expect(eventCtx.intents).toEqual([])
     expect(eventCtx.selections).toEqual([{ kind: 'timeline-event', elementId: 'event:2' }])
     expect(eventCtx.closed).toBe(1)
@@ -629,7 +629,7 @@ describe('timeline 菜单动作（more-diagrams 工单 05）', () => {
 
   it('目标不是 timeline 时期 / 投影未就绪时安静地不执行', () => {
     const wrongTarget = fakeCtx({ projection: timelineProjectionOf(TIMELINE) })
-    MENU_ACTIONS['add-event'](wrongTarget, { kind: 'timeline-event', elementId: 'event:1' })
+    MENU_ACTIONS['add-event'](wrongTarget, { kind: 'element', selection: { kind: 'timeline-event', elementId: 'event:1' } })
     expect(wrongTarget.intents).toEqual([])
     expect(wrongTarget.closed).toBe(0)
 
