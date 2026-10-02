@@ -1,5 +1,6 @@
 import { resolveTreeviewSelection } from '../projection/treeview-projection'
 import { treeviewDeleteIntent, treeviewKeyPlan } from '../pipeline/treeview-keyboard'
+import { nonAddressableCapabilities } from './non-addressable-capabilities'
 import type { CanvasCapabilities, ProjectionOf } from './capabilities'
 
 /**
@@ -20,20 +21,14 @@ import type { CanvasCapabilities, ProjectionOf } from './capabilities'
  *   右键空白菜单（加根节点）与画布键盘（结构树选中后 Tab/Enter/Delete）全部可用。
  * 降级清单：节点画布点选、双击改名、元素级右键菜单——后两者由结构树选中 + 属性面板承接，
  * 语义不缺失，只是入口位置不同。降级证据见 research/treeview.md §4 与提交信息。
- *
- * `canvasIdOf` 用 `(_projection, selection)` 签名（gantt 起升级的约定，工单 22/24 遵循）。
+
  */
 
-export const treeviewCanvasCapabilities: CanvasCapabilities<ProjectionOf<'treeview'>> = {
-  dataIdResolver: () => () => null,
-  toSelection: () => null,
-  // 画布上没有可寻址 DOM：一律返回 null——安静地不高亮
-  canvasIdOf: (_projection, _selection) => null,
-  navigationIds: () => [],
+export const treeviewCanvasCapabilities: CanvasCapabilities<ProjectionOf<'treeview'>> = nonAddressableCapabilities({
   keyboardProjection: (projection) => ({ kind: 'treeview', projection: projection.treeview }),
   resolveSelection: (projection, selection) => resolveTreeviewSelection(projection.treeview, selection),
   // 删除意图：唯一映射在 pipeline/treeview-keyboard 的 treeviewDeleteIntent
   deleteIntent: (projection, selection) => treeviewDeleteIntent(projection.treeview, selection),
   // 键位语义：唯一映射在 pipeline/treeview-keyboard 的 treeviewKeyPlan
   keyHandler: (projection) => (input) => treeviewKeyPlan(projection.treeview, input),
-}
+})

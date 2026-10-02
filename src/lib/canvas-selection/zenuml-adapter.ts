@@ -1,5 +1,6 @@
 import { resolveZenumlSelection } from '../projection/zenuml-projection'
 import { zenumlDeleteIntent, zenumlKeyPlan } from '../pipeline/zenuml-keyboard'
+import { nonAddressableCapabilities } from './non-addressable-capabilities'
 import type { CanvasCapabilities, ProjectionOf } from './capabilities'
 
 /**
@@ -29,20 +30,14 @@ import type { CanvasCapabilities, ProjectionOf } from './capabilities'
  *   程序构造目标触发，`inlineEditTargetFromEvent` 对 zenuml 一律返回 null；
  * - 第 15 项 `node-data-ids.ts` / `edge-adapter.ts` / `edge-locate.ts`：**不做画布可寻址
  *   反注**——渲染器根本无 id / data-id 可注入（任务 0 实测），无从反注。
- *
- * `canvasIdOf` 用 `(_projection, selection)` 签名（工单 19 遵循既有约定）。
+
  */
 
-export const zenumlCanvasCapabilities: CanvasCapabilities<ProjectionOf<'zenuml'>> = {
-  dataIdResolver: () => () => null,
-  toSelection: () => null,
-  // 画布上没有可寻址 DOM：一律返回 null——安静地不高亮
-  canvasIdOf: (_projection, _selection) => null,
-  navigationIds: () => [],
+export const zenumlCanvasCapabilities: CanvasCapabilities<ProjectionOf<'zenuml'>> = nonAddressableCapabilities({
   keyboardProjection: (projection) => ({ kind: 'zenuml', projection: projection.zenuml }),
   resolveSelection: (projection, selection) => resolveZenumlSelection(projection.zenuml, selection),
   // 删除意图：唯一映射在 pipeline/zenuml-keyboard 的 zenumlDeleteIntent
   deleteIntent: (projection, selection) => zenumlDeleteIntent(projection.zenuml, selection),
   // 键位语义：唯一映射在 pipeline/zenuml-keyboard 的 zenumlKeyPlan
   keyHandler: (projection) => (input) => zenumlKeyPlan(projection.zenuml, input),
-}
+})

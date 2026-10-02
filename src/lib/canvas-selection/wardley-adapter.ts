@@ -1,5 +1,6 @@
 import { resolveWardleySelection } from '../projection/wardley-projection'
 import { wardleyDeleteIntent, wardleyKeyPlan } from '../pipeline/wardley-keyboard'
+import { nonAddressableCapabilities } from './non-addressable-capabilities'
 import type { CanvasCapabilities, ProjectionOf } from './capabilities'
 
 /**
@@ -23,16 +24,11 @@ import type { CanvasCapabilities, ProjectionOf } from './capabilities'
  * 语义不缺失，只是入口位置不同。
  */
 
-export const wardleyCanvasCapabilities: CanvasCapabilities<ProjectionOf<'wardley'>> = {
-  dataIdResolver: () => () => null,
-  toSelection: () => null,
-  // 画布上没有可寻址 DOM：一律返回 null——安静地不高亮
-  canvasIdOf: () => null,
-  navigationIds: () => [],
+export const wardleyCanvasCapabilities: CanvasCapabilities<ProjectionOf<'wardley'>> = nonAddressableCapabilities({
   keyboardProjection: (projection) => ({ kind: 'wardley', projection: projection.wardley }),
   resolveSelection: (projection, selection) => resolveWardleySelection(projection.wardley, selection),
   // 删除意图：唯一映射在 pipeline/wardley-keyboard 的 wardleyDeleteIntent
   deleteIntent: (projection, selection) => wardleyDeleteIntent(projection.wardley, selection),
   // 键位语义：唯一映射在 pipeline/wardley-keyboard 的 wardleyKeyPlan
   keyHandler: (projection) => (input) => wardleyKeyPlan(projection.wardley, input),
-}
+})

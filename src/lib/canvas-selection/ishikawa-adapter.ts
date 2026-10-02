@@ -1,5 +1,6 @@
 import { resolveIshikawaSelection } from '../projection/ishikawa-projection'
 import { ishikawaDeleteIntent, ishikawaKeyPlan } from '../pipeline/ishikawa-keyboard'
+import { nonAddressableCapabilities } from './non-addressable-capabilities'
 import type { CanvasCapabilities, ProjectionOf } from './capabilities'
 
 /**
@@ -20,20 +21,14 @@ import type { CanvasCapabilities, ProjectionOf } from './capabilities'
  *   与画布键盘（结构树选中后 Tab/Enter/Delete）全部可用。
  * 降级清单：节点画布点选、双击改名、元素级右键菜单——后两者由结构树选中 + 属性面板承接，
  * 语义不缺失，只是入口位置不同。
- *
- * `canvasIdOf` 用 `(_projection, selection)` 签名（gantt 起升级的约定，工单 22 遵循）。
+
  */
 
-export const ishikawaCanvasCapabilities: CanvasCapabilities<ProjectionOf<'ishikawa'>> = {
-  dataIdResolver: () => () => null,
-  toSelection: () => null,
-  // 画布上没有可寻址 DOM：一律返回 null——安静地不高亮
-  canvasIdOf: (_projection, _selection) => null,
-  navigationIds: () => [],
+export const ishikawaCanvasCapabilities: CanvasCapabilities<ProjectionOf<'ishikawa'>> = nonAddressableCapabilities({
   keyboardProjection: (projection) => ({ kind: 'ishikawa', projection: projection.ishikawa }),
   resolveSelection: (projection, selection) => resolveIshikawaSelection(projection.ishikawa, selection),
   // 删除意图：唯一映射在 pipeline/ishikawa-keyboard 的 ishikawaDeleteIntent
   deleteIntent: (projection, selection) => ishikawaDeleteIntent(projection.ishikawa, selection),
   // 键位语义：唯一映射在 pipeline/ishikawa-keyboard 的 ishikawaKeyPlan
   keyHandler: (projection) => (input) => ishikawaKeyPlan(projection.ishikawa, input),
-}
+})

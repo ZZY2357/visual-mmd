@@ -1,5 +1,6 @@
 import { resolveJourneySelection } from '../projection/journey-projection'
 import { journeyDeleteIntent, journeyKeyPlan } from '../pipeline/journey-keyboard'
+import { nonAddressableCapabilities } from './non-addressable-capabilities'
 import type { CanvasCapabilities, ProjectionOf } from './capabilities'
 
 /**
@@ -18,19 +19,11 @@ import type { CanvasCapabilities, ProjectionOf } from './capabilities'
  * 全部不做——任务名的编辑入口 = 结构树选中 + 右侧属性表单；键盘经能力包 `keyHandler`
  * （`journeyKeyPlan`）对**结构树选中的任务**生效（画布键盘读 store 选中，不依赖 DOM 寻址）。
  */
-export const journeyCanvasCapabilities: CanvasCapabilities<ProjectionOf<'journey'>> = {
-  // 无 data-id：永不命中（只认已知元素也无法命中，因为没有东西会带着 data-id 出现）
-  dataIdResolver: () => () => null,
-  // 画布选中不可能产生（resolver 永不命中）——保留空实现以守能力包形状
-  toSelection: () => null,
-  // 画布上无高亮目标：任务/section 都不可寻址，安静地不高亮
-  canvasIdOf: () => null,
-  // 无画布可寻址节点 → 不参与方位导航 / 回落首节点
-  navigationIds: () => [],
+export const journeyCanvasCapabilities: CanvasCapabilities<ProjectionOf<'journey'>> = nonAddressableCapabilities({
   keyboardProjection: (projection) => ({ kind: 'journey', projection: projection.journey }),
   resolveSelection: (projection, selection) => resolveJourneySelection(projection.journey, selection),
   // 删除意图：唯一映射在 pipeline/journey-keyboard 的 journeyDeleteIntent
   deleteIntent: (projection, selection) => journeyDeleteIntent(projection.journey, selection),
   // 键位语义：唯一映射在 pipeline/journey-keyboard 的 journeyKeyPlan（Tab 同 section 加任务 / Enter 加 section / Delete）
   keyHandler: (projection) => (input) => journeyKeyPlan(projection.journey, input),
-}
+})

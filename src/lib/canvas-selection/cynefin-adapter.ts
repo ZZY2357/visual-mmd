@@ -1,5 +1,6 @@
 import { resolveCynefinSelection } from '../projection/cynefin-projection'
 import { cynefinDeleteIntent, cynefinKeyPlan } from '../pipeline/cynefin-keyboard'
+import { nonAddressableCapabilities } from './non-addressable-capabilities'
 import type { CanvasCapabilities, ProjectionOf } from './capabilities'
 
 /**
@@ -29,20 +30,14 @@ import type { CanvasCapabilities, ProjectionOf } from './capabilities'
  *   画布无 data-id，双击目标无从解析（ADR-0007 诚实降级），文本编辑在右侧表单；
  * - 第 15 项 `node-data-ids.ts` / `edge-adapter.ts` / `edge-locate.ts`：**不做画布可寻址
  *   反注**——渲染器根本无 id / data-id 可注入（research §8.1 实测），无从反注。
- *
- * `canvasIdOf` 用 `(_projection, selection)` 签名（gantt 起升级的约定，工单 25 遵循）。
+
  */
 
-export const cynefinCanvasCapabilities: CanvasCapabilities<ProjectionOf<'cynefin'>> = {
-  dataIdResolver: () => () => null,
-  toSelection: () => null,
-  // 画布上没有可寻址 DOM：一律返回 null——安静地不高亮
-  canvasIdOf: (_projection, _selection) => null,
-  navigationIds: () => [],
+export const cynefinCanvasCapabilities: CanvasCapabilities<ProjectionOf<'cynefin'>> = nonAddressableCapabilities({
   keyboardProjection: (projection) => ({ kind: 'cynefin', projection: projection.cynefin }),
   resolveSelection: (projection, selection) => resolveCynefinSelection(projection.cynefin, selection),
   // 删除意图：唯一映射在 pipeline/cynefin-keyboard 的 cynefinDeleteIntent
   deleteIntent: (projection, selection) => cynefinDeleteIntent(projection.cynefin, selection),
   // 键位语义：唯一映射在 pipeline/cynefin-keyboard 的 cynefinKeyPlan
   keyHandler: (projection) => (input) => cynefinKeyPlan(projection.cynefin, input),
-}
+})

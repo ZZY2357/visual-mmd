@@ -1,5 +1,6 @@
 import { resolvePieSelection } from '../projection/pie-projection'
 import { pieDeleteIntent, pieKeyPlan } from '../pipeline/pie-keyboard'
+import { nonAddressableCapabilities } from './non-addressable-capabilities'
 import type { CanvasCapabilities, ProjectionOf } from './capabilities'
 
 /**
@@ -21,15 +22,7 @@ import type { CanvasCapabilities, ProjectionOf } from './capabilities'
  * `keyHandler`（`pieKeyPlan`）对**结构树选中的扇区**生效（画布键盘读 store 选中，
  * 不依赖 DOM 寻址）。
  */
-export const pieCanvasCapabilities: CanvasCapabilities<ProjectionOf<'pie'>> = {
-  // 无 data-id：永不命中（只认已知元素也无法命中，因为没有东西会带着 data-id 出现）
-  dataIdResolver: () => () => null,
-  // 画布选中不可能产生（resolver 永不命中）——保留空实现以守能力包形状
-  toSelection: () => null,
-  // 画布上无高亮目标：扇区不可寻址，安静地不高亮
-  canvasIdOf: () => null,
-  // 无画布可寻址节点 → 不参与方位导航 / 回落首节点
-  navigationIds: () => [],
+export const pieCanvasCapabilities: CanvasCapabilities<ProjectionOf<'pie'>> = nonAddressableCapabilities({
   keyboardProjection: (projection) => ({ kind: 'pie', projection: projection.pie }),
   resolveSelection: (projection, selection) => resolvePieSelection(projection.pie, selection),
   // 删除意图：唯一映射在 pipeline/pie-keyboard 的 pieDeleteIntent
@@ -37,4 +30,4 @@ export const pieCanvasCapabilities: CanvasCapabilities<ProjectionOf<'pie'>> = {
   // 键位语义：唯一映射在 pipeline/pie-keyboard 的 pieKeyPlan（Tab 加扇区 / Delete 删除；
   // Enter 无自然类比，工单定案不做）
   keyHandler: (projection) => (input) => pieKeyPlan(projection.pie, input),
-}
+})

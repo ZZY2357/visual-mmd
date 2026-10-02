@@ -1,5 +1,6 @@
 import { resolveC4Selection } from '../projection/c4-projection'
 import { c4DeleteIntent, c4KeyPlan } from '../pipeline/c4-keyboard'
+import { nonAddressableCapabilities } from './non-addressable-capabilities'
 import type { CanvasCapabilities, ProjectionOf } from './capabilities'
 
 /**
@@ -20,16 +21,11 @@ import type { CanvasCapabilities, ProjectionOf } from './capabilities'
  * 降级清单：元素 / 边界画布点选、双击改名、元素级右键菜单——后两者由结构树选中 + 属性面板
  * 承接，语义不缺失，只是入口位置不同。
  */
-export const c4CanvasCapabilities: CanvasCapabilities<ProjectionOf<'c4'>> = {
-  dataIdResolver: () => () => null,
-  toSelection: () => null,
-  // 画布上没有可寻址 DOM：一律返回 null——安静地不高亮
-  canvasIdOf: (_projection, _selection) => null,
-  navigationIds: () => [],
+export const c4CanvasCapabilities: CanvasCapabilities<ProjectionOf<'c4'>> = nonAddressableCapabilities({
   keyboardProjection: (projection) => ({ kind: 'c4', projection: projection.c4 }),
   resolveSelection: (projection, selection) => resolveC4Selection(projection.c4, selection),
   // 删除意图：唯一映射在 pipeline/c4-keyboard 的 c4DeleteIntent
   deleteIntent: (projection, selection) => c4DeleteIntent(projection.c4, selection),
   // 键位语义：唯一映射在 pipeline/c4-keyboard 的 c4KeyPlan
   keyHandler: (projection) => (input) => c4KeyPlan(projection.c4, input),
-}
+})
