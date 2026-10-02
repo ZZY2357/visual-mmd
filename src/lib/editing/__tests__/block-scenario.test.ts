@@ -183,7 +183,7 @@ describe('block 菜单动作（MenuActionContext 替身分发）', () => {
   it('嵌套块上「加块节点」：parentGroupId 指向该组（锚点 = 组声明行）', () => {
     const proj = { type: 'block', block: projectionOf() } as AnyProjection
     const intents: EditIntent[] = []
-    MENU_ACTIONS['add-block-node'](fakeCtx(proj, intents, []), { kind: 'block-group', id: 'group1' })
+    MENU_ACTIONS['add-block-node'](fakeCtx(proj, intents, []), { kind: 'element', selection: { kind: 'block-group', id: 'group1' } })
     expect(intents[0]).toMatchObject({ type: 'add-node', parentGroupId: 'group1' })
   })
 
@@ -201,7 +201,7 @@ describe('block 菜单动作（MenuActionContext 替身分发）', () => {
   it('节点「编辑文本」= 进入内联编辑（不改形状表单）', () => {
     const proj = { type: 'block', block: projectionOf() } as AnyProjection
     const inline: string[] = []
-    MENU_ACTIONS['edit-text'](fakeCtx(proj, [], inline), { kind: 'block-node', id: 'a' })
+    MENU_ACTIONS['edit-text'](fakeCtx(proj, [], inline), { kind: 'element', selection: { kind: 'block-node', id: 'a' } })
     expect(inline).toEqual(['block-node'])
   })
 })

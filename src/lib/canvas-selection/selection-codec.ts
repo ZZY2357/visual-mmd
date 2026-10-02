@@ -8,10 +8,6 @@ import { parseKanbanCardElementId, parseKanbanColumnElementId } from '../pipelin
 import { requirementSelectionOf } from './requirement-adapter'
 import { quadrantSelectionOf } from './quadrant-adapter'
 import { packetSelectionOf } from './packet-adapter'
-import {
-  parseRequirementBlockElementId,
-  parseRequirementElemBlockElementId,
-} from '../pipeline/element-id'
 import { blockSelectionOf } from './block-adapter'
 import { xychartSelectionOf } from './xychart-adapter'
 import { vennSelectionOf } from './venn-adapter'
@@ -21,8 +17,6 @@ import {
   parseArchitectureGroupElementId,
   parseArchitectureJunctionElementId,
   parseArchitectureServiceElementId,
-  parseBlockGroupElementId,
-  parseBlockNodeElementId,
 } from '../pipeline/element-id'
 import type { ContextMenuTarget } from '../editing/context-menu'
 
@@ -346,351 +340,99 @@ export function fromCanvasId(diagramType: DiagramTypeId, canvas: CanvasSelection
 
 /**
  * ContextMenuTarget → Selection（右键目标 → 属性面板联动）。
- * blank 目标什么都不选（既有语义：空白菜单不 select）返回 null；其余 9 个元素目标
- * 一一对应各自的 Selection kind。
+ * 工单 architecture-deepening-3 03 起 Target 复用 Selection 词汇：元素目标**就是**选中
+ * 本身，不再有第二套 kind 名字——原先 60+ case 的逐 kind 转写 switch 随之消失；
+ * blank 目标什么都不选（既有语义：空白菜单不 select）返回 null。
  */
 export function selectionOfMenuTarget(target: ContextMenuTarget): Selection | null {
-  switch (target.kind) {
-    case 'flowchart-node':
-      return { kind: 'node', nodeId: target.nodeId }
-    case 'flowchart-edge':
-      return { kind: 'edge', from: target.from, to: target.to, occurrence: target.occurrence }
-    case 'mindmap-node':
-      return { kind: 'mindmap-node', elementId: target.elementId }
-    case 'class-node':
-      return { kind: 'class', name: target.name }
-    case 'sequence-participant':
-      return { kind: 'participant', actorId: target.actorId }
-    case 'class-relation':
-      return { kind: 'class-relation', elementId: target.elementId }
-    case 'sequence-message':
-      return { kind: 'message', elementId: target.elementId }
-    case 'sequence-note':
-      return { kind: 'note', elementId: target.elementId }
-    case 'sequence-block':
-      return { kind: 'block', elementId: target.elementId }
-    case 'state-node':
-      return { kind: 'state', id: target.id }
-    case 'state-transition':
-      return { kind: 'state-transition', elementId: target.elementId }
-    case 'er-entity':
-      return { kind: 'er-entity', name: target.name }
-    case 'er-relation':
-      return { kind: 'er-relation', elementId: target.elementId }
-    case 'er-attribute':
-      return { kind: 'er-attribute', elementId: target.elementId }
-    case 'timeline-period':
-      return { kind: 'timeline-period', elementId: target.elementId }
-    case 'timeline-event':
-      return { kind: 'timeline-event', elementId: target.elementId }
-    // kanban（more-diagrams 工单 06）：列 / 卡片菜单目标一一对应各自 Selection kind。
-    case 'kanban-column':
-      return { kind: 'kanban-column', elementId: target.elementId }
-    case 'kanban-card':
-      return { kind: 'kanban-card', elementId: target.elementId }
-    case 'requirement-node':
-      return { kind: 'requirement', name: target.name }
-    case 'requirement-element':
-      return { kind: 'requirement-element', name: target.name }
-    case 'requirement-relation':
-      return { kind: 'requirement-relation', elementId: target.elementId }
-    // block（more-diagrams 工单 09）：节点 / 嵌套块 / 边菜单目标一一对应各自 Selection kind
-    case 'block-node':
-      return { kind: 'block-node', id: target.id }
-    case 'block-group':
-      return { kind: 'block-group', id: target.id }
-    case 'block-edge':
-      return { kind: 'block-edge', elementId: target.elementId }
-    // sankey（more-diagrams 工单 13）：节点 / 链路菜单目标一一对应各自 Selection kind
-    case 'sankey-node':
-      return { kind: 'sankey-node', name: target.name }
-    case 'sankey-link':
-      return { kind: 'sankey-link', elementId: target.elementId }
-    // quadrant（more-diagrams 工单 12）：点/轴/象限菜单目标一一对应各自 Selection kind
-    case 'quadrant-point':
-      return { kind: 'quadrant-point', elementId: target.elementId }
-    case 'quadrant-axis':
-      return { kind: 'quadrant-axis', elementId: target.elementId }
-    case 'quadrant-quadrant':
-      return { kind: 'quadrant-quadrant', elementId: target.elementId }
-    // packet（more-diagrams 工单 16）：字段菜单目标一一对应 Selection kind
-    case 'packet-field':
-      return { kind: 'packet-field', elementId: target.elementId }
-    // xychart（more-diagrams 工单 14）：系列 / 轴 / 标题菜单目标一一对应各自 Selection kind
-    case 'xychart-series':
-      return { kind: 'xychart-series', elementId: target.elementId }
-    case 'xychart-axis':
-      return { kind: 'xychart-axis', axis: target.axis }
-    case 'xychart-title':
-      return { kind: 'xychart-title' }
-    // architecture（more-diagrams 工单 17）：三类节点 / 边菜单目标一一对应各自 Selection kind
-    case 'architecture-service':
-      return { kind: 'architecture-service', name: target.name }
-    case 'architecture-group':
-      return { kind: 'architecture-group', name: target.name }
-    case 'architecture-junction':
-      return { kind: 'architecture-junction', name: target.name }
-    case 'architecture-edge':
-      return { kind: 'architecture-edge', elementId: target.elementId }
-    // wardley（more-diagrams 工单 23）：节点 / 连线 / evolve 菜单目标一一对应各自 Selection kind
-    case 'wardley-node':
-      return { kind: 'wardley-node', name: target.name }
-    case 'wardley-link':
-      return { kind: 'wardley-link', elementId: target.elementId }
-    case 'wardley-evolve':
-      return { kind: 'wardley-evolve', elementId: target.elementId }
-    // venn（more-diagrams 工单 21）：集合 / 交集菜单目标一一对应各自 Selection kind
-    case 'venn-set':
-      return { kind: 'venn-set', id: target.id }
-    case 'venn-union':
-      return { kind: 'venn-union', elementId: target.elementId }
-    // cynefin（more-diagrams 工单 25）：域 / 条目 / 转移菜单目标一一对应各自 Selection kind
-    case 'cynefin-domain':
-      return { kind: 'cynefin-domain', name: target.name }
-    case 'cynefin-item':
-      return { kind: 'cynefin-item', elementId: target.elementId }
-    case 'cynefin-transition':
-      return { kind: 'cynefin-transition', elementId: target.elementId }
-    // usecase（more-diagrams 工单 26）：actor / 用例 / 边界 / 关系菜单目标一一对应
-    case 'usecase-actor':
-      return { kind: 'usecase-actor', elementId: target.elementId }
-    case 'usecase-usecase':
-      return { kind: 'usecase-usecase', elementId: target.elementId }
-    case 'usecase-boundary':
-      return { kind: 'usecase-boundary', elementId: target.elementId }
-    case 'usecase-relation':
-      return { kind: 'usecase-relation', elementId: target.elementId }
-    case 'usecase-note':
-      return { kind: 'usecase-note', elementId: target.elementId }
-    // eventmodeling（more-diagrams 工单 28）：帧 / 数据块菜单目标一一对应各自 Selection kind
-    case 'em-frame':
-      return { kind: 'em-frame', elementId: target.elementId }
-    case 'em-data':
-      return { kind: 'em-data', elementId: target.elementId }
-    // agentflow（more-diagrams 工单 27）：节点 / 边 / 容器 / 文档行菜单目标一一对应各自
-    // Selection kind
-    case 'agentflow-node':
-      return { kind: 'agentflow-node', nodeId: target.nodeId }
-    case 'agentflow-edge':
-      return { kind: 'agentflow-edge', elementId: target.elementId }
-    case 'agentflow-flow':
-      return { kind: 'agentflow-flow', elementId: target.elementId }
-    case 'agentflow-doc':
-      return { kind: 'agentflow-doc', elementId: target.elementId }
-    // zenuml（more-diagrams 工单 19）：参与者 / 消息 / 片段菜单目标一一对应各自 Selection kind
-    case 'zenuml-participant':
-      return { kind: 'zenuml-participant', elementId: target.elementId }
-    case 'zenuml-message':
-      return { kind: 'zenuml-message', elementId: target.elementId }
-    case 'zenuml-fragment':
-      return { kind: 'zenuml-fragment', elementId: target.elementId }
-    // c4（more-diagrams 工单 18）：元素 / 边界 / 关系菜单目标一一对应各自 Selection kind
-    case 'c4-element':
-      return { kind: 'c4-element', elementId: target.elementId }
-    case 'c4-boundary':
-      return { kind: 'c4-boundary', elementId: target.elementId }
-    case 'c4-relation':
-      return { kind: 'c4-relation', elementId: target.elementId }
-    case 'blank':
-      return null
-  }
+  return target.kind === 'element' ? target.selection : null
 }
 
 /**
- * xychart（more-diagrams 工单 14）：画布 node.id → 菜单目标（固定身份 + 位置序系列）。
- * Selection 与 ContextMenuTarget 的 xychart 形态同构，经 xychartSelectionOf 唯一映射后转形。
+ * 菜单可寻址的选中种类表（工单 architecture-deepening-3 03）：Target 复用 Selection 词汇后，
+ * 「哪些选中能弹菜单」收成这一张显式表（与 canvasIdOf 的「显式可寻址表 + 测试逼答」同范式）。
+ * - 节点类：fromCanvasId 的 node 分支产出中可弹菜单的 kind（gantt-task 等虽有画布选中
+ *   但无元素级菜单，不进表）；timeline / wardley / cynefin / zenuml / c4 / em 等
+ *   画布不可寻址的 kind 也在表内——它们只由测试/程序构造目标，画布路径天然到不了。
+ * - 连线类：edgeSelectionOf 的全部产出（class / sequence / state / er / requirement /
+ *   block / sankey 的位置序连线）+ `edge` / `agentflow-edge`（flowchart / agentflow 的
+ *   原生 `L_{from}_{to}_{n}` data-id 边）。
  */
-function xychartMenuTargetOf(canvas: { kind: 'node'; id: string }): ContextMenuTarget | null {
-  const selection = xychartSelectionOf(canvas)
-  switch (selection?.kind) {
-    case 'xychart-series':
-      return { kind: 'xychart-series', elementId: selection.elementId }
-    case 'xychart-axis':
-      return { kind: 'xychart-axis', axis: selection.axis }
-    case 'xychart-title':
-      return { kind: 'xychart-title' }
-    default:
-      return null
-  }
-}
+const MENU_ADDRESSABLE_KINDS: ReadonlySet<Selection['kind']> = new Set([
+  'node',
+  'edge',
+  'mindmap-node',
+  'class',
+  'participant',
+  'class-relation',
+  'message',
+  'note',
+  'block',
+  'state',
+  'state-transition',
+  'er-entity',
+  'er-relation',
+  'er-attribute',
+  'timeline-period',
+  'timeline-event',
+  'kanban-column',
+  'kanban-card',
+  'requirement',
+  'requirement-element',
+  'requirement-relation',
+  'block-node',
+  'block-group',
+  'block-edge',
+  'sankey-node',
+  'sankey-link',
+  'quadrant-point',
+  'quadrant-axis',
+  'quadrant-quadrant',
+  'packet-field',
+  'xychart-series',
+  'xychart-axis',
+  'xychart-title',
+  'architecture-service',
+  'architecture-group',
+  'architecture-junction',
+  'wardley-node',
+  'wardley-link',
+  'wardley-evolve',
+  'venn-set',
+  'venn-union',
+  'cynefin-domain',
+  'cynefin-item',
+  'cynefin-transition',
+  'usecase-actor',
+  'usecase-usecase',
+  'usecase-boundary',
+  'usecase-relation',
+  'usecase-note',
+  'em-frame',
+  'em-data',
+  'agentflow-node',
+  'agentflow-edge',
+  'zenuml-participant',
+  'zenuml-message',
+  'zenuml-fragment',
+  'c4-element',
+  'c4-boundary',
+  'c4-relation',
+])
 
 /**
- * CanvasSelection + 图种 → ContextMenuTarget：节点/连线按图种改写 kind（四种图种的
- * 节点都有菜单）；连线 flowchart 走 mermaid data-id，class / sequence 走**位置序身份**
- * （工单 02，经 edgeSelectionOf 收窄到本图种可寻址的种类）；空白处（canvas === null）
- * 一律返回 blank（图种随目标携带）；无法映射为菜单目标时返回 null——安静地不弹菜单，
- * 不崩溃。
+ * CanvasSelection + 图种 → ContextMenuTarget（工单 architecture-deepening-3 03 重写）：
+ * Target 复用 Selection 词汇后，菜单目标 = 「fromCanvasId 的选中 + 菜单可寻址过滤」——
+ * 原先与 fromCanvasId 平行的 60+ 分支逐 kind 转写（每个 kind 的身份在两个 switch 各写一遍）
+ * 收敛为一张 MENU_ADDRESSABLE_KINDS 表。空白处（canvas === null）一律返回 blank（图种随
+ * 目标携带）；选中不可得或不在可寻址表内返回 null——安静地不弹菜单，不崩溃。
  */
 export function menuTargetOfCanvas(
   diagramType: DiagramTypeId,
   canvas: CanvasSelection | null,
 ): ContextMenuTarget | null {
   if (canvas === null) return { kind: 'blank', diagramType }
-  if (canvas.kind === 'node') {
-    if (diagramType === 'flowchart') return { kind: 'flowchart-node', nodeId: canvas.id }
-    if (diagramType === 'mindmap') return { kind: 'mindmap-node', elementId: canvas.id }
-    if (diagramType === 'class') return { kind: 'class-node', name: canvas.id }
-    if (diagramType === 'state') {
-      // composite 标志由调用方按投影补齐（menuTargetOfCanvas 不查投影，保持纯映射）
-      return { kind: 'state-node', id: canvas.id }
-    }
-    if (diagramType === 'er') return { kind: 'er-entity', name: canvas.id }
-    if (diagramType === 'gitgraph') return null // 无 data-id（实测降级），画布节点不可命中
-    if (diagramType === 'journey') return null // 无 data-id（实测降级），画布节点不可命中
-    if (diagramType === 'pie') return null // 无 data-id（实测降级），画布节点不可命中
-    if (diagramType === 'radar') return null // 无 data-id（实测降级），画布节点不可命中
-    if (diagramType === 'treemap') return null // 无 data-id（实测降级，research §4），画布节点不可命中
-    if (diagramType === 'ishikawa') return null // 无 data-id 且渲染序 ≠ 源码序（实测降级，research §4），画布节点不可命中
-    if (diagramType === 'wardley') return null // 无 data-id（实测降级，research §4），画布节点不可命中
-    if (diagramType === 'cynefin') return null // 无 data-id（实测降级，research §4/§8.1），画布节点不可命中
-    if (diagramType === 'treeview') return null // 无 data-id 且渲染布局与源码行序无对应（实测降级，research §4），画布节点不可命中
-    if (diagramType === 'zenuml') return null // 无 data-id（任务 0 实测降级），画布节点不可命中
-    if (diagramType === 'c4') return null // 无 data-id（实测降级，见 c4-adapter 顶注），画布节点不可命中
-    if (diagramType === 'gantt') {
-      // gantt（more-diagrams 工单 11）：任务条虽可寻址，但元素级菜单不做（与 journey/pie
-      // 同口径），编辑由结构树选中 + 属性表单承接——画布节点不产生菜单目标
-      return null
-    }
-    // quadrant（more-diagrams 工单 12）：node.id = 投影 elementId（渲染后位置序反注），
-    // 三类元素都有画布菜单
-    if (diagramType === 'quadrant') {
-      const selection = quadrantSelectionOf(canvas)
-      if (selection === null) return null
-      switch (selection.kind) {
-        case 'quadrant-point':
-          return { kind: 'quadrant-point', elementId: selection.elementId }
-        case 'quadrant-axis':
-          return { kind: 'quadrant-axis', elementId: selection.elementId }
-        case 'quadrant-quadrant':
-          return { kind: 'quadrant-quadrant', elementId: selection.elementId }
-        default:
-          return null
-      }
-    }
-    // packet（more-diagrams 工单 16）：node.id = 投影 elementId（渲染后 start-bit 映射
-    // 反注），字段有画布菜单
-    if (diagramType === 'packet') {
-      const selection = packetSelectionOf(canvas)
-      return selection !== null && selection.kind === 'packet-field'
-        ? { kind: 'packet-field', elementId: selection.elementId }
-        : null
-    }
-    if (diagramType === 'kanban') {
-      // 列 / 卡片都渲染成 `g.node` / `g.cluster`，反注后的 canvas.id 带 elementId 前缀，
-      // 按前缀还原菜单目标种类；前缀不认识返回 null（安静地不弹菜单）。
-      if (parseKanbanColumnElementId(canvas.id) !== null) return { kind: 'kanban-column', elementId: canvas.id }
-      if (parseKanbanCardElementId(canvas.id) !== null) return { kind: 'kanban-card', elementId: canvas.id }
-      return null
-    }
-    // requirement（more-diagrams 工单 07）：node.id = 投影 elementId（`requirement:<名>` /
-    // `requirement-element:<名>`），按前缀解回两类节点；都解不开（含空格的引号名在渲染
-    // DOM 上不可寻址，本就到不了这里）→ null
-    if (diagramType === 'requirement') {
-      const requirement = parseRequirementBlockElementId(canvas.id)
-      if (requirement !== null) return { kind: 'requirement-node', name: requirement.name }
-      const element = parseRequirementElemBlockElementId(canvas.id)
-      return element !== null ? { kind: 'requirement-element', name: element.name } : null
-    }
-    // block（more-diagrams 工单 09）：node.id = 投影 elementId（`block-node:<id>` /
-    // `block-group:<gid>`），按前缀解回两类节点；都解不开 → null（安静地不弹菜单）
-    if (diagramType === 'block') {
-      const node = parseBlockNodeElementId(canvas.id)
-      if (node !== null) return { kind: 'block-node', id: node.id }
-      const group = parseBlockGroupElementId(canvas.id)
-      return group !== null ? { kind: 'block-group', id: group.id } : null
-    }
-    // sankey（more-diagrams 工单 13）：node.id = 节点名（位置序反注），名字即身份
-    if (diagramType === 'sankey') return { kind: 'sankey-node', name: canvas.id }
-    // xychart（more-diagrams 工单 14）：node.id = `series:N` / 固定身份（类名组反注），
-    // 唯一映射在 xychartSelectionOf
-    if (diagramType === 'xychart') return xychartMenuTargetOf(canvas)
-    // architecture（more-diagrams 工单 17）：node.id = 投影 elementId（带前缀），按前缀
-    // 解回三类节点；都解不开 → null（安静地不弹菜单）。边不可寻址，无边菜单目标。
-    if (diagramType === 'architecture') {
-      const service = parseArchitectureServiceElementId(canvas.id)
-      if (service !== null) return { kind: 'architecture-service', name: service.id }
-      const group = parseArchitectureGroupElementId(canvas.id)
-      if (group !== null) return { kind: 'architecture-group', name: group.id }
-      const junction = parseArchitectureJunctionElementId(canvas.id)
-      return junction !== null ? { kind: 'architecture-junction', name: junction.id } : null
-    }
-    // venn（more-diagrams 工单 21）：node.id = 投影 elementId（`venn-set:<id>` /
-    // `venn-union:N`，渲染后从 `data-venn-sets` 反注），两类元素都有画布菜单
-    if (diagramType === 'venn') {
-      const selection = vennSelectionOf(canvas)
-      switch (selection?.kind) {
-        case 'venn-set':
-          return { kind: 'venn-set', id: selection.id }
-        case 'venn-union':
-          return { kind: 'venn-union', elementId: selection.elementId }
-        default:
-          return null
-      }
-    }
-    // usecase（more-diagrams 工单 26）：node.id = 投影 elementId（`actor:` / `usecase:` /
-    // `boundary:` / `relation:`，渲染器已写 data-id 由 nodeAnnotator 归一），四类都有菜单
-    if (diagramType === 'usecase') {
-      const selection = usecaseSelectionOf(canvas)
-      switch (selection?.kind) {
-        case 'usecase-actor':
-          return { kind: 'usecase-actor', elementId: selection.elementId }
-        case 'usecase-usecase':
-          return { kind: 'usecase-usecase', elementId: selection.elementId }
-        case 'usecase-boundary':
-          return { kind: 'usecase-boundary', elementId: selection.elementId }
-        case 'usecase-relation':
-          return { kind: 'usecase-relation', elementId: selection.elementId }
-        case 'usecase-note':
-          return { kind: 'usecase-note', elementId: selection.elementId }
-        default:
-          return null
-      }
-    }
-    // eventmodeling（more-diagrams 工单 28）：画布 DOM 无 data-id（research §4/§8.3 实测），
-    // 画布节点不产生菜单目标
-    if (diagramType === 'eventmodeling') return null
-    // agentflow（more-diagrams 工单 27）：node.id = 源码节点 id（反注），节点有画布菜单
-    if (diagramType === 'agentflow') return { kind: 'agentflow-node', nodeId: canvas.id }
-    return { kind: 'sequence-participant', actorId: canvas.id }
-  }
-  if (canvas.kind === 'element') {
-    // 复用「身份 → 编辑器选中」的收窄逻辑，保证路由与选中永远认同一批种类
-    const editorSelection = edgeSelectionOf(diagramType, canvas.elementId)
-    if (editorSelection === null) return null
-    switch (editorSelection.kind) {
-      case 'class-relation':
-        return { kind: 'class-relation', elementId: editorSelection.elementId }
-      case 'message':
-        return { kind: 'sequence-message', elementId: editorSelection.elementId }
-      case 'note':
-        return { kind: 'sequence-note', elementId: editorSelection.elementId }
-      case 'block':
-        return { kind: 'sequence-block', elementId: editorSelection.elementId }
-      case 'state-transition':
-        return { kind: 'state-transition', elementId: editorSelection.elementId }
-      case 'er-relation':
-        return { kind: 'er-relation', elementId: editorSelection.elementId }
-      case 'requirement-relation':
-        return { kind: 'requirement-relation', elementId: editorSelection.elementId }
-      case 'block-edge':
-        return { kind: 'block-edge', elementId: editorSelection.elementId }
-      case 'sankey-link':
-        return { kind: 'sankey-link', elementId: editorSelection.elementId }
-      default:
-        return null
-    }
-  }
-  // canvas.kind === 'edge'（原生 `L_{from}_{to}_{n}` data-id 命中的边）：flowchart 与
-  // agentflow 都走这条路径——agentflow 边身份同 flowchart 口径（`L_{from}_{to}_{n}`），
-  // 用 (from,to,occurrence) 重建成位置序 elementId 后给菜单目标
-  if (diagramType === 'flowchart') {
-    return { kind: 'flowchart-edge', from: canvas.from, to: canvas.to, occurrence: canvas.occurrence }
-  }
-  if (diagramType === 'agentflow') {
-    const selection = agentflowSelectionOf(canvas)
-    return selection !== null && selection.kind === 'agentflow-edge'
-      ? { kind: 'agentflow-edge', elementId: selection.elementId }
-      : null
-  }
-  return null
+  const selection = fromCanvasId(diagramType, canvas)
+  if (selection === null || !MENU_ADDRESSABLE_KINDS.has(selection.kind)) return null
+  return { kind: 'element', selection }
 }

@@ -139,25 +139,25 @@ describe('cynefin 画布寻址降级（research §4/§8.1 实测：渲染器无 
   })
 
   it('程序构造的域 / 条目 / 转移菜单目标各给编辑项，且 selectionOfMenuTarget 互逆', () => {
-    expect(contextMenuItems({ kind: 'cynefin-domain', name: 'complex' })).toEqual(['add-cynefin-item'])
-    expect(contextMenuItems({ kind: 'cynefin-item', elementId: 'cynefin-item:1' })).toEqual([
+    expect(contextMenuItems({ kind: 'element', selection: { kind: 'cynefin-domain', name: 'complex' } })).toEqual(['add-cynefin-item'])
+    expect(contextMenuItems({ kind: 'element', selection: { kind: 'cynefin-item', elementId: 'cynefin-item:1' } })).toEqual([
       'add-cynefin-item',
       'edit-text',
       'delete',
     ])
-    expect(contextMenuItems({ kind: 'cynefin-transition', elementId: 'cynefin-transition:1' })).toEqual([
+    expect(contextMenuItems({ kind: 'element', selection: { kind: 'cynefin-transition', elementId: 'cynefin-transition:1' } })).toEqual([
       'edit-label',
       'delete',
     ])
-    expect(selectionOfMenuTarget({ kind: 'cynefin-domain', name: 'complex' })).toEqual({
+    expect(selectionOfMenuTarget({ kind: 'element', selection: { kind: 'cynefin-domain', name: 'complex' } })).toEqual({
       kind: 'cynefin-domain',
       name: 'complex',
     })
-    expect(selectionOfMenuTarget({ kind: 'cynefin-item', elementId: 'cynefin-item:1' })).toEqual({
+    expect(selectionOfMenuTarget({ kind: 'element', selection: { kind: 'cynefin-item', elementId: 'cynefin-item:1' } })).toEqual({
       kind: 'cynefin-item',
       elementId: 'cynefin-item:1',
     })
-    expect(selectionOfMenuTarget({ kind: 'cynefin-transition', elementId: 'cynefin-transition:1' })).toEqual({
+    expect(selectionOfMenuTarget({ kind: 'element', selection: { kind: 'cynefin-transition', elementId: 'cynefin-transition:1' } })).toEqual({
       kind: 'cynefin-transition',
       elementId: 'cynefin-transition:1',
     })

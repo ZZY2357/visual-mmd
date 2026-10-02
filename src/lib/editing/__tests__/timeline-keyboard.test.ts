@@ -86,12 +86,12 @@ describe('timelineDeleteIntent', () => {
 describe('timeline 右键菜单项', () => {
   it('空白 / 时期 / 事件的菜单项（工单 05 清单）', () => {
     expect(contextMenuItems({ kind: 'blank', diagramType: 'timeline' })).toEqual(['add-period', 'add-section'])
-    expect(contextMenuItems({ kind: 'timeline-period', elementId: 'period:1' })).toEqual([
+    expect(contextMenuItems({ kind: 'element', selection: { kind: 'timeline-period', elementId: 'period:1' } })).toEqual([
       'edit-period-text',
       'add-event',
       'delete',
     ])
-    expect(contextMenuItems({ kind: 'timeline-event', elementId: 'event:1' })).toEqual(['edit-event-text', 'delete'])
+    expect(contextMenuItems({ kind: 'element', selection: { kind: 'timeline-event', elementId: 'event:1' } })).toEqual(['edit-event-text', 'delete'])
   })
 })
 

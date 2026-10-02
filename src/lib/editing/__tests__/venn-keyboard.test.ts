@@ -145,16 +145,16 @@ describe('venn 画布寻址（research §8 实测：data-venn-sets → data-id �
       elementId: 'venn-union:1',
     })
     expect(menuTargetOfCanvas('venn', { kind: 'node', id: 'venn-set:frontend' })).toEqual({
-      kind: 'venn-set',
-      id: 'frontend',
+      kind: 'element',
+      selection: { kind: 'venn-set', id: 'frontend' },
     })
     expect(menuTargetOfCanvas('venn', { kind: 'node', id: 'venn-union:1' })).toEqual({
-      kind: 'venn-union',
-      elementId: 'venn-union:1',
+      kind: 'element',
+      selection: { kind: 'venn-union', elementId: 'venn-union:1' },
     })
     expect(contextMenuTargetFromSelection({ kind: 'node', id: 'venn-set:frontend' }, 'venn')).toEqual({
-      kind: 'venn-set',
-      id: 'frontend',
+      kind: 'element',
+      selection: { kind: 'venn-set', id: 'frontend' },
     })
   })
 
@@ -192,13 +192,13 @@ describe('venn 菜单（more-diagrams 工单 21）', () => {
   })
 
   it('集合菜单 = 改标签尺寸 / 加集合 / 加交集 / 删除；交集菜单 = 改标签尺寸 / 删除', () => {
-    expect(contextMenuItems({ kind: 'venn-set', id: 'frontend' })).toEqual([
+    expect(contextMenuItems({ kind: 'element', selection: { kind: 'venn-set', id: 'frontend' } })).toEqual([
       'edit-venn-area',
       'add-venn-set',
       'add-venn-union-here',
       'delete',
     ])
-    expect(contextMenuItems({ kind: 'venn-union', elementId: 'venn-union:1' })).toEqual([
+    expect(contextMenuItems({ kind: 'element', selection: { kind: 'venn-union', elementId: 'venn-union:1' } })).toEqual([
       'edit-venn-area',
       'delete',
     ])
@@ -248,13 +248,13 @@ describe('venn 菜单（more-diagrams 工单 21）', () => {
 
   it('add-venn-union（集合上）：以该集合与下一集合组交集', () => {
     const h = makeCtx()
-    MENU_ACTIONS['add-venn-union-here'](h.ctx, { kind: 'venn-set', id: 'backend' })
+    MENU_ACTIONS['add-venn-union-here'](h.ctx, { kind: 'element', selection: { kind: 'venn-set', id: 'backend' } })
     expect(h.intents).toEqual([{ type: 'add-union', ids: ['backend', 'devops'] }])
   })
 
   it('add-venn-union（最后一个集合上）：回退与前一个集合组交集', () => {
     const h = makeCtx()
-    MENU_ACTIONS['add-venn-union-here'](h.ctx, { kind: 'venn-set', id: 'devops' })
+    MENU_ACTIONS['add-venn-union-here'](h.ctx, { kind: 'element', selection: { kind: 'venn-set', id: 'devops' } })
     expect(h.intents).toEqual([{ type: 'add-union', ids: ['devops', 'backend'] }])
   })
 

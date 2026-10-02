@@ -220,44 +220,44 @@ describe('fromCanvasId（往返）', () => {
 describe('selectionOfMenuTarget', () => {
   it('全部元素目标逐个映射为对应 Selection', () => {
     const cases: readonly (readonly [ContextMenuTarget, Selection])[] = [
-      [{ kind: 'flowchart-node', nodeId: 'A' }, { kind: 'node', nodeId: 'A' }],
+      [{ kind: 'element', selection: { kind: 'node', nodeId: 'A' } }, { kind: 'node', nodeId: 'A' }],
       [
-        { kind: 'flowchart-edge', from: 'A', to: 'B', occurrence: 2 },
+        { kind: 'element', selection: { kind: 'edge', from: 'A', to: 'B', occurrence: 2 } },
         { kind: 'edge', from: 'A', to: 'B', occurrence: 2 },
       ],
-      [{ kind: 'mindmap-node', elementId: 'mindmap-node:1' }, { kind: 'mindmap-node', elementId: 'mindmap-node:1' }],
-      [{ kind: 'class-node', name: 'Foo' }, { kind: 'class', name: 'Foo' }],
-      [{ kind: 'sequence-participant', actorId: 'B' }, { kind: 'participant', actorId: 'B' }],
-      [{ kind: 'class-relation', elementId: 'relation:1' }, { kind: 'class-relation', elementId: 'relation:1' }],
-      [{ kind: 'sequence-message', elementId: 'message:1' }, { kind: 'message', elementId: 'message:1' }],
-      [{ kind: 'sequence-note', elementId: 'note:1' }, { kind: 'note', elementId: 'note:1' }],
-      [{ kind: 'sequence-block', elementId: 'block:1' }, { kind: 'block', elementId: 'block:1' }],
+      [{ kind: 'element', selection: { kind: 'mindmap-node', elementId: 'mindmap-node:1' } }, { kind: 'mindmap-node', elementId: 'mindmap-node:1' }],
+      [{ kind: 'element', selection: { kind: 'class', name: 'Foo' } }, { kind: 'class', name: 'Foo' }],
+      [{ kind: 'element', selection: { kind: 'participant', actorId: 'B' } }, { kind: 'participant', actorId: 'B' }],
+      [{ kind: 'element', selection: { kind: 'class-relation', elementId: 'relation:1' } }, { kind: 'class-relation', elementId: 'relation:1' }],
+      [{ kind: 'element', selection: { kind: 'message', elementId: 'message:1' } }, { kind: 'message', elementId: 'message:1' }],
+      [{ kind: 'element', selection: { kind: 'note', elementId: 'note:1' } }, { kind: 'note', elementId: 'note:1' }],
+      [{ kind: 'element', selection: { kind: 'block', elementId: 'block:1' } }, { kind: 'block', elementId: 'block:1' }],
       // sankey（more-diagrams 工单 13）：节点 / 链路菜单目标一一对应各自 Selection kind
-      [{ kind: 'sankey-node', name: 'Foo' }, { kind: 'sankey-node', name: 'Foo' }],
-      [{ kind: 'sankey-link', elementId: 'link:1' }, { kind: 'sankey-link', elementId: 'link:1' }],
+      [{ kind: 'element', selection: { kind: 'sankey-node', name: 'Foo' } }, { kind: 'sankey-node', name: 'Foo' }],
+      [{ kind: 'element', selection: { kind: 'sankey-link', elementId: 'link:1' } }, { kind: 'sankey-link', elementId: 'link:1' }],
       // xychart（more-diagrams 工单 14）：系列 / 轴 / 标题菜单目标一一对应各自 Selection kind
-      [{ kind: 'xychart-series', elementId: 'series:1' }, { kind: 'xychart-series', elementId: 'series:1' }],
-      [{ kind: 'xychart-axis', axis: 'x' }, { kind: 'xychart-axis', axis: 'x' }],
-      [{ kind: 'xychart-title' }, { kind: 'xychart-title' }],
+      [{ kind: 'element', selection: { kind: 'xychart-series', elementId: 'series:1' } }, { kind: 'xychart-series', elementId: 'series:1' }],
+      [{ kind: 'element', selection: { kind: 'xychart-axis', axis: 'x' } }, { kind: 'xychart-axis', axis: 'x' }],
+      [{ kind: 'element', selection: { kind: 'xychart-title' } }, { kind: 'xychart-title' }],
       // cynefin（more-diagrams 工单 25）：域 / 条目 / 转移菜单目标一一对应各自 Selection kind
-      [{ kind: 'cynefin-domain', name: 'complex' }, { kind: 'cynefin-domain', name: 'complex' }],
-      [{ kind: 'cynefin-item', elementId: 'cynefin-item:1' }, { kind: 'cynefin-item', elementId: 'cynefin-item:1' }],
+      [{ kind: 'element', selection: { kind: 'cynefin-domain', name: 'complex' } }, { kind: 'cynefin-domain', name: 'complex' }],
+      [{ kind: 'element', selection: { kind: 'cynefin-item', elementId: 'cynefin-item:1' } }, { kind: 'cynefin-item', elementId: 'cynefin-item:1' }],
       [
-        { kind: 'cynefin-transition', elementId: 'cynefin-transition:1' },
+        { kind: 'element', selection: { kind: 'cynefin-transition', elementId: 'cynefin-transition:1' } },
         { kind: 'cynefin-transition', elementId: 'cynefin-transition:1' },
       ],
       // agentflow（more-diagrams 工单 27）：节点 / 边 / 容器 / 文档行菜单目标一一对应各自 Selection kind
-      [{ kind: 'agentflow-node', nodeId: 'draft' }, { kind: 'agentflow-node', nodeId: 'draft' }],
+      [{ kind: 'element', selection: { kind: 'agentflow-node', nodeId: 'draft' } }, { kind: 'agentflow-node', nodeId: 'draft' }],
       [
-        { kind: 'agentflow-edge', elementId: 'edge:draft->lookup' },
+        { kind: 'element', selection: { kind: 'agentflow-edge', elementId: 'edge:draft->lookup' } },
         { kind: 'agentflow-edge', elementId: 'edge:draft->lookup' },
       ],
-      [{ kind: 'agentflow-flow', elementId: 'container:flow:3' }, { kind: 'agentflow-flow', elementId: 'container:flow:3' }],
-      [{ kind: 'agentflow-doc', elementId: 'agentflow-doc:1' }, { kind: 'agentflow-doc', elementId: 'agentflow-doc:1' }],
+      [{ kind: 'element', selection: { kind: 'agentflow-flow', elementId: 'container:flow:3' } }, { kind: 'agentflow-flow', elementId: 'container:flow:3' }],
+      [{ kind: 'element', selection: { kind: 'agentflow-doc', elementId: 'agentflow-doc:1' } }, { kind: 'agentflow-doc', elementId: 'agentflow-doc:1' }],
       // c4（more-diagrams 工单 18）：元素 / 边界 / 关系菜单目标一一对应各自 Selection kind
-      [{ kind: 'c4-element', elementId: 'c4-element:banking' }, { kind: 'c4-element', elementId: 'c4-element:banking' }],
-      [{ kind: 'c4-boundary', elementId: 'c4-boundary:b0' }, { kind: 'c4-boundary', elementId: 'c4-boundary:b0' }],
-      [{ kind: 'c4-relation', elementId: 'relation:1' }, { kind: 'c4-relation', elementId: 'relation:1' }],
+      [{ kind: 'element', selection: { kind: 'c4-element', elementId: 'c4-element:banking' } }, { kind: 'c4-element', elementId: 'c4-element:banking' }],
+      [{ kind: 'element', selection: { kind: 'c4-boundary', elementId: 'c4-boundary:b0' } }, { kind: 'c4-boundary', elementId: 'c4-boundary:b0' }],
+      [{ kind: 'element', selection: { kind: 'c4-relation', elementId: 'relation:1' } }, { kind: 'c4-relation', elementId: 'relation:1' }],
     ]
     for (const [target, sel] of cases) {
       expect(selectionOfMenuTarget(target), target.kind).toEqual(sel)
@@ -274,69 +274,74 @@ describe('menuTargetOfCanvas（往返）', () => {
     expect(menuTargetOfCanvas('class', null)).toEqual({ kind: 'blank', diagramType: 'class' })
   })
 
-  it('节点选中按图种改写 kind；连线 flowchart 走 edge，其它图种的 mermaid 连线不弹菜单', () => {
-    expect(menuTargetOfCanvas('flowchart', { kind: 'node', id: 'A' })).toEqual({ kind: 'flowchart-node', nodeId: 'A' })
-    expect(menuTargetOfCanvas('mindmap', { kind: 'node', id: 'mindmap-node:1' })).toEqual({
-      kind: 'mindmap-node',
-      elementId: 'mindmap-node:1',
+  it('节点选中按图种落成各自 Selection；连线 flowchart 走 edge，其它图种的 mermaid 连线不弹菜单', () => {
+    expect(menuTargetOfCanvas('flowchart', { kind: 'node', id: 'A' })).toEqual({
+      kind: 'element',
+      selection: { kind: 'node', nodeId: 'A' },
     })
-    expect(menuTargetOfCanvas('class', { kind: 'node', id: 'Foo' })).toEqual({ kind: 'class-node', name: 'Foo' })
+    expect(menuTargetOfCanvas('mindmap', { kind: 'node', id: 'mindmap-node:1' })).toEqual({
+      kind: 'element',
+      selection: { kind: 'mindmap-node', elementId: 'mindmap-node:1' },
+    })
+    expect(menuTargetOfCanvas('class', { kind: 'node', id: 'Foo' })).toEqual({
+      kind: 'element',
+      selection: { kind: 'class', name: 'Foo' },
+    })
     expect(menuTargetOfCanvas('sequence', { kind: 'node', id: 'B' })).toEqual({
-      kind: 'sequence-participant',
-      actorId: 'B',
+      kind: 'element',
+      selection: { kind: 'participant', actorId: 'B' },
     })
     expect(menuTargetOfCanvas('flowchart', { kind: 'edge', from: 'A', to: 'B', occurrence: 1 })).toEqual({
-      kind: 'flowchart-edge',
-      from: 'A',
-      to: 'B',
-      occurrence: 1,
+      kind: 'element',
+      selection: { kind: 'edge', from: 'A', to: 'B', occurrence: 1 },
     })
     expect(menuTargetOfCanvas('class', { kind: 'edge', from: 'A', to: 'B', occurrence: 1 })).toBeNull()
     // agentflow（more-diagrams 工单 27）：节点 data-id 即源码节点 id 反注；
     // 边身份同 flowchart 口径（`L_{from}_{to}_{n}`），反注为 `agentflow-edge`
     expect(menuTargetOfCanvas('agentflow', { kind: 'node', id: 'draft' })).toEqual({
-      kind: 'agentflow-node',
-      nodeId: 'draft',
+      kind: 'element',
+      selection: { kind: 'agentflow-node', nodeId: 'draft' },
     })
     expect(menuTargetOfCanvas('agentflow', { kind: 'edge', from: 'draft', to: 'lookup', occurrence: 1 })).toEqual({
-      kind: 'agentflow-edge',
-      elementId: 'edge:draft->lookup',
+      kind: 'element',
+      selection: { kind: 'agentflow-edge', elementId: 'edge:draft->lookup' },
     })
     expect(menuTargetOfCanvas('agentflow', { kind: 'edge', from: 'draft', to: 'lookup', occurrence: 2 })).toEqual({
-      kind: 'agentflow-edge',
-      elementId: 'edge:draft->lookup#2',
+      kind: 'element',
+      selection: { kind: 'agentflow-edge', elementId: 'edge:draft->lookup#2' },
     })
   })
 
   it('位置序连线经 edgeSelectionOf 收窄：本图种可寻址的才是菜单目标', () => {
     expect(menuTargetOfCanvas('class', { kind: 'element', elementId: 'relation:1' })).toEqual({
-      kind: 'class-relation',
-      elementId: 'relation:1',
+      kind: 'element',
+      selection: { kind: 'class-relation', elementId: 'relation:1' },
     })
     expect(menuTargetOfCanvas('sequence', { kind: 'element', elementId: 'message:2' })).toEqual({
-      kind: 'sequence-message',
-      elementId: 'message:2',
+      kind: 'element',
+      selection: { kind: 'message', elementId: 'message:2' },
     })
     // sankey（more-diagrams 工单 13）：链路 `link:N` 是位置序身份；节点 data-id 即名字
     expect(menuTargetOfCanvas('sankey', { kind: 'element', elementId: 'link:1' })).toEqual({
-      kind: 'sankey-link',
-      elementId: 'link:1',
+      kind: 'element',
+      selection: { kind: 'sankey-link', elementId: 'link:1' },
     })
     expect(menuTargetOfCanvas('sankey', { kind: 'node', id: 'Foo' })).toEqual({
-      kind: 'sankey-node',
-      name: 'Foo',
+      kind: 'element',
+      selection: { kind: 'sankey-node', name: 'Foo' },
     })
     // xychart（more-diagrams 工单 14）：node.id = `series:N` / 固定身份（类名组反注）
     expect(menuTargetOfCanvas('xychart', { kind: 'node', id: 'series:2' })).toEqual({
-      kind: 'xychart-series',
-      elementId: 'series:2',
+      kind: 'element',
+      selection: { kind: 'xychart-series', elementId: 'series:2' },
     })
     expect(menuTargetOfCanvas('xychart', { kind: 'node', id: 'xychart-y-axis' })).toEqual({
-      kind: 'xychart-axis',
-      axis: 'y',
+      kind: 'element',
+      selection: { kind: 'xychart-axis', axis: 'y' },
     })
     expect(menuTargetOfCanvas('xychart', { kind: 'node', id: 'xychart-title' })).toEqual({
-      kind: 'xychart-title',
+      kind: 'element',
+      selection: { kind: 'xychart-title' },
     })
     expect(menuTargetOfCanvas('xychart', { kind: 'node', id: '__nope__' })).toBeNull()
     // mermaid 自己的连线 id 不是位置序身份 → null（安静地不弹菜单）

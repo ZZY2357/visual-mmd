@@ -96,8 +96,8 @@ describe('kanbanDeleteIntent', () => {
 describe('kanban 右键菜单与画布寻址', () => {
   it('空白 / 列 / 卡片的菜单项', () => {
     expect(contextMenuItems({ kind: 'blank', diagramType: 'kanban' })).toEqual(['add-column'])
-    expect(contextMenuItems({ kind: 'kanban-column', elementId: 'kanban-column:Todo' })).toEqual(['edit-text', 'add-card', 'delete'])
-    expect(contextMenuItems({ kind: 'kanban-card', elementId: 'kanban-card:t1' })).toEqual([
+    expect(contextMenuItems({ kind: 'element', selection: { kind: 'kanban-column', elementId: 'kanban-column:Todo' } })).toEqual(['edit-text', 'add-card', 'delete'])
+    expect(contextMenuItems({ kind: 'element', selection: { kind: 'kanban-card', elementId: 'kanban-card:t1' } })).toEqual([
       'edit-text',
       'edit-kanban-metadata',
       'delete',
@@ -106,12 +106,12 @@ describe('kanban 右键菜单与画布寻址', () => {
 
   it('画布选中 → 菜单目标（列 / 卡片按 elementId 前缀判种类）', () => {
     expect(contextMenuTargetFromSelection({ kind: 'node', id: 'kanban-column:Todo' }, 'kanban')).toEqual({
-      kind: 'kanban-column',
-      elementId: 'kanban-column:Todo',
+      kind: 'element',
+      selection: { kind: 'kanban-column', elementId: 'kanban-column:Todo' },
     })
     expect(contextMenuTargetFromSelection({ kind: 'node', id: 'kanban-card:t1' }, 'kanban')).toEqual({
-      kind: 'kanban-card',
-      elementId: 'kanban-card:t1',
+      kind: 'element',
+      selection: { kind: 'kanban-card', elementId: 'kanban-card:t1' },
     })
     expect(contextMenuTargetFromSelection({ kind: 'node', id: '__未知__' }, 'kanban')).toBeNull()
   })
@@ -127,8 +127,8 @@ describe('kanban 右键菜单与画布寻址', () => {
     })
     expect(fromCanvasId('kanban', { kind: 'element', elementId: 'x' })).toBeNull()
     expect(menuTargetOfCanvas('kanban', { kind: 'node', id: 'kanban-card:t1' })).toEqual({
-      kind: 'kanban-card',
-      elementId: 'kanban-card:t1',
+      kind: 'element',
+      selection: { kind: 'kanban-card', elementId: 'kanban-card:t1' },
     })
   })
 })

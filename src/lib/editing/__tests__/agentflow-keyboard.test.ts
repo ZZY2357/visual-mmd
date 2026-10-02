@@ -162,10 +162,10 @@ describe('agentflow 画布寻址（research §8.2 实测：节点 / 边可寻址
 
   it('fromCanvasId / menuTargetOfCanvas：节点产生选中与节点菜单目标', () => {
     expect(fromCanvasId('agentflow', { kind: 'node', id: 'a' })).toEqual({ kind: 'agentflow-node', nodeId: 'a' })
-    expect(menuTargetOfCanvas('agentflow', { kind: 'node', id: 'a' })).toEqual({ kind: 'agentflow-node', nodeId: 'a' })
+    expect(menuTargetOfCanvas('agentflow', { kind: 'node', id: 'a' })).toEqual({ kind: 'element', selection: { kind: 'agentflow-node', nodeId: 'a' } })
     expect(contextMenuTargetFromSelection({ kind: 'node', id: 'a' }, 'agentflow')).toEqual({
-      kind: 'agentflow-node',
-      nodeId: 'a',
+      kind: 'element',
+      selection: { kind: 'agentflow-node', nodeId: 'a' },
     })
   })
 
@@ -177,22 +177,22 @@ describe('agentflow 画布寻址（research §8.2 实测：节点 / 边可寻址
   })
 
   it('菜单项：节点 / 边 / 容器 / 文档行各给编辑项，且 selectionOfMenuTarget 互逆', () => {
-    expect(contextMenuItems({ kind: 'agentflow-node', nodeId: 'a' })).toEqual([
+    expect(contextMenuItems({ kind: 'element', selection: { kind: 'agentflow-node', nodeId: 'a' } })).toEqual([
       'edit-agentflow-node',
       'link-from-here',
       'delete',
     ])
-    expect(contextMenuItems({ kind: 'agentflow-edge', elementId: 'edge:a->b' })).toEqual(['edit-label', 'delete'])
-    expect(contextMenuItems({ kind: 'agentflow-flow', elementId: 'container:flow:13' })).toEqual([
+    expect(contextMenuItems({ kind: 'element', selection: { kind: 'agentflow-edge', elementId: 'edge:a->b' } })).toEqual(['edit-label', 'delete'])
+    expect(contextMenuItems({ kind: 'element', selection: { kind: 'agentflow-flow', elementId: 'container:flow:13' } })).toEqual([
       'edit-agentflow-flow',
       'delete',
     ])
-    expect(contextMenuItems({ kind: 'agentflow-doc', elementId: 'agentflow-doc:1' })).toEqual(['delete'])
-    expect(selectionOfMenuTarget({ kind: 'agentflow-node', nodeId: 'a' })).toEqual({
+    expect(contextMenuItems({ kind: 'element', selection: { kind: 'agentflow-doc', elementId: 'agentflow-doc:1' } })).toEqual(['delete'])
+    expect(selectionOfMenuTarget({ kind: 'element', selection: { kind: 'agentflow-node', nodeId: 'a' } })).toEqual({
       kind: 'agentflow-node',
       nodeId: 'a',
     })
-    expect(selectionOfMenuTarget({ kind: 'agentflow-flow', elementId: 'container:flow:13' })).toEqual({
+    expect(selectionOfMenuTarget({ kind: 'element', selection: { kind: 'agentflow-flow', elementId: 'container:flow:13' } })).toEqual({
       kind: 'agentflow-flow',
       elementId: 'container:flow:13',
     })
@@ -257,7 +257,7 @@ describe('agentflow 画布寻址（research §8.2 实测：节点 / 边可寻址
       newNodeText: '新节点',
       close: () => {},
     }
-    MENU_ACTIONS['link-from-here'](ctx, { kind: 'agentflow-node', nodeId: 'a' })
+    MENU_ACTIONS['link-from-here'](ctx, { kind: 'element', selection: { kind: 'agentflow-node', nodeId: 'a' } })
     expect(from).toBe('a')
   })
 })

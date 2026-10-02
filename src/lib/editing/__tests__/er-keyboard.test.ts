@@ -75,17 +75,17 @@ describe('erDeleteIntent', () => {
 describe('er 右键菜单与连线寻址', () => {
   it('空白 / 实体 / 关系 / 属性的菜单项（工单 03 清单）', () => {
     expect(contextMenuItems({ kind: 'blank', diagramType: 'er' })).toEqual(['add-entity'])
-    expect(contextMenuItems({ kind: 'er-entity', name: 'CAR' })).toEqual(['add-attribute', 'link-from-here', 'edit-er-alias', 'delete'])
-    expect(contextMenuItems({ kind: 'er-relation', elementId: 'relation:1' })).toEqual(['cycle-er-line', 'edit-er-relation', 'delete'])
-    expect(contextMenuItems({ kind: 'er-attribute', elementId: 'attr:1' })).toEqual(['edit-er-attribute', 'delete'])
+    expect(contextMenuItems({ kind: 'element', selection: { kind: 'er-entity', name: 'CAR' } })).toEqual(['add-attribute', 'link-from-here', 'edit-er-alias', 'delete'])
+    expect(contextMenuItems({ kind: 'element', selection: { kind: 'er-relation', elementId: 'relation:1' } })).toEqual(['cycle-er-line', 'edit-er-relation', 'delete'])
+    expect(contextMenuItems({ kind: 'element', selection: { kind: 'er-attribute', elementId: 'attr:1' } })).toEqual(['edit-er-attribute', 'delete'])
   })
 
   it('连线位置序身份 → er-relation 选中（ADR-0012）', () => {
     expect(edgeSelectionOf('er', 'relation:1')).toEqual({ kind: 'er-relation', elementId: 'relation:1' })
     expect(edgeSelectionOf('er', 'transition:1')).toBeNull()
     expect(contextMenuTargetFromSelection({ kind: 'element', elementId: 'relation:1' }, 'er')).toEqual({
-      kind: 'er-relation',
-      elementId: 'relation:1',
+      kind: 'element',
+      selection: { kind: 'er-relation', elementId: 'relation:1' },
     })
   })
 

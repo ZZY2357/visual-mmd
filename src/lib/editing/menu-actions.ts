@@ -94,6 +94,12 @@ function nextInCycle<V>(options: ReadonlyArray<{ value: V }>, current: V): V {
   return options[(i + 1) % options.length].value
 }
 
+/** 元素目标的选中（工单 architecture-deepening-3 03）：Target 复用 Selection 词汇后，
+ * 动作对目标的收窄统一走这里——blank 目标（与 undefined 一样）没有选中。 */
+function targetSelection(target: ContextMenuTarget | undefined): Selection | null {
+  return target !== undefined && target.kind === 'element' ? target.selection : null
+}
+
 /**
  * 「创建 + 选中 + 进入内联命名」的唯一参数化实现（architecture-deepening-2 工单 01）。
  * 五个原变体（addNode / addClass / addParticipant / addMindmapRoot / addChildToMindmap）
@@ -214,11 +220,12 @@ export function createElement(ctx: MenuActionContext, target: ContextMenuTarget 
       const used = [...proj.block.nodes.map((n) => n.id), ...proj.block.groups.map((g) => g.id)]
       const id = nextFreeName('b', used)
       if (!isValidBlockId(id)) return null
+      const blockGroup = targetSelection(target)
       const parentGroupId =
-        target !== undefined && target.kind === 'block-group' ? target.id : null
+        blockGroup !== null && blockGroup.kind === 'block-group' ? blockGroup.id : null
       const anchor =
-        target !== undefined && target.kind === 'block-group'
-          ? (proj.block.groups.find((g) => g.id === target.id)?.elementId ?? undefined)
+        blockGroup !== null && blockGroup.kind === 'block-group'
+          ? (proj.block.groups.find((g) => g.id === blockGroup.id)?.elementId ?? undefined)
           : undefined
       return {
         intents: [{ type: 'add-node', id, shape: 'square', label: id, parentGroupId, afterElementId: anchor }],
@@ -314,8 +321,9 @@ export function createElement(ctx: MenuActionContext, target: ContextMenuTarget 
     // mindmap：节点目标 = 挂为其子节点；空白 / 无目标 = 建根（空文档）或挂到根节点下
     const text = ctx.newNodeText
     let mindPlan: MindmapActionPlan | null
-    if (target !== undefined && target.kind === 'mindmap-node') {
-      mindPlan = mindmapActionIntents(proj.mindmap, target.elementId, 'add-child', text)
+    const mindNode = targetSelection(target)
+    if (mindNode !== null && mindNode.kind === 'mindmap-node') {
+      mindPlan = mindmapActionIntents(proj.mindmap, mindNode.elementId, 'add-child', text)
     } else {
       const roots = proj.mindmap.nodes
       mindPlan =
@@ -367,19 +375,21 @@ function deleteTarget(ctx: MenuActionContext, target: ContextMenuTarget | undefi
  * 菜单保持打开，便于连点切到想要的那种；每次切换是一次独立快照（可撤销）。 */
 function cycleRelationKind(ctx: MenuActionContext, target: ContextMenuTarget | undefined): void {
   const proj = ctx.projection
-  if (target === undefined || target.kind !== 'class-relation' || proj === null || proj.type !== 'class') return
-  const relation = proj.class.relations.find((r) => r.elementId === target.elementId)
+  const sel = targetSelection(target)
+  if (sel === null || sel.kind !== 'class-relation' || proj === null || proj.type !== 'class') return
+  const relation = proj.class.relations.find((r) => r.elementId === sel.elementId)
   if (relation === undefined) return
-  ctx.commitIntent(setRelationIntent(target.elementId, { kind: nextInCycle(RELATION_KIND_OPTIONS, relation.kind) }))
+  ctx.commitIntent(setRelationIntent(sel.elementId, { kind: nextInCycle(RELATION_KIND_OPTIONS, relation.kind) }))
 }
 
 /** sequence 消息：循环切换箭头（set-message 的 arrow，直接改，不弹表单）。菜单保持打开。 */
 function cycleMessageArrow(ctx: MenuActionContext, target: ContextMenuTarget | undefined): void {
   const proj = ctx.projection
-  if (target === undefined || target.kind !== 'sequence-message' || proj === null || proj.type !== 'sequence') return
-  const message = proj.sequence.messages.find((m) => m.elementId === target.elementId)
+  const sel = targetSelection(target)
+  if (sel === null || sel.kind !== 'message' || proj === null || proj.type !== 'sequence') return
+  const message = proj.sequence.messages.find((m) => m.elementId === sel.elementId)
   if (message === undefined) return
-  ctx.commitIntent(setMessageIntent(target.elementId, { arrow: nextInCycle(MESSAGE_ARROW_OPTIONS, message.arrow) }))
+  ctx.commitIntent(setMessageIntent(sel.elementId, { arrow: nextInCycle(MESSAGE_ARROW_OPTIONS, message.arrow) }))
 }
 
 /**
@@ -397,23 +407,24 @@ function selectMenuTargetAndClose(ctx: MenuActionContext, target: ContextMenuTar
 
 /** 编辑文本（菜单项）：进入内联编辑（预填当前显示文本） */
 function beginEditText(ctx: MenuActionContext, target: ContextMenuTarget | undefined): void {
-  if (target === undefined) return
-  if (target.kind === 'flowchart-node') ctx.beginInlineEdit({ kind: 'flowchart', nodeId: target.nodeId })
-  else if (target.kind === 'mindmap-node') ctx.beginInlineEdit({ kind: 'mindmap', elementId: target.elementId })
-  else if (target.kind === 'state-node') ctx.beginInlineEdit({ kind: 'state', id: target.id })
-  else if (target.kind === 'er-entity') ctx.beginInlineEdit({ kind: 'er', name: target.name })
+  const sel = targetSelection(target)
+  if (sel === null) return
+  if (sel.kind === 'node') ctx.beginInlineEdit({ kind: 'flowchart', nodeId: sel.nodeId })
+  else if (sel.kind === 'mindmap-node') ctx.beginInlineEdit({ kind: 'mindmap', elementId: sel.elementId })
+  else if (sel.kind === 'state') ctx.beginInlineEdit({ kind: 'state', id: sel.id })
+  else if (sel.kind === 'er-entity') ctx.beginInlineEdit({ kind: 'er', name: sel.name })
   // kanban（more-diagrams 工单 06）：列 = 改标题、卡片 = 改描述（都是内联编辑显示文本）
-  else if (target.kind === 'kanban-column') ctx.beginInlineEdit({ kind: 'kanban-column', elementId: target.elementId })
-  else if (target.kind === 'kanban-card') ctx.beginInlineEdit({ kind: 'kanban-card', elementId: target.elementId })
+  else if (sel.kind === 'kanban-column') ctx.beginInlineEdit({ kind: 'kanban-column', elementId: sel.elementId })
+  else if (sel.kind === 'kanban-card') ctx.beginInlineEdit({ kind: 'kanban-card', elementId: sel.elementId })
   // block（more-diagrams 工单 09）：块节点改标签（内联编辑，set-node-label 落码）
-  else if (target.kind === 'block-node') ctx.beginInlineEdit({ kind: 'block-node', id: target.id })
+  else if (sel.kind === 'block-node') ctx.beginInlineEdit({ kind: 'block-node', id: sel.id })
   // quadrant（more-diagrams 工单 12）：点 = 改文本（内联编辑显示文本）
-  else if (target.kind === 'quadrant-point') ctx.beginInlineEdit({ kind: 'quadrant-point', elementId: target.elementId })
+  else if (sel.kind === 'quadrant-point') ctx.beginInlineEdit({ kind: 'quadrant-point', elementId: sel.elementId })
   // packet（more-diagrams 工单 16）：字段 = 改名（内联编辑显示文本）
-  else if (target.kind === 'packet-field') ctx.beginInlineEdit({ kind: 'packet-field', elementId: target.elementId })
+  else if (sel.kind === 'packet-field') ctx.beginInlineEdit({ kind: 'packet-field', elementId: sel.elementId })
   // architecture（more-diagrams 工单 17）：service / group = 改标题（内联编辑 set-*-title 落码）
-  else if (target.kind === 'architecture-service') ctx.beginInlineEdit({ kind: 'architecture', elementKind: 'service', id: target.name })
-  else if (target.kind === 'architecture-group') ctx.beginInlineEdit({ kind: 'architecture', elementKind: 'group', id: target.name })
+  else if (sel.kind === 'architecture-service') ctx.beginInlineEdit({ kind: 'architecture', elementKind: 'service', id: sel.name })
+  else if (sel.kind === 'architecture-group') ctx.beginInlineEdit({ kind: 'architecture', elementKind: 'group', id: sel.name })
   ctx.close()
 }
 
@@ -424,8 +435,9 @@ function beginEditText(ctx: MenuActionContext, target: ContextMenuTarget | undef
  */
 function addStateIntoComposite(ctx: MenuActionContext, target: ContextMenuTarget | undefined): void {
   const proj = ctx.projection
-  if (target === undefined || target.kind !== 'state-node' || proj === null || proj.type !== 'state') return
-  const composite = proj.state.states.find((s) => s.id === target.id)
+  const sel = targetSelection(target)
+  if (sel === null || sel.kind !== 'state' || proj === null || proj.type !== 'state') return
+  const composite = proj.state.states.find((s) => s.id === sel.id)
   if (composite === undefined || composite.elementId === null) return
   const id = nextFreeName('s', proj.state.states.map((s) => s.id))
   const plan: KeyPlan = {
@@ -440,11 +452,12 @@ function addStateIntoComposite(ctx: MenuActionContext, target: ContextMenuTarget
  * 基数与标签走「在属性面板中编辑」（枚举选择 + 文本输入，工单 03 定案）。 */
 function cycleErLine(ctx: MenuActionContext, target: ContextMenuTarget | undefined): void {
   const proj = ctx.projection
-  if (target === undefined || target.kind !== 'er-relation' || proj === null || proj.type !== 'er') return
-  const relation = proj.er.relations.find((r) => r.elementId === target.elementId)
+  const sel = targetSelection(target)
+  if (sel === null || sel.kind !== 'er-relation' || proj === null || proj.type !== 'er') return
+  const relation = proj.er.relations.find((r) => r.elementId === sel.elementId)
   if (relation === undefined) return
   const next = relation.line === 'identifying' ? '..' : '--'
-  ctx.commitIntent({ type: 'set-relation', elementId: target.elementId, changes: { line: next } })
+  ctx.commitIntent({ type: 'set-relation', elementId: sel.elementId, changes: { line: next } })
 }
 
 /** 添加型表单项共用：在菜单位置浮出对应小表单（锚点 / 预选值由 Hook 的 openForm 按目标算出） */
@@ -489,8 +502,9 @@ function addTimelineSection(ctx: MenuActionContext): void {
 /** 时期上加事件（timeline）：落续行 `: 文本` + 选中新事件（不做内联编辑） */
 function addTimelineEvent(ctx: MenuActionContext, target: ContextMenuTarget | undefined): void {
   const proj = ctx.projection
-  if (target === undefined || target.kind !== 'timeline-period' || proj === null || proj.type !== 'timeline') return
-  const period = proj.timeline.periods.find((p) => p.elementId === target.elementId)
+  const sel = targetSelection(target)
+  if (sel === null || sel.kind !== 'timeline-period' || proj === null || proj.type !== 'timeline') return
+  const period = proj.timeline.periods.find((p) => p.elementId === sel.elementId)
   if (period === undefined) return
   const text = nextFreeName('新事件', period.events.map((e) => e.text))
   const plan: KeyPlan = {
@@ -508,8 +522,9 @@ function addTimelineEvent(ctx: MenuActionContext, target: ContextMenuTarget | un
  */
 function addKanbanCard(ctx: MenuActionContext, target: ContextMenuTarget | undefined): void {
   const proj = ctx.projection
-  if (target === undefined || target.kind !== 'kanban-column' || proj === null || proj.type !== 'kanban') return
-  const column = proj.kanban.columns.find((c) => c.elementId === target.elementId)
+  const sel = targetSelection(target)
+  if (sel === null || sel.kind !== 'kanban-column' || proj === null || proj.type !== 'kanban') return
+  const column = proj.kanban.columns.find((c) => c.elementId === sel.elementId)
   if (column === undefined) return
   const used = [...proj.kanban.columns.map((c) => c.id), ...proj.kanban.cards.map((c) => c.id)]
   const id = nextFreeName('t', used)
@@ -530,13 +545,14 @@ function addKanbanCard(ctx: MenuActionContext, target: ContextMenuTarget | undef
  * 菜单保持打开，便于连点切到想要的那种；每次切换是一次独立快照（可撤销）。 */
 function cycleRequirementKind(ctx: MenuActionContext, target: ContextMenuTarget | undefined): void {
   const proj = ctx.projection
-  if (target === undefined || target.kind !== 'requirement-relation' || proj === null || proj.type !== 'requirement') return
-  const relation = proj.requirement.relations.find((r) => r.elementId === target.elementId)
+  const sel = targetSelection(target)
+  if (sel === null || sel.kind !== 'requirement-relation' || proj === null || proj.type !== 'requirement') return
+  const relation = proj.requirement.relations.find((r) => r.elementId === sel.elementId)
   if (relation === undefined) return
   const options = REQUIREMENT_RELATION_KINDS.map((value) => ({ value }))
   ctx.commitIntent({
     type: 'set-relation',
-    elementId: target.elementId,
+    elementId: sel.elementId,
     changes: { relationKind: nextInCycle(options, relation.relationKind) },
   })
 }
@@ -545,12 +561,13 @@ function cycleRequirementKind(ctx: MenuActionContext, target: ContextMenuTarget 
  * 语义随之反转（from/to 交换），源码保留原书写方向以外的另一种写法。 */
 function invertRequirementRelation(ctx: MenuActionContext, target: ContextMenuTarget | undefined): void {
   const proj = ctx.projection
-  if (target === undefined || target.kind !== 'requirement-relation' || proj === null || proj.type !== 'requirement') return
-  const relation = proj.requirement.relations.find((r) => r.elementId === target.elementId)
+  const sel = targetSelection(target)
+  if (sel === null || sel.kind !== 'requirement-relation' || proj === null || proj.type !== 'requirement') return
+  const relation = proj.requirement.relations.find((r) => r.elementId === sel.elementId)
   if (relation === undefined) return
   ctx.commitIntent({
     type: 'set-relation',
-    elementId: target.elementId,
+    elementId: sel.elementId,
     changes: { reversed: !relation.reversed },
   })
 }
@@ -631,12 +648,13 @@ function addPieSector(ctx: MenuActionContext): void {
  */
 function toggleXychartSeriesType(ctx: MenuActionContext, target: ContextMenuTarget | undefined): void {
   const proj = ctx.projection
-  if (target === undefined || target.kind !== 'xychart-series' || proj === null || proj.type !== 'xychart') return
-  const series = proj.xychart.series.find((s) => s.elementId === target.elementId)
+  const sel = targetSelection(target)
+  if (sel === null || sel.kind !== 'xychart-series' || proj === null || proj.type !== 'xychart') return
+  const series = proj.xychart.series.find((s) => s.elementId === sel.elementId)
   if (series === undefined) return
   ctx.commitIntent({
     type: 'set-series-type',
-    elementId: target.elementId,
+    elementId: sel.elementId,
     seriesType: series.seriesType === 'bar' ? 'line' : 'bar',
   })
 }
@@ -1044,8 +1062,9 @@ function addVennUnion(ctx: MenuActionContext, target: ContextMenuTarget | undefi
   const p = proj.venn
   let a: string | undefined
   let b: string | undefined
-  if (target !== undefined && target.kind === 'venn-set') {
-    const idx = p.sets.findIndex((s) => s.ids[0] === target.id)
+  const sel = targetSelection(target)
+  if (sel !== null && sel.kind === 'venn-set') {
+    const idx = p.sets.findIndex((s) => s.ids[0] === sel.id)
     if (idx === -1) return
     a = p.sets[idx].ids[0]
     // 优先与后一个集合组交集；已是最后一个则与前一个集合组（仍保证两个不同集合）
@@ -1233,8 +1252,9 @@ function addZenumlMessage(ctx: MenuActionContext): void {
 
 /** 改参与者别名（菜单项，双击同语义）：进入内联编辑（预填当前别名，set-zenuml-participant-alias 落码） */
 function editZenumlParticipantAlias(ctx: MenuActionContext, target: ContextMenuTarget | undefined): void {
-  if (target === undefined || target.kind !== 'zenuml-participant') return
-  ctx.beginInlineEdit({ kind: 'zenuml-participant', elementId: target.elementId })
+  const sel = targetSelection(target)
+  if (sel === null || sel.kind !== 'zenuml-participant') return
+  ctx.beginInlineEdit({ kind: 'zenuml-participant', elementId: sel.elementId })
   ctx.close()
 }
 
@@ -1311,20 +1331,22 @@ export const MENU_ACTIONS: Record<Exclude<ContextMenuItemId, 'apply-style'>, Men
   'add-style': (ctx) => ctx.openStyleForm(),
   'link-from-here': (ctx, target) => {
     // narrow 到 flowchart / state / er / architecture / usecase / agentflow 节点才能带预选起点进入连线模式
-    if (target !== undefined && target.kind === 'flowchart-node') ctx.enterLinkMode(target.nodeId)
-    else if (target !== undefined && target.kind === 'state-node') ctx.enterLinkMode(target.id)
-    else if (target !== undefined && target.kind === 'er-entity') ctx.enterLinkMode(target.name)
-    else if (target !== undefined && target.kind === 'architecture-service') ctx.enterLinkMode(target.name)
-    else if (target !== undefined && target.kind === 'usecase-actor') {
+    const sel = targetSelection(target)
+    if (sel === null) return
+    if (sel.kind === 'node') ctx.enterLinkMode(sel.nodeId)
+    else if (sel.kind === 'state') ctx.enterLinkMode(sel.id)
+    else if (sel.kind === 'er-entity') ctx.enterLinkMode(sel.name)
+    else if (sel.kind === 'architecture-service') ctx.enterLinkMode(sel.name)
+    else if (sel.kind === 'usecase-actor') {
       // usecase：起点用**源码标识符**（不是 elementId）——关系行的端点是标识符
-      ctx.enterLinkMode(target.elementId.slice('actor:'.length))
-    } else if (target !== undefined && target.kind === 'usecase-usecase') {
-      ctx.enterLinkMode(target.elementId.slice('usecase:'.length))
-    } else if (target !== undefined && target.kind === 'c4-element') {
+      ctx.enterLinkMode(sel.elementId.slice('actor:'.length))
+    } else if (sel.kind === 'usecase-usecase') {
+      ctx.enterLinkMode(sel.elementId.slice('usecase:'.length))
+    } else if (sel.kind === 'c4-element') {
       // c4：起点用**源码 alias**（不是 elementId）——关系行的端点是 alias
-      ctx.enterLinkMode(target.elementId.slice('c4-element:'.length))
+      ctx.enterLinkMode(sel.elementId.slice('c4-element:'.length))
     }
-    else if (target !== undefined && target.kind === 'agentflow-node') ctx.enterLinkMode(target.nodeId)
+    else if (sel.kind === 'agentflow-node') ctx.enterLinkMode(sel.nodeId)
   },
   'add-subgraph': addSubgraph,
   'add-member': openFormOf('member'),

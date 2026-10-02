@@ -70,6 +70,7 @@ export type { NodeFormKind, NodeFormState, StyleFormState } from './overlay-stat
  * 菜单目标 + 表单种类 + 投影 → 添加型表单状态（工单 06/04/05）：算出锚点、预选值与位置；
  * 该组合无意义（目标种类与图种不匹配、投影里找不到该元素）时返回 null。
  * 右键菜单路径与画布键盘编辑键路径（工单 05）**共用这一个纯函数**，保证两条入口产出同一份表单。
+ * 工单 architecture-deepening-3 03：Target 复用 Selection 词汇，按 `target.selection.kind` 收窄。
  */
 function nodeFormForTarget(
   target: ContextMenuTarget,
@@ -78,31 +79,32 @@ function nodeFormForTarget(
   x: number,
   y: number,
 ): NodeFormState | null {
+  const sel = target.kind === 'element' ? target.selection : null
   if (kind === 'member' || kind === 'relation') {
-    if (target.kind !== 'class-node' || proj.type !== 'class') return null
-    const cls = proj.class.classes.find((c) => c.name === target.name)
+    if (sel === null || sel.kind !== 'class' || proj.type !== 'class') return null
+    const cls = proj.class.classes.find((c) => c.name === sel.name)
     if (cls === undefined) return null
-    return { kind, anchorElementId: cls.elementId, className: target.name, x, y }
+    return { kind, anchorElementId: cls.elementId, className: sel.name, x, y }
   }
   if (kind === 'message') {
-    if (target.kind !== 'sequence-participant' || proj.type !== 'sequence') return null
-    const p = proj.sequence.participants.find((x2) => x2.actorId === target.actorId)
+    if (sel === null || sel.kind !== 'participant' || proj.type !== 'sequence') return null
+    const p = proj.sequence.participants.find((x2) => x2.actorId === sel.actorId)
     if (p === undefined) return null
-    return { kind, anchorElementId: p.elementId, from: target.actorId, x, y }
+    return { kind, anchorElementId: p.elementId, from: sel.actorId, x, y }
   }
   if (kind === 'transition') {
     // state 转移表单（more-diagrams 工单 02）：状态节点右键 / Enter 键 → 预选起点该状态
-    if (target.kind !== 'state-node' || proj.type !== 'state') return null
-    const state = proj.state.states.find((s) => s.id === target.id)
+    if (sel === null || sel.kind !== 'state' || proj.type !== 'state') return null
+    const state = proj.state.states.find((s) => s.id === sel.id)
     if (state === undefined) return null
-    return { kind, anchorElementId: state.tailElementId ?? undefined, from: target.id, x, y }
+    return { kind, anchorElementId: state.tailElementId ?? undefined, from: sel.id, x, y }
   }
   if (kind === 'er-attribute' || kind === 'er-relation') {
     // er 属性 / 关系表单（more-diagrams 工单 03）：实体节点右键 → 锚点：属性表单用实体的
     // 属性锚点（块内最后一个属性 ?? 声明行）；关系表单用实体的**闭合行**（tailElementId，
     // 有块时即 `}`；无块时即声明行），否则关系会被插进属性块内部（工单 29 验收发现）。
-    if (target.kind !== 'er-entity' || proj.type !== 'er') return null
-    const entity = proj.er.entities.find((e) => e.name === target.name)
+    if (sel === null || sel.kind !== 'er-entity' || proj.type !== 'er') return null
+    const entity = proj.er.entities.find((e) => e.name === sel.name)
     if (entity === undefined) return null
     const base = {
       anchorElementId:
@@ -112,7 +114,7 @@ function nodeFormForTarget(
       x,
       y,
     }
-    return kind === 'er-attribute' ? { kind, ...base, entity: target.name } : { kind, ...base, from: target.name }
+    return kind === 'er-attribute' ? { kind, ...base, entity: sel.name } : { kind, ...base, from: sel.name }
   }
   if (kind === 'requirement-node' || kind === 'requirement-element') {
     // requirement / element 添加表单（more-diagrams 工单 07）：空白处右键 → 无锚点
@@ -124,30 +126,30 @@ function nodeFormForTarget(
     // requirement 关系表单（more-diagrams 工单 07）：requirement / element 节点右键或
     // Enter 键 → 锚点为该块的闭合行（关系行插在它之后），预选起点该节点
     if (proj.type !== 'requirement') return null
-    if (target.kind !== 'requirement-node' && target.kind !== 'requirement-element') return null
+    if (sel === null || (sel.kind !== 'requirement' && sel.kind !== 'requirement-element')) return null
     const block =
-      target.kind === 'requirement-node'
-        ? proj.requirement.requirements.find((r) => r.name === target.name)
-        : proj.requirement.elements.find((e) => e.name === target.name)
+      sel.kind === 'requirement'
+        ? proj.requirement.requirements.find((r) => r.name === sel.name)
+        : proj.requirement.elements.find((e) => e.name === sel.name)
     if (block === undefined) return null
-    return { kind, anchorElementId: block.tailElementId, from: target.name, x, y }
+    return { kind, anchorElementId: block.tailElementId, from: sel.name, x, y }
   }
   if (kind === 'block-edge') {
     // block 边表单（more-diagrams 工单 09）：块节点 Enter 键 → 锚点为该节点声明行，
     // 预选起点该节点；终点由表单选择
     if (proj.type !== 'block') return null
-    if (target.kind !== 'block-node') return null
-    const node = proj.block.nodes.find((n) => n.id === target.id)
+    if (sel === null || sel.kind !== 'block-node') return null
+    const node = proj.block.nodes.find((n) => n.id === sel.id)
     if (node === undefined) return null
-    return { kind, anchorElementId: node.elementId ?? undefined, from: target.id, x, y }
+    return { kind, anchorElementId: node.elementId ?? undefined, from: sel.id, x, y }
   }
   if (kind === 'sankey-link') {
     // sankey 加链路表单（more-diagrams 工单 13）：空白右键 → 无锚点（管线回退文档末尾）；
     // 链路上 Tab（经 formTargetOfSelection）→ 锚点为该链路行，source 预填同源
     if (proj.type !== 'sankey') return null
     if (target.kind === 'blank') return { kind, x, y }
-    if (target.kind !== 'sankey-link') return null
-    const link = proj.sankey.links.find((l) => l.elementId === target.elementId)
+    if (sel === null || sel.kind !== 'sankey-link') return null
+    const link = proj.sankey.links.find((l) => l.elementId === sel.elementId)
     if (link === undefined) return null
     return { kind, anchorElementId: link.elementId, from: link.source, x, y }
   }
@@ -156,8 +158,8 @@ function nodeFormForTarget(
     // 系列上 Tab（经 formTargetOfSelection）→ 锚点为该系列行（新系列落在其后）
     if (proj.type !== 'xychart') return null
     if (target.kind === 'blank') return { kind, x, y }
-    if (target.kind !== 'xychart-series') return null
-    const series = proj.xychart.series.find((s) => s.elementId === target.elementId)
+    if (sel === null || sel.kind !== 'xychart-series') return null
+    const series = proj.xychart.series.find((s) => s.elementId === sel.elementId)
     if (series === undefined) return null
     return { kind, anchorElementId: series.elementId, x, y }
   }
@@ -165,8 +167,8 @@ function nodeFormForTarget(
     // architecture 加边表单（more-diagrams 工单 17）：service 右键 / Enter 键 → 锚点为该
     // service 声明行，from 预选该 service；终点由表单选择
     if (proj.type !== 'architecture') return null
-    if (target.kind !== 'architecture-service') return null
-    const service = proj.architecture.services.find((s) => s.id === target.name)
+    if (sel === null || sel.kind !== 'architecture-service') return null
+    const service = proj.architecture.services.find((s) => s.id === sel.name)
     if (service === undefined) return null
     return { kind, anchorElementId: service.elementId, from: service.id, x, y }
   }
@@ -175,8 +177,8 @@ function nodeFormForTarget(
     // 连线上 Tab（经 formTargetOfSelection）→ 锚点为该连线行，from 预填同源
     if (proj.type !== 'wardley') return null
     if (target.kind === 'blank') return { kind, x, y }
-    if (target.kind !== 'wardley-link') return null
-    const link = proj.wardley.links.find((l) => l.elementId === target.elementId)
+    if (sel === null || sel.kind !== 'wardley-link') return null
+    const link = proj.wardley.links.find((l) => l.elementId === sel.elementId)
     if (link === undefined) return null
     return { kind, anchorElementId: link.elementId, from: link.from, x, y }
   }
@@ -185,8 +187,8 @@ function nodeFormForTarget(
     // 转移上 Tab（经 formTargetOfSelection）→ 锚点为该转移行，from 预填同源域
     if (proj.type !== 'cynefin') return null
     if (target.kind === 'blank') return { kind, x, y }
-    if (target.kind !== 'cynefin-transition') return null
-    const t = proj.cynefin.transitions.find((x2) => x2.elementId === target.elementId)
+    if (sel === null || sel.kind !== 'cynefin-transition') return null
+    const t = proj.cynefin.transitions.find((x2) => x2.elementId === sel.elementId)
     if (t === undefined) return null
     return { kind, anchorElementId: t.elementId, from: t.from, x, y }
   }
@@ -194,10 +196,10 @@ function nodeFormForTarget(
     // agentflow 加边表单（more-diagrams 工单 27）：节点右键 / 从这里连线 → 锚点为该节点
     // 声明行，from 预选该节点；终点由表单选择
     if (proj.type !== 'agentflow') return null
-    if (target.kind !== 'agentflow-node') return null
-    const node = proj.agentflow.nodes.find((n) => n.nodeId === target.nodeId)
+    if (sel === null || sel.kind !== 'agentflow-node') return null
+    const node = proj.agentflow.nodes.find((n) => n.nodeId === sel.nodeId)
     if (node === undefined) return null
-    return { kind, anchorElementId: `node:${target.nodeId}`, from: target.nodeId, x, y }
+    return { kind, anchorElementId: `node:${sel.nodeId}`, from: sel.nodeId, x, y }
   }
   if (kind === 'zenuml-message') {
     // zenuml 加消息表单（more-diagrams 工单 19）：空白右键 → 无锚点（管线回退文档末尾）；
@@ -205,8 +207,8 @@ function nodeFormForTarget(
     // 画布无 data-id，右键元素级目标不可命中——空白与结构树选中两条入口
     if (proj.type !== 'zenuml') return null
     if (target.kind === 'blank') return { kind, x, y }
-    if (target.kind !== 'zenuml-message') return null
-    const message = proj.zenuml.messages.find((m) => m.elementId === target.elementId)
+    if (sel === null || sel.kind !== 'zenuml-message') return null
+    const message = proj.zenuml.messages.find((m) => m.elementId === sel.elementId)
     if (message === undefined) return null
     return { kind, anchorElementId: message.elementId, from: message.from ?? undefined, x, y }
   }
@@ -214,8 +216,8 @@ function nodeFormForTarget(
     // c4 加关系表单（more-diagrams 工单 18）：元素右键 / Enter 键 → 锚点为该元素的声明行，
     // from 预选该元素的 alias；终点由表单选择（画布无 data-id，Enter 键路径经结构树选中）
     if (proj.type !== 'c4') return null
-    if (target.kind !== 'c4-element') return null
-    const el = proj.c4.elements.find((e) => e.elementId === target.elementId)
+    if (sel === null || sel.kind !== 'c4-element') return null
+    const el = proj.c4.elements.find((e) => e.elementId === sel.elementId)
     if (el === undefined) return null
     return { kind, anchorElementId: el.elementId, from: el.alias, x, y }
   }
@@ -223,8 +225,8 @@ function nodeFormForTarget(
     // sequence 独有的添加逻辑块：参与者上右键 → 锚点为该参与者的声明；
     // 空白处右键 → 无锚点（管线回退到文档最后一个元素）
     if (proj.type !== 'sequence') return null
-    if (target.kind === 'sequence-participant') {
-      const p = proj.sequence.participants.find((x2) => x2.actorId === target.actorId)
+    if (sel !== null && sel.kind === 'participant') {
+      const p = proj.sequence.participants.find((x2) => x2.actorId === sel.actorId)
       if (p === undefined) return null
       return { kind, anchorElementId: p.elementId, x, y }
     }
@@ -233,10 +235,10 @@ function nodeFormForTarget(
   // note：class 类节点 = note for X（锚点即该类声明）；class 空白 = 浮动 note；
   // sequence 空白 = note over/left/right（参与者由表单自行选择）
   if (proj.type === 'class') {
-    if (target.kind === 'class-node') {
-      const cls = proj.class.classes.find((c) => c.name === target.name)
+    if (sel !== null && sel.kind === 'class') {
+      const cls = proj.class.classes.find((c) => c.name === sel.name)
       if (cls === undefined) return null
-      return { kind, anchorElementId: cls.elementId, className: target.name, x, y }
+      return { kind, anchorElementId: cls.elementId, className: sel.name, x, y }
     }
     return target.kind === 'blank' ? { kind, x, y } : null
   }
@@ -246,34 +248,42 @@ function nodeFormForTarget(
   return null
 }
 
-/** 编辑器选中 → 可打开添加表单的菜单目标形态（类 / 参与者 / 状态 / 实体 / requirement
- * 两类节点；其余选中无该形态） */
-function formTargetOfSelection(selection: Selection): ContextMenuTarget | null {
-  if (selection.kind === 'class') return { kind: 'class-node', name: selection.name }
-  if (selection.kind === 'participant') return { kind: 'sequence-participant', actorId: selection.actorId }
-  if (selection.kind === 'state') return { kind: 'state-node', id: selection.id }
-  if (selection.kind === 'er-entity') return { kind: 'er-entity', name: selection.name }
-  if (selection.kind === 'requirement') return { kind: 'requirement-node', name: selection.name }
-  if (selection.kind === 'requirement-element') return { kind: 'requirement-element', name: selection.name }
+/**
+ * 编辑器选中 → 可打开添加表单的菜单目标形态（工单 architecture-deepening-3 03）：
+ * Target 复用 Selection 词汇后，元素目标**就是**选中本身——原先逐 kind 转写的 if 链
+ * 收成一张「可开表单的选中种类」表（class / 参与者 / 状态 / 实体 / requirement 两类节点 /
+ * block 节点 / sankey 链路 / xychart 系列 / architecture service / wardley 连线 /
+ * cynefin 转移 / agentflow 节点 / zenuml 消息 / c4 元素）；其余选中无该形态返回 null。
+ */
+const FORM_TARGET_KINDS: ReadonlySet<Selection['kind']> = new Set([
+  'class',
+  'participant',
+  'state',
+  'er-entity',
+  'requirement',
+  'requirement-element',
   // block（more-diagrams 工单 09）：块节点 → 边表单（Enter 键）的锚点与预选起点
-  if (selection.kind === 'block-node') return { kind: 'block-node', id: selection.id }
+  'block-node',
   // sankey（more-diagrams 工单 13）：链路 → 加链路表单（Tab 键）的锚点与 source 预填
-  if (selection.kind === 'sankey-link') return { kind: 'sankey-link', elementId: selection.elementId }
+  'sankey-link',
   // xychart（more-diagrams 工单 14）：系列 → 加系列表单（Tab 键）的锚点
-  if (selection.kind === 'xychart-series') return { kind: 'xychart-series', elementId: selection.elementId }
+  'xychart-series',
   // architecture（more-diagrams 工单 17）：service → 加边表单（Enter 键）的锚点与预选起点
-  if (selection.kind === 'architecture-service') return { kind: 'architecture-service', name: selection.name }
+  'architecture-service',
   // wardley（more-diagrams 工单 23）：连线 → 加连线表单（Tab 键）的锚点与 from 预填
-  if (selection.kind === 'wardley-link') return { kind: 'wardley-link', elementId: selection.elementId }
+  'wardley-link',
   // cynefin（more-diagrams 工单 25）：转移 → 加转移表单（Tab 键）的锚点与 from 预填
-  if (selection.kind === 'cynefin-transition') return { kind: 'cynefin-transition', elementId: selection.elementId }
+  'cynefin-transition',
   // agentflow（more-diagrams 工单 27）：节点 → 加边表单（从这里连线）的锚点与 from 预选
-  if (selection.kind === 'agentflow-node') return { kind: 'agentflow-node', nodeId: selection.nodeId }
+  'agentflow-node',
   // zenuml（more-diagrams 工单 19）：消息 → 加消息表单（Tab 键）的锚点与 from 预填
-  if (selection.kind === 'zenuml-message') return { kind: 'zenuml-message', elementId: selection.elementId }
+  'zenuml-message',
   // c4（more-diagrams 工单 18）：元素 → 加关系表单（Enter 键）的锚点与 from 预选
-  if (selection.kind === 'c4-element') return { kind: 'c4-element', elementId: selection.elementId }
-  return null
+  'c4-element',
+])
+
+function formTargetOfSelection(selection: Selection): ContextMenuTarget | null {
+  return FORM_TARGET_KINDS.has(selection.kind) ? { kind: 'element', selection } : null
 }
 
 export interface CanvasContextMenuOptions {
@@ -326,8 +336,9 @@ export function useCanvasContextMenu(
       const selection = selectionFromEventTarget(e.target, r)
       const target = contextMenuTargetFromSelection(selection, proj.type)
       // state 状态节点的 composite 标志由投影补齐（menuTargetOfCanvas 是纯映射，不查投影）
-      if (target !== null && target.kind === 'state-node' && proj.type === 'state') {
-        target.composite = proj.state.states.find((s) => s.id === target.id)?.composite ?? false
+      if (target !== null && target.kind === 'element' && target.selection.kind === 'state' && proj.type === 'state') {
+        const stateSel = target.selection
+        target.composite = proj.state.states.find((s) => s.id === stateSel.id)?.composite ?? false
       }
       if (target === null || contextMenuItems(target).length === 0) {
         // 无可弹项只收菜单（现状：不动已打开的表单浮层）
@@ -426,8 +437,10 @@ export function useCanvasContextMenu(
   const applyStyle = useCallback(
     (className: string): void => {
       const target = menu?.target
-      if (target === undefined || target.kind !== 'flowchart-node') return
-      useEditorStore.getState().commitIntent({ type: 'apply-class', nodeId: target.nodeId, className })
+      if (target === undefined || target.kind !== 'element' || target.selection.kind !== 'node') return
+      useEditorStore
+        .getState()
+        .commitIntent({ type: 'apply-class', nodeId: target.selection.nodeId, className })
       closeMenu()
     },
     [menu, closeMenu],

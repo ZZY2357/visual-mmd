@@ -132,18 +132,18 @@ describe('wardley 画布寻址降级（research §4 实测：渲染器无 data-i
   })
 
   it('程序构造的节点 / 连线 / evolve 菜单目标各给编辑项，且 selectionOfMenuTarget 互逆', () => {
-    expect(contextMenuItems({ kind: 'wardley-node', name: '茶' })).toEqual(['edit-text', 'link-from-here', 'delete'])
-    expect(contextMenuItems({ kind: 'wardley-link', elementId: 'wardley-link:1' })).toEqual([
+    expect(contextMenuItems({ kind: 'element', selection: { kind: 'wardley-node', name: '茶' } })).toEqual(['edit-text', 'link-from-here', 'delete'])
+    expect(contextMenuItems({ kind: 'element', selection: { kind: 'wardley-link', elementId: 'wardley-link:1' } })).toEqual([
       'add-wardley-link',
       'edit-label',
       'delete',
     ])
-    expect(contextMenuItems({ kind: 'wardley-evolve', elementId: 'wardley-evolve:1' })).toEqual([
+    expect(contextMenuItems({ kind: 'element', selection: { kind: 'wardley-evolve', elementId: 'wardley-evolve:1' } })).toEqual([
       'edit-label',
       'delete',
     ])
-    expect(selectionOfMenuTarget({ kind: 'wardley-node', name: '茶' })).toEqual({ kind: 'wardley-node', name: '茶' })
-    expect(selectionOfMenuTarget({ kind: 'wardley-link', elementId: 'wardley-link:1' })).toEqual({
+    expect(selectionOfMenuTarget({ kind: 'element', selection: { kind: 'wardley-node', name: '茶' } })).toEqual({ kind: 'wardley-node', name: '茶' })
+    expect(selectionOfMenuTarget({ kind: 'element', selection: { kind: 'wardley-link', elementId: 'wardley-link:1' } })).toEqual({
       kind: 'wardley-link',
       elementId: 'wardley-link:1',
     })

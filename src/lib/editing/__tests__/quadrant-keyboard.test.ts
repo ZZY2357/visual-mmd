@@ -116,28 +116,28 @@ describe('quadrantDeleteIntent', () => {
 describe('quadrant 菜单（工单 12：空白加点；点 = 改文本/坐标/样式/删除；轴/象限 = 改文本）', () => {
   it('空白 = 添加点；点 / 轴 / 象限的元素级菜单项', () => {
     expect(contextMenuItems({ kind: 'blank', diagramType: 'quadrant' })).toEqual(['add-quadrant-point'])
-    expect(contextMenuItems({ kind: 'quadrant-point', elementId: 'point:1' })).toEqual([
+    expect(contextMenuItems({ kind: 'element', selection: { kind: 'quadrant-point', elementId: 'point:1' } })).toEqual([
       'edit-text',
       'edit-quadrant-coords',
       'edit-quadrant-style',
       'delete',
     ])
-    expect(contextMenuItems({ kind: 'quadrant-axis', elementId: 'x-axis' })).toEqual(['edit-quadrant-text'])
-    expect(contextMenuItems({ kind: 'quadrant-quadrant', elementId: 'quadrant:2' })).toEqual(['edit-quadrant-text'])
+    expect(contextMenuItems({ kind: 'element', selection: { kind: 'quadrant-axis', elementId: 'x-axis' } })).toEqual(['edit-quadrant-text'])
+    expect(contextMenuItems({ kind: 'element', selection: { kind: 'quadrant-quadrant', elementId: 'quadrant:2' } })).toEqual(['edit-quadrant-text'])
   })
 
   it('画布选中（反注 data-id）→ 菜单目标（contextMenuTargetFromSelection）一一对应', () => {
     expect(contextMenuTargetFromSelection({ kind: 'node', id: 'point:1' }, 'quadrant')).toEqual({
-      kind: 'quadrant-point',
-      elementId: 'point:1',
+      kind: 'element',
+      selection: { kind: 'quadrant-point', elementId: 'point:1' },
     })
     expect(contextMenuTargetFromSelection({ kind: 'node', id: 'y-axis' }, 'quadrant')).toEqual({
-      kind: 'quadrant-axis',
-      elementId: 'y-axis',
+      kind: 'element',
+      selection: { kind: 'quadrant-axis', elementId: 'y-axis' },
     })
     expect(contextMenuTargetFromSelection({ kind: 'node', id: 'quadrant:4' }, 'quadrant')).toEqual({
-      kind: 'quadrant-quadrant',
-      elementId: 'quadrant:4',
+      kind: 'element',
+      selection: { kind: 'quadrant-quadrant', elementId: 'quadrant:4' },
     })
     // 不认识的 data-id 不给菜单
     expect(contextMenuTargetFromSelection({ kind: 'node', id: '别的' }, 'quadrant')).toBeNull()

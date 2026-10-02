@@ -136,9 +136,9 @@ describe('zenuml 画布寻址降级（工单 19 任务 0 实测：无 data-id �
   })
 
   it('selectionOfMenuTarget：程序构造的 zenuml 目标 → 同形 selection（结构树右键入口）', () => {
-    expect(selectionOfMenuTarget({ kind: 'zenuml-participant', elementId: 'participant:Client' })).toEqual(PART_SEL)
-    expect(selectionOfMenuTarget({ kind: 'zenuml-message', elementId: 'message:1' })).toEqual(MSG_SEL)
-    expect(selectionOfMenuTarget({ kind: 'zenuml-fragment', elementId: 'fragment:1' })).toEqual(FRAG_SEL)
+    expect(selectionOfMenuTarget({ kind: 'element', selection: { kind: 'zenuml-participant', elementId: 'participant:Client' } })).toEqual(PART_SEL)
+    expect(selectionOfMenuTarget({ kind: 'element', selection: { kind: 'zenuml-message', elementId: 'message:1' } })).toEqual(MSG_SEL)
+    expect(selectionOfMenuTarget({ kind: 'element', selection: { kind: 'zenuml-fragment', elementId: 'fragment:1' } })).toEqual(FRAG_SEL)
   })
 })
 
@@ -153,15 +153,15 @@ describe('zenuml 菜单（more-diagrams 工单 19）', () => {
   })
 
   it('参与者 = 改别名 / 删除；消息 = 编辑 / 删除；片段无菜单项', () => {
-    expect(contextMenuItems({ kind: 'zenuml-participant', elementId: 'participant:Client' })).toEqual([
+    expect(contextMenuItems({ kind: 'element', selection: { kind: 'zenuml-participant', elementId: 'participant:Client' } })).toEqual([
       'edit-zenuml-participant',
       'delete',
     ])
-    expect(contextMenuItems({ kind: 'zenuml-message', elementId: 'message:1' })).toEqual([
+    expect(contextMenuItems({ kind: 'element', selection: { kind: 'zenuml-message', elementId: 'message:1' } })).toEqual([
       'edit-zenuml-message',
       'delete',
     ])
-    expect(contextMenuItems({ kind: 'zenuml-fragment', elementId: 'fragment:1' })).toEqual([])
+    expect(contextMenuItems({ kind: 'element', selection: { kind: 'zenuml-fragment', elementId: 'fragment:1' } })).toEqual([])
   })
 
   function makeCtx() {
@@ -214,20 +214,20 @@ describe('zenuml 菜单（more-diagrams 工单 19）', () => {
 
   it('edit-zenuml-participant：进入别名内联编辑', () => {
     const h = makeCtx()
-    MENU_ACTIONS['edit-zenuml-participant'](h.ctx, { kind: 'zenuml-participant', elementId: 'participant:Client' })
+    MENU_ACTIONS['edit-zenuml-participant'](h.ctx, { kind: 'element', selection: { kind: 'zenuml-participant', elementId: 'participant:Client' } })
     expect(h.inline()).toEqual({ kind: 'zenuml-participant', elementId: 'participant:Client' })
     expect(h.closed()).toBe(1)
   })
 
   it('delete 目标：参与者 / 消息各自产出删除意图并清选中', () => {
     const h1 = makeCtx()
-    MENU_ACTIONS['delete'](h1.ctx, { kind: 'zenuml-message', elementId: 'message:1', from: 'a', to: 'b', occurrence: 1 } as never)
+    MENU_ACTIONS['delete'](h1.ctx, { kind: 'element', selection: { kind: 'zenuml-message', elementId: 'message:1' } })
     expect(h1.intents).toEqual([{ type: 'delete-zenuml-message', elementId: 'message:1' }])
     expect(h1.selected()).toBeNull()
     expect(h1.closed()).toBe(1)
 
     const h2 = makeCtx()
-    MENU_ACTIONS['delete'](h2.ctx, { kind: 'zenuml-participant', elementId: 'participant:Client', from: 'a', to: 'b', occurrence: 1 } as never)
+    MENU_ACTIONS['delete'](h2.ctx, { kind: 'element', selection: { kind: 'zenuml-participant', elementId: 'participant:Client' } })
     expect(h2.intents).toEqual([{ type: 'delete-zenuml-participant', elementId: 'participant:Client' }])
   })
 })

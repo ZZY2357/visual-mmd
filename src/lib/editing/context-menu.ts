@@ -1,5 +1,6 @@
 import type { DiagramTypeId } from '../diagram-registry'
 import type { CanvasSelection } from '../canvas-selection/data-id'
+import type { Selection } from '../projection/selection'
 import { menuTargetOfCanvas } from '../canvas-selection/selection-codec'
 
 /**
@@ -26,132 +27,14 @@ import { menuTargetOfCanvas } from '../canvas-selection/selection-codec'
 export type ContextMenuTarget =
   /** 空白处（无 data-id 命中）：diagramType 决定可做的添加动作 */
   | { kind: 'blank'; diagramType: DiagramTypeId }
-  | { kind: 'flowchart-node'; nodeId: string }
-  | { kind: 'flowchart-edge'; from: string; to: string; occurrence: number }
-  | { kind: 'mindmap-node'; elementId: string }
-  /** class 节点：选中 id 即类名 */
-  | { kind: 'class-node'; name: string }
-  /** sequence 参与者：选中 id 即 actorId */
-  | { kind: 'sequence-participant'; actorId: string }
-  /** class 关系边（工单 02 位置序寻址）：elementId 即投影 elementId（`relation:N`） */
-  | { kind: 'class-relation'; elementId: string }
-  /** sequence 消息 / 注释 / 块（工单 02 位置序寻址）：elementId 为 `message:N` / `note:N` / `block:N` */
-  | { kind: 'sequence-message'; elementId: string }
-  | { kind: 'sequence-note'; elementId: string }
-  | { kind: 'sequence-block'; elementId: string }
-  // state（more-diagrams 工单 02）：状态节点选中 id 即状态 id（composite 由调用方按投影补齐）；
-  // 转移边 elementId 即投影 elementId（`transition:N`，位置序身份）
-  | { kind: 'state-node'; id: string; composite?: boolean }
-  | { kind: 'state-transition'; elementId: string }
-  // er（more-diagrams 工单 03）：实体节点选中 id 即实体名；关系边 / 属性 elementId
-  // 即投影 elementId（`relation:N` / `attr:N`）
-  | { kind: 'er-entity'; name: string }
-  | { kind: 'er-relation'; elementId: string }
-  | { kind: 'er-attribute'; elementId: string }
-// gitGraph（more-diagrams 工单 04）：画布 DOM 无 data-id（实测降级），无元素级菜单目标；
-// 空白菜单提供添加入口（语句序即拓扑，追加 = 文档末尾落码）
-  // timeline（more-diagrams 工单 05）：时期是节点、事件是归属时期的元素，elementId
-  // 即投影 elementId（`period:N` / `event:N`）。**注**：timeline 画布无 data-id 寻址
-  // （见 timeline-adapter），这两个目标目前只能由测试/程序构造，画布右键实际只产出 blank。
-  | { kind: 'timeline-period'; elementId: string }
-  | { kind: 'timeline-event'; elementId: string }
-  // kanban（more-diagrams 工单 06）：列 elementId `kanban-column:<id>`、卡片 `kanban-card:<id>`
-  | { kind: 'kanban-column'; elementId: string }
-  | { kind: 'kanban-card'; elementId: string }
-// requirement（more-diagrams 工单 07）：两类节点（requirement / element）选中 id 即名字；
-// 关系边 elementId 即投影 elementId（`relation:N`，位置序身份）
-  | { kind: 'requirement-node'; name: string }
-  | { kind: 'requirement-element'; name: string }
-  | { kind: 'requirement-relation'; elementId: string }
-// journey（more-diagrams 工单 08）：画布 DOM 无 data-id（实测降级），无元素级菜单目标；
-// 空白菜单提供添加入口（任务/section 的编辑由结构树选中 + 属性表单承接）
-// pie（more-diagrams 工单 10）：画布 DOM 无 data-id（实测降级，见 pie-adapter），无元素级
-// 菜单目标；空白菜单提供添加入口（扇区的编辑由结构树选中 + 属性表单承接）
-// block（more-diagrams 工单 09）：节点选中 id 即语法 id；嵌套块 id 即 gid；
-// 边 elementId 即投影 elementId（`edge:N`，位置序身份）
-  | { kind: 'block-node'; id: string }
-  | { kind: 'block-group'; id: string }
-  | { kind: 'block-edge'; elementId: string }
-// sankey（more-diagrams 工单 13）：节点选中 id 即名字（名字即身份，经位置序反注可寻址）；
-// 链路 elementId 即投影 elementId（`link:N`，位置序身份）
-  | { kind: 'sankey-node'; name: string }
-  | { kind: 'sankey-link'; elementId: string }
-// quadrant（more-diagrams 工单 12）：点/轴/象限经位置序反注可寻址（见 quadrant-adapter），
-// 三类元素都有画布菜单；轴/象限是文档级属性元素，无添加/删除入口
-  | { kind: 'quadrant-point'; elementId: string }
-  | { kind: 'quadrant-axis'; elementId: string }
-  | { kind: 'quadrant-quadrant'; elementId: string }
-// packet（more-diagrams 工单 16）：字段经 start-bit 映射反注可寻址（见 packet-adapter），
-// 改名 / 改位区间 / 删除都有画布菜单
-  | { kind: 'packet-field'; elementId: string }
-// xychart（more-diagrams 工单 14）：系列 elementId 即投影位置序身份 `series:N`（经类名组
-// 位置序反注可寻址）；轴与标题是文档级属性元素（固定身份，经类名组反注可寻址）
-  | { kind: 'xychart-series'; elementId: string }
-  | { kind: 'xychart-axis'; axis: 'x' | 'y' }
-  | { kind: 'xychart-title' }
-// architecture（more-diagrams 工单 17）：三类节点选中 id 即源码 id（DOM id 反注可寻址）；
-// 边 elementId 即投影位置序身份 `edge:N`——但边 DOM 不可寻址（计数器恒 0，见
-// architecture-adapter），边目标只由测试/程序构造，画布右键实际只产出三类节点与 blank
-  | { kind: 'architecture-service'; name: string }
-  | { kind: 'architecture-group'; name: string }
-  | { kind: 'architecture-junction'; name: string }
-  | { kind: 'architecture-edge'; elementId: string }
-// wardley（more-diagrams 工单 23）：画布 DOM 无 data-id（research §4 实测降级，见
-// wardley-adapter），无元素级菜单目标——节点/连线/evolve 目标只由测试/程序构造，
-// 画布右键实际只产出 blank（空白菜单提供 加 component / 加 anchor / 加连线 入口）。
-// 节点选中 id 即名字（名字即身份）；连线 / evolve elementId 即投影位置序身份。
-  | { kind: 'wardley-node'; name: string }
-  | { kind: 'wardley-link'; elementId: string }
-  | { kind: 'wardley-evolve'; elementId: string }
-// venn（more-diagrams 工单 21）：集合经 `data-venn-sets` → `data-id` 反注可寻址
-// （见 venn-adapter），集合选中 id 即源码 id（名字即身份）、交集 elementId 即投影位置序
-// 身份 `venn-union:N`。两者都有画布菜单；text 节点与 style 行无 data-* 整体降级。
-  | { kind: 'venn-set'; id: string }
-  | { kind: 'venn-union'; elementId: string }
-// cynefin（more-diagrams 工单 25）：画布 DOM 无 data-id（research §4/§8.1 实测降级，见
-// cynefin-adapter），无元素级菜单目标——域/条目/转移目标只由测试/程序构造，画布右键实际
-// 只产出 blank（空白菜单提供 加条目 / 加转移 入口）。域选中 id 即域名词（固定五域）；
-// 条目 / 转移 elementId 即投影位置序身份。
-  | { kind: 'cynefin-domain'; name: string }
-  | { kind: 'cynefin-item'; elementId: string }
-  | { kind: 'cynefin-transition'; elementId: string }
-// usecase（more-diagrams 工单 26）：节点（actor / 用例 / 边界）经渲染器 data-id 归一可寻址
-// （见 usecase-adapter），elementId 即投影 elementId（`actor:<id>` / `usecase:<id>` /
-// `boundary:<id>` / `relation:N`）。四类都有画布菜单；关系是唯一连线语句。
-  | { kind: 'usecase-actor'; elementId: string }
-  | { kind: 'usecase-usecase'; elementId: string }
-  | { kind: 'usecase-boundary'; elementId: string }
-  | { kind: 'usecase-relation'; elementId: string }
-  | { kind: 'usecase-note'; elementId: string }
-// eventmodeling（more-diagrams 工单 28）：画布 DOM 无 data-id（research §4/§8.3 实测降级，
-// 见 eventmodeling-adapter），无元素级菜单目标——帧 / 数据块目标只由测试/程序构造，画布右键
-// 实际只产出 blank（空白菜单提供 加帧 / 加数据块 入口）。elementId 即投影位置序身份
-// （`frame:N` / `data:N`）；派生连线（`relation:N`）无源码语句、只读，无编辑目标。
-  | { kind: 'em-frame'; elementId: string }
-  | { kind: 'em-data'; elementId: string }
-// agentflow（more-diagrams 工单 27）：节点 data-id 即源码节点 id（渲染后从
-// `{svgId}-agentflow-{id}-{n}` DOM id 反注可寻址），节点有画布菜单；边有原生
-// `L_{from}_{to}_{n}` data-id（尽力而为）；容器（`flow` 分组）无 data-id（research §8.2
-// 实测降级），容器 / 文档行目标只由测试/程序构造，画布右键实际只产出节点、边与 blank。
-  | { kind: 'agentflow-node'; nodeId: string }
-  | { kind: 'agentflow-edge'; elementId: string }
-  | { kind: 'agentflow-flow'; elementId: string }
-  | { kind: 'agentflow-doc'; elementId: string }
-// zenuml（more-diagrams 工单 19）：画布 DOM 无 data-id（任务 0 实测：渲染产物无 data-id /
-// 无 id，见 zenuml-adapter），无元素级菜单目标——参与者 / 消息 / 片段目标只由测试/程序构造，
-// 画布右键实际只产出 blank（空白菜单提供 加参与者 / 加消息 入口）。
-// 参与者 elementId 即投影 elementId（`participant:<id>`，名字即身份）；消息 / 片段
-// elementId 即投影位置序身份。
-  | { kind: 'zenuml-participant'; elementId: string }
-  | { kind: 'zenuml-message'; elementId: string }
-  | { kind: 'zenuml-fragment'; elementId: string }
-// c4（more-diagrams 工单 18）：画布 DOM 无 data-id（实测降级，见 c4-adapter 顶注），
-// 无元素级菜单目标——元素/边界/关系目标只由结构树选中经键路径或测试/程序构造，画布右键
-// 实际只产出 blank（空白菜单提供 加元素 / 加边界 入口）。三类的 elementId 即投影 elementId
-// （元素/边界 `c4-element:<alias>` / `c4-boundary:<alias>` 名字即身份；关系 `relation:N` 位置序）。
-  | { kind: 'c4-element'; elementId: string }
-  | { kind: 'c4-boundary'; elementId: string }
-  | { kind: 'c4-relation'; elementId: string }
+  /**
+   * 元素目标（工单 architecture-deepening-3 03）：直接复用 Selection 的 kind 命名与载荷
+   * （`projection/selection.ts`），不再是 60+ 成员的平行 union——菜单目标本来就是
+   * 「画布/树来源的选中」，同一身份只该有一个名字。`composite` 仅对 `state` 选中
+   * 有意义：复合状态多一项「添加状态（复合内部）」，由调用方按投影补齐
+   * （menuTargetOfCanvas 是纯映射，不查投影）。
+   */
+  | { kind: 'element'; selection: Selection; composite?: boolean }
 
 export type ContextMenuItemId =
   | 'add-node'
@@ -471,50 +354,37 @@ function blankMenuItems(diagramType: DiagramTypeId): ContextMenuItemId[] {
 }
 
 /**
- * 菜单目标 → 菜单项列表（顺序即展示顺序）：
- * - 空白：按图种（flowchart 添加节点 / 连线模式 / 添加样式 / 添加子图；class 添加类 + 添加注释；
- *   sequence 添加参与者 + 添加注释 + 添加逻辑块；mindmap 添加根节点）
- * - flowchart 节点：从这里连线 / 编辑文本 / 应用样式 / 删除
- * - flowchart 连线：在属性面板中编辑（工单 06：与 class 关系 / sequence 消息同语义）/ 删除
- * - mindmap 节点：添加子节点 / 编辑文本 / 删除
- * - class 节点：添加成员 / 添加关系 / 添加注释（`note for X`）/ 删除类（级联删成员与相关关系）
- * - sequence 参与者：添加消息 / 添加逻辑块（以该参与者为落点）/ 删除参与者（级联删引用它的语句）
- * - class 关系边（工单 03/05）：切换关系类型（循环，直接改 kind）/ 在属性面板中编辑
- *   （选中该关系并关闭菜单，基数与标签由右侧 RelationForm 承接）/ 删除
- * - sequence 消息（工单 03/05）：切换箭头（循环，直接改 arrow）/ 在属性面板中编辑
- *   （选中该消息并关闭菜单，激活与文本由右侧 MessageForm 承接）/ 删除
- * - sequence 注释 / 逻辑块（工单 03）：**只放删除**——本票把这两类目标顺带接上（删除意图
- *   早已存在，接线成本≈0），但不再为它们补编辑动作（不扩大改造面；字段仍可在右侧表单改）
- *
- * 编辑类动作遵守 spec 决策「不新增表单浮层」：能循环的直接改（关系类型 / 箭头），
- * 其余是明确的「编辑属性」入口（工单 05 定案 D5）——菜单项自己选中该连线并关闭菜单，
- * 随后右侧表单可编（ADR-0001：表单驱动编辑，不引入第二个编辑入口）。
- * 添加类动作（工单 04）：空白与节点上的 add-note / add-block 在菜单位置浮出添加型小表单
- * （复用 `Add*InlineForm` 形态），提交才落码。
+ * 菜单目标 → 菜单项列表（顺序即展示顺序）。工单 architecture-deepening-3 03 起
+ * Target 复用 Selection 词汇：元素目标直接 switch `target.selection.kind`
+ * （Selection 的 kind 命名），不再维护第二套平行名字。
+ * - 空白：按图种给「添加到空图」入口（blankMenuItems）
+ * - 元素：各 Selection kind → 菜单项列表（注释随行保留各图种定案）
+ * - 不是可弹菜单目标的选中种类（subgraph / classdef / 区域块等）：返回 []——
+ *   与「无可弹项安静关闭」的兜底同口径
  */
 export function contextMenuItems(target: ContextMenuTarget): ContextMenuItemId[] {
-  switch (target.kind) {
-    case 'blank':
-      return blankMenuItems(target.diagramType)
-    case 'flowchart-node':
+  if (target.kind === 'blank') return blankMenuItems(target.diagramType)
+  const selection = target.selection
+  switch (selection.kind) {
+    case 'node':
       return ['link-from-here', 'edit-text', 'apply-style', 'delete']
-    case 'flowchart-edge':
+    case 'edge':
       return ['edit-label', 'delete']
     case 'mindmap-node':
       return ['add-child', 'edit-text', 'delete']
-    case 'class-node':
+    case 'class':
       return ['add-member', 'add-relation', 'add-note', 'delete-class']
-    case 'sequence-participant':
+    case 'participant':
       return ['add-message', 'add-block', 'delete-participant']
     case 'class-relation':
       return ['cycle-relation-kind', 'edit-relation', 'delete-relation']
-    case 'sequence-message':
+    case 'message':
       return ['cycle-message-arrow', 'edit-message', 'delete-message']
-    case 'sequence-note':
+    case 'note':
       return ['delete-note']
-    case 'sequence-block':
+    case 'block':
       return ['delete-block']
-    case 'state-node':
+    case 'state':
       // 复合状态多一项「添加状态（复合内部）」；普通状态 = 改描述 / 连线模式 / 删除
       return target.composite === true
         ? ['add-state-into', 'edit-state-desc', 'link-from-here', 'delete']
@@ -544,7 +414,7 @@ export function contextMenuItems(target: ContextMenuTarget): ContextMenuItemId[]
     // requirement（more-diagrams 工单 07）：节点（两类同构）= 改字段（选中它，字段在右侧
     // RequirementForm 里改）/ 从这里连线 / 删除；关系 = 切换关系类型（循环直接改）/
     // 反转方向（直接改）/ 删除
-    case 'requirement-node':
+    case 'requirement':
     case 'requirement-element':
       return ['edit-requirement-field', 'link-from-here', 'delete']
     case 'requirement-relation':
@@ -674,5 +544,7 @@ export function contextMenuItems(target: ContextMenuTarget): ContextMenuItemId[]
       return ['edit-c4-boundary', 'delete']
     case 'c4-relation':
       return ['edit-c4-relation', 'delete']
+    default:
+      return []
   }
 }
