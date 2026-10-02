@@ -7,11 +7,11 @@ import type { DataIdResolver } from '../canvas-selection/data-id'
 import type { ViewState } from '../canvas-view/view-state'
 import {
   inlineEditCommitOf,
+  inlineEditKindOf,
   inlineEditTargetFromEvent,
   overlayRectInContainer,
   toRect,
   type CanvasInlineEditTarget,
-  type InlineEditDiagramKind,
   type Rect,
 } from './inline-edit'
 
@@ -311,42 +311,13 @@ export function useCanvasInlineEdit({ projection, resolver, svg, containerRef, v
    * class 命中类名文本 → 改类名；sequence 命中参与者 → 改 `as` 别名（都是"只改显示文本"）。 */
   const onDoubleClick = useCallback(
     (e: React.MouseEvent) => {
-      const type = projection?.type
       const mindmapNodes = projection?.type === 'mindmap' ? projection.mindmap.nodes : []
       const radarAxes =
         projection?.type === 'radar'
           ? projection.radar.axes.map((a) => ({ text: a.label ?? a.id, elementId: a.elementId }))
           : []
-      const kind: InlineEditDiagramKind =
-        type === 'mindmap'
-          ? 'mindmap'
-          : type === 'class'
-            ? 'class'
-            : type === 'sequence'
-              ? 'sequence'
-              : type === 'state'
-                ? 'state'
-                : type === 'er'
-                  ? 'er'
-                  : type === 'requirement'
-                    ? 'requirement'
-                    : type === 'kanban'
-                      ? 'kanban'
-                      : type === 'block'
-                        ? 'block'
-                        : type === 'gantt'
-                          ? 'gantt'
-                          : type === 'quadrant'
-                            ? 'quadrant'
-                            : type === 'xychart'
-                              ? 'xychart'
-                              : type === 'radar'
-                                ? 'radar'
-                                : type === 'packet'
-                                  ? 'packet'
-                                  : type === 'architecture'
-                                    ? 'architecture'
-                                    : 'flowchart'
+      // kind 随图种查表（工单 07：未接双击的图种按 flowchart 兜底，安静地不进入编辑）
+      const kind = inlineEditKindOf(projection?.type ?? '')
       const target = inlineEditTargetFromEvent(e.target, resolver, mindmapNodes, kind, radarAxes)
       if (target === null) return
       e.preventDefault()
