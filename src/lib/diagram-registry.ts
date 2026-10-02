@@ -104,7 +104,9 @@ import { agentflowCanvasCapabilities } from './canvas-selection/agentflow-adapte
 import { zenumlCanvasCapabilities } from './canvas-selection/zenuml-adapter'
 import { c4CanvasCapabilities } from './canvas-selection/c4-adapter'
 import type { CanvasCapabilities } from './canvas-selection/capabilities'
+import type { DiagramMenuDefinition } from './editing/context-menu'
 import { treePartitions, type TreePartitions } from './structure-tree/partitions'
+import { diagramMenus } from './editing/menu'
 import { DEFAULT_DIAGRAM_SOURCE } from './storage'
 import type { ReactNode } from 'react'
 import type { ComponentType } from 'react'
@@ -230,6 +232,13 @@ export interface DiagramTypeRegistration {
   /** 画布能力包（工单 04，ADR-0015）：该图种接入画布所需的全部静态图种知识。
    * registry 只持引用、不含实现——「加一种图」= 新建一个 adapter + 在这里挂一行。 */
   canvas: CanvasCapabilities
+  /** 右键菜单定义（architecture-deepening-3 工单 04）：空白项 + 元素项
+   *（selection.kind → 菜单项规格）。registry 只持引用——定义住在
+   * src/lib/editing/menu/<id>.ts（该图种「菜单长什么样」的成文处，文案键随行），
+   * 实参表 diagramMenus 对 RegisteredDiagramTypeId 穷尽；动作实现仍在 menu-actions.ts
+   * 的 MENU_ACTIONS 穷尽 Record（本字段不装动作）。**独立字段，不进画布能力包**
+   *（守 ADR-0015 的范围）。 */
+  menu: DiagramMenuDefinition
   /** 表单路由（architecture-deepening-3 工单 05）：selection.kind → 属性表单的路由表。
    * registry 只声明槽位；实现见 DiagramSelectionForms 注释（组件层模块加载时挂入）。 */
   forms?: DiagramSelectionForms
@@ -807,6 +816,7 @@ export const DIAGRAM_TYPE_LIST: DiagramTypeRegistration[] = [
     buildProjection: (doc) => ({ type: 'flowchart', flowchart: buildFlowchartProjection(doc) }),
     tree: treePartitions.flowchart,
     canvas: flowchartCanvasCapabilities,
+    menu: diagramMenus.flowchart,
   },
   {
     id: 'sequence',
@@ -816,6 +826,7 @@ export const DIAGRAM_TYPE_LIST: DiagramTypeRegistration[] = [
     buildProjection: (doc) => ({ type: 'sequence', sequence: buildSequenceProjection(doc) }),
     tree: treePartitions.sequence,
     canvas: sequenceCanvasCapabilities,
+    menu: diagramMenus.sequence,
   },
   {
     id: 'class',
@@ -825,6 +836,7 @@ export const DIAGRAM_TYPE_LIST: DiagramTypeRegistration[] = [
     buildProjection: (doc) => ({ type: 'class', class: buildClassProjection(doc) }),
     tree: treePartitions.class,
     canvas: classCanvasCapabilities,
+    menu: diagramMenus.class,
   },
   {
     id: 'mindmap',
@@ -834,6 +846,7 @@ export const DIAGRAM_TYPE_LIST: DiagramTypeRegistration[] = [
     buildProjection: (doc) => ({ type: 'mindmap', mindmap: buildMindmapProjection(doc) }),
     tree: treePartitions.mindmap,
     canvas: mindmapCanvasCapabilities,
+    menu: diagramMenus.mindmap,
   },
   {
     id: 'state',
@@ -844,6 +857,7 @@ export const DIAGRAM_TYPE_LIST: DiagramTypeRegistration[] = [
     buildProjection: (doc) => ({ type: 'state', state: buildStateProjection(doc) }),
     tree: treePartitions.state,
     canvas: stateCanvasCapabilities,
+    menu: diagramMenus.state,
   },
   {
     id: 'er',
@@ -853,6 +867,7 @@ export const DIAGRAM_TYPE_LIST: DiagramTypeRegistration[] = [
     buildProjection: (doc) => ({ type: 'er', er: buildErProjection(doc) }),
     tree: treePartitions.er,
     canvas: erCanvasCapabilities,
+    menu: diagramMenus.er,
   },
   {
     id: 'gitgraph',
@@ -863,6 +878,7 @@ export const DIAGRAM_TYPE_LIST: DiagramTypeRegistration[] = [
     buildProjection: (doc) => ({ type: 'gitgraph', gitgraph: buildGitgraphProjection(doc) }),
     tree: treePartitions.gitgraph,
     canvas: gitgraphCanvasCapabilities,
+    menu: diagramMenus.gitgraph,
   },
   {
     id: 'timeline',
@@ -872,6 +888,7 @@ export const DIAGRAM_TYPE_LIST: DiagramTypeRegistration[] = [
     buildProjection: (doc) => ({ type: 'timeline', timeline: buildTimelineProjection(doc) }),
     tree: treePartitions.timeline,
     canvas: timelineCanvasCapabilities,
+    menu: diagramMenus.timeline,
   },
   {
     id: 'kanban',
@@ -881,6 +898,7 @@ export const DIAGRAM_TYPE_LIST: DiagramTypeRegistration[] = [
     buildProjection: (doc) => ({ type: 'kanban', kanban: buildKanbanProjection(doc) }),
     tree: treePartitions.kanban,
     canvas: kanbanCanvasCapabilities,
+    menu: diagramMenus.kanban,
   },
   {
     id: 'requirement',
@@ -892,6 +910,7 @@ export const DIAGRAM_TYPE_LIST: DiagramTypeRegistration[] = [
     buildProjection: (doc) => ({ type: 'requirement', requirement: buildRequirementProjection(doc) }),
     tree: treePartitions.requirement,
     canvas: requirementCanvasCapabilities,
+    menu: diagramMenus.requirement,
   },
   {
     id: 'journey',
@@ -901,6 +920,7 @@ export const DIAGRAM_TYPE_LIST: DiagramTypeRegistration[] = [
     buildProjection: (doc) => ({ type: 'journey', journey: buildJourneyProjection(doc) }),
     tree: treePartitions.journey,
     canvas: journeyCanvasCapabilities,
+    menu: diagramMenus.journey,
   },
   {
     id: 'pie',
@@ -911,6 +931,7 @@ export const DIAGRAM_TYPE_LIST: DiagramTypeRegistration[] = [
     buildProjection: (doc) => ({ type: 'pie', pie: buildPieProjection(doc) }),
     tree: treePartitions.pie,
     canvas: pieCanvasCapabilities,
+    menu: diagramMenus.pie,
   },
   {
     id: 'block',
@@ -923,6 +944,7 @@ export const DIAGRAM_TYPE_LIST: DiagramTypeRegistration[] = [
     buildProjection: (doc) => ({ type: 'block', block: buildBlockProjection(doc) }),
     tree: treePartitions.block,
     canvas: blockCanvasCapabilities,
+    menu: diagramMenus.block,
   },
   {
     id: 'sankey',
@@ -935,6 +957,7 @@ export const DIAGRAM_TYPE_LIST: DiagramTypeRegistration[] = [
     buildProjection: (doc) => ({ type: 'sankey', sankey: buildSankeyProjection(doc) }),
     tree: treePartitions.sankey,
     canvas: sankeyCanvasCapabilities,
+    menu: diagramMenus.sankey,
   },
   {
     id: 'gantt',
@@ -945,6 +968,7 @@ export const DIAGRAM_TYPE_LIST: DiagramTypeRegistration[] = [
     buildProjection: (doc) => ({ type: 'gantt', gantt: buildGanttProjection(doc) }),
     tree: treePartitions.gantt,
     canvas: ganttCanvasCapabilities,
+    menu: diagramMenus.gantt,
   },
   {
     id: 'quadrant',
@@ -955,6 +979,7 @@ export const DIAGRAM_TYPE_LIST: DiagramTypeRegistration[] = [
     buildProjection: (doc) => ({ type: 'quadrant', quadrant: buildQuadrantProjection(doc) }),
     tree: treePartitions.quadrant,
     canvas: quadrantCanvasCapabilities,
+    menu: diagramMenus.quadrant,
   },
   {
     id: 'packet',
@@ -966,6 +991,7 @@ export const DIAGRAM_TYPE_LIST: DiagramTypeRegistration[] = [
     buildProjection: (doc) => ({ type: 'packet', packet: buildPacketProjection(doc) }),
     tree: treePartitions.packet,
     canvas: packetCanvasCapabilities,
+    menu: diagramMenus.packet,
   },
   {
     id: 'xychart',
@@ -978,6 +1004,7 @@ export const DIAGRAM_TYPE_LIST: DiagramTypeRegistration[] = [
     buildProjection: (doc) => ({ type: 'xychart', xychart: buildXychartProjection(doc) }),
     tree: treePartitions.xychart,
     canvas: xychartCanvasCapabilities,
+    menu: diagramMenus.xychart,
   },
   {
     id: 'radar',
@@ -989,6 +1016,7 @@ export const DIAGRAM_TYPE_LIST: DiagramTypeRegistration[] = [
     buildProjection: (doc) => ({ type: 'radar', radar: buildRadarProjection(doc) }),
     tree: treePartitions.radar,
     canvas: radarCanvasCapabilities,
+    menu: diagramMenus.radar,
   },
   {
     id: 'architecture',
@@ -1000,6 +1028,7 @@ export const DIAGRAM_TYPE_LIST: DiagramTypeRegistration[] = [
     buildProjection: (doc) => ({ type: 'architecture', architecture: buildArchitectureProjection(doc) }),
     tree: treePartitions.architecture,
     canvas: architectureCanvasCapabilities,
+    menu: diagramMenus.architecture,
   },
   {
     id: 'treemap',
@@ -1013,6 +1042,7 @@ export const DIAGRAM_TYPE_LIST: DiagramTypeRegistration[] = [
     buildProjection: (doc) => ({ type: 'treemap', treemap: buildTreemapProjection(doc) }),
     tree: treePartitions.treemap,
     canvas: treemapCanvasCapabilities,
+    menu: diagramMenus.treemap,
   },
   {
     id: 'ishikawa',
@@ -1025,6 +1055,7 @@ export const DIAGRAM_TYPE_LIST: DiagramTypeRegistration[] = [
     buildProjection: (doc) => ({ type: 'ishikawa', ishikawa: buildIshikawaProjection(doc) }),
     tree: treePartitions.ishikawa,
     canvas: ishikawaCanvasCapabilities,
+    menu: diagramMenus.ishikawa,
   },
   {
     id: 'wardley',
@@ -1037,6 +1068,7 @@ export const DIAGRAM_TYPE_LIST: DiagramTypeRegistration[] = [
     buildProjection: (doc) => ({ type: 'wardley', wardley: buildWardleyProjection(doc) }),
     tree: treePartitions.wardley,
     canvas: wardleyCanvasCapabilities,
+    menu: diagramMenus.wardley,
   },
   {
     id: 'venn',
@@ -1049,6 +1081,7 @@ export const DIAGRAM_TYPE_LIST: DiagramTypeRegistration[] = [
     buildProjection: (doc) => ({ type: 'venn', venn: buildVennProjection(doc) }),
     tree: treePartitions.venn,
     canvas: vennCanvasCapabilities,
+    menu: diagramMenus.venn,
   },
   {
     id: 'cynefin',
@@ -1061,6 +1094,7 @@ export const DIAGRAM_TYPE_LIST: DiagramTypeRegistration[] = [
     buildProjection: (doc) => ({ type: 'cynefin', cynefin: buildCynefinProjection(doc) }),
     tree: treePartitions.cynefin,
     canvas: cynefinCanvasCapabilities,
+    menu: diagramMenus.cynefin,
   },
   {
     id: 'usecase',
@@ -1074,6 +1108,7 @@ export const DIAGRAM_TYPE_LIST: DiagramTypeRegistration[] = [
     buildProjection: (doc) => ({ type: 'usecase', usecase: buildUsecaseProjection(doc) }),
     tree: treePartitions.usecase,
     canvas: usecaseCanvasCapabilities,
+    menu: diagramMenus.usecase,
   },
   {
     id: 'treeview',
@@ -1086,6 +1121,7 @@ export const DIAGRAM_TYPE_LIST: DiagramTypeRegistration[] = [
     buildProjection: (doc) => ({ type: 'treeview', treeview: buildTreeviewProjection(doc) }),
     tree: treePartitions.treeview,
     canvas: treeviewCanvasCapabilities,
+    menu: diagramMenus.treeview,
   },
   {
     id: 'eventmodeling',
@@ -1101,6 +1137,7 @@ export const DIAGRAM_TYPE_LIST: DiagramTypeRegistration[] = [
     }),
     tree: treePartitions.eventmodeling,
     canvas: eventModelingCanvasCapabilities,
+    menu: diagramMenus.eventmodeling,
   },
   {
     id: 'agentflow',
@@ -1115,6 +1152,7 @@ export const DIAGRAM_TYPE_LIST: DiagramTypeRegistration[] = [
     buildProjection: (doc) => ({ type: 'agentflow', agentflow: buildAgentflowProjection(doc) }),
     tree: treePartitions.agentflow,
     canvas: agentflowCanvasCapabilities,
+    menu: diagramMenus.agentflow,
   },
   {
     id: 'zenuml',
@@ -1127,6 +1165,7 @@ export const DIAGRAM_TYPE_LIST: DiagramTypeRegistration[] = [
     buildProjection: (doc) => ({ type: 'zenuml', zenuml: buildZenumlProjection(doc) }),
     tree: treePartitions.zenuml,
     canvas: zenumlCanvasCapabilities,
+    menu: diagramMenus.zenuml,
   },
   {
     id: 'c4',
@@ -1140,6 +1179,7 @@ export const DIAGRAM_TYPE_LIST: DiagramTypeRegistration[] = [
     buildProjection: (doc) => ({ type: 'c4', c4: buildC4Projection(doc) }),
     tree: treePartitions.c4,
     canvas: c4CanvasCapabilities,
+    menu: diagramMenus.c4,
   },
 ]
 
