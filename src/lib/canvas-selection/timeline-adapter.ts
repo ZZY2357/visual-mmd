@@ -1,5 +1,6 @@
 import { resolveTimelineSelection } from '../projection/timeline-projection'
 import { timelineDeleteIntent, timelineKeyPlan } from '../pipeline/timeline-keyboard'
+import { nonAddressableCapabilities } from './non-addressable-capabilities'
 import type { CanvasCapabilities, ProjectionOf } from './capabilities'
 
 /**
@@ -16,19 +17,11 @@ import type { CanvasCapabilities, ProjectionOf } from './capabilities'
  * 能力包 `keyHandler`（`timelineKeyPlan`）对**结构树选中的时期**生效（画布键盘读 store 选中，
  * 不依赖 DOM 寻址）。
  */
-export const timelineCanvasCapabilities: CanvasCapabilities<ProjectionOf<'timeline'>> = {
-  // 无 data-id：永不命中（只认已知元素也无法命中，因为没有东西会带着 data-id 出现）
-  dataIdResolver: () => () => null,
-  // 画布选中不可能产生（resolver 永不命中）——保留空实现以守能力包形状
-  toSelection: () => null,
-  // 画布上无高亮目标：时期/事件/section 都不可寻址，安静地不高亮
-  canvasIdOf: () => null,
-  // 无画布可寻址节点 → 不参与方位导航 / 回落首节点
-  navigationIds: () => [],
+export const timelineCanvasCapabilities: CanvasCapabilities<ProjectionOf<'timeline'>> = nonAddressableCapabilities({
   keyboardProjection: (projection) => ({ kind: 'timeline', projection: projection.timeline }),
   resolveSelection: (projection, selection) => resolveTimelineSelection(projection.timeline, selection),
   // 删除意图：唯一映射在 pipeline/timeline-keyboard 的 timelineDeleteIntent
   deleteIntent: (projection, selection) => timelineDeleteIntent(projection.timeline, selection),
   // 键位语义：唯一映射在 pipeline/timeline-keyboard 的 timelineKeyPlan（Tab 加事件 / Enter 加时期 / Delete）
   keyHandler: (projection) => (input) => timelineKeyPlan(projection.timeline, input),
-}
+})

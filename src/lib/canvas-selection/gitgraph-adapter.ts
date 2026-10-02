@@ -1,5 +1,6 @@
 import { resolveGitgraphSelection } from '../projection/gitgraph-projection'
 import { gitgraphDeleteIntent, gitgraphKeyPlan } from '../pipeline/gitgraph-keyboard'
+import { nonAddressableCapabilities } from './non-addressable-capabilities'
 import type { CanvasCapabilities, ProjectionOf } from './capabilities'
 
 /**
@@ -18,16 +19,11 @@ import type { CanvasCapabilities, ProjectionOf } from './capabilities'
  * ——后两者由结构树选中 + 属性面板承接，语义不缺失，只是入口位置不同。
  */
 
-export const gitgraphCanvasCapabilities: CanvasCapabilities<ProjectionOf<'gitgraph'>> = {
-  dataIdResolver: () => () => null,
-  toSelection: () => null,
-  // 画布上没有可寻址 DOM：一律返回 null——安静地不高亮
-  canvasIdOf: () => null,
-  navigationIds: () => [],
+export const gitgraphCanvasCapabilities: CanvasCapabilities<ProjectionOf<'gitgraph'>> = nonAddressableCapabilities({
   keyboardProjection: (projection) => ({ kind: 'gitgraph', projection: projection.gitgraph }),
   resolveSelection: (projection, selection) => resolveGitgraphSelection(projection.gitgraph, selection),
   // 删除意图：唯一映射在 pipeline/gitgraph-keyboard 的 gitgraphDeleteIntent
   deleteIntent: (projection, selection) => gitgraphDeleteIntent(projection.gitgraph, selection),
   // 键位语义：唯一映射在 pipeline/gitgraph-keyboard 的 gitgraphKeyPlan
   keyHandler: (projection) => (input) => gitgraphKeyPlan(projection.gitgraph, input),
-}
+})

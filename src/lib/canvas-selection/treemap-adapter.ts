@@ -1,5 +1,6 @@
 import { resolveTreemapSelection } from '../projection/treemap-projection'
 import { treemapDeleteIntent, treemapKeyPlan } from '../pipeline/treemap-keyboard'
+import { nonAddressableCapabilities } from './non-addressable-capabilities'
 import type { CanvasCapabilities, ProjectionOf } from './capabilities'
 
 /**
@@ -21,16 +22,11 @@ import type { CanvasCapabilities, ProjectionOf } from './capabilities'
  * 语义不缺失，只是入口位置不同。
  */
 
-export const treemapCanvasCapabilities: CanvasCapabilities<ProjectionOf<'treemap'>> = {
-  dataIdResolver: () => () => null,
-  toSelection: () => null,
-  // 画布上没有可寻址 DOM：一律返回 null——安静地不高亮
-  canvasIdOf: () => null,
-  navigationIds: () => [],
+export const treemapCanvasCapabilities: CanvasCapabilities<ProjectionOf<'treemap'>> = nonAddressableCapabilities({
   keyboardProjection: (projection) => ({ kind: 'treemap', projection: projection.treemap }),
   resolveSelection: (projection, selection) => resolveTreemapSelection(projection.treemap, selection),
   // 删除意图：唯一映射在 pipeline/treemap-keyboard 的 treemapDeleteIntent
   deleteIntent: (projection, selection) => treemapDeleteIntent(projection.treemap, selection),
   // 键位语义：唯一映射在 pipeline/treemap-keyboard 的 treemapKeyPlan
   keyHandler: (projection) => (input) => treemapKeyPlan(projection.treemap, input),
-}
+})

@@ -1,5 +1,6 @@
 import { resolveRadarSelection } from '../projection/radar-projection'
 import { radarDeleteIntent, radarKeyPlan } from '../pipeline/radar-keyboard'
+import { nonAddressableCapabilities } from './non-addressable-capabilities'
 import type { CanvasCapabilities, ProjectionOf } from './capabilities'
 
 /**
@@ -20,15 +21,7 @@ import type { CanvasCapabilities, ProjectionOf } from './capabilities'
  * 不依赖 DOM 寻址）；轴 label 另有双击内联编辑（按 class 文本匹配，与 mindmap
  * 同范式，见 inline-edit.ts——canvasIdOf 高亮不做，两者独立）。
  */
-export const radarCanvasCapabilities: CanvasCapabilities<ProjectionOf<'radar'>> = {
-  // 无 data-id：永不命中（只认已知元素也无法命中，因为没有东西会带着 data-id 出现）
-  dataIdResolver: () => () => null,
-  // 画布选中不可能产生（resolver 永不命中）——保留空实现以守能力包形状
-  toSelection: () => null,
-  // 画布上无高亮目标：轴 / 曲线不可寻址，安静地不高亮（双击内联编辑按文本匹配，不经此）
-  canvasIdOf: (_projection, _selection) => null,
-  // 无画布可寻址节点 → 不参与方位导航 / 回落首节点
-  navigationIds: () => [],
+export const radarCanvasCapabilities: CanvasCapabilities<ProjectionOf<'radar'>> = nonAddressableCapabilities({
   keyboardProjection: (projection) => ({ kind: 'radar', projection: projection.radar }),
   resolveSelection: (projection, selection) => resolveRadarSelection(projection.radar, selection),
   // 删除意图：唯一映射在 pipeline/radar-keyboard 的 radarDeleteIntent
@@ -36,4 +29,4 @@ export const radarCanvasCapabilities: CanvasCapabilities<ProjectionOf<'radar'>> 
   // 键位语义：唯一映射在 pipeline/radar-keyboard 的 radarKeyPlan（轴上 Tab 加轴 / 曲线上 Tab 加曲线 /
   // Delete 删除；Enter 无自然类比，工单定案不做）
   keyHandler: (projection) => (input) => radarKeyPlan(projection.radar, input),
-}
+})
