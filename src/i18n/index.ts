@@ -1,5 +1,34 @@
 import i18next from 'i18next'
 import { initReactI18next } from 'react-i18next'
+import { flowchartMenuLabels } from '../lib/editing/menu/flowchart'
+import { sequenceMenuLabels } from '../lib/editing/menu/sequence'
+import { classMenuLabels } from '../lib/editing/menu/class'
+import { mindmapMenuLabels } from '../lib/editing/menu/mindmap'
+import { stateMenuLabels } from '../lib/editing/menu/state'
+import { erMenuLabels } from '../lib/editing/menu/er'
+import { gitgraphMenuLabels } from '../lib/editing/menu/gitgraph'
+import { timelineMenuLabels } from '../lib/editing/menu/timeline'
+import { kanbanMenuLabels } from '../lib/editing/menu/kanban'
+import { requirementMenuLabels } from '../lib/editing/menu/requirement'
+import { journeyMenuLabels } from '../lib/editing/menu/journey'
+import { pieMenuLabels } from '../lib/editing/menu/pie'
+import { sankeyMenuLabels } from '../lib/editing/menu/sankey'
+import { ganttMenuLabels } from '../lib/editing/menu/gantt'
+import { quadrantMenuLabels } from '../lib/editing/menu/quadrant'
+import { packetMenuLabels } from '../lib/editing/menu/packet'
+import { xychartMenuLabels } from '../lib/editing/menu/xychart'
+import { radarMenuLabels } from '../lib/editing/menu/radar'
+import { architectureMenuLabels } from '../lib/editing/menu/architecture'
+import { treemapMenuLabels } from '../lib/editing/menu/treemap'
+import { ishikawaMenuLabels } from '../lib/editing/menu/ishikawa'
+import { wardleyMenuLabels } from '../lib/editing/menu/wardley'
+import { vennMenuLabels } from '../lib/editing/menu/venn'
+import { cynefinMenuLabels } from '../lib/editing/menu/cynefin'
+import { usecaseMenuLabels } from '../lib/editing/menu/usecase'
+import { treeviewMenuLabels } from '../lib/editing/menu/treeview'
+import { eventmodelingMenuLabels } from '../lib/editing/menu/eventmodeling'
+import { zenumlMenuLabels } from '../lib/editing/menu/zenuml'
+import { c4MenuLabels } from '../lib/editing/menu/c4'
 
 /**
  * i18n 只配置中文 locale（spec：从第一天接入但只配中文 locale）。
@@ -31,163 +60,53 @@ export const zhDict = {
       selectHint: '点击图中的节点可在属性面板查看其属性',
       inlineEditAria: '编辑节点文本',
       // ---- 右键菜单（工单 07）：key 与菜单项 id 同名 ----
+      // architecture-deepening-3 工单 04 起，各图种专属的菜单项文案定义在
+      // src/lib/editing/menu/<id>.ts（<id>MenuLabels，与该图种的菜单项定义同文件），
+      // 此处只挂 record；跨图种共用 id 的文案仍收在字典（保持原键与文案不变）。
+      // 注：add-block-node / add-block-group / add-agentflow-* 六个 id 在此收敛前
+      // 即无文案键（照实保留，不新增）。
       menu: {
-        'add-node': '添加节点',
+        ...flowchartMenuLabels,
+        ...sequenceMenuLabels,
+        ...classMenuLabels,
+        ...mindmapMenuLabels,
+        ...stateMenuLabels,
+        ...erMenuLabels,
+        ...gitgraphMenuLabels,
+        ...timelineMenuLabels,
+        ...kanbanMenuLabels,
+        ...requirementMenuLabels,
+        ...journeyMenuLabels,
+        ...pieMenuLabels,
+        ...sankeyMenuLabels,
+        ...ganttMenuLabels,
+        ...quadrantMenuLabels,
+        ...packetMenuLabels,
+        ...xychartMenuLabels,
+        ...radarMenuLabels,
+        ...architectureMenuLabels,
+        ...treemapMenuLabels,
+        ...ishikawaMenuLabels,
+        ...wardleyMenuLabels,
+        ...vennMenuLabels,
+        ...cynefinMenuLabels,
+        ...usecaseMenuLabels,
+        ...treeviewMenuLabels,
+        ...eventmodelingMenuLabels,
+        ...zenumlMenuLabels,
+        ...c4MenuLabels,
+        // 跨图种共用菜单项（多个图种的菜单引用同一 id）
         'link-mode': '添加连线',
-        'add-style': '添加样式',
-        'add-subgraph': '添加子图',
-        // 空白处按图种（工单 04）：class / sequence / mindmap 的添加动作
-        'add-class': '添加类',
-        'add-participant': '添加参与者',
-        'add-root': '添加根节点',
-        // class/sequence 的节点菜单（工单 06）
-        'add-member': '添加成员',
-        'add-relation': '添加关系',
-        'delete-class': '删除类（含成员与关系）',
-        'add-message': '添加消息',
-        'delete-participant': '删除参与者',
-        // 添加入口补全（工单 04）：sequence 的注释与逻辑块、class 的注释
-        'add-note': '添加注释',
-        'add-block': '添加逻辑块',
-        // 连线菜单（工单 03）：class 关系边 / sequence 消息；注释与块只补删除
-        'cycle-relation-kind': '切换关系类型',
-        // 工单 05 定案 D5：菜单项 = 选中该连线 + 关闭菜单，字段编辑在右侧属性面板完成。
-        // 文案如实描述行为（原先的「编辑基数与标签」/「编辑激活与文本」暗示点了就能改）
-        'edit-relation': '在属性面板中编辑',
-        'delete-relation': '删除关系',
-        'cycle-message-arrow': '切换箭头',
-        'edit-message': '在属性面板中编辑',
-        'delete-message': '删除消息',
-        'delete-note': '删除注释',
-        'delete-block': '删除逻辑块',
         'link-from-here': '从这里连线',
         'edit-text': '编辑文本',
-        // 工单 06：flowchart 连线与上面两条措辞统一（原先那句暗示点了就能改，实际只关菜单；
-        // 改后如实说明点完去哪儿改）。
         'edit-label': '在属性面板中编辑',
-        'apply-style': '应用样式',
-        applyStyleEmpty: '暂无样式',
-        'add-child': '添加子节点',
-        // state（more-diagrams 工单 02）
-        'add-state': '添加状态',
-        'add-state-into': '添加状态（复合内部）',
-        'edit-state-desc': '编辑描述',
-        // er（more-diagrams 工单 03）
-        'add-entity': '添加实体',
-        'add-attribute': '添加属性',
-        'edit-er-alias': '改别名',
-        'cycle-er-line': '切换线型',
-        'edit-er-relation': '在属性面板中编辑',
-        'edit-er-attribute': '在属性面板中编辑',
-        // gitGraph（more-diagrams 工单 04）：空白菜单（画布 DOM 无 data-id，无元素级菜单项）
-        'add-commit': '添加提交',
-        'add-branch': '添加分支',
-        // timeline（more-diagrams 工单 05）
-        'add-period': '添加时期',
+        'add-note': '添加注释',
         'add-section': '添加分组',
-        'add-event': '添加事件',
-        'edit-period-text': '编辑时期文本',
-        'edit-event-text': '在属性面板中编辑',
-        // kanban（more-diagrams 工单 06）：空白加列、列上加卡片、卡片改元数据（D5：选中 + 关菜单）。
-        // 改标题 / 改描述复用 edit-text（内联编辑），删除复用 delete。
-        'add-column': '添加列',
-        'add-card': '添加卡片',
-        'edit-kanban-metadata': '在属性面板中编辑',
-        // requirement（more-diagrams 工单 07）
-        'add-requirement': '添加 requirement',
-        'add-requirement-element': '添加元素',
-        'edit-requirement-field': '在属性面板中编辑',
-        'cycle-requirement-kind': '切换关系类型',
-        'invert-requirement-relation': '反转方向',
-        // journey（more-diagrams 工单 08）：空白菜单（画布 DOM 无 data-id，无元素级菜单项）
-        'add-journey-task': '添加任务',
-        'add-journey-section': '添加分组',
-        // pie（more-diagrams 工单 10）：空白菜单（画布 DOM 无 data-id，无元素级菜单项）
-        'add-pie-sector': '添加扇区',
-        // sankey（more-diagrams 工单 13）：空白加链路；节点重命名（选中 + 关菜单）
-        'add-sankey-link': '添加链路',
-        'edit-sankey-name': '重命名',
-        // gantt（more-diagrams 工单 11）：空白菜单（任务条可寻址但元素级菜单与 journey/pie 同口径不做）
-        'add-gantt-task': '添加任务',
-        'add-gantt-section': '添加分组',
-        // quadrant（more-diagrams 工单 12）：空白加点；点 = 改文本（内联）/ 改坐标 / 改样式；
-        // 轴与象限 = 改标题文本（文档级属性元素，无删除语义）
-        'add-quadrant-point': '添加点',
-        'edit-quadrant-coords': '在属性面板中编辑',
-        'edit-quadrant-style': '在属性面板中编辑',
-        'edit-quadrant-text': '在属性面板中编辑',
-        // packet（more-diagrams 工单 16）：空白 = 加字段（+count 形态衔接前序）；
-        // 字段 = 改名（内联）/ 改位区间（右侧表单，绝对形态落码）/ 删除
-        'add-packet-field': '添加字段',
-        'edit-packet-range': '在属性面板中编辑',
-        // xychart（more-diagrams 工单 14）：空白加系列；系列改名/改类型/编辑数值（选中或直接落码）
-        'add-xychart-line': '添加折线（line）',
-        'add-xychart-bar': '添加柱形（bar）',
-        'xychart-toggle-type': '切换 line / bar',
-        'xychart-edit-values': '编辑数值',
-        'edit-xychart-axis': '编辑轴',
-        // radar（more-diagrams 工单 15）：空白菜单（画布 DOM 无 data-id，无元素级菜单项）
-        'add-radar-axis': '添加轴',
-        'add-radar-curve': '添加曲线',
-        // architecture（more-diagrams 工单 17）：空白加 service / group / junction；
-        // service = 改标题（内联）/ 图标与分组（D5）/ 从这里连线 / 删除；group = 改标题 / 删除；
-        // 边 = 改端口与箭头（D5）/ 删除
-        'add-architecture-service': '添加服务',
-        'add-architecture-group': '添加分组',
-        'add-architecture-junction': '添加接合点',
-        'edit-architecture-service': '在属性面板中编辑',
-        'edit-architecture-edge': '在属性面板中编辑',
-        // treemap（more-diagrams 工单 20）：空白菜单（画布 DOM 无 data-id，无元素级菜单项）
-        'add-treemap-group': '添加分组',
-        'add-treemap-leaf': '添加叶子',
-        // ishikawa（more-diagrams 工单 22）：空白菜单（画布 DOM 无 data-id，无元素级菜单项）
-        'add-ishikawa-cause': '添加主因',
-        // wardley（more-diagrams 工单 23）：空白菜单（画布 DOM 无 data-id，无元素级菜单项）
-        'add-wardley-component': '添加组件',
-        'add-wardley-anchor': '添加锚点',
-        'add-wardley-link': '添加连线',
-        // venn（more-diagrams 工单 21）：空白 = 加集合 / 加交集；集合 / 交集 = 改标签与
-        // 尺寸（D5 选中 + 关菜单）；集合上另有加集合 / 加交集
-        'add-venn-set': '添加集合',
-        'add-venn-union': '添加交集',
-        'add-venn-union-here': '添加交集',
-        'edit-venn-area': '在属性面板中编辑',
-        // cynefin（more-diagrams 工单 25）：空白菜单与域/条目菜单（画布 DOM 无 data-id，
-        // 元素级目标只由结构树选中构造）
-        'add-cynefin-item': '添加条目',
-        'add-cynefin-transition': '添加转移',
-        // usecase（more-diagrams 工单 26）：空白 = 加 actor / 加用例 / 加系统边界；
-        // actor / 用例 / 边界 = 改标签（D5 选中 + 关菜单）；关系 = 改标签与种类
-        'add-usecase-actor': '添加参与者',
-        'add-usecase-case': '添加用例',
-        'add-usecase-boundary': '添加系统边界',
-        'edit-usecase-element': '在属性面板中编辑',
-        'edit-usecase-relation': '在属性面板中编辑',
-        // treeView（more-diagrams 工单 24）：空白菜单（画布 DOM 无 data-id，无元素级菜单项）
-        'add-treeview-root': '添加根节点',
-        // eventmodeling（more-diagrams 工单 28）：空白 = 加帧 / 加数据块（画布 DOM 无
-        // data-id，元素级目标只由结构树选中构造）
-        'add-em-frame': '添加帧',
-        'add-em-data': '添加数据块',
-        'edit-em-frame': '在属性面板中编辑',
-        'edit-em-data': '在属性面板中编辑',
-        // zenuml（more-diagrams 工单 19）：空白 = 加参与者 / 加消息；参与者 = 改别名
-        //（内联编辑）/ 删除；消息 = 改文本（D5 选中 + 关菜单）/ 删除
-        'add-zenuml-participant': '添加参与者',
-        'add-zenuml-message': '添加消息',
-        'edit-zenuml-participant': '改别名',
-        'edit-zenuml-message': '在属性面板中编辑',
-        // c4（more-diagrams 工单 18）：空白 = 加元素（类型子菜单）/ 加边界（含 Deployment Node）；
-        // 元素 / 边界 / 关系 = 在属性面板中编辑（D5 选中 + 关菜单，画布无 data-id）
-        'add-c4-element': '添加元素',
-        'add-c4-boundary': '添加边界',
-        'edit-c4-element': '在属性面板中编辑',
-        'edit-c4-boundary': '在属性面板中编辑',
-        'edit-c4-relation': '在属性面板中编辑',
         delete: '删除',
         styleName: '样式名称',
         styleNameInvalid: '名称不能为空，且不能含空格或逗号',
         styleColor: '颜色',
+        applyStyleEmpty: '暂无样式',
       },
     },
     history: {

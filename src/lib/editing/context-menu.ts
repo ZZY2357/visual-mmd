@@ -1,4 +1,4 @@
-import type { DiagramTypeId } from '../diagram-registry'
+import { DIAGRAM_TYPE_LIST, type DiagramTypeId } from '../diagram-registry'
 import type { CanvasSelection } from '../canvas-selection/data-id'
 import type { Selection } from '../projection/selection'
 import { menuTargetOfCanvas } from '../canvas-selection/selection-codec'
@@ -7,8 +7,11 @@ import { menuTargetOfCanvas } from '../canvas-selection/selection-codec'
  * 右键菜单（工单 07/04/06/03）：单一菜单随右键目标变化。
  *
  * 本模块是纯逻辑，与 DOM/React 解耦：
- * - 画布选中（data-id 解析产物）+ 图种 → 菜单目标（blank / 节点 / 连线）
- * - 菜单目标 → 菜单项列表（空白处按图种给添加类动作，元素上 = 该元素的编辑动作）
+ * - 画布选中（data-id 解析产物）+ 图种 → 菜单目标（blank / 元素）
+ * - 菜单目标 → 菜单项列表：architecture-deepening-3 工单 04 起是**一份通用渲染器**——
+ *   各图种「菜单长什么样」（blankItems / nodeItems，文案键随行）定义在
+ *   `src/lib/editing/menu/<id>.ts` 并挂进注册表的 `menu` 字段，本模块查 registration
+ *   取定义，不再维护按 diagramType / selection.kind 的巨型 switch
  *
  * 空白处四种图种都有添加动作（工单 04）：flowchart 添加节点、class 添加类、
  * sequence 添加参与者、mindmap 添加根节点；空图与错误态（空 classDiagram）同样适用。
@@ -248,303 +251,57 @@ export function contextMenuTargetFromSelection(
   return menuTargetOfCanvas(diagramType, selection)
 }
 
-/** 空白菜单项按图种：flowchart 维持既有四项，其余图种各一个「添加到空图」的入口。
- * 工单 04 起 class / sequence 各补一个添加注释的入口，sequence 另有添加逻辑块。 */
-function blankMenuItems(diagramType: DiagramTypeId): ContextMenuItemId[] {
-  switch (diagramType) {
-    case 'flowchart':
-      return ['add-node', 'link-mode', 'add-style', 'add-subgraph']
-    case 'class':
-      return ['add-class', 'add-note']
-    case 'sequence':
-      return ['add-participant', 'add-note', 'add-block']
-    case 'mindmap':
-      return ['add-root']
-    case 'state':
-      return ['add-state', 'link-mode']
-    case 'er':
-      return ['add-entity']
-    case 'gitgraph':
-      return ['add-commit', 'add-branch']
-    case 'timeline':
-      return ['add-period', 'add-section']
-    case 'kanban':
-      return ['add-column']
-    case 'requirement':
-      // requirement 的空白入口（工单 07 定案）：加 requirement（type 在添加表单的枚举里选）与加 element。
-      // 拉关系不做空白入口——关系两端都是节点，从节点菜单「从这里连线」进入更省一步
-      return ['add-requirement', 'add-requirement-element']
-    case 'journey':
-      // journey 的空白入口（工单 08 定案）：加任务（默认 score 3、归属最后一个分组）与加分组
-      return ['add-journey-task', 'add-journey-section']
-    case 'pie':
-      // pie 的空白入口（工单 10 定案）：加扇区（数值落 1，标签避重，右侧表单可改）
-      return ['add-pie-sector']
-    case 'block':
-      // block 的空白入口（more-diagrams 工单 09）：加块节点（创建 + 内联命名）与加嵌套块
-      return ['add-block-node', 'add-block-group']
-    case 'sankey':
-      // sankey 的空白入口（more-diagrams 工单 13）：加链路（三列表单，提交才落码）
-      return ['add-sankey-link']
-    case 'gantt':
-      // gantt 的空白入口（工单 11 定案）：加任务（缺省时长 1d，归属最后一个分组）与加分组
-      return ['add-gantt-task', 'add-gantt-section']
-    case 'quadrant':
-      // quadrant 的空白入口（工单 12 定案）：加点（坐标落 0.5, 0.5，文本避重，右侧表单可改）
-      return ['add-quadrant-point']
-    case 'packet':
-      // packet 的空白入口（工单 16 定案）：加字段（+count 形态衔接前序，位宽缺省 8，
-      // 名称避重，落码后内联命名）
-      return ['add-packet-field']
-    case 'xychart':
-      // xychart 的空白入口（more-diagrams 工单 14）：加 line / 加 bar（表单，提交才落码）
-      return ['add-xychart-line', 'add-xychart-bar']
-    case 'radar':
-      // radar 的空白入口（工单 15 定案）：加轴与加曲线（占位 id 避重，右侧表单可改）
-      return ['add-radar-axis', 'add-radar-curve']
-    case 'architecture':
-      // architecture 的空白入口（more-diagrams 工单 17）：加 service（创建 + 内联命名标题）/
-      // 加 group / 加 junction
-      return ['add-architecture-service', 'add-architecture-group', 'add-architecture-junction']
-    case 'treemap':
-      // treemap 的空白入口（工单 20 定案）：加分组（顶格 Section）/ 加叶子（顶格 Leaf，数值落 1）
-      return ['add-treemap-group', 'add-treemap-leaf']
-    case 'ishikawa':
-      // ishikawa 的空白入口（工单 22 定案）：加主因（顶层因果节点，插在最后一条主因之后）
-      return ['add-ishikawa-cause']
-    case 'wardley':
-      // wardley 的空白入口（工单 23 定案）：加 component / 加 anchor（坐标落图正中，
-      // 名字避重）/ 加连线（两端从既有节点名下选，提交才落码）
-      return ['add-wardley-component', 'add-wardley-anchor', 'add-wardley-link']
-    case 'venn':
-      // venn 的空白入口（工单 21 定案）：加集合（占位 id 避重）/ 加交集（两个集合组二元交集）
-      return ['add-venn-set', 'add-venn-union']
-    case 'cynefin':
-      // cynefin 的空白入口（工单 25 定案）：加条目（归属最后一个声明域，无则 complex）/
-      // 加转移（两端从固定五域下拉，提交才落码）
-      return ['add-cynefin-item', 'add-cynefin-transition']
-    case 'usecase':
-      // usecase 的空白入口（工单 26 定案）：加 actor / 加用例（占位 id 避重）/
-      // 加系统边界（`systemBoundary … end` 两行）。关系从节点菜单「从这里连线」进入更省一步
-      return ['add-usecase-actor', 'add-usecase-case', 'add-usecase-boundary']
-    case 'treeview':
-      // treeView 的空白入口（工单 24 定案）：加根节点（顶层节点，追加到源码末尾）
-      return ['add-treeview-root']
-    case 'eventmodeling':
-      // eventmodeling 的空白入口（工单 28 定案）：加帧（占位帧号 / 标识避重）/
-      // 加数据块（名字避重，空块体）。画布无 data-id，元素级编辑降级到结构树 + 属性表单
-      return ['add-em-frame', 'add-em-data']
-    case 'agentflow':
-      // agentflow 的空白入口（工单 27 定案）：加节点（缺省 `n{N}` id + task 形状）/
-      // 加 flow 容器（空标题）
-      return ['add-agentflow-node', 'add-agentflow-flow']
-    case 'zenuml':
-      // zenuml 的空白入口（工单 19 定案）：加参与者（占位 id 避重）/ 加消息（表单浮出，提交才落码）
-      return ['add-zenuml-participant', 'add-zenuml-message']
-    case 'c4':
-      // c4 的空白入口（工单 18 定案）：加元素（类型子菜单，见 menu-actions）/ 加边界
-      // （四类 Boundary + Deployment Node）。关系从元素菜单「从这里连线」进入更省一步。
-      // 注：画布无 data-id，空白菜单是画布侧唯一入口；元素/边界/关系的编辑走结构树 + 表单。
-      return ['add-c4-element', 'add-c4-boundary']
-    // DiagramTypeId 是开放类型（more-diagrams 工单 01）：未接入画布能力包的图种
-    // 没有空白右键入口（unsupported 态下画布右键整体停用，不会走到这里）
-    default:
-      return []
-  }
+/**
+ * 图种右键菜单定义（architecture-deepening-3 工单 04）：registry  字段的载荷。
+ * 各图种「菜单长什么样」（blankItems / nodeItems，文案键随行）定义在
+ * ；本模块只保留菜单目标词汇（Target）、菜单项 id 的
+ * 共享 union（MENU_ACTIONS 穷尽 Record、CanvasPanel 渲染与 i18n 文案键共用同一份）
+ * 与一份通用渲染器——不再有按 diagramType / selection.kind 的巨型 switch。
+ */
+export type MenuNodeItemSpec<K extends Selection['kind']> =
+  | readonly ContextMenuItemId[]
+  | ((selection: Extract<Selection, { kind: K }>, composite: boolean) => readonly ContextMenuItemId[])
+
+export interface DiagramMenuDefinition {
+  /** 空白处右键项（顺序即展示顺序） */
+  blankItems: readonly ContextMenuItemId[]
+  /**
+   * 选中元素右键项：selection.kind → 菜单项规格。未收录的 kind = 该图种不响应此选中
+   * （渲染器安静返回 []，与「无可弹项安静关闭」同口径）。函数形态目前仅 state 的
+   * 复合特例使用（composite 由调用方按投影补齐，见 use-canvas-context-menu）。
+   */
+  nodeItems: { [K in Selection['kind']]?: MenuNodeItemSpec<K> }
+}
+
+/** diagramType（开放类型）→ 菜单定义；未注册图种返回 null（渲染器安静给空菜单） */
+function menuOf(diagramType: DiagramTypeId): DiagramMenuDefinition | null {
+  return DIAGRAM_TYPE_LIST.find((registration) => registration.id === diagramType)?.menu ?? null
 }
 
 /**
- * 菜单目标 → 菜单项列表（顺序即展示顺序）。工单 architecture-deepening-3 03 起
- * Target 复用 Selection 词汇：元素目标直接 switch `target.selection.kind`
- * （Selection 的 kind 命名），不再维护第二套平行名字。
- * - 空白：按图种给「添加到空图」入口（blankMenuItems）
- * - 元素：各 Selection kind → 菜单项列表（注释随行保留各图种定案）
- * - 不是可弹菜单目标的选中种类（subgraph / classdef / 区域块等）：返回 []——
- *   与「无可弹项安静关闭」的兜底同口径
+ * 菜单目标 → 菜单项列表（通用渲染器，architecture-deepening-3 工单 04）：
+ * - 空白：查该图种 registration.menu 的 blankItems（顺序即展示顺序）；
+ *   未注册图种（开放 DiagramTypeId）返回 []——unsupported 态画布右键整体停用，不会走到这里
+ * - 元素：按 selection.kind 查各 registration.menu.nodeItems（Selection 的 kind 与图种
+ *   一一对应，按注册顺序取第一个声明者；穷举守卫见 menu-actions.test 的可达 id 并集测试）；
+ *   函数形态规格传入选中与 composite（state 复合特例）
+ * 不是可弹菜单目标的选中种类（subgraph / classdef / 区域块等）返回 []——
+ * 与「无可弹项安静关闭」的兜底同口径
  */
 export function contextMenuItems(target: ContextMenuTarget): ContextMenuItemId[] {
-  if (target.kind === 'blank') return blankMenuItems(target.diagramType)
+  if (target.kind === 'blank') return [...(menuOf(target.diagramType)?.blankItems ?? [])]
   const selection = target.selection
-  switch (selection.kind) {
-    case 'node':
-      return ['link-from-here', 'edit-text', 'apply-style', 'delete']
-    case 'edge':
-      return ['edit-label', 'delete']
-    case 'mindmap-node':
-      return ['add-child', 'edit-text', 'delete']
-    case 'class':
-      return ['add-member', 'add-relation', 'add-note', 'delete-class']
-    case 'participant':
-      return ['add-message', 'add-block', 'delete-participant']
-    case 'class-relation':
-      return ['cycle-relation-kind', 'edit-relation', 'delete-relation']
-    case 'message':
-      return ['cycle-message-arrow', 'edit-message', 'delete-message']
-    case 'note':
-      return ['delete-note']
-    case 'block':
-      return ['delete-block']
-    case 'state':
-      // 复合状态多一项「添加状态（复合内部）」；普通状态 = 改描述 / 连线模式 / 删除
-      return target.composite === true
-        ? ['add-state-into', 'edit-state-desc', 'link-from-here', 'delete']
-        : ['edit-state-desc', 'link-from-here', 'delete']
-    case 'state-transition':
-      return ['edit-label', 'delete']
-    // er（more-diagrams 工单 03）：实体 = 添加属性 / 连线模式（预选起点）/ 改别名 / 删除；
-    // 关系 = 切换线型（循环直接改）/ 在属性面板中编辑（基数与标签，枚举选择）/ 删除；
-    // 属性 = 在属性面板中编辑 / 删除
-    case 'er-entity':
-      return ['add-attribute', 'link-from-here', 'edit-er-alias', 'delete']
-    case 'er-relation':
-      return ['cycle-er-line', 'edit-er-relation', 'delete']
-    case 'er-attribute':
-      return ['edit-er-attribute', 'delete']
-    // timeline（more-diagrams 工单 05）：时期 = 改文本 / 加事件 / 删除；事件 = 改文本 / 删除
-    case 'timeline-period':
-      return ['edit-period-text', 'add-event', 'delete']
-    case 'timeline-event':
-      return ['edit-event-text', 'delete']
-    // kanban（more-diagrams 工单 06）：列 = 改标题 / 加卡片 / 删除；卡片 = 改描述 / 改元数据 / 删除。
-    // 改标题与改描述复用 edit-text（内联编辑，见 menu-actions.beginEditText）。
-    case 'kanban-column':
-      return ['edit-text', 'add-card', 'delete']
-    case 'kanban-card':
-      return ['edit-text', 'edit-kanban-metadata', 'delete']
-    // requirement（more-diagrams 工单 07）：节点（两类同构）= 改字段（选中它，字段在右侧
-    // RequirementForm 里改）/ 从这里连线 / 删除；关系 = 切换关系类型（循环直接改）/
-    // 反转方向（直接改）/ 删除
-    case 'requirement':
-    case 'requirement-element':
-      return ['edit-requirement-field', 'link-from-here', 'delete']
-    case 'requirement-relation':
-      return ['cycle-requirement-kind', 'invert-requirement-relation', 'delete']
-    // block（more-diagrams 工单 09）：节点 = 改标签（内联编辑）/ 删除；
-    // 嵌套块 = 加块节点（落进组内）/ 删除；边 = 在属性面板中编辑 / 删除
-    case 'block-node':
-      return ['edit-text', 'delete']
-    case 'block-group':
-      return ['add-block-node', 'delete']
-    case 'block-edge':
-      return ['edit-label', 'delete']
-    // sankey（more-diagrams 工单 13）：节点 = 重命名（选中 + 关菜单，在右侧属性表单改）；
-    // 链路 = 在属性面板中编辑（改三列，选中 + 关菜单）/ 删除
-    case 'sankey-node':
-      return ['edit-sankey-name']
-    case 'sankey-link':
-      return ['edit-label', 'delete']
-    // quadrant（more-diagrams 工单 12）：点 = 改文本（内联编辑）/ 改坐标 / 改样式（都是
-    // D5「选中 + 关菜单」，字段在右侧 QuadrantPointForm 改）/ 删除；
-    // 轴 / 象限标题 = 改文本（D5「选中 + 关菜单」，右侧表单改——文档级属性元素无删除）
-    case 'quadrant-point':
-      return ['edit-text', 'edit-quadrant-coords', 'edit-quadrant-style', 'delete']
-    case 'quadrant-axis':
-    case 'quadrant-quadrant':
-      return ['edit-quadrant-text']
-    // packet（more-diagrams 工单 16）：字段 = 改名（内联编辑）/ 改位区间（D5「选中 +
-    // 关菜单」，start/end 在右侧 PacketFieldForm 改，绝对形态落码）/ 删除
-    case 'packet-field':
-      return ['edit-text', 'edit-packet-range', 'delete']
-    // xychart（more-diagrams 工单 14）：系列 = 改名（选中 + 关菜单，属性表单）/
-    // 改类型（直接落码切换 line↔bar）/ 编辑数值（选中 + 关菜单，数组行编辑在属性表单）/
-    // 删除；轴 = 改形态/字段（选中 + 关菜单，属性表单承接）；标题 = 改标题（选中 + 关菜单）
-    case 'xychart-series':
-      return ['edit-label', 'xychart-toggle-type', 'xychart-edit-values', 'delete']
-    case 'xychart-axis':
-      return ['edit-xychart-axis']
-    case 'xychart-title':
-      return ['edit-label']
-    // architecture（more-diagrams 工单 17）：service = 改标题（内联编辑）/ 图标与分组
-    // （D5「选中 + 关菜单」，右侧 ArchitectureServiceForm 改）/ 从这里连线 / 删除；
-    // group = 改标题（内联编辑）/ 删除；junction = 删除；边 = 改端口与箭头（D5）/ 删除
-    case 'architecture-service':
-      return ['edit-text', 'edit-architecture-service', 'link-from-here', 'delete']
-    case 'architecture-group':
-      return ['edit-text', 'delete']
-    case 'architecture-junction':
-      return ['delete']
-    case 'architecture-edge':
-      return ['edit-architecture-edge', 'delete']
-    // wardley（more-diagrams 工单 23）：节点 = 从这里拉连线（D5：选中 + 关菜单，字段在右侧
-    // WardleyNodeForm 改——画布无 data-id，这几个目标只由结构树选中经键路径构造）/ 删除；
-    // 连线 = 加连线（同源预填）/ 编辑（选中 + 关菜单，右侧 WardleyLinkForm 改端点）/ 删除；
-    // evolve = 编辑（选中 + 关菜单，右侧 WardleyEvolveForm 改目标）/ 删除
-    case 'wardley-node':
-      return ['edit-text', 'link-from-here', 'delete']
-    case 'wardley-link':
-      return ['add-wardley-link', 'edit-label', 'delete']
-    case 'wardley-evolve':
-      return ['edit-label', 'delete']
-    // venn（more-diagrams 工单 21）：集合 = 改标签与尺寸（D5「选中 + 关菜单」，右侧
-    // VennAreaForm 改）/ 加集合（追加在其后）/ 加交集（以该集合与下一集合组二元交集）/ 删除；
-    // 交集 = 改标签与尺寸 / 删除（交集上不加「加集合」——无「集合的兄弟」语义）。
-    case 'venn-set':
-      return ['edit-venn-area', 'add-venn-set', 'add-venn-union-here', 'delete']
-    case 'venn-union':
-      return ['edit-venn-area', 'delete']
-    // cynefin（more-diagrams 工单 25）：域名词行 = 加条目（该域下；域不可改名/删除，
-    // 工单定案——与 ishikawa 鱼头同口径）；条目 = 加条目（同域内该条目之后）/ 编辑
-    // （选中 + 关菜单，右侧 CynefinItemForm 改文本）/ 删除；转移 = 编辑（选中 + 关菜单，
-    // 右侧 CynefinTransitionForm 改端点与标签）/ 删除
-    case 'cynefin-domain':
-      return ['add-cynefin-item']
-    case 'cynefin-item':
-      return ['add-cynefin-item', 'edit-text', 'delete']
-    case 'cynefin-transition':
-      return ['edit-label', 'delete']
-    // usecase（more-diagrams 工单 26）：actor / 用例 = 改标签与形状（D5「选中 + 关菜单」，
-    // 右侧 UsecaseNodeForm 改）/ 从这里连线 / 删除（级联删引用它的关系与 note）；
-    // 边界 = 改标题（D5，右侧表单改）/ 删除（级联删 end）；关系 = 改标签与种类（D5，右侧
-    // UsecaseRelationForm 改）/ 删除
-    case 'usecase-actor':
-    case 'usecase-usecase':
-      return ['edit-usecase-element', 'link-from-here', 'delete']
-    case 'usecase-boundary':
-      return ['edit-usecase-element', 'delete']
-    case 'usecase-relation':
-      return ['edit-usecase-relation', 'delete']
-    case 'usecase-note':
-      return ['delete']
-    // eventmodeling（more-diagrams 工单 28）：帧 = 编辑（D5「选中 + 关菜单」，右侧
-    // EventModelingFrameForm 改帧号 / 类型 / 标识 / 来源 / 数据块引用）/ 删除；
-    // 数据块 = 编辑（D5，右侧 EventModelingDataForm 改名）/ 删除。元素级目标只由
-    // 结构树选中构造（画布无 data-id）。派生连线无编辑目标（只读）
-    case 'em-frame':
-      return ['edit-em-frame', 'delete']
-    case 'em-data':
-      return ['edit-em-data', 'delete']
-    // agentflow（more-diagrams 工单 27）：节点 = 改文本（D5「选中 + 关菜单」，右侧
-    // AgentflowNodeForm 改形状与文本）/ 从这里连线（加边表单，from 预选）/ 删除；
-    // 边 = 改标签（D5「选中 + 关菜单」，右侧 AgentflowEdgeForm 改）/ 删除；
-    // 容器 = 改标题（D5，右侧 AgentflowContainerForm 改）/ 删除（连带块内元素）；
-    // 文档行 = 删除（编辑入口 = 图表级表单）
-    case 'agentflow-node':
-      return ['edit-agentflow-node', 'link-from-here', 'delete']
-    case 'agentflow-edge':
-      return ['edit-label', 'delete']
-    case 'agentflow-flow':
-      return ['edit-agentflow-flow', 'delete']
-    case 'agentflow-doc':
-      return ['delete']
-    // zenuml（more-diagrams 工单 19）：参与者 = 改别名（D5「选中 + 关菜单」，右侧表单改）/
-    // 删除声明行；消息 = 改文本（D5，右侧表单改）/ 删除；片段（分组）无动作
-    case 'zenuml-participant':
-      return ['edit-zenuml-participant', 'delete']
-    case 'zenuml-message':
-      return ['edit-zenuml-message', 'delete']
-    case 'zenuml-fragment':
-      return []
-    // c4（more-diagrams 工单 18）：元素 = 改字段（alias/label/techn/descr，D5「选中 + 关菜单」，
-    // 右侧 C4ElementForm 改）/ 从这里连线 / 删除；边界 = 改标题（D5，右侧 C4BoundaryForm 改）/
-    // 删除；关系 = 改字段（label/techn/descr/方向，D5，右侧 C4RelationForm 改）/ 删除。
-    // 画布无 data-id，这些目标只由结构树选中构造。
-    case 'c4-element':
-      return ['edit-c4-element', 'link-from-here', 'delete']
-    case 'c4-boundary':
-      return ['edit-c4-boundary', 'delete']
-    case 'c4-relation':
-      return ['edit-c4-relation', 'delete']
-    default:
-      return []
+  for (const registration of DIAGRAM_TYPE_LIST) {
+    const spec = registration.menu.nodeItems[selection.kind]
+    if (spec === undefined) continue
+    const items =
+      typeof spec === 'function'
+        ? (spec as (s: never, composite: boolean) => readonly ContextMenuItemId[])(
+            selection as never,
+            target.composite ?? false,
+          )
+        : spec
+    return [...items]
   }
+  return []
 }
