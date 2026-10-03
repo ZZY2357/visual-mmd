@@ -164,10 +164,22 @@ function findTargetElement(root: Element, target: CanvasInlineEditTarget, text: 
     // 'sequence' 与 'sequence-alias' 的 data-id 都是参与者 id（actorId 不变，改的是别名）
     const dataId =
       target.kind === 'flowchart' ? target.nodeId : target.kind === 'class' ? target.name : target.actorId
+    // sequence（gui-test-2026-10-03 工单 01）：mermaid 序列图渲染器给**两个**元素写
+    // `data-id = actorId`——贯穿全程的生命线 `line.actor-line`（data-et="life-line"，
+    // 宽 0.5px）与参与者框 `g.actor`（data-et="participant"）。文档序生命线在前，
+    // 取首个命中会拿到细长竖条（浮层叠在生命线上、文字被裁剪）。
+    // 故 sequence 目标优先取非生命线命中（参与者框），仅生命线可寻址时回落。
+    const isSequence = target.kind === 'sequence' || target.kind === 'sequence-alias'
+    let lifeline: Element | null = null
     for (const el of root.querySelectorAll('[data-id]')) {
-      if (el.getAttribute('data-id') === dataId) return el
+      if (el.getAttribute('data-id') !== dataId) continue
+      if (isSequence && el.getAttribute('data-et') === 'life-line') {
+        lifeline ??= el
+        continue
+      }
+      return el
     }
-    return null
+    return lifeline
   }
   if (target.kind === 'state') {
     // state 的 data-id 即状态 id（渲染后处理从 DOM id 反注，more-diagrams 工单 02）

@@ -1,6 +1,6 @@
 import { act, useEffect, useRef } from 'react'
 import { createRoot } from 'react-dom/client'
-import { afterEach, beforeEach, describe, expect, it } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { resetEditorHistory, useEditorStore } from '../../../store/editor'
 import { DEFAULT_DIAGRAM_SOURCE } from '../../../lib/storage'
 import { flowchartParser } from '../../pipeline/flowchart'
@@ -585,6 +585,153 @@ describe('useCanvasInlineEdit（more-diagrams 工单 11：gantt 双击改任务�
     })
     act(() => api.current!.commit('方案:设计')) // 冒号终止 taskTxt 词法，任务名非法
     expect(useEditorStore.getState().source).toContain('方案设计 :after a1, 5d')
+    expect(snapshots.at(-1)).toBeNull()
+  })
+})
+
+// ---------- gui-test-2026-10-03 工单 01：sequence 参与者 inline 编辑框定位 ----------
+
+/**
+ * 缺陷形态（2026-10-03 实测）：mermaid 序列图渲染器给**两个**元素写 `data-id = actorId`
+ * ——贯穿全程的生命线 `line.actor-line`（data-et="life-line"，宽 0.5px，文档序在前）与
+ * 参与者框 `g.actor`（data-et="participant"）。findTargetElement 取首个命中即生命线，
+ * 浮层退化成叠在生命线上的细长竖条、文字被裁剪。
+ * 修复：sequence 目标优先取非生命线命中。本组用例以 mermaid 真实 DOM 形态 +
+ * jsdom getBoundingClientRect 桩覆盖定位逻辑（不依赖真实浏览器）。
+ */
+
+const SEQ_BOX_SAMPLE = `sequenceDiagram
+    participant 甲
+    participant 乙
+    甲->>乙: hi
+`
+
+/** mermaid v12 sequenceDiagram 真实形态：生命线 line（data-et=life-line）在前，
+ * 参与者框 g（data-et=participant）在后，二者 data-id 同为 actorId */
+const SEQ_BOX_SVG = `<svg><g class="root">
+  <g><line id="actor0" class="actor-line 200" data-et="life-line" data-id="甲" /><g data-et="participant" data-id="甲"><rect class="actor" /><text class="actor">甲</text></g></g>
+  <g><line id="actor1" class="actor-line 200" data-et="life-line" data-id="乙" /><g data-et="participant" data-id="乙"><rect class="actor" /><text class="actor">乙</text></g></g>
+</g></svg>`
+
+/** 负向回落形态：参与者框缺失（老结构 / 反注异常），只剩生命线可寻址 */
+const SEQ_LIFELINE_ONLY_SVG = `<svg><g class="root">
+  <line id="actor0" class="actor-line 200" data-et="life-line" data-id="甲" />
+</g></svg>`
+
+const SEQ_BOX_PROJECTION = (() => {
+  const parsed = sequenceParser.parse(SEQ_BOX_SAMPLE)
+  if (!parsed.ok) throw new Error(`样例源码必须可解析：${parsed.error.message}`)
+  return { type: 'sequence' as const, sequence: buildSequenceProjection(parsed.doc) }
+})()
+
+interface RectLike {
+  left: number
+  top: number
+  width: number
+  height: number
+}
+
+describe('useCanvasInlineEdit（gui-test-2026-10-03 工单 01：sequence 参与者编辑框定位）', () => {
+  let host: HTMLDivElement
+  let root: ReturnType<typeof createRoot>
+  let snapshots: unknown[]
+  let api: { current: InlineEditApi | null }
+  let rects: Map<Element, RectLike>
+
+  beforeEach(() => {
+    host = document.createElement('div')
+    document.body.appendChild(host)
+    root = createRoot(host)
+    snapshots = []
+    api = { current: null }
+    rects = new Map()
+    // jsdom 不做布局：按元素桩定几何（生命线 0.5px 宽、参与者框 80×40）
+    vi.spyOn(Element.prototype, 'getBoundingClientRect').mockImplementation(function (this: Element) {
+      const r = rects.get(this)
+      const zero = { left: 0, top: 0, width: 0, height: 0 }
+      return { ...zero, ...(r ?? zero) } as DOMRect
+    })
+  })
+  afterEach(() => {
+    vi.restoreAllMocks()
+    act(() => root.unmount())
+    host.remove()
+    resetEditorHistory(DEFAULT_DIAGRAM_SOURCE)
+    useEditorStore.getState().select(null)
+  })
+
+  /** 画布容器 800×600 @ (0,0)；生命线 0.5×2000 @ (100,50)；参与者框 80×40 @ (60,10) */
+  function mount(svg: string) {
+    resetEditorHistory(SEQ_BOX_SAMPLE)
+    act(() => {
+      root.render(
+        <DblHarness
+          projection={SEQ_BOX_PROJECTION}
+          resolver={nodeDataIdResolver(['甲', '乙'])}
+          svg={svg}
+          onEditing={(e) => snapshots.push(e)}
+          apiRef={api}
+        />,
+      )
+    })
+    const container = host.firstElementChild as HTMLDivElement
+    rects.set(container, { left: 0, top: 0, width: 800, height: 600 })
+    for (const line of container.querySelectorAll('line.actor-line')) {
+      rects.set(line, { left: 100, top: 50, width: 0.5, height: 2000 })
+    }
+    for (const box of container.querySelectorAll('g[data-et="participant"]')) {
+      rects.set(box, { left: 60, top: 10, width: 80, height: 40 })
+    }
+    return container
+  }
+
+  it('新建命名（kind:sequence）：定位到参与者框（80×40），不是生命线的细长竖条', () => {
+    const container = mount(SEQ_BOX_SVG)
+    act(() => {
+      api.current!.beginEdit({ kind: 'sequence', actorId: '甲' })
+    })
+    expect(snapshots.at(-1)).toMatchObject({ target: { kind: 'sequence', actorId: '甲' } })
+    const editing = snapshots.at(-1) as { rect: RectLike | null }
+    expect(editing.rect).toEqual({ left: 60, top: 10, width: 80, height: 40 })
+    // 负向对照锚点：生命线矩形与此完全不同——断言有效
+    expect(editing.rect).not.toEqual({ left: 100, top: 50, width: 0.5, height: 2000 })
+    expect(container.querySelector('g[data-et="participant"][data-id="甲"]')).not.toBeNull()
+  })
+
+  it('双击参与者框文字（kind:sequence-alias）：同样定位到参与者框，提交落 set-participant', () => {
+    mount(SEQ_BOX_SVG)
+    const box = host.querySelector('g[data-et="participant"][data-id="甲"]')!
+    act(() => {
+      box.querySelector('text')!.dispatchEvent(new MouseEvent('dblclick', { bubbles: true }))
+    })
+    expect(snapshots.at(-1)).toMatchObject({ target: { kind: 'sequence-alias', actorId: '甲' } })
+    const editing = snapshots.at(-1) as { rect: RectLike | null }
+    expect(editing.rect).toEqual({ left: 60, top: 10, width: 80, height: 40 })
+    act(() => api.current!.commit('用户'))
+    expect(useEditorStore.getState().source).toContain('participant 甲 as 用户')
+  })
+
+  it('回落：只有生命线可寻址时仍能定位（rect 非空，输入框不至于 display:none）', () => {
+    mount(SEQ_LIFELINE_ONLY_SVG)
+    act(() => {
+      api.current!.beginEdit({ kind: 'sequence', actorId: '甲' })
+    })
+    const editing = snapshots.at(-1) as { rect: RectLike | null }
+    expect(editing.rect).toEqual({ left: 100, top: 50, width: 0.5, height: 2000 })
+  })
+
+  it('新建命名提交（rename-participant）：源码声明与消息引用同步改写', () => {
+    mount(SEQ_BOX_SVG)
+    act(() => {
+      api.current!.beginEdit({ kind: 'sequence', actorId: '甲' })
+    })
+    act(() => {
+      api.current!.commit('客户')
+    })
+    const source = useEditorStore.getState().source
+    expect(source).toContain('participant 客户')
+    expect(source).toContain('客户->>乙: hi') // 消息端点一并改名，源码不破
+    expect(source).not.toContain('participant 甲')
     expect(snapshots.at(-1)).toBeNull()
   })
 })
