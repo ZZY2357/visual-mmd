@@ -30,6 +30,7 @@ export function DiagramLibraryDrawer({ opened, onClose }: { opened: boolean; onC
 
   const [renaming, setRenaming] = useState<StoredLibraryDiagram | null>(null)
   const [renameValue, setRenameValue] = useState('')
+  const [deleting, setDeleting] = useState<StoredLibraryDiagram | null>(null)
 
   const openRename = (diagram: StoredLibraryDiagram) => {
     setRenaming(diagram)
@@ -39,6 +40,11 @@ export function DiagramLibraryDrawer({ opened, onClose }: { opened: boolean; onC
   const applyRename = () => {
     if (renaming !== null) renameDiagram(renaming.id, renameValue)
     setRenaming(null)
+  }
+
+  const confirmDelete = () => {
+    if (deleting !== null) deleteDiagram(deleting.id)
+    setDeleting(null)
   }
 
   return (
@@ -113,7 +119,7 @@ export function DiagramLibraryDrawer({ opened, onClose }: { opened: boolean; onC
                     aria-label={t('library.deleteAria', { name: diagram.name })}
                     onClick={(e) => {
                       e.stopPropagation()
-                      deleteDiagram(diagram.id)
+                      setDeleting(diagram)
                     }}
                   >
                     ✕
@@ -141,6 +147,21 @@ export function DiagramLibraryDrawer({ opened, onClose }: { opened: boolean; onC
               {t('library.cancel')}
             </Button>
             <Button onClick={applyRename}>{t('library.apply')}</Button>
+          </Group>
+        </Stack>
+      </Modal>
+
+      <Modal opened={deleting !== null} onClose={() => setDeleting(null)} title={t('library.deleteTitle')} size="sm">
+        <Stack gap="sm">
+          <Text size="sm">{t('library.deleteConfirm', { name: deleting?.name ?? '' })}</Text>
+          <Text size="sm" c="dimmed">{t('library.deleteIrreversible')}</Text>
+          <Group justify="flex-end">
+            <Button variant="default" onClick={() => setDeleting(null)}>
+              {t('library.cancel')}
+            </Button>
+            <Button color="red" onClick={confirmDelete}>
+              {t('library.deleteConfirmAction')}
+            </Button>
           </Group>
         </Stack>
       </Modal>

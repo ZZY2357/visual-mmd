@@ -174,6 +174,10 @@ export const zhDict = {
       nameLabel: '图表名称',
       cancel: '取消',
       apply: '应用',
+      deleteTitle: '删除图表',
+      deleteConfirm: '确定要删除图表「{{name}}」吗？',
+      deleteIrreversible: '删除后不可恢复。',
+      deleteConfirmAction: '删除',
     },
     seqArrows: {
       '->>': '实线箭头',
