@@ -5,6 +5,7 @@ import type { KeyInput, KeyPlan } from '../editing/canvas-keyboard'
 import type { TreeviewIntent } from './treeview'
 import type { ProjectionTreeviewNode, TreeviewProjection } from '../projection/treeview-projection'
 import type { Selection } from '../projection/selection'
+import { newElementName } from '../../i18n/domain-strings.ts'
 
 // ---------- treeView 编辑键（more-diagrams 工单 24 / ADR-0013）：就近结构映射 ----------
 
@@ -56,7 +57,7 @@ export function treeviewKeyPlan(projection: TreeviewProjection, input: KeyInput)
   if (index === -1) return null
   const node = projection.nodes[index]
   const names = projection.nodes.map((n) => n.name)
-  const name = nextFreeName('新文件', names)
+  const name = nextFreeName(newElementName('file'), names)
   const ordinal = treeviewSubtreeEnd(projection.nodes, index) + 2
   if (input.key === 'Tab') {
     // 只有目录能挂子（文件叶子无子，语义底线；工单定案）

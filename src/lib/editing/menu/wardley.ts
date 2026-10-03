@@ -14,6 +14,12 @@ export const wardleyMenuLabels = {
   'add-wardley-link': '添加连线',
 } as const
 
+export const wardleyMenuLabelsEn = {
+  'add-wardley-component': 'Add component',
+  'add-wardley-anchor': 'Add anchor',
+  'add-wardley-link': 'Add link',
+} as const
+
 export const wardleyMenu: DiagramMenuDefinition = {
   blankItems: ['add-wardley-component', 'add-wardley-anchor', 'add-wardley-link'],
   nodeItems: {

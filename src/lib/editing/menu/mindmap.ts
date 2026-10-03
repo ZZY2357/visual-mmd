@@ -13,6 +13,11 @@ export const mindmapMenuLabels = {
   'add-child': '添加子节点',
 } as const
 
+export const mindmapMenuLabelsEn = {
+  'add-root': 'Add root node',
+  'add-child': 'Add child node',
+} as const
+
 export const mindmapMenu: DiagramMenuDefinition = {
   blankItems: ['add-root'],
   nodeItems: {

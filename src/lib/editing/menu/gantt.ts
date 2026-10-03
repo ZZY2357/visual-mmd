@@ -13,6 +13,11 @@ export const ganttMenuLabels = {
   'add-gantt-section': '添加分组',
 } as const
 
+export const ganttMenuLabelsEn = {
+  'add-gantt-task': 'Add task',
+  'add-gantt-section': 'Add section',
+} as const
+
 export const ganttMenu: DiagramMenuDefinition = {
   blankItems: ['add-gantt-task', 'add-gantt-section'],
   nodeItems: {

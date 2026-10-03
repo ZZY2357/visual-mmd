@@ -13,6 +13,11 @@ export const radarMenuLabels = {
   'add-radar-curve': '添加曲线',
 } as const
 
+export const radarMenuLabelsEn = {
+  'add-radar-axis': 'Add axis',
+  'add-radar-curve': 'Add curve',
+} as const
+
 export const radarMenu: DiagramMenuDefinition = {
   blankItems: ['add-radar-axis', 'add-radar-curve'],
   nodeItems: {

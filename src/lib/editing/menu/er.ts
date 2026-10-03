@@ -17,6 +17,15 @@ export const erMenuLabels = {
   'edit-er-attribute': '在属性面板中编辑',
 } as const
 
+export const erMenuLabelsEn = {
+  'add-entity': 'Add entity',
+  'add-attribute': 'Add attribute',
+  'edit-er-alias': 'Edit alias',
+  'cycle-er-line': 'Cycle line type',
+  'edit-er-relation': 'Edit in property panel',
+  'edit-er-attribute': 'Edit in property panel',
+} as const
+
 export const erMenu: DiagramMenuDefinition = {
   blankItems: ['add-entity'],
   nodeItems: {

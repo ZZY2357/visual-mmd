@@ -20,6 +20,18 @@ export const sequenceMenuLabels = {
   'delete-block': '删除逻辑块',
 } as const
 
+export const sequenceMenuLabelsEn = {
+  'add-participant': 'Add participant',
+  'delete-participant': 'Delete participant',
+  'add-message': 'Add message',
+  'add-block': 'Add logic block',
+  'cycle-message-arrow': 'Cycle arrow',
+  'edit-message': 'Edit in property panel',
+  'delete-message': 'Delete message',
+  'delete-note': 'Delete note',
+  'delete-block': 'Delete logic block',
+} as const
+
 export const sequenceMenu: DiagramMenuDefinition = {
   blankItems: ['add-participant', 'add-note', 'add-block'],
   nodeItems: {

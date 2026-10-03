@@ -3,6 +3,7 @@ import { frontmatterEnd } from './frontmatter'
 import { insertAfter } from './insert'
 import type { DiagramParser, EditIntent, ParseResult, SourceParseError } from './parser'
 import type { Span } from './span'
+import { newElementName } from '../../i18n/domain-strings.ts'
 
 /**
  * radar-beta（雷达图）完整解析器（more-diagrams 工单 15，语法事实以 spec 的
@@ -907,7 +908,7 @@ function resolveAddAxis(doc: SourceDocument, intent: Extract<RadarIntent, { type
   const givenId = intent.id?.trim() ?? ''
   const id = givenId !== '' ? givenId : nextRadarId('axis', existingIds)
   if (!isValidRadarId(id) || existingIds.includes(id)) return null
-  const labelText = intent.label?.trim() ?? '新轴'
+  const labelText = intent.label?.trim() ?? newElementName('axis')
   if (labelText !== '' && !isValidRadarLabelText(labelText)) return null
   const seg = labelText === '' ? id : `${id}${labelToken(labelText)}`
 
@@ -1016,7 +1017,7 @@ function resolveAddCurve(doc: SourceDocument, intent: Extract<RadarIntent, { typ
   const givenId = intent.id?.trim() ?? ''
   const id = givenId !== '' ? givenId : nextRadarId('curve', existingIds)
   if (!isValidRadarId(id) || existingIds.includes(id)) return null
-  const labelText = intent.label?.trim() ?? '新曲线'
+  const labelText = intent.label?.trim() ?? newElementName('curve')
   if (labelText !== '' && !isValidRadarLabelText(labelText)) return null
   const entries: string[] = []
   for (const p of axes) {

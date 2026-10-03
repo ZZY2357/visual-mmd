@@ -5,6 +5,7 @@ import { mindmapNodeElementId } from './element-id'
 import type { MindmapIntent } from './mindmap'
 import type { MindmapProjection } from '../projection/mindmap-projection'
 import type { Selection } from '../projection/selection'
+import { newElementName } from '../../i18n/domain-strings.ts'
 
 // ---------- mindmap（工单 06）：画布/结构树键盘同 flowchart 方案 ----------
 
@@ -53,7 +54,7 @@ export function mindmapActionIntents(
 export function mindmapKeyPlan(projection: MindmapProjection, input: KeyInput): KeyPlan | null {
   const action = keyToNodeAction(input.key, input.mods)
   if (action === null || input.selection === null || input.selection.kind !== 'mindmap-node') return null
-  const plan = mindmapActionIntents(projection, input.selection.elementId, action, input.newNodeText ?? '新节点')
+  const plan = mindmapActionIntents(projection, input.selection.elementId, action, input.newNodeText ?? newElementName('node'))
   if (plan === null) return null
   const keyPlan: KeyPlan = { intents: plan.intents }
   if (plan.newElementId !== null) {

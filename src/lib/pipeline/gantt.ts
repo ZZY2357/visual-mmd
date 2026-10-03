@@ -3,6 +3,7 @@ import { frontmatterEnd } from './frontmatter'
 import { insertAfter } from './insert'
 import type { DiagramParser, EditIntent, ParseResult, SourceParseError } from './parser'
 import type { Span } from './span'
+import { newElementName } from '../../i18n/domain-strings.ts'
 
 /**
  * gantt（甘特图）完整解析器（more-diagrams 工单 11，语法事实以 spec 的
@@ -641,7 +642,7 @@ export class GanttParser implements DiagramParser {
     doc: SourceDocument,
     intent: Extract<GanttIntent, { type: 'add-section' }>,
   ): Map<string, string> | null {
-    const name = (intent.name ?? '新分组').trim()
+    const name = (intent.name ?? newElementName('section')).trim()
     if (!isValidGanttSectionName(name)) return null
     return insertAfter(doc, {
       afterElementId: intent.afterElementId,

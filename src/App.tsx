@@ -11,6 +11,7 @@ import { CanvasPanel } from './components/CanvasPanel'
 import { PropertyPanel } from './components/PropertyPanel'
 import { ThreePaneLayout } from './components/ThreePaneLayout'
 import { DiagramLibraryDrawer } from './components/DiagramLibraryDrawer'
+import { LanguageSwitcher } from './components/LanguageSwitcher'
 import {
   downloadBlob,
   readFileText,
@@ -294,6 +295,7 @@ export default function App() {
             >
               {t('history.redo')}
             </Button>
+            <LanguageSwitcher />
           </Group>
         </Group>
       </AppShell.Header>

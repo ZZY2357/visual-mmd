@@ -5,6 +5,7 @@ import type { KeyInput, KeyPlan } from '../editing/canvas-keyboard'
 import type { PieIntent } from './pie'
 import type { PieProjection } from '../projection/pie-projection'
 import type { Selection } from '../projection/selection'
+import { newElementName } from '../../i18n/domain-strings.ts'
 
 /**
  * 选中元素 → 删除意图（pie）：扇区映射到既有 delete-sector 意图；
@@ -42,7 +43,7 @@ export function pieKeyPlan(projection: PieProjection, input: KeyInput): KeyPlan 
   if (selection === null || selection.kind !== 'pie-sector') return null
   const index = projection.sectors.findIndex((s) => s.elementId === selection.elementId)
   if (index === -1) return null
-  const label = nextFreeName('新扇区', projection.sectors.map((s) => s.label))
+  const label = nextFreeName(newElementName('sector'), projection.sectors.map((s) => s.label))
   return {
     intents: [
       { type: 'add-sector', label, value: '1', afterElementId: selection.elementId } satisfies PieIntent,

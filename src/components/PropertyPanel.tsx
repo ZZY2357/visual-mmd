@@ -58,7 +58,7 @@ export function PropertyPanel({ projection, parseError, unsupported = false }: P
             <Text size="sm">{t('app:propertyPanel.disabledHint')}</Text>
             {parseError.line !== null && (
               <Button size="compact-sm" variant="light" color="red" onClick={() => requestGotoLine(parseError.line as number)}>
-                {t('app:propertyPanel.gotoError')}（第 {parseError.line} 行）
+                {t('app:propertyPanel.gotoErrorLine', { line: parseError.line })}
               </Button>
             )}
           </Stack>

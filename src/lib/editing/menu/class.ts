@@ -18,6 +18,16 @@ export const classMenuLabels = {
   'delete-relation': '删除关系',
 } as const
 
+export const classMenuLabelsEn = {
+  'add-class': 'Add class',
+  'add-member': 'Add member',
+  'add-relation': 'Add relation',
+  'delete-class': 'Delete class (with members and relations)',
+  'cycle-relation-kind': 'Cycle relation kind',
+  'edit-relation': 'Edit in property panel',
+  'delete-relation': 'Delete relation',
+} as const
+
 export const classMenu: DiagramMenuDefinition = {
   blankItems: ['add-class', 'add-note'],
   nodeItems: {

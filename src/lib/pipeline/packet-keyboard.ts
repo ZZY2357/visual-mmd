@@ -5,6 +5,7 @@ import { nextFreeName } from './element-id'
 import type { KeyInput, KeyPlan } from '../editing/canvas-keyboard'
 import type { PacketProjection } from '../projection/packet-projection'
 import type { Selection } from '../projection/selection'
+import { newElementName } from '../../i18n/domain-strings.ts'
 
 // ---------- packet 编辑键（more-diagrams 工单 16 / ADR-0013）：就近结构映射 ----------
 
@@ -47,7 +48,7 @@ export function packetKeyPlan(projection: PacketProjection, input: KeyInput): Ke
   if (selection === null || selection.kind !== 'packet-field') return null
   const index = projection.fields.findIndex((f) => f.elementId === selection.elementId)
   if (index === -1) return null
-  const name = nextFreeName('新字段', projection.fields.map((f) => f.name))
+  const name = nextFreeName(newElementName('field'), projection.fields.map((f) => f.name))
   const newElementId = `field:${index + 2}`
   return {
     intents: [

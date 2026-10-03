@@ -50,12 +50,12 @@ const BOUNDARY_MACRO_OPTIONS = Object.entries(C4_BOUNDARY_MACROS).map(([macro, s
 }))
 
 /** 关系方向下拉（default + 四显式方向；宏名由 C4_REL_MACRO_OF 给出） */
-const DIRECTION_OPTIONS: ReadonlyArray<{ value: C4Direction; label: string }> = [
-  { value: 'default', label: 'Rel（默认布局）' },
-  { value: 'U', label: 'Rel_U（向上）' },
-  { value: 'D', label: 'Rel_D（向下）' },
-  { value: 'L', label: 'Rel_L（向左）' },
-  { value: 'R', label: 'Rel_R（向右）' },
+const DIRECTION_OPTIONS: ReadonlyArray<{ value: C4Direction; labelKey: string }> = [
+  { value: 'default', labelKey: 'c4RelDirDefault' },
+  { value: 'U', labelKey: 'c4RelDirU' },
+  { value: 'D', labelKey: 'c4RelDirD' },
+  { value: 'L', labelKey: 'c4RelDirL' },
+  { value: 'R', labelKey: 'c4RelDirR' },
 ]
 
 // ---------- 图表（关键字 + 计数） ----------
@@ -316,7 +316,7 @@ export function C4RelationForm({ relation }: { relation: ProjectionC4Relation })
       </Text>
       <Select
         label={t('app:propertyPanel.c4RelationDirection')}
-        data={DIRECTION_OPTIONS.map((d) => ({ value: d.value, label: d.label }))}
+        data={DIRECTION_OPTIONS.map((d) => ({ value: d.value, label: t(`app:propertyPanel.${d.labelKey}`) }))}
         value={relation.direction}
         onChange={(value) => {
           if (value === null || value === relation.direction) return

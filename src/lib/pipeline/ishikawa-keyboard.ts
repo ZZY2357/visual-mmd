@@ -5,6 +5,7 @@ import type { KeyInput, KeyPlan } from '../editing/canvas-keyboard'
 import type { IshikawaIntent } from './ishikawa'
 import type { IshikawaProjection, ProjectionIshikawaNode } from '../projection/ishikawa-projection'
 import type { Selection } from '../projection/selection'
+import { newElementName } from '../../i18n/domain-strings.ts'
 
 /**
  * 选中元素 → 删除意图（ishikawa）：节点（连同子树，由管线负责）映射到既有
@@ -58,7 +59,7 @@ export function ishikawaKeyPlan(projection: IshikawaProjection, input: KeyInput)
   const index = projection.nodes.findIndex((n) => n.elementId === selection.elementId)
   if (index === -1) return null
   const names = projection.nodes.map((n) => n.text)
-  const name = nextFreeName('新原因', names)
+  const name = nextFreeName(newElementName('cause'), names)
   const ordinal = ishikawaSubtreeEnd(projection.nodes, index) + 2
   if (input.key === 'Tab') {
     return {

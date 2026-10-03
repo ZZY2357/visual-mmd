@@ -5,6 +5,7 @@ import type { KeyInput, KeyPlan } from '../editing/canvas-keyboard'
 import type { GanttIntent } from './gantt'
 import type { GanttProjection } from '../projection/gantt-projection'
 import type { Selection } from '../projection/selection'
+import { newElementName } from '../../i18n/domain-strings.ts'
 
 // ---------- gantt 编辑键（more-diagrams 工单 11 / ADR-0013）：就近结构映射 ----------
 
@@ -55,7 +56,7 @@ export function ganttKeyPlan(projection: GanttProjection, input: KeyInput): KeyP
   if (task === undefined) return null
   if (input.key === 'Tab') {
     // 同 section 加任务：无 section（空分组）时不带 sectionElementId（锚点 = 本任务）
-    const name = nextFreeName('新任务', projection.tasks.map((t) => t.name))
+    const name = nextFreeName(newElementName('task'), projection.tasks.map((t) => t.name))
     return {
       intents: [
         {
@@ -74,7 +75,7 @@ export function ganttKeyPlan(projection: GanttProjection, input: KeyInput): KeyP
   const section = task.sectionElementId !== null
     ? projection.sections.find((s) => s.elementId === task.sectionElementId)
     : undefined
-  const name = nextFreeName('新分组', projection.sections.map((s) => s.name))
+  const name = nextFreeName(newElementName('section'), projection.sections.map((s) => s.name))
   const anchor = section !== undefined ? section.tailElementId : task.tailElementId
   return {
     intents: [{ type: 'add-section', name, afterElementId: anchor } satisfies GanttIntent],

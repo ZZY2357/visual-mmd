@@ -15,6 +15,13 @@ export const quadrantMenuLabels = {
   'edit-quadrant-text': '在属性面板中编辑',
 } as const
 
+export const quadrantMenuLabelsEn = {
+  'add-quadrant-point': 'Add point',
+  'edit-quadrant-coords': 'Edit in property panel',
+  'edit-quadrant-style': 'Edit in property panel',
+  'edit-quadrant-text': 'Edit in property panel',
+} as const
+
 export const quadrantMenu: DiagramMenuDefinition = {
   blankItems: ['add-quadrant-point'],
   nodeItems: {

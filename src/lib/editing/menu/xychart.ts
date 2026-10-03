@@ -16,6 +16,14 @@ export const xychartMenuLabels = {
   'edit-xychart-axis': '编辑轴',
 } as const
 
+export const xychartMenuLabelsEn = {
+  'add-xychart-line': 'Add line series',
+  'add-xychart-bar': 'Add bar series',
+  'xychart-toggle-type': 'Toggle line / bar',
+  'xychart-edit-values': 'Edit values',
+  'edit-xychart-axis': 'Edit axis',
+} as const
+
 export const xychartMenu: DiagramMenuDefinition = {
   blankItems: ['add-xychart-line', 'add-xychart-bar'],
   nodeItems: {

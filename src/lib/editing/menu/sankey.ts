@@ -13,6 +13,11 @@ export const sankeyMenuLabels = {
   'edit-sankey-name': '重命名',
 } as const
 
+export const sankeyMenuLabelsEn = {
+  'add-sankey-link': 'Add link',
+  'edit-sankey-name': 'Rename',
+} as const
+
 export const sankeyMenu: DiagramMenuDefinition = {
   blankItems: ['add-sankey-link'],
   nodeItems: {

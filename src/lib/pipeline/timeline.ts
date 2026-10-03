@@ -4,6 +4,7 @@ import { indentLines, insertAfter } from './insert'
 import type { DiagramParser, EditIntent, ParseResult, SourceParseError } from './parser'
 import type { Span } from './span'
 import type { AnyElement } from './document'
+import { newElementName } from '../../i18n/domain-strings.ts'
 
 /**
  * timeline 完整解析器（more-diagrams 工单 05，语法事实以
@@ -417,7 +418,7 @@ export class TimelineParser implements DiagramParser {
     doc: SourceDocument,
     intent: Extract<TimelineIntent, { type: 'add-period' }>,
   ): Map<string, string> | null {
-    const text = (intent.text ?? '新阶段').trim()
+    const text = (intent.text ?? newElementName('period')).trim()
     if (!isValidTimelinePeriodText(text)) return null
     return insertAfter(doc, {
       afterElementId: intent.afterElementId,
@@ -492,7 +493,7 @@ export class TimelineParser implements DiagramParser {
     doc: SourceDocument,
     intent: Extract<TimelineIntent, { type: 'add-section' }>,
   ): Map<string, string> | null {
-    const name = (intent.name ?? '新分组').trim()
+    const name = (intent.name ?? newElementName('section')).trim()
     if (!isValidTimelineSectionName(name)) return null
     return insertAfter(doc, {
       afterElementId: intent.afterElementId,

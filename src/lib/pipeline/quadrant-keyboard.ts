@@ -5,6 +5,7 @@ import type { KeyInput, KeyPlan } from '../editing/canvas-keyboard'
 import type { QuadrantIntent } from './quadrant'
 import type { QuadrantProjection } from '../projection/quadrant-projection'
 import type { Selection } from '../projection/selection'
+import { newElementName } from '../../i18n/domain-strings.ts'
 
 // ---------- quadrant 编辑键（more-diagrams 工单 12 / ADR-0013）：就近结构映射 ----------
 
@@ -49,7 +50,7 @@ export function quadrantKeyPlan(projection: QuadrantProjection, input: KeyInput)
   if (selection === null || selection.kind !== 'quadrant-point') return null
   const index = projection.points.findIndex((p) => p.elementId === selection.elementId)
   if (index === -1) return null
-  const text = nextFreeName('新点', projection.points.map((p) => p.text))
+  const text = nextFreeName(newElementName('point'), projection.points.map((p) => p.text))
   const newElementId = `point:${index + 2}`
   return {
     intents: [

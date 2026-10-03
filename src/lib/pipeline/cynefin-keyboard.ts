@@ -5,6 +5,7 @@ import type { KeyInput, KeyPlan } from '../editing/canvas-keyboard'
 import type { CynefinIntent } from './cynefin'
 import type { CynefinProjection } from '../projection/cynefin-projection'
 import type { Selection } from '../projection/selection'
+import { newElementName } from '../../i18n/domain-strings.ts'
 
 // ---------- cynefin 编辑键（more-diagrams 工单 25 / ADR-0013）：就近结构映射 ----------
 
@@ -55,7 +56,7 @@ export function cynefinKeyPlan(projection: CynefinProjection, input: KeyInput): 
   if (selection.kind === 'cynefin-domain') {
     const domain = projection.domains.find((d) => d.name === selection.name)
     if (domain === undefined) return null
-    const text = nextFreeName('新条目', projection.items.map((i) => i.text))
+    const text = nextFreeName(newElementName('item'), projection.items.map((i) => i.text))
     // 该域末条目之后（域无条目则紧跟域名词行）；新条目位置序 = 域末条目序号 + 1
     const lastItem = domain.items[domain.items.length - 1]
     const anchorId = lastItem !== undefined ? lastItem.elementId : domain.elementId
@@ -70,7 +71,7 @@ export function cynefinKeyPlan(projection: CynefinProjection, input: KeyInput): 
     const index = projection.items.findIndex((i) => i.elementId === selection.elementId)
     if (index === -1) return null
     const item = projection.items[index]
-    const text = nextFreeName('新条目', projection.items.map((i) => i.text))
+    const text = nextFreeName(newElementName('item'), projection.items.map((i) => i.text))
     return {
       intents: [{ type: 'add-item', domain: item.domain, text, afterElementId: item.elementId }],
       newElementTarget: { selection: { kind: 'cynefin-item', elementId: `cynefin-item:${index + 2}` } },

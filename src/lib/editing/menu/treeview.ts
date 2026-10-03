@@ -12,6 +12,10 @@ export const treeviewMenuLabels = {
   'add-treeview-root': '添加根节点',
 } as const
 
+export const treeviewMenuLabelsEn = {
+  'add-treeview-root': 'Add root node',
+} as const
+
 export const treeviewMenu: DiagramMenuDefinition = {
   blankItems: ['add-treeview-root'],
   nodeItems: {

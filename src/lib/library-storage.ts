@@ -6,6 +6,7 @@
  */
 
 import { STORAGE_KEY, loadDiagram } from './storage'
+import { unnamedDiagramName } from '../i18n/domain-strings.ts'
 
 /** 图表库中单张图表的持久化形态 */
 export interface StoredLibraryDiagram {
@@ -73,7 +74,7 @@ export function bootstrapLibrary(storage: Storage = localStorage): StoredLibrary
   const legacy = loadDiagram(storage)
   if (legacy !== null) {
     return {
-      diagrams: [{ id: createDiagramId(undefined, () => legacy.savedAt || Date.now()), name: '未命名图表', source: legacy.source, savedAt: legacy.savedAt }],
+      diagrams: [{ id: createDiagramId(undefined, () => legacy.savedAt || Date.now()), name: unnamedDiagramName(), source: legacy.source, savedAt: legacy.savedAt }],
       activeId: null,
     }
   }

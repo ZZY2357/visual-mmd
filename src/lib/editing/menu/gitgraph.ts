@@ -13,6 +13,11 @@ export const gitgraphMenuLabels = {
   'add-branch': '添加分支',
 } as const
 
+export const gitgraphMenuLabelsEn = {
+  'add-commit': 'Add commit',
+  'add-branch': 'Add branch',
+} as const
+
 export const gitgraphMenu: DiagramMenuDefinition = {
   blankItems: ['add-commit', 'add-branch'],
   nodeItems: {

@@ -5,6 +5,7 @@ import type { KeyInput, KeyPlan } from '../editing/canvas-keyboard'
 import type { UsecaseIntent } from './usecase'
 import type { UsecaseProjection } from '../projection/usecase-projection'
 import type { Selection } from '../projection/selection'
+import { newElementName } from '../../i18n/domain-strings.ts'
 
 // ---------- usecase 编辑键（more-diagrams 工单 26 / ADR-0013）：就近结构映射 ----------
 
@@ -64,7 +65,7 @@ export function usecaseKeyPlan(projection: UsecaseProjection, input: KeyInput): 
     const id = nextFreeName('Usecase', used)
     return {
       intents: [
-        { type: 'add-usecase', id, label: '新用例', shape: 'ellipse' } satisfies UsecaseIntent,
+        { type: 'add-usecase', id, label: newElementName('usecase'), shape: 'ellipse' } satisfies UsecaseIntent,
       ],
       newElementTarget: { selection: { kind: 'usecase-usecase', elementId: `usecase:${id}` } },
     }

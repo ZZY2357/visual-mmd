@@ -12,6 +12,7 @@ import {
   type KeyFormKind,
   type NodeExtent,
 } from './canvas-keyboard'
+import { newElementName } from '../../i18n/domain-strings.ts'
 
 /**
  * 画布键盘操作 Hook（工单 04 焦点体系，工单 06 扩展 mindmap，工单 14 方向键方位导航，
@@ -70,7 +71,7 @@ export interface CanvasKeyboardOptions {
 
 export function useCanvasKeyboard(
   target: CanvasKeyboardProjection | null,
-  { containerRef, onNodeCreated, newNodeText = '新节点', navigation, openForm }: CanvasKeyboardOptions,
+  { containerRef, onNodeCreated, newNodeText = newElementName('node'), navigation, openForm }: CanvasKeyboardOptions,
 ): void {
   // 事件回调里读最新值：ref 兜住
   const latest = useRef({ onNodeCreated, newNodeText, navigation, openForm })

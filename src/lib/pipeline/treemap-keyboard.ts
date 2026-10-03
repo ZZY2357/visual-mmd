@@ -5,6 +5,7 @@ import { nextFreeName } from './element-id'
 import type { TreemapIntent } from './treemap'
 import type { ProjectionTreemapNode, TreemapProjection } from '../projection/treemap-projection'
 import type { Selection } from '../projection/selection'
+import { newElementName } from '../../i18n/domain-strings.ts'
 
 // ---------- treemap 编辑键（more-diagrams 工单 20 / ADR-0013）：就近结构映射 ----------
 
@@ -59,14 +60,14 @@ export function treemapKeyPlan(projection: TreemapProjection, input: KeyInput): 
   const names = projection.nodes.map((n) => n.name)
   if (input.key === 'Tab') {
     if (node.nodeKind !== 'section') return null // 叶子下不挂子（有值即叶子）
-    const name = nextFreeName('新节点', names)
+    const name = nextFreeName(newElementName('node'), names)
     const ordinal = treemapSubtreeEnd(projection.nodes, index) + 2
     return {
       intents: [{ type: 'add-child', parentElementId: selection.elementId, name, value: '1' }],
       newElementTarget: { selection: { kind: 'treemap-node', elementId: `treemap-node:${ordinal}` } },
     }
   }
-  const name = nextFreeName('新节点', names)
+  const name = nextFreeName(newElementName('node'), names)
   const ordinal = treemapSubtreeEnd(projection.nodes, index) + 2
   return {
     intents: [{ type: 'add-sibling', elementId: selection.elementId, name, value: '1' }],

@@ -15,6 +15,13 @@ export const eventmodelingMenuLabels = {
   'edit-em-data': '在属性面板中编辑',
 } as const
 
+export const eventmodelingMenuLabelsEn = {
+  'add-em-frame': 'Add frame',
+  'add-em-data': 'Add data block',
+  'edit-em-frame': 'Edit in property panel',
+  'edit-em-data': 'Edit in property panel',
+} as const
+
 export const eventmodelingMenu: DiagramMenuDefinition = {
   blankItems: ['add-em-frame', 'add-em-data'],
   nodeItems: {

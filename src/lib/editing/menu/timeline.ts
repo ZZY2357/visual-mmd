@@ -15,6 +15,13 @@ export const timelineMenuLabels = {
   'edit-event-text': '在属性面板中编辑',
 } as const
 
+export const timelineMenuLabelsEn = {
+  'add-period': 'Add period',
+  'add-event': 'Add event',
+  'edit-period-text': 'Edit period text',
+  'edit-event-text': 'Edit in property panel',
+} as const
+
 export const timelineMenu: DiagramMenuDefinition = {
   blankItems: ['add-period', 'add-section'],
   nodeItems: {

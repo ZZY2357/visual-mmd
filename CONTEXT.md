@@ -132,3 +132,12 @@ _Avoid_: 可视化模型、AST（仅用于指解析器的内部产物）
 **逐字保留（Verbatim Preservation）**:
 不被编辑触碰的源码文本——注释、空行、格式习惯、无法解析的语法——保持逐字不变。
 _Avoid_: 往返转换、透传
+
+### 界面语言
+
+**界面语言（Interface Language）**:
+应用界面的显示语言，中文（zh）与英文（en）两种。所有界面文案必须经过 `src/i18n/` 的字典；
+zh 与 en 的字典叶键必须一一对应（`en-coverage.test.ts` 全量审计），lib 层的默认命名
+走 `src/i18n/domain-strings`。用户偏好持久化于 localStorage（`visual-mmd:language`），
+首次启动跟随浏览器语言。
+_Avoid_: 多语言、locale（单独使用时）

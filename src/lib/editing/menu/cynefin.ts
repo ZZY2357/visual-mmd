@@ -13,6 +13,11 @@ export const cynefinMenuLabels = {
   'add-cynefin-transition': '添加转移',
 } as const
 
+export const cynefinMenuLabelsEn = {
+  'add-cynefin-item': 'Add item',
+  'add-cynefin-transition': 'Add transition',
+} as const
+
 export const cynefinMenu: DiagramMenuDefinition = {
   blankItems: ['add-cynefin-item', 'add-cynefin-transition'],
   nodeItems: {

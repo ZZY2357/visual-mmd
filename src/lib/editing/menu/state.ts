@@ -14,6 +14,12 @@ export const stateMenuLabels = {
   'edit-state-desc': '编辑描述',
 } as const
 
+export const stateMenuLabelsEn = {
+  'add-state': 'Add state',
+  'add-state-into': 'Add state (inside composite)',
+  'edit-state-desc': 'Edit description',
+} as const
+
 export const stateMenu: DiagramMenuDefinition = {
   blankItems: ['add-state', 'link-mode'],
   nodeItems: {

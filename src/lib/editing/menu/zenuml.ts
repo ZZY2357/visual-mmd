@@ -15,6 +15,13 @@ export const zenumlMenuLabels = {
   'edit-zenuml-message': '在属性面板中编辑',
 } as const
 
+export const zenumlMenuLabelsEn = {
+  'add-zenuml-participant': 'Add participant',
+  'add-zenuml-message': 'Add message',
+  'edit-zenuml-participant': 'Edit alias',
+  'edit-zenuml-message': 'Edit in property panel',
+} as const
+
 export const zenumlMenu: DiagramMenuDefinition = {
   blankItems: ['add-zenuml-participant', 'add-zenuml-message'],
   nodeItems: {

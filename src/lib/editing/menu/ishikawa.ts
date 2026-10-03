@@ -12,6 +12,10 @@ export const ishikawaMenuLabels = {
   'add-ishikawa-cause': '添加主因',
 } as const
 
+export const ishikawaMenuLabelsEn = {
+  'add-ishikawa-cause': 'Add primary cause',
+} as const
+
 export const ishikawaMenu: DiagramMenuDefinition = {
   blankItems: ['add-ishikawa-cause'],
   nodeItems: {

@@ -16,6 +16,14 @@ export const architectureMenuLabels = {
   'edit-architecture-edge': '在属性面板中编辑',
 } as const
 
+export const architectureMenuLabelsEn = {
+  'add-architecture-service': 'Add service',
+  'add-architecture-group': 'Add group',
+  'add-architecture-junction': 'Add junction',
+  'edit-architecture-service': 'Edit in property panel',
+  'edit-architecture-edge': 'Edit in property panel',
+} as const
+
 export const architectureMenu: DiagramMenuDefinition = {
   blankItems: ['add-architecture-service', 'add-architecture-group', 'add-architecture-junction'],
   nodeItems: {

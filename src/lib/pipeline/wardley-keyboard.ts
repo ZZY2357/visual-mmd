@@ -5,6 +5,7 @@ import { isValidWardleyCoord, isValidWardleyEvolutionTarget, type WardleyIntent 
 import type { KeyInput, KeyPlan } from '../editing/canvas-keyboard'
 import type { WardleyProjection } from '../projection/wardley-projection'
 import type { Selection } from '../projection/selection'
+import { newElementName } from '../../i18n/domain-strings.ts'
 
 // ---------- wardley 编辑键（more-diagrams 工单 23 / ADR-0013）：就近结构映射 ----------
 
@@ -57,7 +58,7 @@ export function wardleyKeyPlan(projection: WardleyProjection, input: KeyInput): 
   const node = projection.nodes.find((n) => n.name === selection.name)
   if (node === undefined) return null
   const nodeKind = input.key === 'Tab' ? 'component' : 'anchor'
-  const name = nextFreeName(nodeKind === 'component' ? '新组件' : '新锚点', projection.nodes.map((n) => n.name))
+  const name = nextFreeName(nodeKind === 'component' ? newElementName('component') : newElementName('anchor'), projection.nodes.map((n) => n.name))
   const intent: WardleyIntent = {
     type: 'add-node',
     nodeKind,

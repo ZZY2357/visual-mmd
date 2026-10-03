@@ -5,6 +5,7 @@ import type { KeyInput, KeyPlan } from '../editing/canvas-keyboard'
 import type { TimelineIntent } from './timeline'
 import type { TimelineProjection } from '../projection/timeline-projection'
 import type { Selection } from '../projection/selection'
+import { newElementName } from '../../i18n/domain-strings.ts'
 
 /**
  * 选中元素 → 删除意图（timeline，more-diagrams 工单 05）：时期（连同其事件，由管线负责
@@ -50,7 +51,7 @@ export function timelineKeyPlan(projection: TimelineProjection, input: KeyInput)
   const period = projection.periods.find((p) => p.elementId === selection.elementId)
   if (period === undefined) return null
   if (input.key === 'Tab') {
-    const text = nextFreeName('新事件', period.events.map((e) => e.text))
+    const text = nextFreeName(newElementName('event'), period.events.map((e) => e.text))
     return {
       intents: [{ type: 'add-event', periodElementId: period.elementId, text }],
       newElementTarget: {
@@ -58,7 +59,7 @@ export function timelineKeyPlan(projection: TimelineProjection, input: KeyInput)
       },
     }
   }
-  const text = nextFreeName('新阶段', projection.periods.map((p) => p.text))
+  const text = nextFreeName(newElementName('period'), projection.periods.map((p) => p.text))
   return {
     intents: [{ type: 'add-period', text, afterElementId: period.tailElementId }],
     newElementTarget: {

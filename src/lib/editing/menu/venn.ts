@@ -15,6 +15,13 @@ export const vennMenuLabels = {
   'edit-venn-area': '在属性面板中编辑',
 } as const
 
+export const vennMenuLabelsEn = {
+  'add-venn-set': 'Add set',
+  'add-venn-union': 'Add intersection',
+  'add-venn-union-here': 'Add intersection',
+  'edit-venn-area': 'Edit in property panel',
+} as const
+
 export const vennMenu: DiagramMenuDefinition = {
   blankItems: ['add-venn-set', 'add-venn-union'],
   nodeItems: {

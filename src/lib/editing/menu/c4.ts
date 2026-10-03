@@ -16,6 +16,14 @@ export const c4MenuLabels = {
   'edit-c4-relation': '在属性面板中编辑',
 } as const
 
+export const c4MenuLabelsEn = {
+  'add-c4-element': 'Add element',
+  'add-c4-boundary': 'Add boundary',
+  'edit-c4-element': 'Edit in property panel',
+  'edit-c4-boundary': 'Edit in property panel',
+  'edit-c4-relation': 'Edit in property panel',
+} as const
+
 export const c4Menu: DiagramMenuDefinition = {
   blankItems: ['add-c4-element', 'add-c4-boundary'],
   nodeItems: {

@@ -6,6 +6,7 @@ import type { KeyInput, KeyPlan } from '../editing/canvas-keyboard'
 import type { KanbanIntent } from './kanban'
 import type { KanbanProjection } from '../projection/kanban-projection'
 import type { Selection } from '../projection/selection'
+import { newElementName } from '../../i18n/domain-strings.ts'
 
 // ---------- kanban 编辑键（more-diagrams 工单 06 / ADR-0013）：就近结构映射 ----------
 
@@ -70,7 +71,7 @@ export function kanbanKeyPlan(projection: KanbanProjection, input: KeyInput): Ke
   if (action === 'add-column') {
     const id = nextFreeName('col', used)
     return {
-      intents: [{ type: 'add-column', id, title: '新列' }],
+      intents: [{ type: 'add-column', id, title: newElementName('column') }],
       newElementTarget: {
         selection: { kind: 'kanban-column', elementId: kanbanColumnElementId(id) },
         inlineEdit: { kind: 'kanban-column', elementId: kanbanColumnElementId(id) },
@@ -85,7 +86,7 @@ export function kanbanKeyPlan(projection: KanbanProjection, input: KeyInput): Ke
   if (columnElementId === null || !projection.columns.some((c) => c.elementId === columnElementId)) return null
   const id = nextFreeName('t', used)
   return {
-    intents: [{ type: 'add-card', columnElementId, id, description: '新卡片' }],
+    intents: [{ type: 'add-card', columnElementId, id, description: newElementName('card') }],
     newElementTarget: {
       selection: { kind: 'kanban-card', elementId: kanbanCardElementId(id) },
       inlineEdit: { kind: 'kanban-card', elementId: kanbanCardElementId(id) },

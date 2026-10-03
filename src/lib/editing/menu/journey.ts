@@ -13,6 +13,11 @@ export const journeyMenuLabels = {
   'add-journey-section': '添加分组',
 } as const
 
+export const journeyMenuLabelsEn = {
+  'add-journey-task': 'Add task',
+  'add-journey-section': 'Add section',
+} as const
+
 export const journeyMenu: DiagramMenuDefinition = {
   blankItems: ['add-journey-task', 'add-journey-section'],
   nodeItems: {

@@ -12,6 +12,10 @@ export const pieMenuLabels = {
   'add-pie-sector': '添加扇区',
 } as const
 
+export const pieMenuLabelsEn = {
+  'add-pie-sector': 'Add sector',
+} as const
+
 export const pieMenu: DiagramMenuDefinition = {
   blankItems: ['add-pie-sector'],
   nodeItems: {

@@ -15,6 +15,13 @@ export const flowchartMenuLabels = {
   'apply-style': '应用样式',
 } as const
 
+export const flowchartMenuLabelsEn = {
+  'add-node': 'Add node',
+  'add-style': 'Add style',
+  'add-subgraph': 'Add subgraph',
+  'apply-style': 'Apply style',
+} as const
+
 export const flowchartMenu: DiagramMenuDefinition = {
   blankItems: ['add-node', 'link-mode', 'add-style', 'add-subgraph'],
   nodeItems: {

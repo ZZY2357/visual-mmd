@@ -3,6 +3,7 @@ import { frontmatterEnd } from './frontmatter'
 import { insertAfter } from './insert'
 import type { DiagramParser, EditIntent, ParseResult, SourceParseError } from './parser'
 import type { Span } from './span'
+import { newElementName } from '../../i18n/domain-strings.ts'
 
 /**
  * journey（用户旅程图）完整解析器（more-diagrams 工单 08，语法事实以
@@ -449,7 +450,7 @@ export class JourneyParser implements DiagramParser {
     doc: SourceDocument,
     intent: Extract<JourneyIntent, { type: 'add-section' }>,
   ): Map<string, string> | null {
-    const name = (intent.name ?? '新分组').trim()
+    const name = (intent.name ?? newElementName('section')).trim()
     if (!isValidJourneySectionName(name)) return null
     return insertAfter(doc, {
       afterElementId: intent.afterElementId,

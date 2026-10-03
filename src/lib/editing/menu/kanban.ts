@@ -14,6 +14,12 @@ export const kanbanMenuLabels = {
   'edit-kanban-metadata': '在属性面板中编辑',
 } as const
 
+export const kanbanMenuLabelsEn = {
+  'add-column': 'Add column',
+  'add-card': 'Add card',
+  'edit-kanban-metadata': 'Edit in property panel',
+} as const
+
 export const kanbanMenu: DiagramMenuDefinition = {
   blankItems: ['add-column'],
   nodeItems: {

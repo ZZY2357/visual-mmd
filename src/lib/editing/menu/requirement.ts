@@ -16,6 +16,14 @@ export const requirementMenuLabels = {
   'invert-requirement-relation': '反转方向',
 } as const
 
+export const requirementMenuLabelsEn = {
+  'add-requirement': 'Add requirement',
+  'add-requirement-element': 'Add element',
+  'edit-requirement-field': 'Edit in property panel',
+  'cycle-requirement-kind': 'Cycle relation kind',
+  'invert-requirement-relation': 'Invert direction',
+} as const
+
 export const requirementMenu: DiagramMenuDefinition = {
   blankItems: ['add-requirement', 'add-requirement-element'],
   nodeItems: {

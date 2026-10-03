@@ -16,6 +16,14 @@ export const usecaseMenuLabels = {
   'edit-usecase-relation': '在属性面板中编辑',
 } as const
 
+export const usecaseMenuLabelsEn = {
+  'add-usecase-actor': 'Add actor',
+  'add-usecase-case': 'Add use case',
+  'add-usecase-boundary': 'Add system boundary',
+  'edit-usecase-element': 'Edit in property panel',
+  'edit-usecase-relation': 'Edit in property panel',
+} as const
+
 export const usecaseMenu: DiagramMenuDefinition = {
   blankItems: ['add-usecase-actor', 'add-usecase-case', 'add-usecase-boundary'],
   nodeItems: {

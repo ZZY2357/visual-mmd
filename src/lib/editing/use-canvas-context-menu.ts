@@ -24,6 +24,7 @@ import {
 import { addClassDefIntent } from './flowchart-forms'
 import { MENU_ACTIONS, type MenuActionContext } from './menu-actions'
 import { useEditorStore } from '../../store/editor'
+import { newElementName } from '../../i18n/domain-strings.ts'
 
 /**
  * 画布右键菜单 Hook（工单 07/04）：右键弹出单一菜单（随目标变化），并托管连线模式
@@ -299,7 +300,7 @@ export interface CanvasContextMenuOptions {
 }
 
 export function useCanvasContextMenu(
-  { projection, resolver, containerRef, onNodeCreated, newNodeText = '新节点' }: CanvasContextMenuOptions,
+  { projection, resolver, containerRef, onNodeCreated, newNodeText = newElementName('node') }: CanvasContextMenuOptions,
 ) {
   // 覆盖层状态机（architecture-deepening-2 工单 05）：menu / styleForm / nodeForm /
   // linkMode 四个互斥浮层收进单个 open（负载随行），迁移与点击 / 拖拽 / Escape 的裁定

@@ -13,6 +13,11 @@ export const packetMenuLabels = {
   'edit-packet-range': '在属性面板中编辑',
 } as const
 
+export const packetMenuLabelsEn = {
+  'add-packet-field': 'Add field',
+  'edit-packet-range': 'Edit in property panel',
+} as const
+
 export const packetMenu: DiagramMenuDefinition = {
   blankItems: ['add-packet-field'],
   nodeItems: {

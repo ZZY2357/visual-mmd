@@ -13,6 +13,11 @@ export const treemapMenuLabels = {
   'add-treemap-leaf': '添加叶子',
 } as const
 
+export const treemapMenuLabelsEn = {
+  'add-treemap-group': 'Add group',
+  'add-treemap-leaf': 'Add leaf',
+} as const
+
 export const treemapMenu: DiagramMenuDefinition = {
   blankItems: ['add-treemap-group', 'add-treemap-leaf'],
   nodeItems: {

@@ -39,6 +39,7 @@ import {
   setMessageIntent,
   MESSAGE_ARROW_OPTIONS,
 } from './sequence-forms'
+import { newElementName } from '../../i18n/domain-strings.ts'
 
 /**
  * 菜单项动作表（架构工单 05 → architecture-deepening-2 工单 01）：
@@ -132,14 +133,14 @@ export function createElement(ctx: MenuActionContext, target: ContextMenuTarget 
     }
     if (proj.type === 'class') {
       // 空 classDiagram（画布停在解析错误态）同样可用：管线在表头后落一行 `class 新类`，源码随之合法
-      const name = nextFreeName('新类', proj.class.classes.map((c) => c.name))
+      const name = nextFreeName(newElementName('class'), proj.class.classes.map((c) => c.name))
       return {
         intents: [{ type: 'add-class', name }],
         newElementTarget: { selection: { kind: 'class', name }, inlineEdit: { kind: 'class', name } },
       }
     }
     if (proj.type === 'sequence') {
-      const actorId = nextFreeName('新参与者', proj.sequence.participants.map((p) => p.actorId))
+      const actorId = nextFreeName(newElementName('participant'), proj.sequence.participants.map((p) => p.actorId))
       return {
         intents: [{ type: 'add-participant', actorId }],
         newElementTarget: {
@@ -159,7 +160,7 @@ export function createElement(ctx: MenuActionContext, target: ContextMenuTarget 
     }
     if (proj.type === 'er') {
       // er 空白：新建实体 + 内联编辑别名（more-diagrams 工单 03）
-      const name = nextFreeName('新实体', proj.er.entities.map((e) => e.name))
+      const name = nextFreeName(newElementName('entity'), proj.er.entities.map((e) => e.name))
       if (!isValidErName(name)) return null
       return {
         intents: [{ type: 'add-entity', name }],
@@ -182,7 +183,7 @@ export function createElement(ctx: MenuActionContext, target: ContextMenuTarget 
       const id = nextFreeName('col', used)
       if (!isValidKanbanId(id)) return null
       return {
-        intents: [{ type: 'add-column', id, title: '新列' }],
+        intents: [{ type: 'add-column', id, title: newElementName('column') }],
         newElementTarget: {
           selection: { kind: 'kanban-column', elementId: kanbanColumnElementId(id) },
           inlineEdit: { kind: 'kanban-column', elementId: kanbanColumnElementId(id) },
@@ -480,7 +481,7 @@ function openFormOf(kind: NodeFormKind): MenuAction {
 function addTimelinePeriod(ctx: MenuActionContext): void {
   const proj = ctx.projection
   if (proj === null || proj.type !== 'timeline') return
-  const text = nextFreeName('新阶段', proj.timeline.periods.map((p) => p.text))
+  const text = nextFreeName(newElementName('period'), proj.timeline.periods.map((p) => p.text))
   const plan: KeyPlan = {
     intents: [{ type: 'add-period', text } satisfies TimelineIntent],
     newElementTarget: {
@@ -495,9 +496,9 @@ function addTimelinePeriod(ctx: MenuActionContext): void {
 function addTimelineSection(ctx: MenuActionContext): void {
   const proj = ctx.projection
   if (proj === null || proj.type !== 'timeline') return
-  if (!isValidTimelineSectionName('新分组')) return
+  if (!isValidTimelineSectionName(newElementName('section'))) return
   const plan: KeyPlan = {
-    intents: [{ type: 'add-section', name: '新分组' } satisfies TimelineIntent],
+    intents: [{ type: 'add-section', name: newElementName('section') } satisfies TimelineIntent],
     newElementTarget: {
       selection: { kind: 'timeline-section', elementId: `section:${proj.timeline.sections.length + 1}` },
     },
@@ -513,7 +514,7 @@ function addTimelineEvent(ctx: MenuActionContext, target: ContextMenuTarget | un
   if (sel === null || sel.kind !== 'timeline-period' || proj === null || proj.type !== 'timeline') return
   const period = proj.timeline.periods.find((p) => p.elementId === sel.elementId)
   if (period === undefined) return
-  const text = nextFreeName('新事件', period.events.map((e) => e.text))
+  const text = nextFreeName(newElementName('event'), period.events.map((e) => e.text))
   const plan: KeyPlan = {
     intents: [{ type: 'add-event', periodElementId: period.elementId, text } satisfies TimelineIntent],
     newElementTarget: {
@@ -538,7 +539,7 @@ function addKanbanCard(ctx: MenuActionContext, target: ContextMenuTarget | undef
   const id = nextFreeName('t', used)
   if (!isValidKanbanId(id)) return
   const plan: KeyPlan = {
-    intents: [{ type: 'add-card', columnElementId: column.elementId, id, description: '新卡片' }],
+    intents: [{ type: 'add-card', columnElementId: column.elementId, id, description: newElementName('card') }],
     newElementTarget: {
       selection: { kind: 'kanban-card', elementId: kanbanCardElementId(id) },
       inlineEdit: { kind: 'kanban-card', elementId: kanbanCardElementId(id) },
@@ -593,7 +594,7 @@ function invertRequirementRelation(ctx: MenuActionContext, target: ContextMenuTa
 function addJourneyTask(ctx: MenuActionContext): void {
   const proj = ctx.projection
   if (proj === null || proj.type !== 'journey') return
-  const name = nextFreeName('新任务', proj.journey.tasks.map((t) => t.name))
+  const name = nextFreeName(newElementName('task'), proj.journey.tasks.map((t) => t.name))
   if (!isValidJourneyTaskName(name)) return
   const lastSection = proj.journey.sections[proj.journey.sections.length - 1]
   const plan: KeyPlan = {
@@ -618,7 +619,7 @@ function addJourneyTask(ctx: MenuActionContext): void {
 function addJourneySection(ctx: MenuActionContext): void {
   const proj = ctx.projection
   if (proj === null || proj.type !== 'journey') return
-  const name = nextFreeName('新分组', proj.journey.sections.map((s) => s.name))
+  const name = nextFreeName(newElementName('section'), proj.journey.sections.map((s) => s.name))
   if (!isValidJourneySectionName(name)) return
   const plan: KeyPlan = {
     intents: [{ type: 'add-section', name } satisfies JourneyIntent],
@@ -640,7 +641,7 @@ function addJourneySection(ctx: MenuActionContext): void {
 function addPieSector(ctx: MenuActionContext): void {
   const proj = ctx.projection
   if (proj === null || proj.type !== 'pie') return
-  const label = nextFreeName('新扇区', proj.pie.sectors.map((s) => s.label))
+  const label = nextFreeName(newElementName('sector'), proj.pie.sectors.map((s) => s.label))
   if (!isValidPieLabel(label)) return
   const plan: KeyPlan = {
     intents: [{ type: 'add-sector', label, value: '1' } satisfies PieIntent],
@@ -699,7 +700,7 @@ function addBlockGroup(ctx: MenuActionContext): void {
 function addGanttTask(ctx: MenuActionContext): void {
   const proj = ctx.projection
   if (proj === null || proj.type !== 'gantt') return
-  const name = nextFreeName('新任务', proj.gantt.tasks.map((t) => t.name))
+  const name = nextFreeName(newElementName('task'), proj.gantt.tasks.map((t) => t.name))
   if (!isValidGanttTaskName(name)) return
   const lastSection = proj.gantt.sections[proj.gantt.sections.length - 1]
   const plan: KeyPlan = {
@@ -722,7 +723,7 @@ function addGanttTask(ctx: MenuActionContext): void {
 function addGanttSection(ctx: MenuActionContext): void {
   const proj = ctx.projection
   if (proj === null || proj.type !== 'gantt') return
-  const name = nextFreeName('新分组', proj.gantt.sections.map((s) => s.name))
+  const name = nextFreeName(newElementName('section'), proj.gantt.sections.map((s) => s.name))
   if (!isValidGanttSectionName(name)) return
   const plan: KeyPlan = {
     intents: [{ type: 'add-section', name } satisfies GanttIntent],
@@ -744,7 +745,7 @@ function addGanttSection(ctx: MenuActionContext): void {
 function addQuadrantPoint(ctx: MenuActionContext): void {
   const proj = ctx.projection
   if (proj === null || proj.type !== 'quadrant') return
-  const text = nextFreeName('新点', proj.quadrant.points.map((p) => p.text))
+  const text = nextFreeName(newElementName('point'), proj.quadrant.points.map((p) => p.text))
   if (!isValidQuadrantPointText(text)) return
   const elementId = `point:${proj.quadrant.nextPointOrdinal}`
   const plan: KeyPlan = {
@@ -823,7 +824,7 @@ function addRadarCurve(ctx: MenuActionContext): void {
 function addPacketField(ctx: MenuActionContext): void {
   const proj = ctx.projection
   if (proj === null || proj.type !== 'packet') return
-  const name = nextFreeName('新字段', proj.packet.fields.map((f) => f.name))
+  const name = nextFreeName(newElementName('field'), proj.packet.fields.map((f) => f.name))
   if (!isValidPacketFieldName(name)) return
   const elementId = `field:${proj.packet.nextFieldOrdinal}`
   const plan: KeyPlan = {
@@ -858,7 +859,7 @@ function addTreemapRoot(ctx: MenuActionContext, kind: 'section' | 'leaf'): void 
   const proj = ctx.projection
   if (proj === null || proj.type !== 'treemap') return
   const names = proj.treemap.nodes.map((n) => n.name)
-  const name = nextFreeName(kind === 'section' ? '新分组' : '新叶子', names)
+  const name = nextFreeName(kind === 'section' ? newElementName('section') : newElementName('leaf'), names)
   if (!isValidTreemapName(name)) return
   const value = kind === 'leaf' ? '1' : undefined
   if (value !== undefined && !isValidTreemapValue(value)) return
@@ -885,7 +886,7 @@ function addIshikawaCause(ctx: MenuActionContext): void {
   const p = proj.ishikawa
   if (p.root === null) return // 无鱼头（空文档）：mermaid 此时也不渲染（research 坑 7）
   const names = p.nodes.map((n) => n.text)
-  const text = nextFreeName('新原因', names)
+  const text = nextFreeName(newElementName('cause'), names)
   if (!isValidIshikawaText(text)) return
   // 最后一条主因（depth 1，文档序末位）；没有则在鱼头下建第一条主因
   const causes = p.nodes.filter((n) => n.depth === 1)
@@ -918,7 +919,7 @@ function addIshikawaCause(ctx: MenuActionContext): void {
 function addWardleyNode(ctx: MenuActionContext, nodeKind: 'component' | 'anchor'): void {
   const proj = ctx.projection
   if (proj === null || proj.type !== 'wardley') return
-  const name = nextFreeName(nodeKind === 'component' ? '新组件' : '新锚点', proj.wardley.nodes.map((n) => n.name))
+  const name = nextFreeName(nodeKind === 'component' ? newElementName('component') : newElementName('anchor'), proj.wardley.nodes.map((n) => n.name))
   if (!isValidWardleyName(name)) return
   const plan: KeyPlan = {
     intents: [
@@ -960,7 +961,7 @@ function addCynefinItem(ctx: MenuActionContext): void {
   // 锚点 = 该域末条目行（无则域名词行）——保证新条目留在域块内、转移行之前
   const lastItem = target.items[target.items.length - 1]
   const afterElementId = lastItem !== undefined ? lastItem.elementId : target.elementId
-  const text = nextFreeName('新条目', p.items.map((i) => i.text))
+  const text = nextFreeName(newElementName('item'), p.items.map((i) => i.text))
   const plan: KeyPlan = {
     intents: [{ type: 'add-item', domain: target.name, text, afterElementId } satisfies CynefinIntent],
     newElementTarget: {
@@ -983,7 +984,7 @@ function addTreeviewRoot(ctx: MenuActionContext): void {
   if (proj === null || proj.type !== 'treeview') return
   const p = proj.treeview
   const names = p.nodes.map((n) => n.name)
-  const name = nextFreeName('新目录', names)
+  const name = nextFreeName(newElementName('directory'), names)
   if (!isValidTreeviewName(name)) return
   // 锚点：末个顶层节点用 add-sibling 保持同级；无顶层节点则用 add-child（缺省落文档末尾）。
   const lastRoot = p.roots[p.roots.length - 1]
@@ -1143,7 +1144,7 @@ function addUsecaseCase(ctx: MenuActionContext): void {
   const id = nextFreeName('Usecase', usecaseKnownIds(proj))
   if (!isValidUsecaseId(id)) return
   const plan: KeyPlan = {
-    intents: [{ type: 'add-usecase', id, label: '新用例', shape: 'ellipse' } satisfies UsecaseIntent],
+    intents: [{ type: 'add-usecase', id, label: newElementName('usecase'), shape: 'ellipse' } satisfies UsecaseIntent],
     newElementTarget: { selection: { kind: 'usecase-usecase', elementId: `usecase:${id}` } },
   }
   if (applyPlan(plan, { commitIntent: ctx.commitIntent,
@@ -1158,7 +1159,7 @@ function addUsecaseBoundary(ctx: MenuActionContext): void {
   const id = nextFreeName('Boundary', usecaseKnownIds(proj))
   if (!isValidUsecaseId(id)) return
   const plan: KeyPlan = {
-    intents: [{ type: 'add-boundary', id, label: '新系统边界' } satisfies UsecaseIntent],
+    intents: [{ type: 'add-boundary', id, label: newElementName('systemBoundary') } satisfies UsecaseIntent],
     newElementTarget: { selection: { kind: 'usecase-boundary', elementId: `boundary:${id}` } },
   }
   if (applyPlan(plan, { commitIntent: ctx.commitIntent,
@@ -1251,7 +1252,7 @@ function addAgentflowFlow(ctx: MenuActionContext): void {
   const used = proj.agentflow.containers.map((c) => c.id).filter((id): id is string => id !== null)
   const id = nextFreeName('f', used, { referential: false })
   if (!isValidNewNodeId(id)) return
-  if (ctx.commitIntent({ type: 'add-flow', id, title: '新流程' } satisfies AgentflowIntent)) ctx.close()
+  if (ctx.commitIntent({ type: 'add-flow', id, title: newElementName('flow') } satisfies AgentflowIntent)) ctx.close()
 }
 
 // ---------- zenuml（more-diagrams 工单 19） ----------
@@ -1328,7 +1329,7 @@ function addC4Element(ctx: MenuActionContext, macro: string = C4_MACRO_OF_KIND.s
   const alias = nextFreeName(c4AliasBase(macro), c4KnownAliasList(proj))
   if (!isValidC4Alias(alias)) return
   const plan: KeyPlan = {
-    intents: [{ type: 'add-c4-element', macro, alias, label: '新元素' } satisfies C4Intent],
+    intents: [{ type: 'add-c4-element', macro, alias, label: newElementName('element') } satisfies C4Intent],
     newElementTarget: { selection: { kind: 'c4-element', elementId: `c4-element:${alias}` } },
   }
   if (applyPlan(plan, { commitIntent: ctx.commitIntent,

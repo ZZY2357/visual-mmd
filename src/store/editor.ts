@@ -1,4 +1,5 @@
 import { create } from 'zustand'
+import { copyDiagramName, unnamedDiagramName } from '../i18n/domain-strings'
 import { DEFAULT_DIAGRAM_SOURCE } from '../lib/storage'
 import {
   bootstrapLibrary,
@@ -123,7 +124,7 @@ export function bootstrapEditorLibrary(storage: Storage = localStorage): void {
   let library = bootstrapLibrary(storage)
   if (library.diagrams.length === 0) {
     library = {
-      diagrams: [{ id: nextId(), name: '未命名图表', source: DEFAULT_DIAGRAM_SOURCE, savedAt: 0 }],
+      diagrams: [{ id: nextId(), name: unnamedDiagramName(), source: DEFAULT_DIAGRAM_SOURCE, savedAt: 0 }],
       activeId: null,
     }
   }
@@ -236,7 +237,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
     const state = get()
     const diagram: StoredLibraryDiagram = {
       id: nextId(),
-      name: uniqueName(baseName ?? '未命名图表', state.diagrams),
+      name: uniqueName(baseName ?? unnamedDiagramName(), state.diagrams),
       source: DIAGRAM_TYPES[typeId].template,
       savedAt: Date.now(),
     }
@@ -262,7 +263,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
     if (origin === undefined) return
     const copy: StoredLibraryDiagram = {
       id: nextId(),
-      name: uniqueName(`${origin.name} 副本`, state.diagrams),
+      name: uniqueName(copyDiagramName(origin.name), state.diagrams),
       source: origin.source,
       savedAt: Date.now(),
     }
