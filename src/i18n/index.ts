@@ -40,6 +40,10 @@ export const zhDict = {
   app: {
     title: 'Visual MMD',
     subtitle: '可视化 Mermaid 编辑器',
+    // 三栏布局（工单 03：折叠互斥的禁用态与提示）
+    layout: {
+      collapseDisabled: '另一面板已折叠，至多同时折叠一个面板',
+    },
     codePanel: {
       title: '代码面板',
       ariaLabel: 'Mermaid 源码编辑区',

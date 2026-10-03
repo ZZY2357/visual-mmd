@@ -111,6 +111,22 @@ export function ThreePaneLayout({ code, canvas, properties }: ThreePaneLayoutPro
   const toggleCode = () => setCodeCollapsed((c) => resolveCollapse(!c, propsCollapsed))
   const toggleProps = () => setPropsCollapsed((c) => resolveCollapse(!c, codeCollapsed))
 
+  // 工单 03（gui-test-2026-10-03）：折叠互斥的禁用态与提示。
+  // 另一面板已折叠且本面板尚未折叠时，折叠按钮置为 disabled；
+  // tooltip / aria-label 改述互斥原因，避免"可点但静默无效"被当成 bug。
+  const codeCollapseDisabled = !codeCollapsed && propsCollapsed
+  const propsCollapseDisabled = !propsCollapsed && codeCollapsed
+  const codeButtonLabel = codeCollapsed
+    ? t('app:codePanel.expand')
+    : codeCollapseDisabled
+      ? t('app:layout.collapseDisabled')
+      : t('app:codePanel.collapse')
+  const propsButtonLabel = propsCollapsed
+    ? t('app:propertyPanel.expand')
+    : propsCollapseDisabled
+      ? t('app:layout.collapseDisabled')
+      : t('app:propertyPanel.collapse')
+
   const dividerStyle: React.CSSProperties = {
     width: 6,
     cursor: 'col-resize',
@@ -145,14 +161,12 @@ export function ThreePaneLayout({ code, canvas, properties }: ThreePaneLayoutPro
           />
         </>
       )}
-      <Tooltip
-        label={codeCollapsed ? t('app:codePanel.expand') : t('app:codePanel.collapse')}
-        position="bottom"
-      >
+      <Tooltip label={codeButtonLabel} position="bottom">
         <ActionIcon
           variant="default"
-          aria-label={codeCollapsed ? t('app:codePanel.expand') : t('app:codePanel.collapse')}
+          aria-label={codeButtonLabel}
           onClick={toggleCode}
+          disabled={codeCollapseDisabled}
           style={{ alignSelf: 'flex-start', flexShrink: 0, marginInline: 2 }}
           size="compact-sm"
         >
@@ -175,14 +189,12 @@ export function ThreePaneLayout({ code, canvas, properties }: ThreePaneLayoutPro
           </div>
         </>
       )}
-      <Tooltip
-        label={propsCollapsed ? t('app:propertyPanel.expand') : t('app:propertyPanel.collapse')}
-        position="bottom"
-      >
+      <Tooltip label={propsButtonLabel} position="bottom">
         <ActionIcon
           variant="default"
-          aria-label={propsCollapsed ? t('app:propertyPanel.expand') : t('app:propertyPanel.collapse')}
+          aria-label={propsButtonLabel}
           onClick={toggleProps}
+          disabled={propsCollapseDisabled}
           style={{ alignSelf: 'flex-start', flexShrink: 0, marginInline: 2 }}
           size="compact-sm"
         >
