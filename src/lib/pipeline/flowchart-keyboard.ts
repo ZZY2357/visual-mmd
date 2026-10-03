@@ -37,7 +37,9 @@ export function nodeActionIntents(
   return {
     intents: [
       { type: 'add-node', nodeId: newId, text: newId, shape: 'rectangle', afterElementId: anchor },
-      { type: 'add-edge', from: parent, to: newId, afterElementId: anchor },
+      // 连线锚定在新节点行后：落码顺序为 选中行 → 新节点行 → 连线行，
+      // 否则连线行插进新节点定义之前，投影首次出现（裸端点）取不到文本
+      { type: 'add-edge', from: parent, to: newId, afterElementId: nodeElementId(newId, 1) },
     ],
     newNodeId: newId,
   }

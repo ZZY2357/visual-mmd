@@ -1120,6 +1120,37 @@ export class FlowchartParser implements DiagramParser {
         rewrites.set(part.id, '')
       }
     }
+
+    // 被清空的连线行：行上仅作端点出现（无形状、无独立定义）且在其它行仍有出现的节点
+    // 一并摘除，避免残留只剩端点的孤立语句（browser-findings 2026-10-02 #2）；
+    // 带形状的出现（如 `B{判断}`、`E[内部]`）是节点定义本身，一律保留
+    const emptiedLines = new Set<number>()
+    for (const part of links) {
+      if (rewrites.get(part.id) === '') emptiedLines.add(lineAtOffset(doc.source, part.span.start))
+    }
+    for (const line of emptiedLines) {
+      const survivingLink = doc.elements.some(
+        (part) =>
+          part.element.kind === 'link' &&
+          lineAtOffset(doc.source, part.span.start) === line &&
+          rewrites.get(part.id) === undefined,
+      )
+      if (survivingLink) continue
+      for (const part of doc.elements) {
+        if (part.element.kind !== 'node' || rewrites.has(part.id)) continue
+        const occ = part.element as NodeOccData
+        if (occ.shapeType !== null) continue
+        if (lineAtOffset(doc.source, part.span.start) !== line) continue
+        const elsewhere = doc.elements.some(
+          (p) =>
+            p !== part &&
+            p.element.kind === 'node' &&
+            (p.element as NodeOccData).nodeId === occ.nodeId &&
+            lineAtOffset(doc.source, p.span.start) !== line,
+        )
+        if (elsewhere) rewrites.set(part.id, '')
+      }
+    }
     return rewrites
   }
 

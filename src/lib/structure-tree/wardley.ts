@@ -28,8 +28,8 @@ function wardleyNodeKeyDown(
     const selection: Selection = { kind: 'wardley-node', name }
     const plan = wardleyKeyPlan(projection, { key: e.key, mods: { shift: e.shiftKey }, selection })
     if (plan === null) return
-    const { commitIntent, select } = useEditorStore.getState()
-    applyPlan(plan, { commitIntent, select, preventDefault: () => e.preventDefault() })
+    const { commitIntent, commitIntents, select } = useEditorStore.getState()
+    applyPlan(plan, { commitIntent, commitIntents, select, preventDefault: () => e.preventDefault() })
   }
 }
 

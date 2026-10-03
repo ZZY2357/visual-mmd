@@ -18,7 +18,8 @@ export function flowchartPartitions(projection: AnyProjection, { t }: TreePartit
       entries: p.nodes.map((node) => ({
         key: node.nodeId,
         label: node.text ?? node.nodeId,
-        detail: node.text !== null ? node.nodeId : undefined,
+        // 文本与 id 相同（如新建的 `n1[n1]`）不再重复拼接（browser-findings #1 附带）
+        detail: node.text !== null && node.text !== node.nodeId ? node.nodeId : undefined,
         depth: 1,
         selection: { kind: 'node', nodeId: node.nodeId },
       })),

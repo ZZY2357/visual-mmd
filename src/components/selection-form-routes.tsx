@@ -181,11 +181,13 @@ function commitStateDirection(direction: string | null): void {
 
 const flowchartSelectionForms: SelectionFormTable<FlowchartProjection> = {
   diagram: ({ projection }) => {
-    // 方向来自表头 token（`flowchart TD`）：没有「不设置」的形态，故不提供「跟随默认」
+    // 方向来自表头 token（`flowchart TD`）：没有「不设置」的形态，故不提供「跟随默认」。
+    // TD 是 TB 的合法别名，下拉按 TB 归一化显示，否则 `flowchart TD` 打开时无选中项
+    // （browser-findings 2026-10-02 #4）
     const commitIntent = useEditorStore((s) => s.commitIntent)
     return (
       <DiagramForm
-        direction={projection.direction}
+        direction={projection.direction === 'TD' ? 'TB' : projection.direction}
         knownDirections={DIRECTIONS}
         onSelect={(next) => {
           if (next !== null) commitIntent(setDirectionIntent(next))

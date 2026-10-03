@@ -202,4 +202,11 @@ describe('方向表单（工单 07）', () => {
     await clickOption(directionInput(), LR_LABEL)
     expect(useEditorStore.getState().source.startsWith('flowchart LR')).toBe(true)
   })
+
+  it('flowchart TD：下拉应有选中项（TD 归一化显示为 TB，browser-findings 2026-10-02 #4）', async () => {
+    const source = 'flowchart TD\n    A --> B\n'
+    resetEditorHistory(source)
+    await renderPanel(flowchartProjectionOf(source))
+    expect(directionInput().value).toBe('从上到下（TB）')
+  })
 })

@@ -536,6 +536,7 @@ export function useCanvasContextMenu(
         projection: latest.current.projection,
         selection: useEditorStore.getState().selection,
         commitIntent: (intent) => useEditorStore.getState().commitIntent(intent),
+        commitIntents: (intents) => useEditorStore.getState().commitIntents(intents),
         select: (selection) => useEditorStore.getState().select(selection),
         openForm: openNodeForm,
         openStyleForm,

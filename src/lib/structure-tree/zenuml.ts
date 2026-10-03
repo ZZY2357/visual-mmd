@@ -21,8 +21,8 @@ function zenumlEntryKeyDown(
     if (e.key !== 'Tab' && e.key !== 'Delete' && e.key !== 'Backspace') return
     const plan = zenumlKeyPlan(projection, { key: e.key, mods: { shift: e.shiftKey }, selection })
     if (plan === null) return
-    const { commitIntent, select } = useEditorStore.getState()
-    applyPlan(plan, { commitIntent, select, preventDefault: () => e.preventDefault() })
+    const { commitIntent, commitIntents, select } = useEditorStore.getState()
+    applyPlan(plan, { commitIntent, commitIntents, select, preventDefault: () => e.preventDefault() })
   }
 }
 

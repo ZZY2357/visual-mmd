@@ -103,12 +103,20 @@ const INTERACTIVE_TARGET_SELECTOR =
 
 /**
  * 指针按下的目标是否算「画布背景」（即允许启动背景拖拽平移）：
- * - SVG 内容（节点/连线/标签）：不算背景，指针事件留给选中链路；
  * - 交互控件（按钮/输入框/链接/可编辑区）及其后代：不算背景 ——
  *   背景拖拽会对容器 setPointerCapture，把派生的 click 劫持到容器，
- *   控件自身的 onClick 永不触发（工单 12：常驻的「适应窗口」按钮就是这样失效的）。
+ *   控件自身的 onClick 永不触发（工单 12：常驻的「适应窗口」按钮就是这样失效的）；
+ * - SVG 内的图形元素（带 data-id 的节点/连线，或 mindmap 的 node_N 节点）：
+ *   不算背景，指针事件留给选中链路；
+ * - 其余（SVG 外的容器空白、SVG 内的空白区——svg 根 / 容器 g）：算背景。
  */
 export function isBackgroundDragTarget(target: Element): boolean {
-  if (target.closest('svg') !== null) return false
-  return target.closest(INTERACTIVE_TARGET_SELECTOR) === null
+  if (target.closest(INTERACTIVE_TARGET_SELECTOR) !== null) return false
+  if (target.closest('svg') === null) return true
+  // SVG 内：落点归属图形元素才算「内容」，空白区（svg 根/容器 g）允许拖拽平移。
+  // mindmap 不发 data-id，节点 <g> 只带 DOM id `{svgId}-node_N`（mindmap-adapter 同约定），
+  // 因此单看 data-id 会把 mindmap 节点误判为背景、拖拽劫持其点击。
+  if (target.closest('[data-id]') !== null) return false
+  const ided = target.closest('[id]')
+  return ided === null || !/(?:^|-)node_(\d+)$/.test(ided.getAttribute('id') ?? '')
 }

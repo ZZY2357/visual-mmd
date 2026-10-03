@@ -69,6 +69,9 @@ export interface MenuActionContext {
   selection: Selection | null
   /** 提交编辑意图（可撤销）；false = 被拒绝，动作应中止后续步骤 */
   commitIntent: (intent: EditIntent) => boolean
+  /** 多意图原子提交（同一动作的意图序列合并为一个撤销快照，见 store.commitIntents）；
+   * 未供给时 applyPlan 退化为逐个 commitIntent */
+  commitIntents?: (intents: EditIntent[]) => boolean
   /** 更新编辑器选中 */
   select: (selection: Selection | null) => void
   /** 在菜单位置浮出添加型小表单（member / relation / message / note / block），提交才落码 */
@@ -342,7 +345,8 @@ export function createElement(ctx: MenuActionContext, target: ContextMenuTarget 
     return keyPlan
   })()
   if (plan === null) return
-  if (!applyPlan(plan, { commitIntent: ctx.commitIntent, select: ctx.select, beginInlineEdit: ctx.beginInlineEdit })) return
+  if (!applyPlan(plan, { commitIntent: ctx.commitIntent,
+        commitIntents: ctx.commitIntents, select: ctx.select, beginInlineEdit: ctx.beginInlineEdit })) return
   ctx.close()
 }
 
@@ -444,7 +448,8 @@ function addStateIntoComposite(ctx: MenuActionContext, target: ContextMenuTarget
     intents: [{ type: 'add-state', id, parentElementId: composite.elementId }],
     newElementTarget: { selection: { kind: 'state', id }, inlineEdit: { kind: 'state', id } },
   }
-  if (applyPlan(plan, { commitIntent: ctx.commitIntent, select: ctx.select, beginInlineEdit: ctx.beginInlineEdit })) ctx.close()
+  if (applyPlan(plan, { commitIntent: ctx.commitIntent,
+        commitIntents: ctx.commitIntents, select: ctx.select, beginInlineEdit: ctx.beginInlineEdit })) ctx.close()
 }
 
 /** er 关系边：循环切换线型（set-relation 的 line：实线 ↔ 虚线，直接改，不弹表单）。
@@ -482,7 +487,8 @@ function addTimelinePeriod(ctx: MenuActionContext): void {
       selection: { kind: 'timeline-period', elementId: `period:${proj.timeline.nextPeriodOrdinal}` },
     },
   }
-  if (applyPlan(plan, { commitIntent: ctx.commitIntent, select: ctx.select })) ctx.close()
+  if (applyPlan(plan, { commitIntent: ctx.commitIntent,
+        commitIntents: ctx.commitIntents, select: ctx.select })) ctx.close()
 }
 
 /** 空白处加分组 section（timeline）：落一行 `section 名称` + 选中新分组 */
@@ -496,7 +502,8 @@ function addTimelineSection(ctx: MenuActionContext): void {
       selection: { kind: 'timeline-section', elementId: `section:${proj.timeline.sections.length + 1}` },
     },
   }
-  if (applyPlan(plan, { commitIntent: ctx.commitIntent, select: ctx.select })) ctx.close()
+  if (applyPlan(plan, { commitIntent: ctx.commitIntent,
+        commitIntents: ctx.commitIntents, select: ctx.select })) ctx.close()
 }
 
 /** 时期上加事件（timeline）：落续行 `: 文本` + 选中新事件（不做内联编辑） */
@@ -513,7 +520,8 @@ function addTimelineEvent(ctx: MenuActionContext, target: ContextMenuTarget | un
       selection: { kind: 'timeline-event', elementId: `event:${period.nextEventOrdinal}` },
     },
   }
-  if (applyPlan(plan, { commitIntent: ctx.commitIntent, select: ctx.select })) ctx.close()
+  if (applyPlan(plan, { commitIntent: ctx.commitIntent,
+        commitIntents: ctx.commitIntents, select: ctx.select })) ctx.close()
 }
 
 /**
@@ -536,7 +544,8 @@ function addKanbanCard(ctx: MenuActionContext, target: ContextMenuTarget | undef
       inlineEdit: { kind: 'kanban-card', elementId: kanbanCardElementId(id) },
     },
   }
-  if (applyPlan(plan, { commitIntent: ctx.commitIntent, select: ctx.select, beginInlineEdit: ctx.beginInlineEdit })) {
+  if (applyPlan(plan, { commitIntent: ctx.commitIntent,
+        commitIntents: ctx.commitIntents, select: ctx.select, beginInlineEdit: ctx.beginInlineEdit })) {
     ctx.close()
   }
 }
@@ -601,7 +610,8 @@ function addJourneyTask(ctx: MenuActionContext): void {
       selection: { kind: 'journey-task', elementId: `task:${proj.journey.nextTaskOrdinal}` },
     },
   }
-  if (applyPlan(plan, { commitIntent: ctx.commitIntent, select: ctx.select })) ctx.close()
+  if (applyPlan(plan, { commitIntent: ctx.commitIntent,
+        commitIntents: ctx.commitIntents, select: ctx.select })) ctx.close()
 }
 
 /** 空白处加分组 section（journey）：落一行 `section 名称` + 选中新分组 */
@@ -616,7 +626,8 @@ function addJourneySection(ctx: MenuActionContext): void {
       selection: { kind: 'journey-section', elementId: `section:${proj.journey.nextSectionOrdinal}` },
     },
   }
-  if (applyPlan(plan, { commitIntent: ctx.commitIntent, select: ctx.select })) ctx.close()
+  if (applyPlan(plan, { commitIntent: ctx.commitIntent,
+        commitIntents: ctx.commitIntents, select: ctx.select })) ctx.close()
 }
 
 // ---------- pie（more-diagrams 工单 10） ----------
@@ -637,7 +648,8 @@ function addPieSector(ctx: MenuActionContext): void {
       selection: { kind: 'pie-sector', elementId: `sector:${proj.pie.nextSectorOrdinal}` },
     },
   }
-  if (applyPlan(plan, { commitIntent: ctx.commitIntent, select: ctx.select })) ctx.close()
+  if (applyPlan(plan, { commitIntent: ctx.commitIntent,
+        commitIntents: ctx.commitIntents, select: ctx.select })) ctx.close()
 }
 
 // ---------- xychart（more-diagrams 工单 14） ----------
@@ -671,7 +683,8 @@ function addBlockGroup(ctx: MenuActionContext): void {
     intents: [{ type: 'add-group', id }],
     newElementTarget: { selection: { kind: 'block-group', id } },
   }
-  if (applyPlan(plan, { commitIntent: ctx.commitIntent, select: ctx.select })) ctx.close()
+  if (applyPlan(plan, { commitIntent: ctx.commitIntent,
+        commitIntents: ctx.commitIntents, select: ctx.select })) ctx.close()
 }
 
 // ---------- gantt（more-diagrams 工单 11） ----------
@@ -701,7 +714,8 @@ function addGanttTask(ctx: MenuActionContext): void {
       selection: { kind: 'gantt-task', elementId: `task:${proj.gantt.nextTaskOrdinal}` },
     },
   }
-  if (applyPlan(plan, { commitIntent: ctx.commitIntent, select: ctx.select })) ctx.close()
+  if (applyPlan(plan, { commitIntent: ctx.commitIntent,
+        commitIntents: ctx.commitIntents, select: ctx.select })) ctx.close()
 }
 
 /** 空白处加分组 section（gantt）：落一行 `section 名称` + 选中新分组 */
@@ -716,7 +730,8 @@ function addGanttSection(ctx: MenuActionContext): void {
       selection: { kind: 'gantt-section', elementId: `section:${proj.gantt.nextSectionOrdinal}` },
     },
   }
-  if (applyPlan(plan, { commitIntent: ctx.commitIntent, select: ctx.select })) ctx.close()
+  if (applyPlan(plan, { commitIntent: ctx.commitIntent,
+        commitIntents: ctx.commitIntents, select: ctx.select })) ctx.close()
 }
 
 // ---------- quadrant（more-diagrams 工单 12） ----------
@@ -742,6 +757,7 @@ function addQuadrantPoint(ctx: MenuActionContext): void {
   if (
     applyPlan(plan, {
       commitIntent: ctx.commitIntent,
+        commitIntents: ctx.commitIntents,
       select: ctx.select,
       beginInlineEdit: ctx.beginInlineEdit,
     })
@@ -771,7 +787,8 @@ function addRadarAxis(ctx: MenuActionContext): void {
       selection: { kind: 'radar-axis', elementId: `axis:${proj.radar.nextAxisOrdinal}` },
     },
   }
-  if (applyPlan(plan, { commitIntent: ctx.commitIntent, select: ctx.select })) ctx.close()
+  if (applyPlan(plan, { commitIntent: ctx.commitIntent,
+        commitIntents: ctx.commitIntents, select: ctx.select })) ctx.close()
 }
 
 /**
@@ -793,7 +810,8 @@ function addRadarCurve(ctx: MenuActionContext): void {
       selection: { kind: 'radar-curve', elementId: `curve:${proj.radar.nextCurveOrdinal}` },
     },
   }
-  if (applyPlan(plan, { commitIntent: ctx.commitIntent, select: ctx.select })) ctx.close()
+  if (applyPlan(plan, { commitIntent: ctx.commitIntent,
+        commitIntents: ctx.commitIntents, select: ctx.select })) ctx.close()
 }
 
 /**
@@ -820,6 +838,7 @@ function addPacketField(ctx: MenuActionContext): void {
   if (
     applyPlan(plan, {
       commitIntent: ctx.commitIntent,
+        commitIntents: ctx.commitIntents,
       select: ctx.select,
       beginInlineEdit: ctx.beginInlineEdit,
     })
@@ -849,7 +868,8 @@ function addTreemapRoot(ctx: MenuActionContext, kind: 'section' | 'leaf'): void 
       selection: { kind: 'treemap-node', elementId: `treemap-node:${proj.treemap.nextNodeOrdinal}` },
     },
   }
-  if (applyPlan(plan, { commitIntent: ctx.commitIntent, select: ctx.select })) ctx.close()
+  if (applyPlan(plan, { commitIntent: ctx.commitIntent,
+        commitIntents: ctx.commitIntents, select: ctx.select })) ctx.close()
 }
 
 // ---------- ishikawa（more-diagrams 工单 22） ----------
@@ -884,7 +904,8 @@ function addIshikawaCause(ctx: MenuActionContext): void {
     intents,
     newElementTarget: { selection: { kind: 'ishikawa-node', elementId: `ishikawa-node:${ordinal}` } },
   }
-  if (applyPlan(plan, { commitIntent: ctx.commitIntent, select: ctx.select })) ctx.close()
+  if (applyPlan(plan, { commitIntent: ctx.commitIntent,
+        commitIntents: ctx.commitIntents, select: ctx.select })) ctx.close()
 }
 
 // ---------- wardley（more-diagrams 工单 23） ----------
@@ -912,7 +933,8 @@ function addWardleyNode(ctx: MenuActionContext, nodeKind: 'component' | 'anchor'
       selection: { kind: 'wardley-node', name },
     },
   }
-  if (applyPlan(plan, { commitIntent: ctx.commitIntent, select: ctx.select })) ctx.close()
+  if (applyPlan(plan, { commitIntent: ctx.commitIntent,
+        commitIntents: ctx.commitIntents, select: ctx.select })) ctx.close()
 }
 
 // ---------- cynefin（more-diagrams 工单 25） ----------
@@ -945,7 +967,8 @@ function addCynefinItem(ctx: MenuActionContext): void {
       selection: { kind: 'cynefin-item', elementId: `cynefin-item:${p.nextItemOrdinal}` },
     },
   }
-  if (applyPlan(plan, { commitIntent: ctx.commitIntent, select: ctx.select })) ctx.close()
+  if (applyPlan(plan, { commitIntent: ctx.commitIntent,
+        commitIntents: ctx.commitIntents, select: ctx.select })) ctx.close()
 }
 
 // ---------- treeView（more-diagrams 工单 24） ----------
@@ -976,7 +999,8 @@ function addTreeviewRoot(ctx: MenuActionContext): void {
     intents,
     newElementTarget: { selection: { kind: 'treeview-node', elementId: `treeview-node:${ordinal}` } },
   }
-  if (applyPlan(plan, { commitIntent: ctx.commitIntent, select: ctx.select })) ctx.close()
+  if (applyPlan(plan, { commitIntent: ctx.commitIntent,
+        commitIntents: ctx.commitIntents, select: ctx.select })) ctx.close()
 }
 
 /** 目标节点整棵子树在平铺数组中的末位下标（找不到返回 -1） */
@@ -1027,7 +1051,8 @@ function addArchitectureNode(
       inlineEdit: kind === 'junction' ? undefined : { kind: 'architecture', elementKind: kind, id },
     },
   }
-  if (applyPlan(plan, { commitIntent: ctx.commitIntent, select: ctx.select, beginInlineEdit: ctx.beginInlineEdit })) {
+  if (applyPlan(plan, { commitIntent: ctx.commitIntent,
+        commitIntents: ctx.commitIntents, select: ctx.select, beginInlineEdit: ctx.beginInlineEdit })) {
     ctx.close()
   }
 }
@@ -1048,7 +1073,8 @@ function addVennSet(ctx: MenuActionContext): void {
     intents: [{ type: 'add-set', id } satisfies VennIntent],
     newElementTarget: { selection: { kind: 'venn-set', id } },
   }
-  if (applyPlan(plan, { commitIntent: ctx.commitIntent, select: ctx.select })) ctx.close()
+  if (applyPlan(plan, { commitIntent: ctx.commitIntent,
+        commitIntents: ctx.commitIntents, select: ctx.select })) ctx.close()
 }
 
 /**
@@ -1078,7 +1104,8 @@ function addVennUnion(ctx: MenuActionContext, target: ContextMenuTarget | undefi
     intents: [{ type: 'add-union', ids: [a, b] } satisfies VennIntent],
     newElementTarget: { selection: { kind: 'venn-union', elementId: `venn-union:${p.nextUnionOrdinal}` } },
   }
-  if (applyPlan(plan, { commitIntent: ctx.commitIntent, select: ctx.select })) ctx.close()
+  if (applyPlan(plan, { commitIntent: ctx.commitIntent,
+        commitIntents: ctx.commitIntents, select: ctx.select })) ctx.close()
 }
 
 // ---------- usecase（more-diagrams 工单 26） ----------
@@ -1104,7 +1131,8 @@ function addUsecaseActor(ctx: MenuActionContext): void {
     intents: [{ type: 'add-actor', id } satisfies UsecaseIntent],
     newElementTarget: { selection: { kind: 'usecase-actor', elementId: `actor:${id}` } },
   }
-  if (applyPlan(plan, { commitIntent: ctx.commitIntent, select: ctx.select })) ctx.close()
+  if (applyPlan(plan, { commitIntent: ctx.commitIntent,
+        commitIntents: ctx.commitIntents, select: ctx.select })) ctx.close()
 }
 
 /** 空白处加用例（usecase）：落一行 `<id>("<占位标签>")`（id 避重 base `Usecase`），
@@ -1118,7 +1146,8 @@ function addUsecaseCase(ctx: MenuActionContext): void {
     intents: [{ type: 'add-usecase', id, label: '新用例', shape: 'ellipse' } satisfies UsecaseIntent],
     newElementTarget: { selection: { kind: 'usecase-usecase', elementId: `usecase:${id}` } },
   }
-  if (applyPlan(plan, { commitIntent: ctx.commitIntent, select: ctx.select })) ctx.close()
+  if (applyPlan(plan, { commitIntent: ctx.commitIntent,
+        commitIntents: ctx.commitIntents, select: ctx.select })) ctx.close()
 }
 
 /** 空白处加系统边界（usecase）：落 `systemBoundary <id>["<占位标题>"]` … `end` 两行
@@ -1132,7 +1161,8 @@ function addUsecaseBoundary(ctx: MenuActionContext): void {
     intents: [{ type: 'add-boundary', id, label: '新系统边界' } satisfies UsecaseIntent],
     newElementTarget: { selection: { kind: 'usecase-boundary', elementId: `boundary:${id}` } },
   }
-  if (applyPlan(plan, { commitIntent: ctx.commitIntent, select: ctx.select })) ctx.close()
+  if (applyPlan(plan, { commitIntent: ctx.commitIntent,
+        commitIntents: ctx.commitIntents, select: ctx.select })) ctx.close()
 }
 
 // ---------- eventmodeling（more-diagrams 工单 28） ----------
@@ -1164,7 +1194,8 @@ function addEmFrame(ctx: MenuActionContext): void {
     ],
     newElementTarget: { selection: { kind: 'em-frame', elementId: `frame:${p.nextFrameOrdinal}` } },
   }
-  if (applyPlan(plan, { commitIntent: ctx.commitIntent, select: ctx.select })) ctx.close()
+  if (applyPlan(plan, { commitIntent: ctx.commitIntent,
+        commitIntents: ctx.commitIntents, select: ctx.select })) ctx.close()
 }
 
 /** 空白处加数据块（eventmodeling）：落 `data <名字> {` … `}` 多行块（名字避重 base `Data`，
@@ -1178,7 +1209,8 @@ function addEmData(ctx: MenuActionContext): void {
     intents: [{ type: 'add-em-data', name } satisfies EventModelingIntent],
     newElementTarget: { selection: { kind: 'em-data', elementId: `data:${p.dataBlocks.length + 1}` } },
   }
-  if (applyPlan(plan, { commitIntent: ctx.commitIntent, select: ctx.select })) ctx.close()
+  if (applyPlan(plan, { commitIntent: ctx.commitIntent,
+        commitIntents: ctx.commitIntents, select: ctx.select })) ctx.close()
 }
 
 // ---------- agentflow（more-diagrams 工单 27） ----------
@@ -1199,7 +1231,8 @@ function addAgentflowNode(ctx: MenuActionContext): void {
     intents: [{ type: 'add-node', nodeId, text: nodeId, shape: 'task' } satisfies AgentflowIntent],
     newElementTarget: { selection: { kind: 'agentflow-node', nodeId } },
   }
-  if (applyPlan(plan, { commitIntent: ctx.commitIntent, select: ctx.select })) ctx.close()
+  if (applyPlan(plan, { commitIntent: ctx.commitIntent,
+        commitIntents: ctx.commitIntents, select: ctx.select })) ctx.close()
 }
 
 /**
@@ -1237,7 +1270,8 @@ function addZenumlParticipant(ctx: MenuActionContext): void {
     intents: [{ type: 'add-zenuml-participant', id } satisfies ZenumlIntent],
     newElementTarget: { selection: { kind: 'zenuml-participant', elementId: `participant:${id}` } },
   }
-  if (applyPlan(plan, { commitIntent: ctx.commitIntent, select: ctx.select })) ctx.close()
+  if (applyPlan(plan, { commitIntent: ctx.commitIntent,
+        commitIntents: ctx.commitIntents, select: ctx.select })) ctx.close()
 }
 
 /**
@@ -1297,7 +1331,8 @@ function addC4Element(ctx: MenuActionContext, macro: string = C4_MACRO_OF_KIND.s
     intents: [{ type: 'add-c4-element', macro, alias, label: '新元素' } satisfies C4Intent],
     newElementTarget: { selection: { kind: 'c4-element', elementId: `c4-element:${alias}` } },
   }
-  if (applyPlan(plan, { commitIntent: ctx.commitIntent, select: ctx.select })) ctx.close()
+  if (applyPlan(plan, { commitIntent: ctx.commitIntent,
+        commitIntents: ctx.commitIntents, select: ctx.select })) ctx.close()
 }
 
 /**
@@ -1314,7 +1349,8 @@ function addC4Boundary(ctx: MenuActionContext, macro: string = 'Enterprise_Bound
     intents: [{ type: 'add-c4-boundary', macro, alias, label: '新边界' } satisfies C4Intent],
     newElementTarget: { selection: { kind: 'c4-boundary', elementId: `c4-boundary:${alias}` } },
   }
-  if (applyPlan(plan, { commitIntent: ctx.commitIntent, select: ctx.select })) ctx.close()
+  if (applyPlan(plan, { commitIntent: ctx.commitIntent,
+        commitIntents: ctx.commitIntents, select: ctx.select })) ctx.close()
 }
 
 export const MENU_ACTIONS: Record<Exclude<ContextMenuItemId, 'apply-style'>, MenuAction> = {

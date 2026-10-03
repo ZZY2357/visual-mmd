@@ -119,11 +119,32 @@ describe('isBackgroundDragTarget（工单 12：背景拖拽的命中判定）', 
     expect(isBackgroundDragTarget(parse('<a>锚点</a>'))).toBe(true)
   })
 
-  it('svg 及其后代（节点/连线/标签）不算背景：指针事件留给选中链路', () => {
-    const svg = parse('<svg width="100" height="100"><g><rect /><text>节点</text></g></svg>')
-    expect(isBackgroundDragTarget(svg)).toBe(false)
-    expect(isBackgroundDragTarget(svg.querySelector('g') as Element)).toBe(false)
-    expect(isBackgroundDragTarget(svg.querySelector('text') as Element)).toBe(false)
+  it('SVG 内空白区（svg 根 / 容器 g）算背景：SVG 矩形内也能拖拽平移', () => {
+    const svg = parse(
+      '<svg id="mermaid-0" width="100" height="100"><g id="graph0"><rect data-id="n1" /><text>节点</text></g></svg>',
+    )
+    expect(isBackgroundDragTarget(svg)).toBe(true)
+    expect(isBackgroundDragTarget(svg.querySelector('#graph0') as Element)).toBe(true)
+  })
+
+  it('SVG 内图形元素（带 data-id 的节点/连线）不算背景：指针事件留给选中链路', () => {
+    const svg = parse(
+      '<svg id="mermaid-0" width="100" height="100"><g id="graph0"><g data-id="n1"><rect /><text>节点</text></g></g></svg>',
+    )
+    const node = svg.querySelector('[data-id="n1"]') as Element
+    expect(isBackgroundDragTarget(node)).toBe(false)
+    expect(isBackgroundDragTarget(node.querySelector('rect') as Element)).toBe(false)
+    expect(isBackgroundDragTarget(node.querySelector('text') as Element)).toBe(false)
+  })
+
+  it('mindmap 节点不发 data-id，但 node_N 的 DOM id 不算背景（与 mindmap-adapter 同约定）', () => {
+    const svg = parse(
+      '<svg id="mm-1" width="100" height="100"><g id="mm-1-node_0"><rect /><text>根</text></g></svg>',
+    )
+    expect(isBackgroundDragTarget(svg.querySelector('#mm-1-node_0') as Element)).toBe(false)
+    expect(isBackgroundDragTarget(svg.querySelector('#mm-1-node_0 rect') as Element)).toBe(false)
+    // 其他 id（svg 根、graph0）不是 mindmap 节点：仍是背景
+    expect(isBackgroundDragTarget(svg)).toBe(true)
   })
 })
 

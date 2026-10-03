@@ -62,6 +62,9 @@ export type KeyHandler = (input: KeyInput) => KeyPlan | null
 export interface PlanExecutor {
   /** 提交编辑意图（可撤销）；false = 被拒绝，中止后续步骤（含选中与内联编辑） */
   commitIntent: (intent: EditIntent) => boolean
+  /** 多意图原子提交（可选）：同一动作的意图序列（如加节点+加边）合并为一个撤销快照；
+   * 未接线时退化为逐个 commitIntent（每个意图各一个快照） */
+  commitIntents?: (intents: EditIntent[]) => boolean
   /** 更新编辑器选中 */
   select: (selection: Selection | null) => void
   /** 进入内联编辑（新建元素的命名）；结构树路径经由 pendingInlineEdit 请求间接接入 */
@@ -83,8 +86,14 @@ export function applyPlan(plan: KeyPlan, exec: PlanExecutor): boolean {
     exec.openForm?.(plan.form)
     return true
   }
-  for (const intent of plan.intents) {
-    if (!exec.commitIntent(intent)) return false
+  // 多意图 plan 优先走原子提交：添加节点 = 加节点 + 加边是同一个用户动作，
+  // 撤销栈里不应出现「有节点无边」的中间态（browser-findings 2026-10-02 #1）
+  if (plan.intents.length > 1 && exec.commitIntents !== undefined) {
+    if (!exec.commitIntents(plan.intents)) return false
+  } else {
+    for (const intent of plan.intents) {
+      if (!exec.commitIntent(intent)) return false
+    }
   }
   if (plan.newElementTarget !== undefined) {
     exec.select(plan.newElementTarget.selection)

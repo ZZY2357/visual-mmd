@@ -31,9 +31,10 @@ function mindmapEntryKeyDown(
       newNodeText: t('app:propertyPanel.mindmapNewNode'),
     })
     if (plan === null) return
-    const { commitIntent, select, requestInlineEdit } = useEditorStore.getState()
+    const { commitIntent, commitIntents, select, requestInlineEdit } = useEditorStore.getState()
     applyPlan(plan, {
       commitIntent,
+      commitIntents,
       select,
       // 本图种（mindmap）的 plan 只产 mindmap 目标：经 store 请求，画布侧消费（工单 06）
       beginInlineEdit: (target) => {

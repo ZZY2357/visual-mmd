@@ -83,7 +83,8 @@ describe('动作 → 编辑意图序列', () => {
     expect(plan!.newNodeId).toBe('n1')
     expect(plan!.intents).toEqual([
       { type: 'add-node', nodeId: 'n1', text: 'n1', shape: 'rectangle', afterElementId: 'node:B' },
-      { type: 'add-edge', from: 'B', to: 'n1', afterElementId: 'node:B' },
+      // 连线锚定在新节点行后：定义行在前、连线行在后（投影首次出现才取得到文本）
+      { type: 'add-edge', from: 'B', to: 'n1', afterElementId: 'node:n1' },
     ])
   })
 
@@ -93,13 +94,13 @@ describe('动作 → 编辑意图序列', () => {
       type: 'add-edge',
       from: 'A',
       to: 'n1',
-      afterElementId: 'node:B',
+      afterElementId: 'node:n1',
     })
   })
 
   it('无入边的根节点按 Enter 退化为添加子节点', () => {
     const plan = nodeActionIntents(projection, 'A', 'add-sibling')
-    expect(plan!.intents[1]).toEqual({ type: 'add-edge', from: 'A', to: 'n1', afterElementId: 'node:A' })
+    expect(plan!.intents[1]).toEqual({ type: 'add-edge', from: 'A', to: 'n1', afterElementId: 'node:n1' })
   })
 
   it('选中的节点不存在于投影 → null（不产出意图）', () => {
@@ -121,8 +122,8 @@ describe('意图经管线落码（手术式、可渲染）', () => {
     // 新增的两行紧跟 B 行之后（缩进跟随锚点行）
     const lines = source.split('\n')
     const idx = lines.findIndex((l) => l.includes('B[处理]'))
-    expect(lines[idx + 1]).toBe('    B --> n1')
-    expect(lines[idx + 2]).toBe('    n1[n1]')
+    expect(lines[idx + 1]).toBe('    n1[n1]')
+    expect(lines[idx + 2]).toBe('    B --> n1')
     // 原有行逐字保留（新行插在首个 B 出现行之后）
     expect(lines[0]).toBe('flowchart TD')
     expect(lines[1]).toBe('    A[开始] --> B[处理]')
@@ -379,7 +380,7 @@ describe('键 → KeyPlan：flowchart（工单 04 键位表 + 意图映射）', 
     expect(flowchartKeyPlan(projection, { key: 'Tab', selection: FLOW_SELECTION })).toEqual({
       intents: [
         { type: 'add-node', nodeId: 'n1', text: 'n1', shape: 'rectangle', afterElementId: 'node:B' },
-        { type: 'add-edge', from: 'B', to: 'n1', afterElementId: 'node:B' },
+        { type: 'add-edge', from: 'B', to: 'n1', afterElementId: 'node:n1' },
       ],
       newElementTarget: {
         selection: { kind: 'node', nodeId: 'n1' },

@@ -69,6 +69,10 @@ interface EditorState {
   commitEdit: (source: string) => void
   /** 表单意图入口：经管线手术式落码，独立快照；意图不可应用时返回 false */
   commitIntent: (intent: EditIntent) => boolean
+  /** 多意图原子提交（同一动作的意图序列，如 Tab 添加节点 = 加节点 + 加边）：
+   * 全部落码成功才产生**一个**撤销快照；任一失败则整体不提交并返回 false。
+   * 单意图动作的中间态不应暴露给撤销栈（browser-findings 2026-10-02 #1）。 */
+  commitIntents: (intents: EditIntent[]) => boolean
   select: (selection: Selection | null) => void
   requestGotoLine: (line: number) => void
   requestInlineEdit: (target: InlineEditTarget) => void
@@ -148,6 +152,23 @@ function withActiveSource(state: EditorState, source: string): StoredLibraryDiag
   return state.diagrams.map((d) => (d.id === active.id ? { ...d, source, savedAt: Date.now() } : d))
 }
 
+/** 单个意图落到当前源码：可应用返回新源码，不可应用返回 null（不产生副作用）。
+ * 主题是图种无关的 frontmatter 编辑（工单 01）：不经图种解析器，直接手术式落码；
+ * 源码有语法错误时也可用（不依赖解析成功）。theme: null = 「跟随 Mermaid 默认」。
+ * 其余意图：源码不属于任何已注册图种（unsupported 态，more-diagrams 工单 01）时
+ * 没有解析器可落码：拒绝意图而不是喂给 flowchart 误解析。 */
+function applyIntentToSource(source: string, intent: EditIntent): string | null {
+  if (intent.type === 'set-theme') {
+    const theme = intent.theme
+    if (theme !== null && (typeof theme !== 'string' || !isMermaidTheme(theme))) return null
+    return applySetTheme(source, theme)
+  }
+  const registration = detectDiagramType(source)
+  if (registration === null) return null
+  const result = applyEdit(source, registration.parser, intent)
+  return result.ok ? result.source : null
+}
+
 /** 切换活跃图表：快照栈重置 + 选中状态清空（编辑器完整换装） */
 function switchTo(diagram: StoredLibraryDiagram | null): Partial<EditorState> {
   snapshotStack.reset(diagram?.source ?? '')
@@ -180,26 +201,22 @@ export const useEditorStore = create<EditorState>((set, get) => ({
   },
   commitIntent: (intent) => {
     const state = get()
-    const current = state.source
-    // 主题是图种无关的 frontmatter 编辑（工单 01）：不经图种解析器，
-    // 直接手术式落码；源码有语法错误时也可用（不依赖解析成功）。
-    // theme: null = 「跟随 Mermaid 默认」，清除主题键（连带清掉悬空的 config/frontmatter）
-    if (intent.type === 'set-theme') {
-      const theme = intent.theme
-      if (theme !== null && (typeof theme !== 'string' || !isMermaidTheme(theme))) return false
-      const next = applySetTheme(current, theme)
-      snapshotStack.commit(next)
-      set({ source: next, diagrams: withActiveSource(state, next), ...historyOf(snapshotStack) })
-      return true
+    const next = applyIntentToSource(state.source, intent)
+    if (next === null) return false
+    snapshotStack.commit(next)
+    set({ source: next, diagrams: withActiveSource(state, next), ...historyOf(snapshotStack) })
+    return true
+  },
+  commitIntents: (intents) => {
+    const state = get()
+    let source = state.source
+    for (const intent of intents) {
+      const next = applyIntentToSource(source, intent)
+      if (next === null) return false
+      source = next
     }
-    // 源码不属于任何已注册图种（unsupported 态，more-diagrams 工单 01）时
-    // 没有解析器可落码：拒绝意图而不是喂给 flowchart 误解析
-    const registration = detectDiagramType(current)
-    if (registration === null) return false
-    const result = applyEdit(current, registration.parser, intent)
-    if (!result.ok) return false
-    snapshotStack.commit(result.source)
-    set({ source: result.source, diagrams: withActiveSource(state, result.source), ...historyOf(snapshotStack) })
+    snapshotStack.commit(source)
+    set({ source, diagrams: withActiveSource(state, source), ...historyOf(snapshotStack) })
     return true
   },
   select: (selection) => set({ selection }),

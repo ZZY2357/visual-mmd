@@ -25,8 +25,8 @@ function pieSectorKeyDown(projection: PieProjection, elementId: string): (e: Key
     const selection: Selection = { kind: 'pie-sector', elementId }
     const plan = pieKeyPlan(projection, { key: e.key, mods: { shift: e.shiftKey }, selection })
     if (plan === null) return
-    const { commitIntent, select } = useEditorStore.getState()
-    applyPlan(plan, { commitIntent, select, preventDefault: () => e.preventDefault() })
+    const { commitIntent, commitIntents, select } = useEditorStore.getState()
+    applyPlan(plan, { commitIntent, commitIntents, select, preventDefault: () => e.preventDefault() })
   }
 }
 

@@ -80,6 +80,14 @@ export function buildFlowchartProjection(doc: SourceDocument): FlowchartProjecti
       if (!nodeSeen.has(node.nodeId)) {
         nodeSeen.add(node.nodeId)
         nodes.push({ nodeId: node.nodeId, text: node.text, shape: node.shapeType })
+      } else if (node.shapeType !== null) {
+        // 首次出现可能是连线里的裸端点（text/shape 为空）；带形状的出现才是节点的
+        // 定义（文本、形状），用它覆盖（browser-findings 2026-10-02 #3）
+        const known = nodes.find((n) => n.nodeId === node.nodeId)
+        if (known !== undefined) {
+          known.text = node.text
+          known.shape = node.shapeType
+        }
       }
     } else if (data.kind === 'link') {
       const link = data as LinkOccData

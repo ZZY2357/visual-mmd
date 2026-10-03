@@ -114,7 +114,7 @@ export function useCanvasKeyboard(
       const el = e.target
       if (el instanceof Element && el.closest(FOCUS_EXCLUDE_SELECTOR)) return
 
-      const { selection, commitIntent, select } = useEditorStore.getState()
+      const { selection, commitIntent, commitIntents, select } = useEditorStore.getState()
 
       // ① 方向键（工单 14 §5）：修饰键按住时不导航，但**一律** preventDefault
       //    （修掉 Alt/Ctrl/Cmd+方向键触发浏览器前进后退、Shift+方向键静默改选中）
@@ -138,6 +138,7 @@ export function useCanvasKeyboard(
       if (plan === null) return
       applyPlan(plan, {
         commitIntent,
+        commitIntents,
         select,
         beginInlineEdit: (inlineTarget) => latest.current.onNodeCreated?.(inlineTarget),
         openForm: (kind) => latest.current.openForm?.(kind),

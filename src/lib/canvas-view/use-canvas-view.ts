@@ -5,7 +5,7 @@ import { fitView, isBackgroundDragTarget, panIntoView, zoomAtPoint, type ViewSta
  * 画布视图 Hook（工单 03）：
  * - SVG 换新（编辑重渲染 / 切换图表）即回到 fit —— 视图不持久化
  * - 纯滚轮以鼠标位置为锚点缩放（0.25–4 倍，不区分 Ctrl），preventDefault 阻止页面滚动
- * - 按住背景（非 SVG 元素）拖拽平移
+ * - 按住背景（SVG 空白区 / 非交互控件）拖拽平移
  *
  * 变换全部通过 SVG 元素上的 CSS transform 表达，不改 SVG 内容 ——
  * 导出（App.tsx）走 preview.svg 原始字符串，天然与视图无关。
@@ -96,7 +96,7 @@ export function useCanvasView(svg: string | null) {
   }, [])
 
   const onPointerDown = (e: React.PointerEvent) => {
-    // 仅背景（非 SVG 元素、非交互控件）拖拽平移；元素上的指针事件留给选中链路，
+    // 仅背景（SVG 空白区、非交互控件）拖拽平移；图形元素上的指针事件留给选中链路，
     // 控件（如常驻的「适应窗口」按钮）上的留给其自身点击——否则 setPointerCapture
     // 会把派生的 click 劫持到容器，onClick 永不触发（工单 12）
     const container = containerRef.current
