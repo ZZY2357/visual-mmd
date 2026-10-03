@@ -15,6 +15,13 @@ import type { SourceParseError } from '../lib/mermaid-error'
 
 const setErrorLineEffect = StateEffect.define<number | null>()
 
+/** 编辑器撑满面板宿主（工单 04）：面板内任意位置点击都落在编辑器上，焦点可进入 */
+const fillPanelTheme = EditorView.theme({
+  '&': { height: '100%' },
+  '.cm-scroller': { minHeight: '100%' },
+  '.cm-content': { minHeight: '100%' },
+})
+
 const errorLineField = StateField.define<DecorationSet>({
   create: () => Decoration.none,
   update(decorations, transaction) {
@@ -78,6 +85,9 @@ export function CodePanel({ error }: CodePanelProps) {
       errorLineField,
       updateListener,
       EditorView.lineWrapping,
+      // 编辑器撑满面板宿主高度：否则文档下方是宿主的空白区（工单 04 实测）——
+      // 点击该区域焦点不进入 CodeMirror，Ctrl+Z 等编辑键全部落空
+      fillPanelTheme,
     ]
 
     const view = new EditorView({
@@ -132,6 +142,10 @@ export function CodePanel({ error }: CodePanelProps) {
       <Title order={4}>{t('codePanel.title')}</Title>
       <Box
         ref={hostRef}
+        onMouseDown={(e) => {
+          // 兜底：点到编辑器之外的宿主表面（边框缝隙等）时把焦点交给编辑器（工单 04）
+          if ((e.target as Element).closest('.cm-editor') === null) viewRef.current?.focus()
+        }}
         h="100%"
         style={{
           flex: 1,
