@@ -1,0 +1,1 @@
+if('serviceWorker' in navigator) {window.addEventListener('load', () => {navigator.serviceWorker.register('/visual-mmd/sw.js', { scope: '/visual-mmd/' })})}
