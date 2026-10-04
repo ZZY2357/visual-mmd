@@ -49,6 +49,18 @@ npm run build
 npm run preview
 ```
 
+## 部署
+
+线上地址：<https://zzy2357.github.io/visual-mmd/>（GitHub Pages，托管在 `gh-pages` 分支）。
+
+推送一条命令完成构建与发布——在当前分支正常构建后，脚本会把 `dist/` 作为一次独立提交推到 `gh-pages` 分支，全程不切换工作区分支：
+
+```bash
+npm run deploy
+```
+
+> 首次使用需在 GitHub 仓库的 Settings → Pages 里把 Source 设为 `gh-pages` 分支。
+
 > 你的图表数据只存在浏览器本地（localStorage），不会上传到任何服务器。换浏览器或清空站点数据前，记得先把图表导出为 `.mmd` 备份。
 
 ## 贡献

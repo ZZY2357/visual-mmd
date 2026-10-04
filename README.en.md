@@ -49,6 +49,18 @@ npm run build
 npm run preview
 ```
 
+## Deployment
+
+Live at: <https://zzy2357.github.io/visual-mmd/> (GitHub Pages, served from the `gh-pages` branch).
+
+One command builds and publishes — the project builds on the current branch as usual, then the script pushes `dist/` to the `gh-pages` branch as a standalone commit, without ever switching branches in your working tree:
+
+```bash
+npm run deploy
+```
+
+> First time only: in the GitHub repo, set Settings → Pages → Source to the `gh-pages` branch.
+
 > Your diagrams are stored only in your browser (localStorage) and never uploaded to any server. Before switching browsers or clearing site data, export your diagrams as `.mmd` backups.
 
 ## Contributing
