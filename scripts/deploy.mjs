@@ -23,16 +23,20 @@ try {
     process.exit(1)
   }
 
-  // 用临时 index 把 dist 内容收进一棵树，路径以 dist 为根
+  // 用临时 index 把 dist 内容收进一棵树，路径以 dist 为根；关掉 autocrlf 免去换行转换与警告
   const indexEnv = { GIT_INDEX_FILE: indexFile }
   git(['read-tree', '--empty'], indexEnv)
-  git(['add', '-A', '--'], { ...indexEnv, GIT_DIR: join(repo, '.git'), GIT_WORK_TREE: dist })
+  git(['-c', 'core.autocrlf=false', 'add', '-A', '--'], {
+    ...indexEnv,
+    GIT_DIR: join(repo, '.git'),
+    GIT_WORK_TREE: dist,
+  })
   const tree = git(['write-tree'], indexEnv)
 
   // 与远端 gh-pages 现有内容一致时跳过，重复部署零开销
   let remoteTree
   try {
-    remoteTree = git(['rev-parse', `refs/remotes/origin/${branch}^{tree}`])
+    remoteTree = git(['rev-parse', '--verify', '--quiet', `refs/remotes/origin/${branch}^{tree}`])
   } catch {
     // 首次部署，远端还没有该分支
   }
