@@ -246,3 +246,11 @@ mindmap 模板（13 节点，力导向）：
   - **不变量**：全流程 `document.activeElement` 恒为画布容器；焦点移到代码面板（`.cm-content`）后方向键
     完全不拦截、选中不变。
   - **控制台**：`agent-browser console` 与 `errors` 均为空（0 error / 0 warning）。
+
+---
+
+### 收编记录（工单 19 仓库卫生，2026-10-06）
+
+根目录 `BUG_AND_FEAT.md` 已删除，其内容去向：本单即「上下左右键切换选中」条目的落地处
+（本文件开头「来源」已注明），该条目已 `[x]` 归档。详见
+`.scratch/self-grill-hardening/issues/19-repo-hygiene.md` 的 Answer。

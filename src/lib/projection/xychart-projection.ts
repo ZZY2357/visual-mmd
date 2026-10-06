@@ -87,7 +87,7 @@ export function buildXychartProjection(doc: SourceDocument): XychartProjection {
     if (kind === 'xychart-axis') {
       const d = part.element as XychartAxisData
       let form: ProjectionXychartAxis['form'] = 'none'
-      let categories: ProjectionXychartAxis['categories'] = []
+      const categories: ProjectionXychartAxis['categories'] = []
       let range: ProjectionXychartAxis['range'] = null
       if (d.restRaw !== null) {
         if (d.restRaw.startsWith('[')) {
@@ -102,7 +102,7 @@ export function buildXychartProjection(doc: SourceDocument): XychartProjection {
           form = 'range'
           const m = /^\s*([+-]?(?:\d+(?:\.\d+)?|\.\d+))\s*-->\s*([+-]?(?:\d+(?:\.\d+)?|\.\d+))\s*$/.exec(d.restRaw)
           if (m !== null) {
-            range = { min: m[1]!, max: m[2]! }
+            range = { min: m[1], max: m[2] }
           } else {
             // 手写非法 range 原样保留并标注
             range = { min: d.restRaw, max: '' }

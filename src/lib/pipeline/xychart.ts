@@ -219,7 +219,7 @@ export function renderXychartArray(entries: readonly XychartArrayEntry[], traili
  * 且数值词法优先）：仅放行「字母开头 + 词形字符」的 ASCII 裸词，其余一律引号包裹
  * （引号 STR 总是合法——工单 Comments 记录口径）。空串非法（引号空串语义不明）。
  */
-const BARE_TEXT_RE = /^[A-Za-z][A-Za-z0-9_\-]*$/
+const BARE_TEXT_RE = /^[A-Za-z][A-Za-z0-9_-]*$/
 
 /** 文本 → 段原文：词形 ASCII 裸写，其余（含空格/中文/逗号）引号包裹 */
 export function encodeXychartText(text: string): string {
@@ -341,7 +341,7 @@ function parseAxisBody(axis: 'x' | 'y', body: string): XychartAxisData | null {
     const right = rest.slice(arrow + 3)
     const minMatch = /^([\s\S]*?)([+-]?(?:\d+(?:\.\d+)?|\.\d+))$/.exec(left.trimEnd())
     if (minMatch === null || parseRangeRest(`0 --> ${right.trim()}`) === null) return null
-    const titlePart = minMatch[1]!.trim()
+    const titlePart = minMatch[1].trim()
     return {
       kind: 'xychart-axis',
       axis,
@@ -415,7 +415,7 @@ export class XychartParser implements DiagramParser {
               kind: 'xychart-header',
               keyword,
               ...(orientation !== undefined ? { orientation } : {}),
-              gap: orientation !== undefined ? trimmed.slice(keyword.length, trimmed.length - header[1]!.length) : '',
+              gap: orientation !== undefined ? trimmed.slice(keyword.length, trimmed.length - header[1].length) : '',
               trailing: line.slice(firstChar + trimmed.length),
             },
           })
@@ -574,7 +574,7 @@ export class XychartParser implements DiagramParser {
     if (part === null || !isValidXychartNumberInput(value)) return null
     const arr = this.editableEntries(part.element as XychartSeriesData)
     if (arr === null || intent.index < 0 || intent.index >= arr.entries.length) return null
-    arr.entries[intent.index] = { ...arr.entries[intent.index]!, token: value }
+    arr.entries[intent.index] = { ...arr.entries[intent.index], token: value }
     return new Map([
       [part.id, renderXychartSeries(part.element as XychartSeriesData, { arrayRaw: renderXychartArray(arr.entries, arr.trailing) })],
     ])
@@ -594,7 +594,7 @@ export class XychartParser implements DiagramParser {
     const lead =
       arr.trailing !== ''
         ? arr.trailing
-        : arr.entries[arr.entries.length - 1]!.lead.includes(',')
+        : arr.entries[arr.entries.length - 1].lead.includes(',')
           ? ', '
           : ' '
     arr.entries.push({ lead, token: value })
@@ -612,9 +612,9 @@ export class XychartParser implements DiagramParser {
     const arr = this.editableEntries(data)
     if (arr === null || intent.index < 0 || intent.index >= arr.entries.length) return null
     if (arr.entries.length === 1) return null // 至少保留一个数值（空数组 mermaid 渲染无意义）
-    const removed = arr.entries.splice(intent.index, 1)[0]!
+    const removed = arr.entries.splice(intent.index, 1)[0]
     if (intent.index < arr.entries.length) {
-      arr.entries[intent.index] = { lead: removed.lead, token: arr.entries[intent.index]!.token }
+      arr.entries[intent.index] = { lead: removed.lead, token: arr.entries[intent.index].token }
     }
     return new Map([[part.id, renderXychartSeries(data, { arrayRaw: renderXychartArray(arr.entries, arr.trailing) })]])
   }
@@ -682,7 +682,7 @@ export class XychartParser implements DiagramParser {
     const data = part.element as XychartAxisData
     const arr = this.categoryEntries(data)
     if (arr === null || intent.index < 0 || intent.index >= arr.entries.length) return null
-    arr.entries[intent.index] = { ...arr.entries[intent.index]!, token: encodeXychartText(text) }
+    arr.entries[intent.index] = { ...arr.entries[intent.index], token: encodeXychartText(text) }
     return new Map([[part.id, renderXychartAxis(data, { restRaw: renderXychartArray(arr.entries, arr.trailing) })]])
   }
 
@@ -704,7 +704,7 @@ export class XychartParser implements DiagramParser {
     const lead =
       arr.trailing !== ''
         ? arr.trailing
-        : arr.entries[arr.entries.length - 1]!.lead.includes(',')
+        : arr.entries[arr.entries.length - 1].lead.includes(',')
           ? ', '
           : ' '
     arr.entries.push({ lead, token: encodeXychartText(text) })
@@ -722,9 +722,9 @@ export class XychartParser implements DiagramParser {
     const arr = this.categoryEntries(data)
     if (arr === null || intent.index < 0 || intent.index >= arr.entries.length) return null
     if (arr.entries.length === 1) return null
-    const removed = arr.entries.splice(intent.index, 1)[0]!
+    const removed = arr.entries.splice(intent.index, 1)[0]
     if (intent.index < arr.entries.length) {
-      arr.entries[intent.index] = { lead: removed.lead, token: arr.entries[intent.index]!.token }
+      arr.entries[intent.index] = { lead: removed.lead, token: arr.entries[intent.index].token }
     }
     return new Map([[part.id, renderXychartAxis(data, { restRaw: renderXychartArray(arr.entries, arr.trailing) })]])
   }
@@ -763,7 +763,7 @@ function parseSeriesBody(body: string): XychartSeriesData | null {
   const m = /^(line|bar)([\s\S]*)$/.exec(body)
   if (m === null) return null
   const seriesType = m[1] as 'line' | 'bar'
-  const rest = m[2]!
+  const rest = m[2]
   const gap1Match = /^[ \t]*/.exec(rest)
   const gap1 = gap1Match?.[0] ?? ''
   const afterGap1 = rest.slice(gap1.length)

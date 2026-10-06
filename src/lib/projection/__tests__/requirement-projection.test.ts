@@ -38,7 +38,7 @@ describe('buildRequirementProjection', () => {
 
   it('requirement 块：名字 / type / 字段语义字段齐全，elementId 带 kind 前缀', () => {
     expect(projection.requirements).toHaveLength(1)
-    const r = projection.requirements[0]!
+    const r = projection.requirements[0]
     expect(r).toMatchObject({
       name: 'login',
       type: 'functionalRequirement',

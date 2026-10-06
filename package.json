@@ -3,13 +3,19 @@
   "private": true,
   "version": "0.1.0",
   "type": "module",
+  "engines": {
+    "node": ">=20.19"
+  },
   "scripts": {
     "dev": "vite",
     "build": "tsc -b && vite build",
     "deploy": "npm run build && node scripts/deploy.mjs",
     "preview": "vite preview",
     "typecheck": "tsc -b --noEmit",
-    "test": "vitest run"
+    "lint": "eslint .",
+    "test": "vitest run",
+    "smoke": "playwright test",
+    "prepare": "husky"
   },
   "dependencies": {
     "@mantine/core": "^8.0.0",
@@ -24,17 +30,28 @@
     "zustand": "^5.0.0"
   },
   "devDependencies": {
+    "@eslint/js": "^9.39.5",
+    "@playwright/test": "^1.63.0",
     "@types/node": "^26.6.3",
     "@types/react": "^19.1.0",
     "@types/react-dom": "^19.1.0",
     "@vitejs/plugin-react": "^5.0.0",
+    "eslint": "^9.39.4",
+    "eslint-plugin-react-hooks": "^5.2.0",
+    "globals": "^17.13.0",
     "happy-dom": "^18.0.0",
+    "husky": "^9.1.7",
+    "lint-staged": "^16.4.0",
     "typescript": "~5.8.0",
+    "typescript-eslint": "^8.71.1",
     "vite": "^7.0.0",
     "vite-plugin-pwa": "^1.0.0",
     "vitest": "^3.0.0"
   },
   "allowScripts": {
     "esbuild@0.28.2": true
+  },
+  "lint-staged": {
+    "*.{ts,tsx}": "eslint --no-warn-ignored"
   }
 }

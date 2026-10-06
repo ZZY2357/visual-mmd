@@ -59,6 +59,7 @@ import { treeviewMenuLabelsEn } from '../lib/editing/menu/treeview'
 import { eventmodelingMenuLabelsEn } from '../lib/editing/menu/eventmodeling'
 import { zenumlMenuLabelsEn } from '../lib/editing/menu/zenuml'
 import { c4MenuLabelsEn } from '../lib/editing/menu/c4'
+import { sampleNamesZh, sampleNamesEn } from '../lib/sample-library'
 
 /**
  * i18n 配置中文与英文 locale（i18n-english 工单 01）。
@@ -82,9 +83,33 @@ export const zhDict = {
       en: 'English',
       switchAria: '切换界面语言',
     },
-    // 三栏布局（工单 03：折叠互斥的禁用态与提示）
+    // 三栏布局（工单 03：折叠互斥的禁用态与提示；工单 15：手机单栏切换器）
     layout: {
       collapseDisabled: '另一面板已折叠，至多同时折叠一个面板',
+      mobileSwitcherAria: '切换面板',
+      mobileCodeTab: '代码',
+      mobileCanvasTab: '画布',
+      mobilePropertiesTab: '属性',
+    },
+    // 面板级错误边界（工单 10）：崩溃只降级所在面板，错误态提供「重新渲染」「重置视图」与可复制摘要
+    errorBoundary: {
+      title: '此面板渲染出错',
+      hint: '其余面板仍可使用；修复后点「重新渲染」重试。',
+      pane: {
+        code: '代码面板',
+        canvas: '画布',
+        properties: '属性面板',
+      },
+      rerender: '重新渲染',
+      resetView: '重置视图',
+      resetViewHint: '重置画布的缩放与平移',
+      summaryLabel: '错误摘要（可复制后反馈）',
+      copy: '复制错误信息',
+      copied: '已复制',
+      summaryHeader: 'Visual MMD 渲染错误',
+      summaryPane: '面板：{{pane}}',
+      summaryMessage: '消息：{{message}}',
+      summaryStack: '堆栈：',
     },
     codePanel: {
       title: '代码面板',
@@ -97,6 +122,8 @@ export const zhDict = {
       rendering: '渲染中…',
       empty: '暂无可渲染的图表',
       errorTitle: '源码存在语法错误，画布已停留在最近一次合法状态',
+      // 画布错误角标（工单 13）：非遮挡提示，只说明「画布停在旧渲染」
+      errorBadge: '源码有语法错误，画布停留在此前的渲染',
       emptySource: '暂无内容，请在左侧代码面板输入 Mermaid 源码',
       keyboardHint: '点击节点选中后：方向键移动选中 · Delete 删除 · Tab 添加子节点 · Enter 添加同级节点',
       // ---- unsupported 只读降级（more-diagrams 工单 01）：源码合法但图种未注册 ----
@@ -168,6 +195,52 @@ export const zhDict = {
       exportSvg: '导出为 SVG',
       exportPng: '导出为 PNG',
       exportUnavailable: '（画布尚未渲染成功，暂不可导出图像）',
+      // ---- File System Access API 直接打开/保存（self-grill-hardening 工单 18）----
+      // 仅在支持 FSA 的浏览器显示；不支持时回退到上方导入/导出
+      open: '打开文件',
+      openAria: '打开本地 .mmd 文件',
+      save: '保存',
+      saveAria: '保存到本地文件',
+      saveAs: '另存为…',
+      openReadError: '读取文件失败，请重试',
+      saveWriteError: '写入文件失败，请重试',
+      saveDenied: '没有写入该文件的权限，请重新打开文件或另存为',
+    },
+    // 本地文件绑定提示（工单 18）：显示已连接的文件、未保存改动与重新授权入口
+    fileSync: {
+      bound: '已连接到本地文件「{{name}}」',
+      dirty: '有未保存的改动——图表库会自动保存草稿，磁盘文件需点「保存」写回',
+      clean: '磁盘文件已是最新',
+      needsPermission: '文件「{{name}}」需要重新授权才能读写',
+      reconnect: '重新连接',
+      denied: '没有访问文件「{{name}}」的权限',
+      error: '无法读取文件「{{name}}」',
+      retry: '重试',
+      unbind: '解除绑定',
+    },
+    // 存储降级提示（self-grill-hardening 工单 07）：
+    // quota 满 = 可重试的「保存失败」；隐私模式 = 存储不可用的一次性明示
+    storage: {
+      saveFailedTitle: '保存失败',
+      saveFailedHint: '图表已保留在内存中，可继续编辑；请释放浏览器存储空间后重试。',
+      unavailableTitle: '无法访问浏览器存储',
+      unavailableHint: '当前浏览器禁用了本地存储（如隐私模式），图表不会被保存到本机。',
+      dismiss: '知道了',
+    },
+    // 跨标签页修改提示（self-grill-hardening 工单 11）
+    crossTab: {
+      title: '另一个标签页修改了当前图表',
+      hint: '可在本页继续编辑（保存时会覆盖对方的改动），或载入最新。',
+      loadLatest: '载入最新',
+      dismiss: '忽略',
+    },
+    // 挂起的外部写回提示（self-grill-hardening 工单 09）：
+    // 打字中表单/画布写回被挂起，用户显式选择接受或放弃（放弃 = LWW 本页获胜）
+    pendingWriteback: {
+      title: '表单或画布的改动已暂停',
+      hint: '你正在代码面板输入。可接受外部变更，或放弃它继续编辑（保存时会覆盖对方的改动）。',
+      accept: '接受外部变更',
+      discard: '放弃外部变更',
     },
     newDiagram: {
       title: '新建',
@@ -224,6 +297,8 @@ export const zhDict = {
       deleteConfirm: '确定要删除图表「{{name}}」吗？',
       deleteIrreversible: '删除后不可恢复。',
       deleteConfirmAction: '删除',
+      // 首启动预置示例图表名（工单 17）：名字键与 sample-library 的示例一一对应
+      samples: { ...sampleNamesZh },
     },
     seqArrows: {
       '->>': '实线箭头',
@@ -1256,6 +1331,29 @@ export const enDict = {
     subtitle: 'Visual Mermaid editor',
     layout: {
       collapseDisabled: 'The other panel is collapsed; at most one panel can be collapsed',
+      mobileSwitcherAria: 'Switch panel',
+      mobileCodeTab: 'Code',
+      mobileCanvasTab: 'Canvas',
+      mobilePropertiesTab: 'Properties',
+    },
+    errorBoundary: {
+      title: 'This panel failed to render',
+      hint: 'The other panels keep working; fix the issue and click “Re-render” to retry.',
+      pane: {
+        code: 'Code panel',
+        canvas: 'Canvas',
+        properties: 'Property panel',
+      },
+      rerender: 'Re-render',
+      resetView: 'Reset view',
+      resetViewHint: 'Reset the canvas zoom and pan',
+      summaryLabel: 'Error summary (copy to report)',
+      copy: 'Copy error info',
+      copied: 'Copied',
+      summaryHeader: 'Visual MMD render error',
+      summaryPane: 'Panel: {{pane}}',
+      summaryMessage: 'Message: {{message}}',
+      summaryStack: 'Stack:',
     },
     codePanel: {
       title: 'Code Panel',
@@ -1268,6 +1366,7 @@ export const enDict = {
       rendering: 'Rendering…',
       empty: 'Nothing to render yet',
       errorTitle: 'The source has syntax errors; the canvas stays at the last valid state',
+      errorBadge: 'Syntax error — the canvas keeps the previous render',
       emptySource: 'Nothing here yet — type Mermaid source in the code panel on the left',
       keyboardHint:
         'After clicking a node to select: arrow keys move selection · Delete removes · Tab adds a child · Enter adds a sibling',
@@ -1336,6 +1435,53 @@ export const enDict = {
       exportSvg: 'Export as SVG',
       exportPng: 'Export as PNG',
       exportUnavailable: '(The canvas has not rendered yet; image export is unavailable)',
+      // File System Access API open/save (ticket 18)
+      open: 'Open file',
+      openAria: 'Open a local .mmd file',
+      save: 'Save',
+      saveAria: 'Save to the local file',
+      saveAs: 'Save as…',
+      openReadError: 'Failed to read the file, please try again',
+      saveWriteError: 'Failed to write the file, please try again',
+      saveDenied: 'No permission to write this file; reopen it or use Save as',
+    },
+    // Local file binding notice (ticket 18): connected file, unsaved changes, reconnect entry
+    fileSync: {
+      bound: 'Connected to local file “{{name}}”',
+      dirty: 'Unsaved changes — the library autosaves a draft, but the file needs “Save”',
+      clean: 'The file on disk is up to date',
+      needsPermission: 'File “{{name}}” needs permission again to read and write',
+      reconnect: 'Reconnect',
+      denied: 'No permission to access file “{{name}}”',
+      error: 'Could not read file “{{name}}”',
+      retry: 'Retry',
+      unbind: 'Disconnect',
+    },
+    // Storage degradation notice (ticket 07): quota = retryable "save failed";
+    // private mode = one-time "storage unavailable" message.
+    storage: {
+      saveFailedTitle: 'Save failed',
+      saveFailedHint:
+        'Your diagrams stay in memory and remain editable; free up browser storage and try again.',
+      unavailableTitle: 'Browser storage is unavailable',
+      unavailableHint:
+        'This browser has local storage disabled (e.g. private mode); diagrams will not be saved on this device.',
+      dismiss: 'Got it',
+    },
+    // Cross-tab modification notice (ticket 11)
+    crossTab: {
+      title: 'Another tab modified the current diagram',
+      hint: 'Keep editing here (saving will overwrite the other tab’s changes), or load the latest.',
+      loadLatest: 'Load latest',
+      dismiss: 'Ignore',
+    },
+    // Suspended external write-back notice (ticket 09):
+    // form/canvas writes are paused while typing; user explicitly accepts or discards
+    pendingWriteback: {
+      title: 'Form or canvas changes are paused',
+      hint: 'You are typing in the code panel. Accept the external change, or discard it and keep editing (saving will overwrite it).',
+      accept: 'Accept external change',
+      discard: 'Discard external change',
     },
     newDiagram: {
       title: 'New',
@@ -1392,6 +1538,8 @@ export const enDict = {
       deleteConfirm: 'Delete diagram “{{name}}”?',
       deleteIrreversible: 'This cannot be undone.',
       deleteConfirmAction: 'Delete',
+      // 首启动预置示例图表名（工单 17）
+      samples: { ...sampleNamesEn },
     },
     propertyPanel: {
       title: 'Properties',

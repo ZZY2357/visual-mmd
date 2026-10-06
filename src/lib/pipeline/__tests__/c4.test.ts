@@ -598,27 +598,27 @@ describe('C4 词法 / 渲染助手（表单侧）', () => {
   })
 
   it('renderC4Element：alias 位不加引号，文本位按需加引号；tail 逐字保留', () => {
-    const el = elementsOf(parse('C4Context\n    System(banking, "网银", "核心")\n'))[0]!
+    const el = elementsOf(parse('C4Context\n    System(banking, "网银", "核心")\n'))[0]
     expect(renderC4Element(el, { label: 'NewLabel' })).toBe('System(banking, "NewLabel", "核心")')
     // alias 改动走渲染器时也是裸词（真正的 alias 改名走 rename 意图）
     expect(renderC4Element(el, { alias: 'coreBanking' })).toBe('System(coreBanking, "网银", "核心")')
     // `%%` 尾注前的空白被解析器吸进 span 交接处、注释本身留在 tail —— 逐字保留原文
-    const withTail = elementsOf(parse('C4Context\n    System(a, "A")  %% 尾注\n'))[0]!
+    const withTail = elementsOf(parse('C4Context\n    System(a, "A")  %% 尾注\n'))[0]
     expect(renderC4Element(withTail, { label: 'B' })).toBe('System(a, "B")%% 尾注  ')
   })
 
   it('renderC4Element：补位编辑填中间缺口；目标位超出已有实参时追加', () => {
-    const el = elementsOf(parse('C4Context\n    Person(a, "A")\n'))[0]!
+    const el = elementsOf(parse('C4Context\n    Person(a, "A")\n'))[0]
     expect(renderC4Element(el, { descr: '描述' })).toBe('Person(a, "A", "描述")')
   })
 
   it('renderC4Boundary：` {` 尾段逐字保留', () => {
-    const bd = boundariesOf(parse(SAMPLE))[0]!
+    const bd = boundariesOf(parse(SAMPLE))[0]
     expect(renderC4Boundary(bd, { label: '内网' })).toBe('Enterprise_Boundary(b0, "内网") {')
   })
 
   it('renderC4Relation：direction 改宏名；from / to 手术改写不加引号', () => {
-    const rel = relationsOf(parse(SAMPLE))[0]!
+    const rel = relationsOf(parse(SAMPLE))[0]
     expect(renderC4Relation(rel, { label: '登录' })).toBe('Rel(customer, banking, "登录", "HTTPS")')
     expect(renderC4Relation(rel, { direction: 'R' })).toBe('Rel_R(customer, banking, "访问", "HTTPS")')
     expect(renderC4Relation(rel, { from: 'client' })).toBe('Rel(client, banking, "访问", "HTTPS")')

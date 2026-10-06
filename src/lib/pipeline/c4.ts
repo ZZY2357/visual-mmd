@@ -570,7 +570,7 @@ function renderC4Call(
   macro: string,
   args: readonly C4Argument[],
   slots: readonly string[],
-  changes: Record<string, unknown>,
+  changes: Record<string, string | null | undefined>,
   tail: string,
 ): string {
   const out: C4Argument[] = []
@@ -627,7 +627,10 @@ export function renderC4Relation(data: C4RelationData, changes: C4RelationChange
   const rest = data.indexed ? data.args.slice(1) : data.args
   // 关系位表：0=from、1=to、2=label、3=techn、4=descr、5=sprite、6=tags（link 走命名参数）
   const slots: readonly string[] = ['from', 'to', 'label', 'techn', 'descr', 'sprite', 'tags']
-  const inner = renderC4Call('', rest, slots, changes as Record<string, unknown>, '').slice(1, -1)
+  // C4RelationChanges 的字段全是字符串（label/techn/descr/from/to/direction）；
+  // 摊平成 renderC4Call 的索引签名形状，避免 unknown 值触发 no-base-to-string。
+  const callChanges: Record<string, string | null | undefined> = { ...changes }
+  const inner = renderC4Call('', rest, slots, callChanges, '').slice(1, -1)
   const macro = changes.direction !== undefined ? C4_REL_MACRO_OF[changes.direction] : data.macro
   const rendered = [...indexArgs.map(renderC4Argument), ...(inner === '' ? [] : [inner])]
   return `${macro}(${rendered.join(', ')})${data.tail}`

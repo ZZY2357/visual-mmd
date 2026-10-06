@@ -45,7 +45,7 @@ describe('usecase 解析（more-diagrams 工单 26）', () => {
     expect(reassemble(parse(SAMPLE))).toBe(SAMPLE)
   })
 
-  it('声明头：只有 usecase-beta（探测器 /^\\s*usecase-beta(?:\s|$)/；裸 usecase 不认）', () => {
+  it('声明头：只有 usecase-beta（探测器 /^\\s*usecase-beta(?:\\s|$)/；裸 usecase 不认）', () => {
     expect(parse('usecase-beta\n').elements[0]?.element.kind).toBe('usecase-header')
     expect(usecaseParser.parse('usecase\n    actor A\n').ok).toBe(false)
     expect(usecaseParser.parse('USE-CASE\n').ok).toBe(false)

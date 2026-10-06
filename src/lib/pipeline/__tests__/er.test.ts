@@ -77,10 +77,10 @@ describe('er 解析器：语法覆盖（分层对齐核心清单）', () => {
     const doc = parseOk(source)
     const entities = doc.elements.filter((p) => p.element.kind === 'er-entity')
     expect(entities).toHaveLength(4)
-    expect(entities[0]!.element).toMatchObject({ name: 'CAR', quoted: false, alias: null })
-    expect(entities[1]!.element).toMatchObject({ name: 'name with space', quoted: true })
-    expect(entities[2]!.element).toMatchObject({ name: 'CAR', alias: 'alias' })
-    expect(entities[3]!.element).toMatchObject({ name: 'name with space', alias: 'alias2' })
+    expect(entities[0].element).toMatchObject({ name: 'CAR', quoted: false, alias: null })
+    expect(entities[1].element).toMatchObject({ name: 'name with space', quoted: true })
+    expect(entities[2].element).toMatchObject({ name: 'CAR', alias: 'alias' })
+    expect(entities[3].element).toMatchObject({ name: 'name with space', alias: 'alias2' })
   })
 
   it('属性块：类型 / 名 / PK / 可空 / 注释 / `*` 前缀', () => {

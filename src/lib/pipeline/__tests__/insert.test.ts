@@ -109,7 +109,7 @@ describe('resolveAnchor：afterElementId 锚点，缺省回退文档末尾（arc
     const anchor = resolveAnchor(doc, 'class:Alpha')!
     const result = insertAfter(doc, {
       afterElementId: 'class:Alpha',
-      render: (indent, _original) => indentLines(indent, ['class Gamma']),
+      render: (indent) => indentLines(indent, ['class Gamma']),
     })
     expect(result!.has(anchor.id)).toBe(true)
   })

@@ -1,0 +1,22 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <title>Visual MMD — DOM 契约冒烟夹具</title>
+    <!--
+      DOM 契约冒烟的静态夹具页（ticket 08）。
+
+      为什么是「静态夹具」而不是驱动整个 app：冒烟要验的是 mermaid 渲染产物上的
+      data-id 寻址契约（本仓唯一锚在 mermaid 非公开 API 的地方）。驱动三栏 app
+      要拉起 Mantine / CodeMirror / zustand store / localStorage 引导，链路长、慢且
+      噪音大；夹具页只 import mermaid + 注册表 + 金样语料 + 画布能力包，把 app 的
+      「渲染后处理」链（annotateNodeDataIds → nodeAnnotator → edgeAnnotator →
+      addEdgeHitAreas）逐字复用，跑得最快也最稳。见 docs/adr/0018。
+    -->
+  </head>
+  <body>
+    <div id="smoke-status">loading…</div>
+    <div id="smoke-hosts"></div>
+    <script type="module" src="./main.ts"></script>
+  </body>
+</html>

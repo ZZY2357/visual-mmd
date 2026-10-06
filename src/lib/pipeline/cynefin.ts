@@ -310,7 +310,6 @@ export class CynefinParser implements DiagramParser {
     /** 当前归属域（最近一个前序域名词行）；条目归属纯由位置决定（research §8.2） */
     let currentDomain: CynefinDomainName | null = null
     const bodyStart = frontmatterEnd(source)
-    let lineNo = bodyStart === 0 ? 0 : source.slice(0, bodyStart).split('\n').length - 1
     let cursor = bodyStart
 
     for (;;) {
@@ -318,7 +317,6 @@ export class CynefinParser implements DiagramParser {
       const lineEnd = nl === -1 ? source.length : nl
       const line = source.slice(cursor, lineEnd)
       const eol = nl === -1 ? '' : '\n'
-      lineNo++
       const trimmed = line.trim()
       const span: Span = { start: cursor, end: cursor + line.length + eol.length }
 

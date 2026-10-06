@@ -455,9 +455,23 @@ describe('useCanvasContextMenu（工单 07 右键菜单）', () => {
     expect(created).toEqual(['n1'])
   })
 
+  it('代码面板打字中：画布菜单落码被挂起，来源标记为 canvas（工单 09）', () => {
+    mountFlow()
+    // 模拟代码面板存在未完成输入会话（打字中）
+    act(() => useEditorStore.setState({ hasUnfinishedInput: true }))
+
+    act(() => api.current!.addNode())
+
+    // 画布写回被挂起：源码未被静默覆盖，挂起写回来源如实为 canvas（不是默认 form）
+    const pending = useEditorStore.getState().pendingWriteback
+    expect(pending).not.toBeNull()
+    expect(pending?.origin).toBe('canvas')
+    expect(useEditorStore.getState().source).toBe(SAMPLE)
+  })
+
   it('菜单「删除」：删除右键节点并清空选中', () => {
     mountFlow()
-    act(() => contextMenuOn(host.firstElementChild as HTMLDivElement, '[data-id="C"]'))
+    act(() => { contextMenuOn(host.firstElementChild as HTMLDivElement, '[data-id="C"]') })
     snapshots.length = 0
 
     act(() => api.current!.deleteTarget())
@@ -473,7 +487,7 @@ describe('useCanvasContextMenu（工单 07 右键菜单）', () => {
     act(() => api.current!.enterLinkMode('A'))
     expect(snapshots.at(-1)!.linkMode).toEqual({ stage: 'pick-end', from: 'A' })
     // 单击终点（走 onCanvasClick 消费链路）
-    act(() => api.current!.onCanvasClick({ target: container.querySelector('[data-id="B"]') }))
+    act(() => { api.current!.onCanvasClick({ target: container.querySelector('[data-id="B"]') }) })
 
     expect(useEditorStore.getState().source).toContain('A --> B')
     expect(useEditorStore.getState().selection).toEqual({ kind: 'edge', from: 'A', to: 'B', occurrence: 1 })
@@ -484,18 +498,18 @@ describe('useCanvasContextMenu（工单 07 右键菜单）', () => {
     const container = mountFlow()
 
     act(() => api.current!.enterLinkMode())
-    act(() => api.current!.onCanvasClick({ target: container.querySelector('[data-id="C"]') }))
+    act(() => { api.current!.onCanvasClick({ target: container.querySelector('[data-id="C"]') }) })
     expect(snapshots.at(-1)!.linkMode).toEqual({ stage: 'pick-end', from: 'C' })
 
     // 点击空白：取消，不落码
-    act(() => api.current!.onCanvasClick({ target: container }))
+    act(() => { api.current!.onCanvasClick({ target: container }) })
     expect(snapshots.at(-1)!.linkMode).toEqual({ stage: 'idle' })
     expect(useEditorStore.getState().source).toBe(SAMPLE)
 
     // 重新进入并两步完成
     act(() => api.current!.enterLinkMode())
-    act(() => api.current!.onCanvasClick({ target: container.querySelector('[data-id="A"]') }))
-    act(() => api.current!.onCanvasClick({ target: container.querySelector('[data-id="C"]') }))
+    act(() => { api.current!.onCanvasClick({ target: container.querySelector('[data-id="A"]') }) })
+    act(() => { api.current!.onCanvasClick({ target: container.querySelector('[data-id="C"]') }) })
     expect(useEditorStore.getState().source).toContain('A --> C')
   })
 
@@ -544,7 +558,7 @@ describe('useCanvasContextMenu（工单 07 右键菜单）', () => {
     expect(api.current!.submitStyleForm('a b', '#ff0000')).toBe(false)
     expect(useEditorStore.getState().source).toBe(SAMPLE)
 
-    act(() => api.current!.submitStyleForm('hl', '#ff0000'))
+    act(() => { api.current!.submitStyleForm('hl', '#ff0000') })
     expect(useEditorStore.getState().source).toContain('classDef hl fill:#ff0000')
   })
 
@@ -1474,7 +1488,7 @@ describe('useCanvasContextMenu（工单 04 添加入口补全）', () => {
 
   /** 提交的意图（断言意图字段与 afterElementId）；未提交时为 undefined */
   function intentAt(spy: ReturnType<typeof spyCommitIntent>, n: number): Record<string, unknown> | undefined {
-    return spy.mock.calls[n]?.[0] as unknown as Record<string, unknown> | undefined
+    return spy.mock.calls[n]?.[0]
   }
 
   it('sequence 空白右键：菜单含「添加参与者 / 添加注释 / 添加逻辑块」，不改变选中', () => {

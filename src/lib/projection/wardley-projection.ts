@@ -118,7 +118,7 @@ export function buildWardleyProjection(doc: SourceDocument): WardleyProjection {
   const docLines: ProjectionWardleyDocLine[] = []
   const pipelines: ProjectionWardleyPipeline[] = []
   let title: string | null = null
-  let pipelineDepth = 0
+  const pipelineDepth = 0
 
   for (const part of doc.elements) {
     const data = part.element

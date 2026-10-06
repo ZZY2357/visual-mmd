@@ -10,7 +10,12 @@ import { CodePanel } from './components/CodePanel'
 import { CanvasPanel } from './components/CanvasPanel'
 import { PropertyPanel } from './components/PropertyPanel'
 import { ThreePaneLayout } from './components/ThreePaneLayout'
+import { ErrorBoundary } from './components/ErrorBoundary'
 import { DiagramLibraryDrawer } from './components/DiagramLibraryDrawer'
+import { StorageNotice } from './components/StorageNotice'
+import { CrossTabNotice } from './components/CrossTabNotice'
+import { PendingWritebackNotice } from './components/PendingWritebackNotice'
+import { FileSyncNotice } from './components/FileSyncNotice'
 import { LanguageSwitcher } from './components/LanguageSwitcher'
 import {
   downloadBlob,
@@ -19,6 +24,17 @@ import {
   svgToPngBlob,
   withExtension,
 } from './lib/file-io'
+import {
+  defaultHandleStore,
+  pickAndReadFile,
+  pickAndWriteFile,
+  reconnectHandle,
+  resolvePicker,
+  restoreBoundFile,
+  supportsFileSystemAccess,
+  writeToHandle,
+} from './lib/file-system-access'
+import { useFileBindingStore } from './lib/file-binding'
 
 /**
  * 三栏布局（工单 04）：代码面板 | 画布 | 属性面板（结构树 + 属性表单）。
@@ -76,6 +92,67 @@ export default function App() {
     downloadBlob(blob, withExtension(exportBaseName, 'png'))
   }
 
+  // ---- File System Access API 直接打开/保存（self-grill-hardening 工单 18）----
+  // 纯增量：不支持 FSA 的浏览器（resolvePicker 为 null）隐藏这两个按钮，回退到上方导入/导出。
+  const fsaSupported = useMemo(() => supportsFileSystemAccess(), [])
+  // 句柄存储（IndexedDB）惰性创建一次；不可用时内部降级为 no-op，不影响启动
+  const handleStoreRef = useRef<ReturnType<typeof defaultHandleStore> | null>(null)
+  const handleStore = () => (handleStoreRef.current ??= defaultHandleStore())
+  const bindFile = useFileBindingStore((s) => s.bindFile)
+  const noteRestore = useFileBindingStore((s) => s.noteRestore)
+  const markSaved = useFileBindingStore((s) => s.markSaved)
+  const unbindFile = useFileBindingStore((s) => s.unbind)
+
+  const handleOpenFile = async () => {
+    const outcome = await pickAndReadFile(resolvePicker())
+    if (outcome.kind === 'cancelled') return // 用户取消：no-op，不报错
+    if (outcome.kind === 'unsupported') return
+    if (outcome.kind === 'error') {
+      window.alert(t('file.openReadError'))
+      return
+    }
+    // 打开即成为当前源码（system 级显式替换，可撤销），并记住句柄与磁盘基准
+    commitEdit(outcome.text, 'system')
+    bindFile(outcome.handle, outcome.text)
+    void handleStore().set(outcome.handle)
+  }
+  const handleSaveFile = async () => {
+    const binding = useFileBindingStore.getState()
+    if (binding.handle === null) {
+      // 尚未绑定：另存为（选择落点），成功后建立绑定
+      const outcome = await pickAndWriteFile(resolvePicker(), source, withExtension(exportBaseName, 'mmd'))
+      if (outcome.kind === 'cancelled') return
+      if (outcome.kind === 'saved') {
+        bindFile(outcome.handle, source)
+        void handleStore().set(outcome.handle)
+        return
+      }
+      if (outcome.kind === 'denied') window.alert(t('file.saveDenied'))
+      else if (outcome.kind === 'error') window.alert(t('file.saveWriteError'))
+      return
+    }
+    // 已绑定：把当前源码逐字写回原文件（ADR-0008 逐字承诺延伸到交付物）
+    const outcome = await writeToHandle(binding.handle, source)
+    if (outcome.kind === 'saved') markSaved(source)
+    else if (outcome.kind === 'denied') window.alert(t('file.saveDenied'))
+    else if (outcome.kind === 'error') window.alert(t('file.saveWriteError'))
+  }
+  // 恢复绑定（权限请求需用户手势，无手势时降级为 needs-permission 提示）
+  const handleReconnectFile = async () => {
+    const binding = useFileBindingStore.getState()
+    if (binding.handle === null) return
+    noteRestore(await reconnectHandle(binding.handle, true))
+  }
+  const handleUnbindFile = () => {
+    unbindFile()
+    void handleStore().set(null)
+  }
+  // 启动恢复：取回上次绑定的句柄并建立基准；**不**用磁盘内容覆盖当前草稿
+  // （图表库是工作副本，磁盘是交付物——覆盖草稿应由用户显式「打开」触发）
+  useEffect(() => {
+    void restoreBoundFile(handleStore()).then(noteRestore)
+  }, [noteRestore])
+
   // 投影：源码 → 图表注册表分发解析器 → 只读结构视图（属性面板，工单 06 起）。
   // detect 失败 = unsupported 态（more-diagrams 工单 01）：mermaid 预览与代码面板照常，
   // 投影为空、无选中、无右键动作，画布/属性面板显示「暂不支持可视化编辑」占位提示——
@@ -100,7 +177,12 @@ export default function App() {
   // 图表库自动保存（工单 09）：整库序列化为一个 key，活跃图表随编辑更新；
   // 连续输入合并为一次写入（防抖），卸载/隐藏时立即冲刷
   const debouncedSaveRef = useRef(
-    debounce((lib: { diagrams: typeof diagrams; activeId: string | null }) => saveLibrary(lib), 500),
+    debounce(
+      (lib: { diagrams: typeof diagrams; activeId: string | null }) =>
+        // 保存结果回写 store（工单 07）：quota / 不可用降级为可见提示，不抛出
+        useEditorStore.getState().reportSaveResult(saveLibrary(lib)),
+      500,
+    ),
   )
   useEffect(() => {
     const debouncedSave = debouncedSaveRef.current
@@ -138,6 +220,26 @@ export default function App() {
               style={{ display: 'none' }}
               onChange={(e) => void handleImportFile(e.target.files?.[0])}
             />
+            {fsaSupported ? (
+              <>
+                <Button
+                  variant="default"
+                  size="compact-sm"
+                  onClick={() => void handleOpenFile()}
+                  aria-label={t('file.openAria')}
+                >
+                  {t('file.open')}
+                </Button>
+                <Button
+                  variant="default"
+                  size="compact-sm"
+                  onClick={() => void handleSaveFile()}
+                  aria-label={t('file.saveAria')}
+                >
+                  {t('file.save')}
+                </Button>
+              </>
+            ) : null}
             <Button
               variant="default"
               size="compact-sm"
@@ -302,19 +404,33 @@ export default function App() {
       <AppShell.Main>
         <div style={{ height: 'calc(100vh - 56px - var(--mantine-spacing-md) * 2)' }}>
           <ThreePaneLayout
-            code={<CodePanel error={preview.error} />}
-            canvas={<CanvasPanel preview={preview} projection={projection} unsupported={unsupported} />}
+            code={
+              <ErrorBoundary pane="code">
+                <CodePanel error={preview.error} />
+              </ErrorBoundary>
+            }
+            canvas={
+              <ErrorBoundary pane="canvas">
+                <CanvasPanel preview={preview} projection={projection} unsupported={unsupported} />
+              </ErrorBoundary>
+            }
             properties={
-              <PropertyPanel
-                projection={projection}
-                parseError={parseResult !== null && !parseResult.ok ? parseResult.error : null}
-                unsupported={unsupported}
-              />
+              <ErrorBoundary pane="properties">
+                <PropertyPanel
+                  projection={projection}
+                  parseError={parseResult !== null && !parseResult.ok ? parseResult.error : null}
+                  unsupported={unsupported}
+                />
+              </ErrorBoundary>
             }
           />
         </div>
       </AppShell.Main>
       <DiagramLibraryDrawer opened={libraryOpened} onClose={() => setLibraryOpened(false)} />
+      <StorageNotice />
+      <CrossTabNotice />
+      <PendingWritebackNotice />
+      <FileSyncNotice onReconnect={() => void handleReconnectFile()} onUnbind={handleUnbindFile} />
     </AppShell>
   )
 }

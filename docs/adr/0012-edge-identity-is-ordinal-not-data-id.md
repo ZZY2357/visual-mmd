@@ -1,5 +1,7 @@
 # 连线的身份是「位置序」，不是 mermaid 的 data-id
 
+> **状态：accepted**
+
 画布要让 `class` 的关系边与 `sequence` 的消息线可点选、可右键，就必须给每条连线一个**身份**，
 否则「右键了哪条线」无从回答。自然的选择是沿用 ADR-0007 对节点的做法——把 mermaid 渲染出的
 `data-id` 当身份（de facto hook）。

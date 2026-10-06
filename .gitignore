@@ -9,3 +9,8 @@ dev-dist
 .codegraph/
 .gp1-accept/
 .scratch/
+# 真机走查截图（本地产物；.scratch/ 本身已忽略，归档进 .scratch/ 即本地保留）
+gui-test-screenshots/
+# Playwright 产物（DOM 契约冒烟与真机走查）
+test-results/
+playwright-report/

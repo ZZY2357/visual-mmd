@@ -222,6 +222,89 @@ describe('useCanvasInlineEdit（工单 05 内联编辑）', () => {
 })
 
 /**
+ * 工单 06：IME 组合期间的提交/取消抑制。
+ * 输入框的 Enter/Esc/blur 由渲染方（CanvasPanel 的 InlineEditInput）转成 commit/cancel
+ * 调用，事件到不了 hook，故 hook 在画布容器上跟踪 compositionstart/end。组合期间收到的
+ * commit/cancel 一律忽略：Enter 只是确认候选词、Esc 只是打断 IME，都不能把半截拼音写进源码。
+ */
+describe('useCanvasInlineEdit（工单 06 IME 组合输入）', () => {
+  let host: HTMLDivElement
+  let root: ReturnType<typeof createRoot>
+  let snapshots: unknown[]
+  let api: { current: InlineEditApi | null }
+
+  beforeEach(() => {
+    host = document.createElement('div')
+    document.body.appendChild(host)
+    root = createRoot(host)
+    snapshots = []
+    api = { current: null }
+  })
+  afterEach(() => {
+    act(() => root.unmount())
+    host.remove()
+    resetEditorHistory(DEFAULT_DIAGRAM_SOURCE)
+    useEditorStore.getState().select(null)
+  })
+
+  function mountAndEnterEdit() {
+    resetEditorHistory(SAMPLE)
+    act(() => {
+      root.render(<Harness projection={projectionOf(SAMPLE)} onEditing={(e) => snapshots.push(e)} apiRef={api} />)
+    })
+    const container = host.firstElementChild as HTMLDivElement
+    act(() => {
+      container.querySelector('[data-id="A"]')!.dispatchEvent(new MouseEvent('dblclick', { bubbles: true }))
+    })
+    return container
+  }
+
+  function compositionOn(target: Element, type: 'compositionstart' | 'compositionend'): void {
+    target.dispatchEvent(new CompositionEvent(type, { bubbles: true }))
+  }
+
+  it('组合期间 Enter 提交：忽略（确认候选词不落码），编辑仍打开', () => {
+    const container = mountAndEnterEdit()
+
+    act(() => compositionOn(container, 'compositionstart'))
+    act(() => api.current!.commit('zhong', { restoreFocus: true }))
+
+    expect(useEditorStore.getState().source).toBe(SAMPLE)
+    expect(snapshots.at(-1)).not.toBeNull() // 编辑未关闭
+
+    // compositionend 后输入已确认的文本再提交：正常落码
+    act(() => compositionOn(container, 'compositionend'))
+    act(() => api.current!.commit('登录', { restoreFocus: true }))
+    expect(useEditorStore.getState().source).toContain('A[登录]')
+    expect(snapshots.at(-1)).toBeNull()
+  })
+
+  it('组合期间 Esc（打断 IME）：不取消内联编辑、不落码', () => {
+    const container = mountAndEnterEdit()
+
+    act(() => compositionOn(container, 'compositionstart'))
+    act(() => api.current!.cancel())
+
+    expect(useEditorStore.getState().source).toBe(SAMPLE)
+    expect(snapshots.at(-1)).not.toBeNull() // 编辑仍打开
+
+    act(() => compositionOn(container, 'compositionend'))
+    act(() => api.current!.cancel())
+    expect(snapshots.at(-1)).toBeNull()
+  })
+
+  it('组合期间失焦提交：忽略（不把组合缓冲写进源码）', () => {
+    const container = mountAndEnterEdit()
+
+    act(() => compositionOn(container, 'compositionstart'))
+    act(() => api.current!.commit('ban'))
+
+    expect(useEditorStore.getState().source).toBe(SAMPLE)
+    expect(snapshots.at(-1)).not.toBeNull()
+  })
+})
+
+/**
  * 工单 09：class 图新建类后的内联命名（浮层定位）。
  * 缺陷形态：类框 g.node 没有 data-id（v12 只有 `{svgId}-classId-{类名}-{n}`），
  * findTargetElement 找不到元素 → rect === null → 输入框 `display: none`、拿不到焦点。
@@ -373,6 +456,7 @@ function DblHarness(props: {
   apiRef: { current: InlineEditApi | null }
 }) {
   const ref = useRef<HTMLDivElement | null>(null)
+  const { onEditing } = props
   const { editing, onDoubleClick, commit, beginEdit } = useCanvasInlineEdit({
     projection: props.projection,
     resolver: props.resolver,
@@ -382,8 +466,8 @@ function DblHarness(props: {
   })
   props.apiRef.current = { commit, cancel: () => {}, beginEdit }
   useEffect(() => {
-    props.onEditing(editing)
-  }, [editing, props.onEditing])
+    onEditing(editing)
+  }, [editing, onEditing])
   return (
     <div ref={ref} tabIndex={0} onDoubleClick={onDoubleClick} dangerouslySetInnerHTML={{ __html: props.svg }} />
   )

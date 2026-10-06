@@ -349,16 +349,16 @@ function parseEntries(entriesRaw: string): { form: RadarCurveForm; pieces: Radar
   const spans = splitTopLevelSpans(entriesRaw)
   if (spans.length === 0) return { form: 'raw', pieces: [] }
   const sepAfterOf = (i: number): string =>
-    i < spans.length - 1 ? entriesRaw.slice(spans[i]!.end, spans[i + 1]!.start) : ''
+    i < spans.length - 1 ? entriesRaw.slice(spans[i].end, spans[i + 1].start) : ''
   const keyed = spans.map((s) => KEYED_ENTRY_RE.exec(s.text))
-  const outerLead = entriesRaw.slice(0, spans[0]!.start)
+  const outerLead = entriesRaw.slice(0, spans[0].start)
   // 末段 span.end 记到 entriesRaw 末尾（含尾随空白），尾空白要按 text 结束处取回
-  const lastSpan = spans[spans.length - 1]!
+  const lastSpan = spans[spans.length - 1]
   const outerTrail = entriesRaw.slice(lastSpan.start + lastSpan.text.length)
   let pieces: RadarEntryPiece[]
   if (keyed.every((m) => m !== null)) {
     pieces = spans.map((s, i) => {
-      const m = keyed[i]!
+      const m = keyed[i]
       return {
         raw: s.text,
         sepAfter: sepAfterOf(i),
@@ -377,12 +377,12 @@ function parseEntries(entriesRaw: string): { form: RadarCurveForm; pieces: Radar
       return { form: 'raw', pieces: [] }
     }
     pieces = spans.map((s, i) => {
-      const m = numbers[i]!
+      const m = numbers[i]
       return { raw: s.text, sepAfter: sepAfterOf(i), kind: 'number', leadWs: m[1], num: m[2], trailWs: m[3] }
     })
   }
-  pieces[0]!.leadWs = outerLead + pieces[0]!.leadWs
-  const last = pieces[pieces.length - 1]!
+  pieces[0].leadWs = outerLead + pieces[0].leadWs
+  const last = pieces[pieces.length - 1]
   last.trailWs = (last.trailWs ?? '') + outerTrail
   for (const p of pieces) p.raw = normalizePieceRaw(p)
   return { form: keyed.every((m) => m !== null) ? 'keyed' : 'value-list', pieces }
@@ -525,7 +525,7 @@ export class RadarParser implements DiagramParser {
     const entries: RawEntry[] = []
     const counters: SegmentCounters = { axis: 0, curve: 0, option: 0 }
     let seenHeader = false
-    let lineIndex = 0
+    const lineIndex = 0
     // 文首 frontmatter 块不参与解析，整体 verbatim 保留
     const bodyStart = frontmatterEnd(source)
     let lineNo = bodyStart === 0 ? 0 : source.slice(0, bodyStart).split('\n').length - 1
@@ -621,11 +621,11 @@ export class RadarParser implements DiagramParser {
       validSeen++
       const isFirst = validSeen === 1
       const isLast = validSeen === validTotal
-      const prevEnd = i > 0 ? spans[i - 1]!.end : spans[i]!.start
-      const lead = isFirst ? '' : rest.slice(prevEnd, spans[i]!.start)
-      const tail = isLast ? rest.slice(spans[i]!.end) : ''
-      const segStartAbs = absBase + restStart + spans[i]!.start
-      const segEndAbs = absBase + restStart + spans[i]!.end
+      const prevEnd = i > 0 ? spans[i - 1].end : spans[i].start
+      const lead = isFirst ? '' : rest.slice(prevEnd, spans[i].start)
+      const tail = isLast ? rest.slice(spans[i].end) : ''
+      const segStartAbs = absBase + restStart + spans[i].start
+      const segEndAbs = absBase + restStart + spans[i].end
       const span: Span = isFirst && isLast
         ? { start: absBase + indent, end: absBase + body.length }
         : isFirst
@@ -658,7 +658,7 @@ export class RadarParser implements DiagramParser {
     const valid = parsed.filter((p) => p !== null)
     const out: RawEntry[] = []
     geometry.forEach((g, i) => {
-      const p = valid[i]!
+      const p = valid[i]
       counters.axis++
       const data: RadarAxisData = {
         kind: 'radar-axis',
@@ -692,7 +692,7 @@ export class RadarParser implements DiagramParser {
     const valid = parsed.filter((p) => p !== null)
     const out: RawEntry[] = []
     geometry.forEach((g, i) => {
-      const p = valid[i]!
+      const p = valid[i]
       counters.curve++
       const data: RadarCurveData = {
         kind: 'radar-curve',
@@ -751,7 +751,7 @@ export class RadarParser implements DiagramParser {
     const rest = m[3]
     const spans = splitTopLevelSpans(rest)
     if (spans.length === 0) return null
-    if (!isValidRadarOptionValue(firstName, spans[0]!.text)) return null
+    if (!isValidRadarOptionValue(firstName, spans[0].text)) return null
     const parsed = spans.map((s, i): { name: string; innerGap: string; value: string; valid: boolean } => {
       if (i === 0) return { name: firstName, innerGap: gap, value: s.text, valid: true }
       const segM = OPTION_SEG_RE.exec(s.text)
@@ -769,7 +769,7 @@ export class RadarParser implements DiagramParser {
     const valid = parsed.filter((p) => p.valid)
     const out: RawEntry[] = []
     geometry.forEach((g, i) => {
-      const p = valid[i]!
+      const p = valid[i]
       counters.option++
       const data: RadarOptionData = {
         kind: 'radar-option',
@@ -870,7 +870,7 @@ function segmentOnlyText(part: ElementPart): string {
  * - 其余段 → span（lead + 段文本）删除 = ''，不残留逗号。
  */
 function deleteSegment(parts: ElementPart[], index: number, rewrites: Map<string, string>): void {
-  const part = parts[index]!
+  const part = parts[index]
   const data = part.element as unknown as RadarSegmentInfo
   if (data.isFirst && data.isLast) {
     rewrites.set(part.id, '')
@@ -894,8 +894,8 @@ function withoutPiece(pieces: RadarEntryPiece[], index: number): RadarEntryPiece
   const next = pieces.filter((_, i) => i !== index)
   // 删首条目时把它的 leadWs（花括号外侧空白并进了首 piece）转移给新首条目，否则前导空白丢失
   if (index === 0 && next.length > 0) {
-    const first = next[0]!
-    next[0] = { ...first, leadWs: pieces[0]!.leadWs + first.leadWs, raw: '' }
+    const first = next[0]
+    next[0] = { ...first, leadWs: pieces[0].leadWs + first.leadWs, raw: '' }
     next[0].raw = normalizePieceRaw(next[0])
   }
   return next
@@ -920,7 +920,7 @@ function resolveAddAxis(doc: SourceDocument, intent: Extract<RadarIntent, { type
     })
   }
   const rewrites = new Map<string, string>()
-  const last = axes[axes.length - 1]!
+  const last = axes[axes.length - 1]
   rewrites.set(last.id, renderRadarAxis(last.element as RadarAxisData, { appendSegment: seg }))
   // 键值曲线联动：新轴必须有值（mermaid computeCurveEntries 缺条目抛错）
   for (const part of curveParts(doc)) {
@@ -975,7 +975,7 @@ function resolveDeleteAxis(doc: SourceDocument, intent: Extract<RadarIntent, { t
   if (index === -1) return null
   const rewrites = new Map<string, string>()
   deleteSegment(axes, index, rewrites)
-  const deletedId = (axes[index]!.element as RadarAxisData).id
+  const deletedId = (axes[index].element as RadarAxisData).id
   const curves = curveParts(doc)
   curves.forEach((curve, curveIndex) => {
     const c = curve.element as RadarCurveData
@@ -1002,7 +1002,7 @@ function applyCurveCascade(
   remaining: RadarEntryPiece[],
 ): void {
   if (remaining.length > 0) {
-    rewrites.set(curves[curveIndex]!.id, renderRadarCurve(data, { entriesRaw: renderRadarEntries(remaining) }))
+    rewrites.set(curves[curveIndex].id, renderRadarCurve(data, { entriesRaw: renderRadarEntries(remaining) }))
   } else {
     deleteSegment(curves, curveIndex, rewrites)
   }
@@ -1069,7 +1069,7 @@ function resolveSetCurveValue(doc: SourceDocument, intent: Extract<RadarIntent, 
   if (c.form === 'keyed') {
     const at = c.pieces.findIndex((p) => p.kind === 'keyed' && p.ref === intent.axisId)
     if (at === -1) return null
-    const piece = c.pieces[at]!
+    const piece = c.pieces[at]
     const next: RadarEntryPiece = {
       ...piece,
       num: value,
@@ -1080,7 +1080,7 @@ function resolveSetCurveValue(doc: SourceDocument, intent: Extract<RadarIntent, 
   if (c.form === 'value-list') {
     const axisIndex = axisParts(doc).findIndex((p) => (p.element as RadarAxisData).id === intent.axisId)
     if (axisIndex === -1 || axisIndex >= c.pieces.length) return null
-    const piece = c.pieces[axisIndex]!
+    const piece = c.pieces[axisIndex]
     const next: RadarEntryPiece = { ...piece, num: value, raw: `${piece.leadWs}${value}${piece.trailWs ?? ''}` }
     return new Map([[part.id, renderRadarCurve(c, { entriesRaw: renderRadarEntries(withPiece(c.pieces, axisIndex, next)) })]])
   }

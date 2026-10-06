@@ -14,12 +14,14 @@ import { useCanvasInlineEdit, inlineEditTextOf } from '../lib/editing/use-canvas
 import type { InlineEditCloseOptions } from '../lib/editing/use-canvas-inline-edit'
 import type { Rect } from '../lib/editing/inline-edit'
 import { useCanvasContextMenu } from '../lib/editing/use-canvas-context-menu'
+import { useLongPress } from '../lib/editing/use-long-press'
 import { canvasClickRuling, pointerDownBlocksDrag } from '../lib/editing/overlay-state'
 import type { ContextMenuItemId } from '../lib/editing/context-menu'
 import { NodeFormPopup } from './node-form-popup'
 import { useCanvasView } from '../lib/canvas-view/use-canvas-view'
 import type { AnyProjection } from '../lib/diagram-registry'
 import { useEditorStore } from '../store/editor'
+import { useCursorHintStore } from '../lib/follow/hint-store'
 
 /**
  * 画布（中间）：展示 mermaid 实时渲染的预览。
@@ -290,7 +292,10 @@ export function CanvasPanel({ preview, projection, unsupported = false }: Canvas
   const { t } = useTranslation()
   const select = useEditorStore((s) => s.select)
   const selection = useEditorStore((s) => s.selection)
-  const { svg, error } = preview
+  // 光标跟随提示（工单 16）：代码面板光标停在某元素源码区间内时给出的轻量提示。
+  // 纯展示态，不写回 store.selection——画布选中语义不受影响（不抢选中、不弹层）。
+  const hintedSelection = useCursorHintStore((s) => s.hint)
+  const { svg, error, errorNotice } = preview
 
   // 画布能力包（工单 04，ADR-0015）：本组件唯一的图种分发点——一次查表，
   // 之后所有图种知识（resolver / 选中映射 / 导航 id / 键盘投影 / 连线标注）都经 caps 取用。
@@ -358,7 +363,7 @@ export function CanvasPanel({ preview, projection, unsupported = false }: Canvas
         return firstId === undefined ? null : toSelection(firstId)
       },
     }
-  }, [caps, projection, svg, revealRect])
+  }, [caps, projection, revealRect, containerRef])
 
   // 右键菜单（工单 07）：菜单/连线模式/添加样式表单三个状态托管在 hook 中，
   // 编辑文本与新建节点的内联命名同样走 beginEdit。
@@ -369,6 +374,13 @@ export function CanvasPanel({ preview, projection, unsupported = false }: Canvas
     containerRef,
     onNodeCreated: beginEdit,
     newNodeText: t('app:propertyPanel.mindmapNewNode'),
+  })
+
+  // 触屏长按（工单 15）：手机没有右键，长按触点打开**同一份**上下文菜单
+  // （复用 ctx.openMenuAt——与 onContextMenu 共用目标解析与菜单项），
+  // 保证长按与桌面右键产出完全一致的菜单内容（ADR-0017 分层覆盖）。
+  const longPress = useLongPress((point) => {
+    ctx.openMenuAt(point.target, point.x, point.y)
   })
 
   // 键盘焦点体系（工单 04，工单 06 扩展 mindmap，工单 14 方向键覆盖四图种，
@@ -433,6 +445,12 @@ export function CanvasPanel({ preview, projection, unsupported = false }: Canvas
       selection !== null && caps !== null && projection !== null
         ? caps.canvasIdOf(projection, selection)
         : null,
+    // 光标提示的 data-id（工单 16）：用同一份 canvasIdOf 映射；映射不出（不可寻址图种）
+    // 则为 null，画布不提示——静默降级
+    hintedDataId:
+      hintedSelection !== null && caps !== null && projection !== null
+        ? caps.canvasIdOf(projection, hintedSelection)
+        : null,
     annotateEdges,
     annotateNodes,
     hitTestEdge,
@@ -448,11 +466,6 @@ export function CanvasPanel({ preview, projection, unsupported = false }: Canvas
       <Text size="xs" c="dimmed">
         {t('canvas.keyboardHint')}
       </Text>
-      {error !== null && (
-        <Alert color="red" title={t('canvas.errorTitle')}>
-          <Text size="sm">{error.message}</Text>
-        </Alert>
-      )}
       {unsupported && (
         <Alert color="yellow" title={t('canvas.unsupportedTitle')}>
           <Text size="sm">{t('canvas.unsupportedHint')}</Text>
@@ -474,6 +487,9 @@ export function CanvasPanel({ preview, projection, unsupported = false }: Canvas
           outline: 'none', // 画布聚焦即键盘生效，不要浏览器默认焦点圈
         }}
         onClick={(e) => {
+          // 长按刚打开菜单：抑制紧随的 click（真实触屏长按后仍会派发 click，
+          // 不抑制会把刚打开的菜单立刻关掉）。消费一次后复位。
+          if (longPress.consumeSuppressedClick()) return
           // 只在点击画布背景/节点时把焦点收进容器：Tab/Enter/Del 随即可用。
           // 点击内联编辑浮层（含其根元素的留白）时不抢焦点——否则输入框立刻失焦并
           // 触发 onBlur 提交，表现为「输入框点不进去」（工单 02 修复的死守卫：
@@ -501,6 +517,8 @@ export function CanvasPanel({ preview, projection, unsupported = false }: Canvas
         onContextMenu={ctx.onContextMenu}
         onDoubleClick={onDoubleClick}
         onPointerDown={(e) => {
+          // 触屏长按计时（工单 15）：与背景拖拽共存——移动即撤销长按（见 use-long-press）
+          longPress.handlers.onPointerDown(e)
           // 背景拖拽让位由覆盖层状态机的裁定表驱动（architecture-deepening-2 工单 05，
           // overlay-state.ts 的 pointerDownBlocksDrag）：内联编辑期间不让拖拽抢走指针
           // （输入框上的按下要留给文本选择）；右键菜单 / 添加样式表单 / 节点表单打开时
@@ -510,9 +528,18 @@ export function CanvasPanel({ preview, projection, unsupported = false }: Canvas
           if (pointerDownBlocksDrag({ open: ctx.open, inlineEdit: editing !== null })) return
           onPointerDown(e)
         }}
-        onPointerMove={onPointerMove}
-        onPointerUp={onPointerUp}
-        onPointerCancel={onPointerUp}
+        onPointerMove={(e) => {
+          longPress.handlers.onPointerMove(e)
+          onPointerMove(e)
+        }}
+        onPointerUp={(e) => {
+          longPress.handlers.onPointerUp(e)
+          onPointerUp(e)
+        }}
+        onPointerCancel={(e) => {
+          longPress.handlers.onPointerCancel(e)
+          onPointerUp(e)
+        }}
       >
         {svg === null ? (
           <Text c="dimmed" mt="xl" ta="center">
@@ -530,6 +557,36 @@ export function CanvasPanel({ preview, projection, unsupported = false }: Canvas
           >
             {t('canvas.fitView')}
           </Button>
+        )}
+        {/* last good render 错误角标（工单 13）：源码解析失败时画布保留上一次合法 SVG，
+            左上角浮出一份非遮挡提示。整层 pointer-events:none —— 角标纯信息展示，
+            不消费任何指针事件，画布的点选/拖拽/右键照常。绝对定位在角落、体量小，
+            且与右上角的「适应窗口」按钮错开，不盖住按钮；diagram 仍在角标之下可见。
+            只在「已有 last good render」时显示（从未渲染成功时中心占位文案已给错误）。 */}
+        {svg !== null && errorNotice !== null && (
+          <Box
+            data-canvas-error-badge
+            role="status"
+            aria-live="polite"
+            style={{
+              position: 'absolute',
+              top: 8,
+              left: 8,
+              zIndex: 10,
+              maxWidth: '60%',
+              pointerEvents: 'none',
+              padding: '2px 8px',
+              borderRadius: 'var(--mantine-radius-sm)',
+              background: 'var(--mantine-color-red-filled)',
+              color: 'var(--mantine-color-white)',
+              fontSize: 12,
+              lineHeight: 1.4,
+              boxShadow: 'var(--mantine-shadow-sm)',
+            }}
+          >
+            <span>{t('canvas.errorBadge')}</span>
+            {errorNotice.message !== '' && <span>{` ${errorNotice.message}`}</span>}
+          </Box>
         )}
         {editing !== null && (
           <InlineEditInput

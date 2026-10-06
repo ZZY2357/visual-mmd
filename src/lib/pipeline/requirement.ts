@@ -569,7 +569,7 @@ export class RequirementParser implements DiagramParser {
     const wanted = kind === 'requirement' ? 'requirement' : 'requirement-element'
     for (const part of doc.elements) {
       const data = part.element as RequirementData
-      if (data.kind === wanted && (data as RequirementBlockData | RequirementElementBlockData).name === name) {
+      if (data.kind === wanted && (data).name === name) {
         return { id: part.id, span: part.span, data }
       }
     }
@@ -830,7 +830,7 @@ const UNQUOTABLE_WORDS = new Set<string>([
  *   ——但字段自身的枚举取值天然就是关键字（`risk: High` / `verifymethod: Test`），故放行
  */
 export function isSafelyUnquotedRequirementValue(field: RequirementFieldKind, value: string): boolean {
-  if (value === '' || /[\-:,<>{}=]/.test(value) || /^[#%]/.test(value)) return false
+  if (value === '' || /[-:,<>{}=]/.test(value) || /^[#%]/.test(value)) return false
   if (!UNQUOTABLE_WORDS.has(value)) return true
   if (field === 'risk') return isOneOf(REQUIREMENT_RISKS, value)
   if (field === 'verifymethod') return isOneOf(REQUIREMENT_VERIFY_METHODS, value)

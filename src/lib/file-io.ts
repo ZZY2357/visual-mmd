@@ -12,6 +12,8 @@
 export const FALLBACK_FILE_NAME = 'diagram'
 
 /** Windows/macOS 通用非法字符与控制字符 */
+// 控制字符（\u0000-\u001F）正是要清洗的目标，故显式豁免 no-control-regex。
+// eslint-disable-next-line no-control-regex
 const FORBIDDEN_CHARS = /[\\/:*?"<>|\u0000-\u001F]/g
 
 /** 图表名 → 安全文件名主体（去路径分隔符等非法字符，空白收敛，空则兜底） */

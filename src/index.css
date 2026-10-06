@@ -5,9 +5,21 @@ body,
   margin: 0;
 }
 
-/* 代码面板错误行整行标红（工单 01：错误行标红并显示错误信息） */
+/* 代码面板错误行标记（工单 01 标红；工单 14 加行侧标记 + 波浪下划线）。
+   行侧 3px 红边 + 淡红底 + 文字波浪下划线三重可见标记；错误信息由行元素 title
+   （hover 显示）承载，见 CodePanel.tsx 的 errorLineField。 */
 .cm-editor .cm-errorLine {
-  background: rgba(250, 82, 82, 0.18);
+  background: rgba(250, 82, 82, 0.14);
+  box-shadow: inset 3px 0 0 0 var(--mantine-color-red-6);
+  text-decoration: underline wavy var(--mantine-color-red-6);
+  text-decoration-skip-ink: none;
+}
+
+/* 跟随高亮（工单 16）：选中画布元素后代码面板短暂高亮的源码区间。
+   淡黄底 + 圆角；到点由 CodePanel 清除装饰，自然消失（不做 CSS 动画，测试可断言） */
+.cm-editor .cm-followHighlight {
+  background: rgba(255, 212, 59, 0.35);
+  border-radius: 2px;
 }
 
 .cm-editor {
@@ -18,6 +30,13 @@ body,
    渲染 SVG 的 [data-id] 元素上；用 filter 光晕避免与 mermaid 描边样式冲突 */
 [data-vm-selected] {
   filter: drop-shadow(0 0 4px var(--mantine-color-blue-6));
+}
+
+/* 画布光标提示（工单 16）：比选中高亮更轻——细虚线描边、无光晕，
+   不改变选中语义（独立 data-vm-hinted 属性，不抢 data-vm-selected 的观感） */
+[data-vm-hinted] {
+  outline: 1px dashed var(--mantine-color-blue-4);
+  outline-offset: 1px;
 }
 
 .cm-editor .cm-scroller {

@@ -85,7 +85,6 @@ export function buildTimelineProjection(doc: SourceDocument): TimelineProjection
   let direction: string | null = null
   let currentSection: ProjectionTimelineSection | null = null
   let currentPeriod: ProjectionTimelinePeriod | null = null
-  let eventCount = 0
 
   for (const part of doc.elements) {
     const data = part.element
@@ -123,7 +122,6 @@ export function buildTimelineProjection(doc: SourceDocument): TimelineProjection
     } else if (data.kind === 'timeline-event') {
       // parser 保证事件紧跟在时期段之后；无时期（不合法）时安静忽略
       if (currentPeriod !== null) {
-        eventCount++
         const event: ProjectionTimelineEvent = {
           elementId: part.id,
           text: (data as TimelineEventData).text,

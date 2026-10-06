@@ -84,7 +84,7 @@ describe('ThreePaneLayout 折叠互斥禁用态（工单 03）', () => {
 
   it('属性面板已折叠时，代码面板折叠按钮 disabled 且 aria 说明互斥原因', async () => {
     await render()
-    let { props } = buttons(host)
+    const { props } = buttons(host)
     await act(async () => {
       props.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true }))
     })
@@ -99,7 +99,7 @@ describe('ThreePaneLayout 折叠互斥禁用态（工单 03）', () => {
 
   it('代码面板已折叠时，属性面板折叠按钮 disabled 且 aria 说明互斥原因', async () => {
     await render()
-    let { code } = buttons(host)
+    const { code } = buttons(host)
     await act(async () => {
       code.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true }))
     })
@@ -110,7 +110,7 @@ describe('ThreePaneLayout 折叠互斥禁用态（工单 03）', () => {
 
   it('禁用态下点击不改变任何折叠状态', async () => {
     await render()
-    let { props } = buttons(host)
+    const { props } = buttons(host)
     await act(async () => {
       props.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true }))
     })
@@ -127,7 +127,7 @@ describe('ThreePaneLayout 折叠互斥禁用态（工单 03）', () => {
 
   it('互斥解除：展开属性面板后，代码面板折叠按钮恢复可点', async () => {
     await render()
-    let { props } = buttons(host)
+    const { props } = buttons(host)
     await act(async () => {
       props.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true }))
     })

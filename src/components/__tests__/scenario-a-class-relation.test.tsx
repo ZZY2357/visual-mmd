@@ -300,7 +300,7 @@ describe('验收场景 A（单测等价覆盖）', () => {
   }
 
   function intentAt(spy: ReturnType<typeof spyCommitIntent>, n: number): Record<string, unknown> | undefined {
-    return spy.mock.calls[n]?.[0] as unknown as Record<string, unknown> | undefined
+    return spy.mock.calls[n]?.[0]
   }
 
   it('加类 → 两个成员 → 连到另一个类 → 点线改基数/标签并改成 *--', async () => {

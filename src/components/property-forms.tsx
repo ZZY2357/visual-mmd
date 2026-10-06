@@ -229,7 +229,7 @@ export function EdgeForm({ edge }: { edge: ProjectionEdge }) {
   return (
     <Stack gap="sm">
       <Text size="sm" c="dimmed">
-        {t('app:propertyPanel.edgeFrom')}: {edge.from}　{t('app:propertyPanel.edgeTo')}: {edge.to}
+        {t('app:propertyPanel.edgeFrom')}: {edge.from} {t('app:propertyPanel.edgeTo')}: {edge.to}
       </Text>
       <Select
         label={t('app:propertyPanel.edgeLineStyle')}

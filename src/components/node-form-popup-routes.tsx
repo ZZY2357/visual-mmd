@@ -61,7 +61,7 @@ interface DiagramNodeForms {
 function bindNodeForms<P>(table: NodeFormTable<P>): DiagramNodeForms {
   return {
     render: (projection, state, onClose) => {
-      const Entry = table[state.kind] as ComponentType<NodeFormEntryProps<P>> | undefined
+      const Entry = table[state.kind]
       if (Entry === undefined) return null
       return <Entry projection={projection as P} state={state} onClose={onClose} />
     },

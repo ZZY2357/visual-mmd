@@ -33,7 +33,7 @@ Mermaid 能把文本变成图，但手写语法有门槛；常见的图形化编
 
 ## 快速开始
 
-需要 Node.js 20.19+（Vite 7 的要求）与 npm。
+需要 Node.js 20.19+（Vite 7 的要求）与 npm。版本要求同时声明在 `package.json` 的 `engines` 与仓库根的 `.nvmrc` 中。
 
 ```bash
 git clone https://github.com/ZZY2357/visual-mmd.git
@@ -41,6 +41,8 @@ cd visual-mmd
 npm install
 npm run dev        # 开发模式，默认地址 http://localhost:5173
 ```
+
+CI（GitHub Actions）在每次 PR 与 main 分支提交时自动运行 `npm run typecheck`、`npm test` 与 `npm run build`，全部通过才算绿灯。
 
 生产构建与本地预览：
 

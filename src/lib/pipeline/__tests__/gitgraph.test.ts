@@ -69,10 +69,10 @@ gitGraph
 
 describe('gitGraph 解析器：语法覆盖（分层对齐核心清单）', () => {
   it('表头方向：缺省 / LR: / TB: / BT:（全方向关键字）', () => {
-    expect(elementsOf(doc0('gitGraph\n'), 'gitgraph-header')[0]!.element).toMatchObject({ direction: null })
+    expect(elementsOf(doc0('gitGraph\n'), 'gitgraph-header')[0].element).toMatchObject({ direction: null })
     for (const dir of GITGRAPH_DIRECTIONS) {
       const doc = parseOk(`gitGraph ${dir}:\n    commit\n`)
-      expect(elementsOf(doc, 'gitgraph-header')[0]!.element).toMatchObject({ direction: dir })
+      expect(elementsOf(doc, 'gitgraph-header')[0].element).toMatchObject({ direction: dir })
       // 方向 token 也在 verbatim identity 内
       expect(reassemble(doc, new Map())).toBe(`gitGraph ${dir}:\n    commit\n`)
     }
@@ -82,12 +82,12 @@ describe('gitGraph 解析器：语法覆盖（分层对齐核心清单）', () =
     const doc = parseOk(SIMPLE)
     const commits = elementsOf(doc, 'gg-commit')
     expect(commits.map((p) => p.id)).toEqual(['commit:1', 'commit:2', 'commit:3', 'commit:4'])
-    expect(commits[0]!.element).toMatchObject({ kind: 'gg-commit', keyword: 'commit' })
-    expect(paramsOf(commits[0]!.element)).toMatchObject({ id: 'init' })
-    expect(paramsOf(commits[3]!.element)).toMatchObject({ id: 'feat', tag: 'v0.1' })
+    expect(commits[0].element).toMatchObject({ kind: 'gg-commit', keyword: 'commit' })
+    expect(paramsOf(commits[0].element)).toMatchObject({ id: 'init' })
+    expect(paramsOf(commits[3].element)).toMatchObject({ id: 'feat', tag: 'v0.1' })
 
     const typed = parseOk('gitGraph\n    commit id: "a" type: HIGHLIGHT\n')
-    expect(paramsOf(elementsOf(typed, 'gg-commit')[0]!.element)).toMatchObject({ id: 'a', type: 'HIGHLIGHT' })
+    expect(paramsOf(elementsOf(typed, 'gg-commit')[0].element)).toMatchObject({ id: 'a', type: 'HIGHLIGHT' })
   })
 
   it('branch：裸名 / order: / 引号名（关键字名）+ order', () => {
@@ -98,10 +98,10 @@ describe('gitGraph 解析器：语法覆盖（分层对齐核心清单）', () =
 `)
     const branches = elementsOf(doc, 'gg-branch')
     expect(branches.map((p) => p.id)).toEqual(['branch:develop', 'branch:release', 'branch:cherry-pick'])
-    expect(branches[0]!.element).toMatchObject({ name: 'develop', quote: '', nameAfter: '' })
-    expect(paramsOf(branches[1]!.element)).toMatchObject({ order: '2' })
-    expect(branches[2]!.element).toMatchObject({ name: 'cherry-pick', quote: '"' })
-    expect(paramsOf(branches[2]!.element)).toMatchObject({ order: '3' })
+    expect(branches[0].element).toMatchObject({ name: 'develop', quote: '', nameAfter: '' })
+    expect(paramsOf(branches[1].element)).toMatchObject({ order: '2' })
+    expect(branches[2].element).toMatchObject({ name: 'cherry-pick', quote: '"' })
+    expect(paramsOf(branches[2].element)).toMatchObject({ order: '3' })
     expect(reassemble(doc, new Map())).toBe(
       `gitGraph
     branch develop
@@ -122,7 +122,7 @@ describe('gitGraph 解析器：语法覆盖（分层对齐核心清单）', () =
 
   it('merge：裸合并 + id / tag / type 参数', () => {
     const doc = parseOk('gitGraph\n    merge feature id: "m" tag: "t" type: REVERSE\n')
-    const merge = elementsOf(doc, 'gg-merge')[0]!
+    const merge = elementsOf(doc, 'gg-merge')[0]
     expect(merge.element).toMatchObject({ keyword: 'merge', name: 'feature' })
     expect(paramsOf(merge.element)).toMatchObject({ id: 'm', tag: 't', type: 'REVERSE' })
   })
@@ -131,8 +131,8 @@ describe('gitGraph 解析器：语法覆盖（分层对齐核心清单）', () =
     const doc = parseOk('gitGraph\n    cherry-pick id: "src"\n    cherry-pick id: "merge" parent: "p"\n')
     const picks = elementsOf(doc, 'gg-cherry-pick')
     expect(picks.map((p) => p.id)).toEqual(['cherry-pick:1', 'cherry-pick:2'])
-    expect(paramsOf(picks[0]!.element)).toMatchObject({ id: 'src' })
-    expect(paramsOf(picks[1]!.element)).toMatchObject({ id: 'merge', parent: 'p' })
+    expect(paramsOf(picks[0].element)).toMatchObject({ id: 'src' })
+    expect(paramsOf(picks[1].element)).toMatchObject({ id: 'merge', parent: 'p' })
   })
 })
 
@@ -243,7 +243,7 @@ describe('gitGraph 意图落码（语句序即拓扑，ADR-0012）', () => {
       gitgraphParser.resolveRewrites(doc, { type: 'set-branch-order', elementId: 'branch:feature', order: 2 })!,
     )
     expect(add).toContain('branch feature order: 2')
-    expect(paramsOf(elementsOf(parseOk(add), 'gg-branch')[0]!.element)).toMatchObject({ order: '2' })
+    expect(paramsOf(elementsOf(parseOk(add), 'gg-branch')[0].element)).toMatchObject({ order: '2' })
 
     const withOrder = parseOk('gitGraph\n    branch b order: 5\n')
     const clear = reassemble(

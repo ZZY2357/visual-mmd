@@ -1,0 +1,31 @@
+# Git 属性：统一换行符为 LF，消除 Windows 工作区（core.autocrlf=true）下
+# 整个文件被重写为 CRLF 的假 diff（真实改动被淹没在 6000+ 行噪声里）。
+#
+# 规则：仓库内一律以 LF 存储；检出时也不做 CRLF 转换（eol=lf），
+# 让工作区与 blob 完全一致，git diff 只反映真实内容变更。
+* text=auto eol=lf
+
+# 二进制文件不做文本规范化（避免被当作文本转换而损坏）
+*.png  binary
+*.jpg  binary
+*.jpeg binary
+*.gif  binary
+*.ico  binary
+*.webp binary
+*.svgz binary
+# 归档
+*.zip  binary
+*.gz   binary
+*.tgz  binary
+*.tar  binary
+*.7z   binary
+*.bz2  binary
+*.xz   binary
+# 字体
+*.woff  binary
+*.woff2 binary
+*.ttf   binary
+*.otf   binary
+
+# MMD 源码是纯文本，明确保持 LF（会被测试与解析器逐字节读取）
+*.mmd text eol=lf

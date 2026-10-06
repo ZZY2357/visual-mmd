@@ -12,11 +12,15 @@ Issues and specs for this repo live as markdown files in `.scratch/`.
 
 ## When a skill says "publish to the issue tracker"
 
-Create a new file under `.scratch/<feature-slug>/` (creating the directory if needed).
+Create a new issue file at `.scratch/<feature-slug>/issues/<NN>-<slug>.md` (creating the feature directory and its `issues/` subdirectory if needed), numbered from `01`. A `spec.md` at the feature root holds the feature's shared context; individual tickets live in `issues/`, never at the feature root.
 
 ## When a skill says "fetch the relevant ticket"
 
 Read the file at the referenced path. The user will normally pass the path or the issue number directly.
+
+## Notes on `.scratch/` and git
+
+`.scratch/` is listed in `.gitignore` — it is the local working area. Files already tracked before the ignore was added remain tracked (e.g. earlier feature dirs), but new scratch files are local-only and are not committed.
 
 ## Wayfinding operations
 

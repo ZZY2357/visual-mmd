@@ -77,7 +77,7 @@ function valueListEntries(data: RadarCurveData, axisIds: string[]): Record<strin
   const values: Record<string, number> = {}
   const numbers = data.pieces
   for (let i = 0; i < numbers.length && i < axisIds.length; i++) {
-    values[axisIds[i]!] = Number.parseFloat(numbers[i]!.num)
+    values[axisIds[i]] = Number.parseFloat(numbers[i].num)
   }
   return values
 }

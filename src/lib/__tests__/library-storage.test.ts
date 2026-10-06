@@ -4,11 +4,14 @@ import {
   LIBRARY_STORAGE_KEY,
   bootstrapLibrary,
   createDiagramId,
+  isStorageAvailable,
   loadLibrary,
   removeLegacyDiagram,
   saveLibrary,
   type StoredLibrary,
 } from '../library-storage'
+import { LIBRARY_SCHEMA_VERSION } from '../library-migrations'
+import { SAMPLE_DIAGRAMS } from '../sample-library'
 
 class MemoryStorage implements Storage {
   private map = new Map<string, string>()
@@ -29,6 +32,13 @@ class MemoryStorage implements Storage {
   }
   setItem(key: string, value: string) {
     this.map.set(key, value)
+  }
+}
+
+/** 写入必抛异常的存储：模拟 quota 满 / 隐私模式下 setItem 失败 */
+class QuotaExceededStorage extends MemoryStorage {
+  override setItem(): void {
+    throw new DOMException('QuotaExceededError', 'QuotaExceededError')
   }
 }
 
@@ -103,6 +113,59 @@ describe('loadLibrary / saveLibrary（图表库存取接缝）', () => {
   })
 })
 
+describe('schema 版本与迁移（工单 07）', () => {
+  let storage: MemoryStorage
+  beforeEach(() => {
+    storage = new MemoryStorage()
+  })
+
+  it('saveLibrary 落盘记录带当前 schema 版本', () => {
+    saveLibrary(sampleLibrary(), storage)
+    const raw = JSON.parse(storage.getItem(LIBRARY_STORAGE_KEY)!) as { version?: number }
+    expect(raw.version).toBe(LIBRARY_SCHEMA_VERSION)
+  })
+
+  it('旧版 v1 记录（无 version 字段）被迁移而非丢弃', () => {
+    const v1 = { diagrams: sampleLibrary().diagrams, activeId: 'd2' }
+    storage.setItem(LIBRARY_STORAGE_KEY, JSON.stringify(v1))
+    const loaded = loadLibrary(storage)
+    expect(loaded).not.toBeNull()
+    expect(loaded?.diagrams).toHaveLength(2)
+    expect(loaded?.activeId).toBe('d2')
+  })
+
+  it('未来版本记录返回 null（降级运行不误读）', () => {
+    storage.setItem(
+      LIBRARY_STORAGE_KEY,
+      JSON.stringify({ version: LIBRARY_SCHEMA_VERSION + 1, diagrams: sampleLibrary().diagrams, activeId: 'd1' }),
+    )
+    expect(loadLibrary(storage)).toBeNull()
+  })
+})
+
+describe('存储失败降级（工单 07）', () => {
+  it('setItem 抛异常时 saveLibrary 返回 quota 失败而非抛出', () => {
+    const storage = new QuotaExceededStorage()
+    const result = saveLibrary(sampleLibrary(), storage)
+    expect(result).toEqual({ ok: false, reason: 'quota' })
+  })
+
+  it('存储不可用（null）时 saveLibrary 返回 unavailable，loadLibrary 返回 null', () => {
+    expect(saveLibrary(sampleLibrary(), null)).toEqual({ ok: false, reason: 'unavailable' })
+    expect(loadLibrary(null)).toBeNull()
+  })
+
+  it('正常存储时 saveLibrary 返回 ok', () => {
+    expect(saveLibrary(sampleLibrary(), new MemoryStorage())).toEqual({ ok: true })
+  })
+
+  it('isStorageAvailable：可写为 true；null 或 setItem 抛异常为 false', () => {
+    expect(isStorageAvailable(new MemoryStorage())).toBe(true)
+    expect(isStorageAvailable(null)).toBe(false)
+    expect(isStorageAvailable(new QuotaExceededStorage())).toBe(false)
+  })
+})
+
 describe('bootstrapLibrary（启动引导与旧版迁移）', () => {
   let storage: MemoryStorage
   beforeEach(() => {
@@ -125,7 +188,16 @@ describe('bootstrapLibrary（启动引导与旧版迁移）', () => {
     expect(storage.getItem(STORAGE_KEY)).toBeNull()
   })
 
-  it('两者皆无时返回空库（由 store 决定起步图表）', () => {
+  it('两者皆无（真·首次启动）时预置示例图表库（工单 17）', () => {
+    const lib = bootstrapLibrary(storage)
+    expect(lib.diagrams).toHaveLength(SAMPLE_DIAGRAMS.length)
+    expect(lib.diagrams.map((d) => d.id)).toEqual(SAMPLE_DIAGRAMS.map((s) => s.id))
+    expect(lib.activeId).toBe(SAMPLE_DIAGRAMS[0]?.id ?? null)
+  })
+
+  it('用户删空图表库后不再重新播种（删除示例不复活）', () => {
+    // 存储里存在图表库 key（哪怕空数组）即视为「已有数据」，原样返回
+    saveLibrary({ diagrams: [], activeId: null }, storage)
     expect(bootstrapLibrary(storage)).toEqual({ diagrams: [], activeId: null })
   })
 })

@@ -89,7 +89,7 @@ describe('buildC4Projection（more-diagrams 工单 18）', () => {
   it('边界名字即身份 `c4-boundary:<alias>`；boundaryKind / techn / memberCount 透传', () => {
     const p = buildC4Projection(parse(SAMPLE))
     expect(p.boundaries.map((b) => b.elementId)).toEqual(['c4-boundary:b0'])
-    const b0 = p.boundaries[0]!
+    const b0 = p.boundaries[0]
     expect(b0).toMatchObject({
       macro: 'Enterprise_Boundary',
       boundaryKind: 'enterprise',

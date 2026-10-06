@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest'
 import { SnapshotStack } from '../snapshot-stack'
 
 function fixedNow(): () => number {
-  let t = 0
+  const t = 0
   return () => t
 }
 
@@ -47,7 +47,7 @@ describe('SnapshotStack：代码快照单栈', () => {
   })
 
   it('离散编辑打断合并会话', () => {
-    let t = 0
+    const t = 0
     const stack = new SnapshotStack('v0', { now: () => t, coalesceMs: 1000 })
     stack.commit('v1', { coalesce: true })
     stack.commit('v2') // 离散
@@ -82,5 +82,62 @@ describe('SnapshotStack：代码快照单栈', () => {
     expect(stack.undo()).toBe('v2')
     expect(stack.undo()).toBe('v1')
     expect(stack.undo()).toBeNull()
+  })
+})
+
+describe('SnapshotStack：泛型载荷（工单 12 撤销快照携带选中）', () => {
+  interface Payload {
+    source: string
+    selection: string | null
+  }
+  const equals = (a: Payload, b: Payload) =>
+    a.source === b.source && a.selection === b.selection
+
+  it('undo/redo 连同载荷（source + selection）一并还原', () => {
+    const stack = new SnapshotStack<Payload>(
+      { source: 'v0', selection: null },
+      { equals },
+    )
+    stack.commit({ source: 'v1', selection: 'node:A' })
+    stack.commit({ source: 'v2', selection: 'node:B' })
+    expect(stack.undo()).toEqual({ source: 'v1', selection: 'node:A' })
+    expect(stack.undo()).toEqual({ source: 'v0', selection: null })
+    expect(stack.redo()).toEqual({ source: 'v1', selection: 'node:A' })
+  })
+
+  it('amend 只更新当前载荷的选中，不产生撤销步骤也不丢重做分支', () => {
+    const stack = new SnapshotStack<Payload>(
+      { source: 'v0', selection: null },
+      { equals },
+    )
+    stack.commit({ source: 'v1', selection: null })
+    stack.undo() // 现在 current = v0，future = [v1]
+    expect(stack.canRedo).toBe(true)
+    stack.amend({ source: 'v0', selection: 'edge:0' })
+    expect(stack.canRedo).toBe(true) // 重做分支保留
+    expect(stack.canUndo).toBe(false) // 没多出历史
+    expect(stack.current).toEqual({ source: 'v0', selection: 'edge:0' })
+    expect(stack.redo()).toEqual({ source: 'v1', selection: null })
+  })
+
+  it('coalesce 会话合并时，撤销回到会话开始前的载荷（含选中）', () => {
+    const now = fixedNow()
+    const stack = new SnapshotStack<Payload>(
+      { source: 'v0', selection: 'edge:0' },
+      { now, coalesceMs: 1000, equals },
+    )
+    stack.commit({ source: 'v1', selection: 'edge:0' }, { coalesce: true })
+    stack.commit({ source: 'v2', selection: 'edge:0' }, { coalesce: true })
+    expect(stack.undo()).toEqual({ source: 'v0', selection: 'edge:0' })
+  })
+
+  it('自定义 equals：仅选中不同也算新快照', () => {
+    const stack = new SnapshotStack<Payload>(
+      { source: 'v0', selection: null },
+      { equals },
+    )
+    stack.commit({ source: 'v0', selection: 'node:A' })
+    expect(stack.canUndo).toBe(true)
+    expect(stack.undo()).toEqual({ source: 'v0', selection: null })
   })
 })

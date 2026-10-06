@@ -1,5 +1,7 @@
 # 画布能力包只装图种知识，DOM 运行期测量留在外面
 
+> **状态：accepted**
+
 `CanvasPanel.tsx` 有 24 处 `projection.type ===`，散在 6 个分发函数里
 （`resolverOf` / `canvasToEditorSelection` / `selectedDataIdOf` / `nodeDataIdsOf` /
 `keyboardProjectionOf` / `annotateEdges`），`PropertyPanel.tsx:237` 还有第七处。

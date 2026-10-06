@@ -232,7 +232,6 @@ export class TreeviewParser implements DiagramParser {
     let seenHeader = false
     // 文首 frontmatter 块不参与解析，整体 verbatim 保留（工单 11）
     const bodyStart = frontmatterEnd(source)
-    let lineNo = bodyStart === 0 ? 0 : source.slice(0, bodyStart).split('\n').length - 1
     let cursor = bodyStart
 
     for (;;) {
@@ -240,7 +239,6 @@ export class TreeviewParser implements DiagramParser {
       const lineEnd = nl === -1 ? source.length : nl
       const line = source.slice(cursor, lineEnd)
       const eol = nl === -1 ? '' : '\n'
-      lineNo++
       const trimmed = line.trim()
 
       if (trimmed !== '') {

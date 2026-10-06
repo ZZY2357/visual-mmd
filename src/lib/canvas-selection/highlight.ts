@@ -7,6 +7,8 @@
  */
 
 const HIGHLIGHT_ATTR = 'data-vm-selected'
+/** 光标跟随提示标记（工单 16）：与选中高亮分离，视觉更轻（见 index.css） */
+const HINT_ATTR = 'data-vm-hinted'
 
 /** 参与 data-id 匹配的候选元素（`[data-id]` 或带 DOM id 的元素） */
 export const DATA_ID_CANDIDATE_SELECTOR = '[data-id], [id]'
@@ -50,5 +52,24 @@ export function applyHighlight(root: ParentNode, dataId: string): void {
 export function clearHighlight(root: ParentNode): void {
   for (const el of findMarked(root)) {
     el.removeAttribute(HIGHLIGHT_ATTR)
+  }
+}
+
+/**
+ * 轻量提示 data-id 匹配的元素（工单 16，光标→画布方向）：
+ * 与选中高亮同款匹配、独立标记属性——不抢选中（不改 store.selection）、不弹层。
+ * 先清除旧提示（同一容器同时至多一个提示）。元素不存在时静默无事发生。
+ */
+export function applyHint(root: ParentNode, dataId: string): void {
+  clearHint(root)
+  for (const el of Array.from(root.querySelectorAll(DATA_ID_CANDIDATE_SELECTOR))) {
+    if (matchesDataId(el, dataId)) el.setAttribute(HINT_ATTR, 'true')
+  }
+}
+
+/** 清除容器内全部提示标记 */
+export function clearHint(root: ParentNode): void {
+  for (const el of Array.from(root.querySelectorAll(`[${HINT_ATTR}]`))) {
+    el.removeAttribute(HINT_ATTR)
   }
 }

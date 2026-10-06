@@ -237,7 +237,7 @@ export class PieParser implements DiagramParser {
             data: {
               kind: 'pie-header',
               // `pie` 与 `showData` 之间的空白原文（无 showData 时空串）
-              gap: showData ? trimmed.slice('pie'.length, trimmed.length - header[1]!.length) : '',
+              gap: showData ? trimmed.slice('pie'.length, trimmed.length - header[1].length) : '',
               showData,
               trailing: line.slice(firstChar + trimmed.length),
             },

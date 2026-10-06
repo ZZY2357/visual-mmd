@@ -29,9 +29,9 @@ describe('buildErProjection', () => {
 `)
     expect(p.direction).toBe('LR')
     expect(p.entities.map((e) => e.name)).toEqual(['CAR', 'DRIVER'])
-    expect(p.entities[0]!.attributes.map((a) => a.name)).toEqual(['make', 'year'])
-    expect(p.entities[0]!.attributes[0]).toMatchObject({ keys: ['PK'], comment: '制造商', nullable: false })
-    expect(p.entities[0]!.attributes[1]).toMatchObject({ nullable: true, keys: [] })
+    expect(p.entities[0].attributes.map((a) => a.name)).toEqual(['make', 'year'])
+    expect(p.entities[0].attributes[0]).toMatchObject({ keys: ['PK'], comment: '制造商', nullable: false })
+    expect(p.entities[0].attributes[1]).toMatchObject({ nullable: true, keys: [] })
     expect(p.relations).toMatchObject([
       { from: 'CAR', to: 'DRIVER', cardLeft: '||', line: 'identifying', cardRight: '|{', label: '"drives"' },
       { from: 'DRIVER', to: 'CAR', line: 'non-identifying', label: 'insured' },

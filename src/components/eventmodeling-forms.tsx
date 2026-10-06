@@ -11,7 +11,6 @@ import {
   isValidEmEntityIdentifier,
   isValidEmFrameId,
   isEmEntityType,
-  type EmEntityType,
   type EventModelingIntent,
 } from '../lib/pipeline/eventmodeling'
 import { useEditorStore } from '../store/editor'
@@ -107,7 +106,7 @@ export function EventModelingFrameForm({ frame }: { frame: ProjectionEmFrame }) 
           commitIntent({
             type: 'set-em-frame',
             elementId: frame.elementId,
-            entityType: value as EmEntityType,
+            entityType: value,
           } satisfies EventModelingIntent)
         }}
       />

@@ -256,8 +256,8 @@ describe('frontmatter 被各图种解析器 verbatim 保留', () => {
         class: { type: 'add-class', name: 'Z' },
         mindmap: { type: 'add-child', parentElementId: 'mindmap-node:1', text: '新叶' },
       } as const
-      const intent = intents[name as keyof typeof intents]
-      const result = applyEdit(src, parser, intent as never)
+      const intent = intents[name]
+      const result = applyEdit(src, parser, intent)
       expect(result.ok).toBe(true)
       if (!result.ok) return
       expect(result.source.startsWith(FM)).toBe(true)

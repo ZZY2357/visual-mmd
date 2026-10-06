@@ -91,7 +91,7 @@ export function renderParamsWith(
     out.push({ key, colonRaw: ': ', quote: quoted ? '"' : '', value: String(value), after: '' })
   }
   // 末项的行尾空白在编辑后不再有意义：去掉，避免留下悬挂空格
-  if (out.length > 0) out[out.length - 1] = { ...out[out.length - 1]!, after: '' }
+  if (out.length > 0) out[out.length - 1] = { ...out[out.length - 1], after: '' }
   return renderGitgraphParams(out)
 }
 

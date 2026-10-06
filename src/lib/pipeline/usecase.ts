@@ -326,7 +326,7 @@ function parseRelationLine(
   const scan = RELATION_SCAN_RE.exec(hard.slice(srcMatch[0].length))
   if (scan === null || scan.groups === undefined) return null
   const operator = scan[0]
-  let cursor = srcMatch[0].length + operator.length
+  const cursor = srcMatch[0].length + operator.length
   // 已知算子校验（防止 `--` 吞掉 `--|>` / `..>`）
   if (!OPERATOR_RE.test(operator)) return null
   const rest = hard.slice(cursor)

@@ -2,7 +2,7 @@ import { useEffect, useRef } from 'react'
 import { selectionFromEventTarget, type CanvasSelection, type DataIdResolver } from './data-id'
 import { addEdgeHitAreas } from './edge-hit-area'
 import { annotateNodeDataIds } from './node-data-ids'
-import { applyHighlight, clearHighlight } from './highlight'
+import { applyHighlight, clearHighlight, applyHint, clearHint } from './highlight'
 
 /**
  * 画布选中 Hook（工单 05，图种无关）：
@@ -19,6 +19,8 @@ export interface CanvasSelectionOptions {
   resolver: DataIdResolver | null
   /** 当前选中的 data-id（节点选中即节点 id）；null = 无高亮 */
   selectedDataId: string | null
+  /** 光标跟随提示的 data-id（工单 16）；null = 无提示。与选中分离——不改变选中语义 */
+  hintedDataId?: string | null
   /** 点击命中选中时回调 */
   onSelect: (selection: CanvasSelection) => void
   /** 外部已有的容器 ref（工单 03：画布视图与选中共享同一容器）；缺省自建 */
@@ -36,6 +38,7 @@ export function useCanvasSelection({
   svg,
   resolver,
   selectedDataId,
+  hintedDataId = null,
   onSelect,
   containerRef: externalRef,
   annotateEdges,
@@ -70,7 +73,13 @@ export function useCanvasSelection({
     } else {
       applyHighlight(root, selectedDataId)
     }
-  }, [svg, selectedDataId])
+    // 光标跟随提示（工单 16）：与选中高亮独立的轻量标记；无提示即清除
+    if (hintedDataId === null || hintedDataId === selectedDataId) {
+      clearHint(root)
+    } else {
+      applyHint(root, hintedDataId)
+    }
+  }, [svg, selectedDataId, hintedDataId, containerRef])
 
   const onClick = (e: React.MouseEvent) => {
     const selection = selectionFromEventTarget(e.target, resolver)

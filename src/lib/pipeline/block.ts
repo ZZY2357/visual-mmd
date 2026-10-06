@@ -678,7 +678,7 @@ export class BlockParser implements DiagramParser {
       const data = part.element as BlockData
       if (data.kind === 'block-group-close') continue
       if (data.kind === 'block-group-open') continue
-      const owner = 'owner' in data ? (data.owner as string | null) : null
+      const owner = 'owner' in data ? (data.owner) : null
       if (owner === null) last = part
     }
     if (last !== undefined) return last.id
@@ -913,7 +913,7 @@ export class BlockParser implements DiagramParser {
       return new Map([[scopeOpen!.id, `${original}\n${indent}${renderBlockColumns(fresh)}`]])
     }
     return insertAfter(doc, {
-      afterElementId: insertAnchor!.id,
+      afterElementId: insertAnchor.id,
       render: (indent) => indentLines(indent, [renderBlockColumns(fresh)]),
     })
   }
@@ -976,7 +976,7 @@ export function isValidBlockId(id: string): boolean {
 
 /** 标签合法性：非空、不含 `"` `[` `]` 与换行（含则无法安全写回形状定界符内） */
 export function isValidBlockLabel(label: string): boolean {
-  return label.trim() !== '' && !/["\[\]\r\n]/.test(label)
+  return label.trim() !== '' && !/["[\]\r\n]/.test(label)
 }
 
 // ---------- 编辑意图（工单 09 表单/画布所需集合） ----------

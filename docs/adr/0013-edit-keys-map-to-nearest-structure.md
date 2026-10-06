@@ -1,5 +1,7 @@
 # 类图与时序图的编辑键按「就近结构」映射，而非子/同级
 
+> **状态：accepted**
+
 `flowchart` 与 `mindmap` 的画布编辑键有既定语义：`Tab` 加子节点、`Enter` 加同级节点、`Delete` 删除
 （`canvas-keyboard.ts` 的 `keyToNodeAction`）。`class` 与 `sequence` 一直没有这两个键——命中即
 `return`，不落码也不 `preventDefault`（工单 14 明确列为非目标）。

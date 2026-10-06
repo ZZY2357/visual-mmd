@@ -5,7 +5,7 @@ import type { ComponentType, ReactNode } from 'react'
 import type {
   AnyProjection,
   DiagramSelectionForms,
-  DiagramTypeId,
+  RegisteredDiagramTypeId,
   SelectionFormTable,
 } from '../lib/diagram-registry'
 import { DIAGRAM_TYPE_LIST } from '../lib/diagram-registry'
@@ -180,7 +180,7 @@ function commitStateDirection(direction: string | null): void {
 }
 
 const flowchartSelectionForms: SelectionFormTable<FlowchartProjection> = {
-  diagram: ({ projection }) => {
+  diagram: function DiagramEntry({ projection }) {
     // 方向来自表头 token（`flowchart TD`）：没有「不设置」的形态，故不提供「跟随默认」。
     // TD 是 TB 的合法别名，下拉按 TB 归一化显示，否则 `flowchart TD` 打开时无选中项
     // （browser-findings 2026-10-02 #4）
@@ -243,7 +243,7 @@ const sequenceSelectionForms: SelectionFormTable<SequenceProjection> = {
 }
 
 const classSelectionForms: SelectionFormTable<ClassProjection> = {
-  diagram: ({ projection }) => {
+  diagram: function DiagramEntry({ projection }) {
     // classDiagram 的方向是独立语句行：没有该行时如实显示「跟随 Mermaid 默认」（工单 07）
     const commitIntent = useEditorStore((s) => s.commitIntent)
     return (
@@ -281,7 +281,7 @@ const classSelectionForms: SelectionFormTable<ClassProjection> = {
 }
 
 const mindmapSelectionForms: SelectionFormTable<MindmapProjection> = {
-  diagram: () => {
+  diagram: function DiagramEntry() {
     const { t } = useTranslation()
     return (
       <Text size="sm" c="dimmed" px="xs">
@@ -321,7 +321,7 @@ const stateSelectionForms: SelectionFormTable<StateProjection> = {
 }
 
 const erSelectionForms: SelectionFormTable<ErProjection> = {
-  diagram: ({ projection }) => {
+  diagram: function DiagramEntry({ projection }) {
     // erDiagram 的 direction 是独立语句行：没有该行时如实显示「跟随 Mermaid 默认」
     const commitIntent = useEditorStore((s) => s.commitIntent)
     return (
@@ -347,7 +347,7 @@ const erSelectionForms: SelectionFormTable<ErProjection> = {
 }
 
 const gitgraphSelectionForms: SelectionFormTable<GitgraphProjection> = {
-  diagram: ({ projection }) => {
+  diagram: function DiagramEntry({ projection }) {
     // gitGraph 的方向在表头 token 上（gitGraph LR:）：没有「不设置」之外的独立语句；
     // 缺省即 mermaid 默认 LR（表头可写回方向 token，无「跟随」哨兵的必要——默认就是 LR）
     const { t } = useTranslation()
@@ -402,7 +402,7 @@ const timelineSelectionForms: SelectionFormTable<TimelineProjection> = {
 /** kanban（more-diagrams 工单 06）：选中列 / 卡片时渲染对应表单；图表级（无方向概念）
  * 显示看板操作提示。卡片表单需要归属列标题，按 `columnElementId` 反查。 */
 const kanbanSelectionForms: SelectionFormTable<KanbanProjection> = {
-  diagram: () => {
+  diagram: function DiagramEntry() {
     const { t } = useTranslation()
     return (
       <Text size="sm" c="dimmed" px="xs">
@@ -425,7 +425,7 @@ const kanbanSelectionForms: SelectionFormTable<KanbanProjection> = {
 /** requirement 属性表单（more-diagrams 工单 07）：图表级 direction（独立语句行，
  * 没有「跟随 Mermaid 默认」形态）+ requirement / element / relation 三类元素 */
 const requirementSelectionForms: SelectionFormTable<RequirementProjection> = {
-  diagram: ({ projection }) => {
+  diagram: function DiagramEntry({ projection }) {
     const commitIntent = useEditorStore((s) => s.commitIntent)
     return (
       <DiagramForm
@@ -519,7 +519,7 @@ const blockSelectionForms: SelectionFormTable<BlockProjection> = {
  * 可编辑项，config 不做编辑——工单定案）；节点 = 重命名（名字即身份）；链路 = 三列编辑。
  */
 const sankeySelectionForms: SelectionFormTable<SankeyProjection> = {
-  diagram: () => {
+  diagram: function DiagramEntry() {
     const { t } = useTranslation()
     return (
       <Text size="sm" c="dimmed" px="xs">
@@ -589,7 +589,7 @@ const packetSelectionForms: SelectionFormTable<PacketProjection> = {
  * 不做编辑——工单定案）；标题 / 轴 = 文档级属性表单；系列 = 名字/类型/数值行编辑。
  */
 const xychartSelectionForms: SelectionFormTable<XychartProjection> = {
-  diagram: () => {
+  diagram: function DiagramEntry() {
     const { t } = useTranslation()
     return (
       <Text size="sm" c="dimmed" px="xs">
@@ -613,7 +613,7 @@ const xychartSelectionForms: SelectionFormTable<XychartProjection> = {
  * architecture-adapter），ArchitectureEdgeForm 只从结构树选中进入。
  */
 const architectureSelectionForms: SelectionFormTable<ArchitectureProjection> = {
-  diagram: () => {
+  diagram: function DiagramEntry() {
     const { t } = useTranslation()
     return (
       <Text size="sm" c="dimmed" px="xs">
@@ -649,7 +649,7 @@ const architectureSelectionForms: SelectionFormTable<ArchitectureProjection> = {
  * treemap 画布无 data-id 寻址（见 treemap-adapter），这两张表单是唯一文本编辑入口。
  */
 const treemapSelectionForms: SelectionFormTable<TreemapProjection> = {
-  diagram: () => {
+  diagram: function DiagramEntry() {
     const { t } = useTranslation()
     return (
       <Text size="sm" c="dimmed" px="xs">
@@ -669,7 +669,7 @@ const treemapSelectionForms: SelectionFormTable<TreemapProjection> = {
  * ishikawa 画布无 data-id 寻址（见 ishikawa-adapter），这两张表单是唯一文本编辑入口。
  */
 const ishikawaSelectionForms: SelectionFormTable<IshikawaProjection> = {
-  diagram: () => {
+  diagram: function DiagramEntry() {
     const { t } = useTranslation()
     return (
       <Text size="sm" c="dimmed" px="xs">
@@ -690,7 +690,7 @@ const ishikawaSelectionForms: SelectionFormTable<IshikawaProjection> = {
  * wardley 画布无 data-id 寻址（见 wardley-adapter），这些表单是唯一文本编辑入口。
  */
 const wardleySelectionForms: SelectionFormTable<WardleyProjection> = {
-  diagram: () => {
+  diagram: function DiagramEntry() {
     const { t } = useTranslation()
     return (
       <Text size="sm" c="dimmed" px="xs">
@@ -778,7 +778,7 @@ const usecaseSelectionForms: SelectionFormTable<UsecaseProjection> = {
  * treeView 画布无 data-id 寻址（见 treeview-adapter），这两张表单是唯一文本编辑入口。
  */
 const treeviewSelectionForms: SelectionFormTable<TreeviewProjection> = {
-  diagram: () => {
+  diagram: function DiagramEntry() {
     const { t } = useTranslation()
     return (
       <Text size="sm" c="dimmed" px="xs">
@@ -877,8 +877,10 @@ const c4SelectionForms: SelectionFormTable<C4Projection> = {
 }
 
 /**
- * 图种 id → 已绑定（擦除图种泛型）的表单路由。键穷尽由 DiagramTypeId 索引签名 +
- * `satisfies` 校验：漏一张表是编译错误（挂载循环按 id 逐项挂入）。
+ * 图种 id → 已绑定（擦除图种泛型）的表单路由。键穷尽由 `Record<RegisteredDiagramTypeId, …>`
+ * 的 `satisfies` 校验：**已注册图种漏一张表是编译错误**（挂载循环按 id 逐项挂入）——
+ * 这是「七件套」里表单一件套的编译期背书（registry 的 forms 槽位因跨层无法在 lib 层强制，
+ * 其穷尽性落在这里）。
  */
 const SELECTION_FORMS = {
   flowchart: bindSelectionForms(flowchartSelectionForms),
@@ -912,7 +914,7 @@ const SELECTION_FORMS = {
   agentflow: bindSelectionForms(agentflowSelectionForms),
   zenuml: bindSelectionForms(zenumlSelectionForms),
   c4: bindSelectionForms(c4SelectionForms),
-} as const satisfies Record<DiagramTypeId, DiagramSelectionForms>
+} as const satisfies Record<RegisteredDiagramTypeId, DiagramSelectionForms>
 
 /**
  * 挂载（工单 05）：路由表在组件层定义，注册表在 lib 层不能反向 import（会成

@@ -41,5 +41,8 @@ export default defineConfig({
   test: {
     environment: 'happy-dom',
     include: ['src/**/*.test.{ts,tsx}'],
+    // 修 Node >= 22 实验性全局 localStorage 遮蔽 happy-dom 的 window.localStorage
+    // （zenuml 外部插件在模块顶层读裸全局，见 setup 文件头注释）
+    setupFiles: ['src/test-setup.ts'],
   },
 })

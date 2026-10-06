@@ -338,7 +338,6 @@ export class WardleyParser implements DiagramParser {
     let pipelineCount = 0
     let seenHeader = false
     const bodyStart = frontmatterEnd(source)
-    let lineNo = bodyStart === 0 ? 0 : source.slice(0, bodyStart).split('\n').length - 1
     let cursor = bodyStart
 
     for (;;) {
@@ -346,7 +345,6 @@ export class WardleyParser implements DiagramParser {
       const lineEnd = nl === -1 ? source.length : nl
       const line = source.slice(cursor, lineEnd)
       const eol = nl === -1 ? '' : '\n'
-      lineNo++
       const trimmed = line.trim()
 
       if (trimmed !== '') {
@@ -391,7 +389,6 @@ export class WardleyParser implements DiagramParser {
             })
             if (consumed.end >= source.length) break
             cursor = consumed.end
-            lineNo += consumed.lines
             continue
           }
           // 其余（无法识别的行）逐字保留

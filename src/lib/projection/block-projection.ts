@@ -2,10 +2,7 @@ import type { SourceDocument } from '../pipeline/document'
 import {
   parseBlockNodeAtom,
   type BlockData,
-  type BlockEdgeData,
-  type BlockGroupOpenData,
   type BlockNodeAtom,
-  type BlockNodeData,
   type BlockShape,
 } from '../pipeline/block'
 import type { Selection } from './selection'
@@ -130,7 +127,7 @@ export function buildBlockProjection(doc: SourceDocument): BlockProjection {
         }
         break
       case 'block-node': {
-        const decl = data as BlockNodeData
+        const decl = data
         const parent = decl.owner === null ? null : (byGroup.get(decl.owner)?.id ?? null)
         const node = ensureNode(decl.atom, parent)
         // 首个声明承担编辑入口（与 er 的 ensure* 同口径）；宽度取首个声明值
@@ -144,7 +141,7 @@ export function buildBlockProjection(doc: SourceDocument): BlockProjection {
         break
       }
       case 'block-edge': {
-        const edge = data as BlockEdgeData
+        const edge = data
         const parent = edge.owner === null ? null : (byGroup.get(edge.owner)?.id ?? null)
         // 端点是隐式节点声明（mermaid 语法事实：边语句也把端点放进 blockDatabase）
         const from = parseBlockNodeAtom(edge.left)
@@ -161,7 +158,7 @@ export function buildBlockProjection(doc: SourceDocument): BlockProjection {
         break
       }
       case 'block-group-open': {
-        const decl = data as BlockGroupOpenData
+        const decl = data
         const group: ProjectionBlockGroup = {
           id: decl.id,
           width: decl.width,

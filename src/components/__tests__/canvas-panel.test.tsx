@@ -10,6 +10,7 @@ import { flowchartParser } from '../../lib/pipeline/flowchart'
 import type { CanvasCapabilities } from '../../lib/canvas-selection/capabilities'
 import type { Selection } from '../../lib/projection/selection'
 import type { MermaidPreview } from '../../lib/use-mermaid-preview'
+import { useCursorHintStore } from '../../lib/follow/hint-store'
 import { CanvasPanel } from '../CanvasPanel'
 
 /**
@@ -48,7 +49,7 @@ function flowchartProjection() {
   return { type: 'flowchart', flowchart: buildFlowchartProjection(parsed.doc) } as const
 }
 
-const preview: MermaidPreview = { svg: SVG, error: null, rendering: false }
+const preview: MermaidPreview = { svg: SVG, error: null, errorNotice: null, rendering: false }
 
 describe('CanvasPanel（工单 04：经假能力包注入的首个组件测试）', () => {
   let host: HTMLDivElement
@@ -58,6 +59,7 @@ describe('CanvasPanel（工单 04：经假能力包注入的首个组件测试�
     window.localStorage?.clear()
     resetEditorHistory(DEFAULT_DIAGRAM_SOURCE)
     useEditorStore.getState().select(null)
+    useCursorHintStore.getState().setHint(null)
     host = document.createElement('div')
     document.body.appendChild(host)
     root = createRoot(host)
@@ -106,5 +108,33 @@ describe('CanvasPanel（工单 04：经假能力包注入的首个组件测试�
       useEditorStore.getState().select(null)
     })
     expect(target.hasAttribute('data-vm-selected')).toBe(false)
+  })
+
+  it('光标提示（工单 16）→ 画布轻量标记，且不改变选中', async () => {
+    const target = host.querySelector('[data-id="X1"]')
+    if (target === null) throw new Error('SVG 必须渲染出 data-id="X1" 的元素')
+    await act(async () => {
+      useCursorHintStore.getState().setHint({ kind: 'node', nodeId: 'X1' } satisfies Selection)
+    })
+    expect(target.getAttribute('data-vm-hinted')).toBe('true')
+    // 提示不抢选中：store 选中仍为空，且未写选中高亮标记
+    expect(useEditorStore.getState().selection).toBeNull()
+    expect(target.hasAttribute('data-vm-selected')).toBe(false)
+
+    await act(async () => {
+      useCursorHintStore.getState().setHint(null)
+    })
+    expect(target.hasAttribute('data-vm-hinted')).toBe(false)
+  })
+
+  it('提示与选中同一元素时提示不叠加（选中高亮已表达）', async () => {
+    const target = host.querySelector('[data-id="X1"]')
+    if (target === null) throw new Error('SVG 必须渲染出 data-id="X1" 的元素')
+    await act(async () => {
+      useEditorStore.getState().select({ kind: 'node', nodeId: 'X1' } satisfies Selection)
+      useCursorHintStore.getState().setHint({ kind: 'node', nodeId: 'X1' } satisfies Selection)
+    })
+    expect(target.getAttribute('data-vm-selected')).toBe('true')
+    expect(target.hasAttribute('data-vm-hinted')).toBe(false)
   })
 })

@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { applyEdit } from '../../pipeline/pipeline'
-import { flowchartParser, type NodeShapeType } from '../../pipeline/flowchart'
+import { flowchartParser } from '../../pipeline/flowchart'
 import {
   addClassDefIntent,
   addEdgeIntent,
@@ -38,7 +38,7 @@ describe('表单 → 意图映射：节点', () => {
   })
 
   it('换形状', () => {
-    const next = apply(SOURCE, setNodeShapeIntent('A', 'stadium' as NodeShapeType))
+    const next = apply(SOURCE, setNodeShapeIntent('A', 'stadium'))
     expect(next).toContain('A([开始])')
   })
 
@@ -57,14 +57,14 @@ describe('表单 → 意图映射：节点', () => {
   })
 
   it('新增节点（文本缺省用 id）', () => {
-    const intent = addNodeIntent({ nodeId: 'X1', text: '', shape: 'circle' as NodeShapeType })
+    const intent = addNodeIntent({ nodeId: 'X1', text: '', shape: 'circle' })
     expect(intent).not.toBeNull()
     const next = apply(SOURCE, intent!)
     expect(next.trimEnd().endsWith('X1((X1))')).toBe(true)
   })
 
   it('新增节点 id 非法返回 null', () => {
-    expect(addNodeIntent({ nodeId: 'has space', text: 'x', shape: 'rectangle' as NodeShapeType })).toBeNull()
+    expect(addNodeIntent({ nodeId: 'has space', text: 'x', shape: 'rectangle' })).toBeNull()
   })
 
   it('删除节点：触及的连线一并消失', () => {

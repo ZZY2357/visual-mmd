@@ -193,7 +193,7 @@ export function renderErRelation(
   const cardRight = changes.cardRight ?? d.cardRight
   const name1 = d.fromQuoted ? `"${d.from}"` : d.from
   const name2 = d.toQuoted ? `"${d.to}"` : d.to
-  let s = `${name1}${d.gap1}${cardLeft}${line}${cardRight}${d.gap2}${name2}`
+  const s = `${name1}${d.gap1}${cardLeft}${line}${cardRight}${d.gap2}${name2}`
   if (changes.label === null) return s
   if (changes.label !== undefined) {
     // 新标签：无原冒号段时补一段（保留 mermaid 惯用形态 ` : `）
@@ -317,7 +317,7 @@ function parseAttributeLine(line: string, firstChar: number): ErAttributeData | 
   const km = /^((?:PK|FK|UK)(?:[ \t]*,[ \t]*(?:PK|FK|UK))*)([\s\S]*)$/.exec(rest)
   if (km === null) return null
   keysRaw = km[1]
-  let rest2 = km[2]
+  const rest2 = km[2]
   if (rest2.trimStart().startsWith('"')) {
     gap3 = rest2.slice(0, rest2.length - rest2.trimStart().length)
     const cm = /^"([^"]*)"([ \t\r]*)$/.exec(rest2.trimStart())
@@ -353,7 +353,7 @@ function parseRelationLine(line: string, firstChar: number): ErRelationData | nu
   if (gap2 === '') return null
   const tail = parseNameToken(rest)
   if (tail === null) return null
-  let after = tail.rest
+  const after = tail.rest
   let colonRaw = ''
   let label = ''
   if (/^[ \t\r]*$/.test(after)) {
@@ -636,7 +636,7 @@ export class ErParser implements DiagramParser {
           rewrites.set(end.id, '')
         }
       } else if (data.kind === 'er-relation') {
-        const rel = data as ErRelationData
+        const rel = data
         if (rel.from === intent.name || rel.to === intent.name) rewrites.set(part.id, '')
       }
     }

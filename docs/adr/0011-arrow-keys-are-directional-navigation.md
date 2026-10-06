@@ -1,5 +1,7 @@
 # 画布方向键是「方位导航」，不是「结构导航」
 
+> **状态：accepted**
+
 画布方向键原先按**语法/树关系**定义落点（flowchart 走源码顺序、mindmap 走父/子/兄弟），但 mermaid 的
 布局与源码顺序无关：flowchart 交给 dagre 分层，mindmap 交给 cose-bilkent 力导向。真机实测（2026-09-29）：
 flowchart 从 B 按 `→` 跳到**正下方**的 C、从 C 按 `→` 跳到**右上**的 D；mindmap 从「双面板同步」按 `↓`

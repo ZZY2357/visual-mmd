@@ -390,7 +390,7 @@ export class PacketParser implements DiagramParser {
     if (part === null || startNum === null || endNum === null || endNum < startNum) return null
     const fields = this.fieldsOf(doc)
     const sequence = fields.map((f) =>
-      f.id === intent.elementId ? { ...f, form: { kind: 'range', start, end } as PacketFieldForm } : f,
+      f.id === intent.elementId ? { ...f, form: { kind: 'range', start, end } satisfies PacketFieldForm } : f,
     )
     if (!isContiguousFieldSequence(sequence)) return null
     return new Map([

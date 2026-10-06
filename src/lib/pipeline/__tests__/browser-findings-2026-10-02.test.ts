@@ -15,7 +15,7 @@ const SRC = 'flowchart TD\n    A[开始] --> B[处理]\n'
 
 function projectionOf(source: string) {
   const parsed = flowchartParser.parse(source)
-  if (!parsed.ok) throw new Error(`样例源码必须可解析：${String(parsed.error)}`)
+  if (!parsed.ok) throw new Error(`样例源码必须可解析：${parsed.error.message}`)
   return buildFlowchartProjection(parsed.doc)
 }
 
@@ -54,13 +54,13 @@ describe('实测发现 2：删除节点不应残留孤立语句', () => {
     let source = SRC
     for (const intent of plan!.intents) {
       const result = applyEdit(source, flowchartParser, intent)
-      if (!result.ok) throw new Error(`意图应可落码：${String(result.error)}`)
+      if (!result.ok) throw new Error(`意图应可落码：${result.error.message}`)
       source = result.source
     }
     expect(source).toContain('A --> n1')
 
     const result = applyEdit(source, flowchartParser, { type: 'delete-node', nodeId: 'n1' })
-    if (!result.ok) throw new Error(`删除应可落码：${String(result.error)}`)
+    if (!result.ok) throw new Error(`删除应可落码：${result.error.message}`)
     const orphan = result.source
       .split('\n')
       .filter((line) => line.trim() !== '' && !line.trim().startsWith('flowchart'))

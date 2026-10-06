@@ -223,7 +223,7 @@ describe('cynefin 意图往返', () => {
     expect(
       cynefinParser.resolveRewrites(doc, {
         type: 'add-transition',
-        from: 'foo' as never,
+        from: 'foo',
         to: 'clear',
       }),
     ).toBeNull()

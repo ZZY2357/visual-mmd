@@ -33,7 +33,7 @@ Mermaid turns text into diagrams, but writing the syntax by hand has a learning 
 
 ## Getting started
 
-You need Node.js 20.19+ (required by Vite 7) and npm.
+You need Node.js 20.19+ (required by Vite 7) and npm. The version requirement is declared both in `package.json` (`engines`) and in `.nvmrc` at the repo root.
 
 ```bash
 git clone https://github.com/ZZY2357/visual-mmd.git
@@ -41,6 +41,8 @@ cd visual-mmd
 npm install
 npm run dev        # dev server, default address http://localhost:5173
 ```
+
+CI (GitHub Actions) runs `npm run typecheck`, `npm test` and `npm run build` automatically on every pull request and push to `main`; all three must pass for a green build.
 
 Production build and local preview:
 

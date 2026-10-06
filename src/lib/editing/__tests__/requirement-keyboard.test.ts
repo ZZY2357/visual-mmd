@@ -40,7 +40,7 @@ describe('requirementKeyPlan（ADR-0013 就近映射）', () => {
     const plan = requirementKeyPlan(projection, { key: 'Tab', selection: { kind: 'requirement', name: 'login' } })
     expect(plan).not.toBeNull()
     expect(plan!.intents).toEqual([
-      { type: 'add-element', name: 'e', afterElementId: projection.requirements[0]!.tailElementId },
+      { type: 'add-element', name: 'e', afterElementId: projection.requirements[0].tailElementId },
     ])
     expect(plan!.newElementTarget).toEqual({ selection: { kind: 'requirement-element', name: 'e' } })
     // 名字避让已有节点（requirement / element 共享名字空间）

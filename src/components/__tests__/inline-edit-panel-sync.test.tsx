@@ -24,13 +24,13 @@ const SRC = 'flowchart TD\n    A[开始] --> B[处理]\n'
 
 function projectionOf(source: string): AnyProjection {
   const parsed = flowchartParser.parse(source)
-  if (!parsed.ok) throw new Error(`样例源码必须可解析：${String(parsed.error)}`)
+  if (!parsed.ok) throw new Error(`样例源码必须可解析：${parsed.error.message}`)
   return { type: 'flowchart', flowchart: buildFlowchartProjection(parsed.doc) }
 }
 
 function flowProjectionOf(source: string) {
   const parsed = flowchartParser.parse(source)
-  if (!parsed.ok) throw new Error(`样例源码必须可解析：${String(parsed.error)}`)
+  if (!parsed.ok) throw new Error(`样例源码必须可解析：${parsed.error.message}`)
   return buildFlowchartProjection(parsed.doc)
 }
 

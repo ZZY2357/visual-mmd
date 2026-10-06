@@ -99,7 +99,7 @@ export function eventModelingPartitions(
           label: `${source?.frameId ?? '—'} → ${target?.frameId ?? '—'}`,
           detail: t(`app:propertyPanel.emRelationOrigins.${relation.origin}`),
           depth: 1,
-          selection: { kind: 'em-relation', elementId: relation.elementId } as Selection,
+          selection: { kind: 'em-relation', elementId: relation.elementId },
           // 派生连线只读（无源码语句，不可手术编辑）→ 不挂 onKeyDown
         }
       }),

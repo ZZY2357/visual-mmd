@@ -83,7 +83,7 @@ describe('requirementDiagram 解析器：语法覆盖（分层对齐核心清单
       const doc = parseOk(`requirementDiagram\n    direction ${dir}\n`)
       const directions = elementsOf(doc, 'requirement-direction')
       expect(directions).toHaveLength(1)
-      expect((directions[0]!.element as RequirementDirectionData).value).toBe(dir)
+      expect((directions[0].element as RequirementDirectionData).value).toBe(dir)
       expect(reassemble(doc, new Map())).toBe(`requirementDiagram\n    direction ${dir}\n`)
     }
   })
@@ -93,10 +93,10 @@ describe('requirementDiagram 解析器：语法覆盖（分层对齐核心清单
       const doc = parseOk(`requirementDiagram\n    ${type} r1 {\n        id: "1"\n    }\n`)
       const blocks = elementsOf(doc, 'requirement')
       expect(blocks).toHaveLength(1)
-      expect(blocks[0]!.element).toMatchObject({ kind: 'requirement', type, name: 'r1' })
+      expect(blocks[0].element).toMatchObject({ kind: 'requirement', type, name: 'r1' })
     }
     const doc = parseOk(SIMPLE)
-    const block = elementsOf(doc, 'requirement')[0]!
+    const block = elementsOf(doc, 'requirement')[0]
     expect(block.element).toMatchObject({ kind: 'requirement', type: 'functionalRequirement', name: 'login' })
     // 只取该块区间内的字段行（element 块的字段在后面，按 span 过滤）
     const fields = elementsOf(doc, 'requirement-field')
@@ -113,7 +113,7 @@ describe('requirementDiagram 解析器：语法覆盖（分层对齐核心清单
 
   it('element 块：type / docref 两字段', () => {
     const doc = parseOk(SIMPLE)
-    const blockPart = elementsOf(doc, 'requirement-element')[0]!
+    const blockPart = elementsOf(doc, 'requirement-element')[0]
     const block = blockPart.element as RequirementElementBlockData
     expect(block).toMatchObject({ kind: 'requirement-element', name: 'loginUI' })
     const fields = elementsOf(doc, 'requirement-field').filter((p) => p.span.start > blockPart.span.start)
@@ -123,7 +123,7 @@ describe('requirementDiagram 解析器：语法覆盖（分层对齐核心清单
   it('关系：正向 `a - kind -> b` 与反向 `b <- kind - a` 都解析，kind 七种全认', () => {
     for (const kind of REQUIREMENT_RELATION_KINDS) {
       const doc = parseOk(`requirementDiagram\n    a - ${kind} -> b\n`)
-      const rel = normalizeRelation(elementsOf(doc, 'requirement-relation')[0]!.element as RequirementRelationData)
+      const rel = normalizeRelation(elementsOf(doc, 'requirement-relation')[0].element as RequirementRelationData)
       expect(rel).toMatchObject({ from: 'a', to: 'b', relationKind: kind, reversed: false })
     }
     const doc = parseOk(SIMPLE)
@@ -250,14 +250,14 @@ describe('requirementDiagram 解析器：意图落码往返', () => {
 
   it('set-relation：改 kind / 反转书写方向；未知 elementId / 非法 kind 拒绝', () => {
     const doc = parseOk(SIMPLE)
-    const relationPart = elementsOf(doc, 'requirement-relation')[0]!
+    const relationPart = elementsOf(doc, 'requirement-relation')[0]
     const kindChanged = reassemble(doc, requirementParser.resolveRewrites(doc, { type: 'set-relation', elementId: relationPart.id, changes: { relationKind: 'verifies' } })!)
     expect(kindChanged).toContain('loginUI - verifies -> login')
     const flipped = reassemble(doc, requirementParser.resolveRewrites(doc, { type: 'set-relation', elementId: relationPart.id, changes: { reversed: true } })!)
     // 反转 = 语义反转（from/to 交换），书写换成另一种形式：`语义终点 <- kind - 语义起点`
     expect(flipped).toContain('loginUI <- satisfies - login')
     const flippedDoc = parseOk(flipped)
-    const flippedRel = normalizeRelation(elementsOf(flippedDoc, 'requirement-relation')[0]!.element as RequirementRelationData)
+    const flippedRel = normalizeRelation(elementsOf(flippedDoc, 'requirement-relation')[0].element as RequirementRelationData)
     expect(flippedRel).toMatchObject({ from: 'login', to: 'loginUI', relationKind: 'satisfies', reversed: true })
     expect(parseOk(flipped)).toBeDefined()
     expect(requirementParser.resolveRewrites(doc, { type: 'set-relation', elementId: 'relation:99', changes: { relationKind: 'verifies' } })).toBeNull()
@@ -266,7 +266,7 @@ describe('requirementDiagram 解析器：意图落码往返', () => {
 
   it('delete-relation：只删关系行', () => {
     const doc = parseOk(SIMPLE)
-    const relationPart = elementsOf(doc, 'requirement-relation')[1]!
+    const relationPart = elementsOf(doc, 'requirement-relation')[1]
     const next = reassemble(doc, requirementParser.resolveRewrites(doc, { type: 'delete-relation', elementId: relationPart.id })!)
     expect(next).not.toContain('traces')
     expect(next).toContain('satisfies')

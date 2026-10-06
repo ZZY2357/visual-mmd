@@ -226,7 +226,6 @@ export class MindmapParser implements DiagramParser {
     let seenHeader = false
     // 文首 frontmatter 块（主题等配置）不参与解析，整体 verbatim 保留（工单 11）
     const bodyStart = frontmatterEnd(source)
-    let lineNo = bodyStart === 0 ? 0 : source.slice(0, bodyStart).split('\n').length - 1
     let cursor = bodyStart
 
     for (;;) {
@@ -234,7 +233,6 @@ export class MindmapParser implements DiagramParser {
       const lineEnd = nl === -1 ? source.length : nl
       const line = source.slice(cursor, lineEnd)
       const eol = nl === -1 ? '' : '\n'
-      lineNo++
 
       const trimmed = line.trim()
       if (trimmed !== '') {
@@ -262,7 +260,7 @@ export class MindmapParser implements DiagramParser {
           if (iconMatch !== null) {
             const prev = entries[entries.length - 1]
             const ownerDepth = prev !== undefined && prev.data.kind === 'mindmap-node'
-              ? (prev.data as MindmapNodeData).depth
+              ? (prev.data).depth
               : 0
             iconCount++
             entries.push({

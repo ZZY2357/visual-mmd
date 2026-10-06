@@ -212,7 +212,7 @@ function parseNodeLine(line: string): ParsedNodeLine | null {
   const indentM = /^[ \t]*/.exec(line)
   const indent = indentM !== null ? indentM[0] : ''
   const body = line.slice(indent.length)
-  const idm = /^[^\[\n(){}@]+/.exec(body)
+  const idm = /^[^[\n(){}@]+/.exec(body)
   if (idm === null) return null
   const rawId = idm[0]
   const id = rawId.replace(/[ \t]+$/, '')

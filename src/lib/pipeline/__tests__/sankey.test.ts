@@ -102,7 +102,7 @@ describe('sankey 解析：verbatim identity 与 CSV 边界', () => {
       'grid',
       '"gas, natural"',
     ])
-    expect(links[1]!.targetRaw).toBe('"gas, natural"')
+    expect(links[1].targetRaw).toBe('"gas, natural"')
     const ids = parseOk(TEMPLATE).elements.map((p) => p.id)
     expect(ids).toEqual(['sankey-header', 'link:1', 'link:2', 'link:3', 'link:4'])
   })
@@ -132,10 +132,10 @@ describe('sankey 解析：verbatim identity 与 CSV 边界', () => {
     const doc = parseOk(src)
     const links = doc.elements.filter((p) => p.element.kind === 'sankey-link')
     expect(links).toHaveLength(2)
-    expect(links[0]!.id).toBe('link:1')
+    expect(links[0].id).toBe('link:1')
     // 跨行记录的原文（含内部换行）整体保留
-    expect(doc.source.slice(links[0]!.span.start, links[0]!.span.end)).toBe('"multi\nline",home,2.5')
-    expect(links[1]!.id).toBe('link:2')
+    expect(doc.source.slice(links[0].span.start, links[0].span.end)).toBe('"multi\nline",home,2.5')
+    expect(links[1].id).toBe('link:2')
     expect(reassemble(doc)).toBe(src)
   })
 
@@ -149,7 +149,7 @@ describe('sankey 解析：verbatim identity 与 CSV 边界', () => {
   it('value 列非严格词法（mermaid 的 parseFloat 宽松口径）仍成元素并原样保留', () => {
     const links = linksOf('sankey-beta\na,b,1.2.3\n')
     expect(links).toHaveLength(1)
-    expect(links[0]!.valueRaw).toBe('1.2.3')
+    expect(links[0].valueRaw).toBe('1.2.3')
   })
 
   it('sankey / sankey-beta 两关键字同认（大小写不敏感）；首个非空记录必须是裸关键字', () => {
@@ -278,7 +278,7 @@ describe('sankey 投影：节点首现去重派生 + 链路位置序 + 非法标
   it('节点 = source/target 首现去重（文档序），linkIds 按参与顺序', () => {
     const projection = buildSankeyProjection(parseOk(TEMPLATE))
     expect(projection.nodes.map((n) => n.name)).toEqual(['electricity', 'grid', 'gas, natural', 'home'])
-    expect(projection.nodes[0]!.linkIds).toEqual(['link:1', 'link:2'])
+    expect(projection.nodes[0].linkIds).toEqual(['link:1', 'link:2'])
     expect(projection.nextLinkOrdinal).toBe(5)
   })
 
@@ -287,7 +287,7 @@ describe('sankey 投影：节点首现去重派生 + 链路位置序 + 非法标
     const projection = buildSankeyProjection(parseOk(src))
     const badName = projection.nodes.find((n) => n.name === '中文')
     expect(badName?.nameValid).toBe(false)
-    const badValue = projection.links[1]!
+    const badValue = projection.links[1]
     expect(badValue.value).toBeNull()
     expect(badValue.valueValid).toBe(false)
     expect(badValue.valueText).toBe('1.2.3')

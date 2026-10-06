@@ -176,7 +176,7 @@ describe('packet data-id 反注（渲染器不写 id/data-id → start-bit 映�
 
   it('start 位号文本非十进制整数（空文本 / 负号）→ 整体不标（Number("") = 0 不得误归 bit 0）', () => {
     const empty = packetSvg([0, 16])
-    ;(empty.querySelectorAll('text.packetByte.start')[1] as Element).textContent = ''
+    ;(empty.querySelectorAll('text.packetByte.start')[1]).textContent = ''
     annotatePacketDataIds(empty, FIELDS.slice(0, 2))
     expect(empty.querySelectorAll('[data-id]').length).toBe(0)
   })

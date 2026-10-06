@@ -163,7 +163,7 @@ export interface ProjectionTypes {
 }
 
 /** 已注册图种的 id 集合（字面量联合，随 ProjectionTypes 增长） */
-export type RegisteredDiagramTypeId = keyof ProjectionTypes & string
+export type RegisteredDiagramTypeId = keyof ProjectionTypes
 
 /** 投影包装：type 与承载投影的同名字段（如 `{ type: 'flowchart', flowchart }`） */
 export type ProjectionWrapper<K extends RegisteredDiagramTypeId> = { type: K } & { [p in K]: ProjectionTypes[K] }
@@ -217,20 +217,25 @@ export interface DiagramSelectionForms {
   render(projection: AnyDiagramProjection, selection: Selection): ReactNode
 }
 
-export interface DiagramTypeRegistration {
-  id: RegisteredDiagramTypeId
+export interface DiagramTypeRegistration<K extends RegisteredDiagramTypeId = RegisteredDiagramTypeId> {
+  id: K
   parser: DiagramParser
   /** 新建图表时的起步模板（spec 用户故事 1） */
   template: string
   /** 源码识别：首个语句行是否为该图种的声明 */
   detect(source: string): boolean
-  buildProjection(doc: SourceDocument): AnyProjection
+  /** 投影构建：返回的包装必须与 id 同名（`{ type: id, [id]: … }`）——
+   * 泛型 K 把 id 与投影类型钉在一起，接错图种的投影是编译错误。 */
+  buildProjection(doc: SourceDocument): ProjectionWrapper<K>
   /** 结构树分区描述（architecture-deepening-2 工单 06）：该图种的结构树由哪些分区组成、
    * 每个元素如何显示与选中。**独立字段，不进画布能力包**（守 ADR-0015 的范围——
    * 结构树展示分区不是画布知识）。registry 只持引用、不含实现。 */
   tree: TreePartitions
   /** 画布能力包（工单 04，ADR-0015）：该图种接入画布所需的全部静态图种知识。
-   * registry 只持引用、不含实现——「加一种图」= 新建一个 adapter + 在这里挂一行。 */
+   * registry 只持引用、不含实现——「加一种图」= 新建一个 adapter + 在这里挂一行。
+   * （`CanvasCapabilities` 的泛型约束是 `AnyProjection`，无法在此用 `ProjectionWrapper<K>`
+   * 参数化；能力包与图种投影的匹配由各 adapter 自己的 `CanvasCapabilities<ProjectionOf<…>>`
+   * 注解保证。） */
   canvas: CanvasCapabilities
   /** 右键菜单定义（architecture-deepening-3 工单 04）：空白项 + 元素项
    *（selection.kind → 菜单项规格）。registry 只持引用——定义住在
@@ -239,10 +244,23 @@ export interface DiagramTypeRegistration {
    * 的 MENU_ACTIONS 穷尽 Record（本字段不装动作）。**独立字段，不进画布能力包**
    *（守 ADR-0015 的范围）。 */
   menu: DiagramMenuDefinition
+  /** i18n 键（图种名，WIRING-GUIDE 第 16 步）：新建菜单的展示名文案键。模板字面量类型
+   * 把「这个图种在 i18n 字典里的键名」钉死为 `newDiagram.<id>`——键名拼错是编译错误；
+   * 字典是否真收录该键由 `diagram-registry.test.ts` 对 zh/en 双字典断言兜底。
+   * registry 只持引用，不反向 import i18n（避免 lib → i18n 的环）。 */
+  labelKey: `newDiagram.${K}`
   /** 表单路由（architecture-deepening-3 工单 05）：selection.kind → 属性表单的路由表。
-   * registry 只声明槽位；实现见 DiagramSelectionForms 注释（组件层模块加载时挂入）。 */
+   * registry 只声明槽位；实现见 DiagramSelectionForms 注释（组件层模块加载时挂入）。
+   * 槽位可选是因为实现住在组件层（lib 不能反向 import），**但表单这一件套的编译期
+   * 穷尽性由 selection-form-routes.tsx 的 `SELECTION_FORMS: Record<RegisteredDiagramTypeId,
+   * DiagramSelectionForms>` 承担**——漏一张表是那里的编译错误，不是这里的静默降级。 */
   forms?: DiagramSelectionForms
 }
+
+/** 全部已注册图种的注册项并集（按 id 保留每项的投影/能力包泛型关联）。 */
+export type AnyDiagramTypeRegistration = {
+  [K in RegisteredDiagramTypeId]: DiagramTypeRegistration<K>
+}[RegisteredDiagramTypeId]
 
 /** 跳过 frontmatter 块、空行与注释后的首个语句行 */
 function firstStatementLine(source: string): string {
@@ -806,10 +824,22 @@ export const C4_TEMPLATE = `C4Context
  * 注册表：数组是唯一权威（more-diagrams 工单 01），DIAGRAM_TYPES 由它推导。
  * detectDiagramType 按数组顺序显式遍历——不再维护手写的 if 分发链，
  * 新图种挂一条即可参与识别，无法识别时不再默认 flowchart（见下）。
+ *
+ * 七件套穷尽性（self-grill-hardening 工单 03）：`satisfies readonly
+ * AnyDiagramTypeRegistration[]` 把每一项钉在**它自己 id 的注册类型**上——解析器 / 投影 /
+ * 画布能力 / 右键菜单 / 结构树 / i18n 键（labelKey）任一缺失或接错图种都是编译错误；
+ * 紧随其后的 `_exhaustiveDiagramTypes` 断言再保证 ProjectionTypes 里的每个 id
+ * 都在数组里出现过（漏一个图种也是编译错误）。表单一件套的实现住在组件层，
+ * 其穷尽性由 selection-form-routes.tsx 的 SELECTION_FORMS 穷尽 Record 承担。
+ *
+ * 注：先在 `REGISTRATIONS` 上做 `satisfies`（保留每项的字面量 id 以支撑穷尽断言），
+ * 再以宽类型 `AnyDiagramTypeRegistration[]` 导出——否则消费侧（如
+ * selection-form-routes 给 `forms` 槽位赋值）拿到的是没有可选槽位的字面量联合。
  */
-export const DIAGRAM_TYPE_LIST: DiagramTypeRegistration[] = [
+const REGISTRATIONS = [
   {
     id: 'flowchart',
+    labelKey: 'newDiagram.flowchart',
     parser: flowchartParser,
     template: FLOWCHART_TEMPLATE,
     detect: (source) => /^(flowchart|graph)\b/i.test(firstStatementLine(source)),
@@ -820,6 +850,7 @@ export const DIAGRAM_TYPE_LIST: DiagramTypeRegistration[] = [
   },
   {
     id: 'sequence',
+    labelKey: 'newDiagram.sequence',
     parser: sequenceParser,
     template: SEQUENCE_TEMPLATE,
     detect: (source) => /^sequenceDiagram\b/i.test(firstStatementLine(source)),
@@ -830,6 +861,7 @@ export const DIAGRAM_TYPE_LIST: DiagramTypeRegistration[] = [
   },
   {
     id: 'class',
+    labelKey: 'newDiagram.class',
     parser: classParser,
     template: CLASS_TEMPLATE,
     detect: (source) => /^classDiagram\b/i.test(firstStatementLine(source)),
@@ -840,6 +872,7 @@ export const DIAGRAM_TYPE_LIST: DiagramTypeRegistration[] = [
   },
   {
     id: 'mindmap',
+    labelKey: 'newDiagram.mindmap',
     parser: mindmapParser,
     template: MINDMAP_TEMPLATE,
     detect: (source) => /^mindmap\b/i.test(firstStatementLine(source)),
@@ -850,6 +883,7 @@ export const DIAGRAM_TYPE_LIST: DiagramTypeRegistration[] = [
   },
   {
     id: 'state',
+    labelKey: 'newDiagram.state',
     parser: stateParser,
     template: STATE_TEMPLATE,
     // v1 `stateDiagram` 与 v2 同认（mermaid 两个关键字都渲染）；投影按 v2 解析
@@ -861,6 +895,7 @@ export const DIAGRAM_TYPE_LIST: DiagramTypeRegistration[] = [
   },
   {
     id: 'er',
+    labelKey: 'newDiagram.er',
     parser: erParser,
     template: ER_TEMPLATE,
     detect: (source) => /^erDiagram\b/i.test(firstStatementLine(source)),
@@ -871,6 +906,7 @@ export const DIAGRAM_TYPE_LIST: DiagramTypeRegistration[] = [
   },
   {
     id: 'gitgraph',
+    labelKey: 'newDiagram.gitgraph',
     parser: gitgraphParser,
     template: GITGRAPH_TEMPLATE,
     // 方向写在声明后（`gitGraph LR:`）；`\b` 让关键字不被 `gitGraphX` 误认
@@ -882,6 +918,7 @@ export const DIAGRAM_TYPE_LIST: DiagramTypeRegistration[] = [
   },
   {
     id: 'timeline',
+    labelKey: 'newDiagram.timeline',
     parser: timelineParser,
     template: TIMELINE_TEMPLATE,
     detect: (source) => /^timeline\b/i.test(firstStatementLine(source)),
@@ -892,6 +929,7 @@ export const DIAGRAM_TYPE_LIST: DiagramTypeRegistration[] = [
   },
   {
     id: 'kanban',
+    labelKey: 'newDiagram.kanban',
     parser: kanbanParser,
     template: KANBAN_TEMPLATE,
     detect: (source) => /^kanban\b/i.test(firstStatementLine(source)),
@@ -902,6 +940,7 @@ export const DIAGRAM_TYPE_LIST: DiagramTypeRegistration[] = [
   },
   {
     id: 'requirement',
+    labelKey: 'newDiagram.requirement',
     parser: requirementParser,
     template: REQUIREMENT_TEMPLATE,
     // v12 只认 `requirementDiagram`（`requirementDiagram_v2` 关键字已消失，见 research/
@@ -914,6 +953,7 @@ export const DIAGRAM_TYPE_LIST: DiagramTypeRegistration[] = [
   },
   {
     id: 'journey',
+    labelKey: 'newDiagram.journey',
     parser: journeyParser,
     template: JOURNEY_TEMPLATE,
     detect: (source) => /^journey\b/i.test(firstStatementLine(source)),
@@ -924,6 +964,7 @@ export const DIAGRAM_TYPE_LIST: DiagramTypeRegistration[] = [
   },
   {
     id: 'pie',
+    labelKey: 'newDiagram.pie',
     parser: pieParser,
     template: PIE_TEMPLATE,
     // `\b` 让关键字不被 `pieXxx` 之类的更长词误认
@@ -935,6 +976,7 @@ export const DIAGRAM_TYPE_LIST: DiagramTypeRegistration[] = [
   },
   {
     id: 'block',
+    labelKey: 'newDiagram.block',
     parser: blockParser,
     template: BLOCK_TEMPLATE,
     // 老用户源码更常见 block-beta；12.0.0 起文档统一 block——两个关键字都认（工单决策）。
@@ -948,6 +990,7 @@ export const DIAGRAM_TYPE_LIST: DiagramTypeRegistration[] = [
   },
   {
     id: 'sankey',
+    labelKey: 'newDiagram.sankey',
     parser: sankeyParser,
     template: SANKEY_TEMPLATE,
     // sankey 词法两个关键字都认（`sankey-beta` / `sankey`，均 case-insensitive，离线核对
@@ -961,6 +1004,7 @@ export const DIAGRAM_TYPE_LIST: DiagramTypeRegistration[] = [
   },
   {
     id: 'gantt',
+    labelKey: 'newDiagram.gantt',
     parser: ganttParser,
     template: GANTT_TEMPLATE,
     // `\b` 让关键字不被 `ganttXxx` 之类的更长词误认
@@ -972,6 +1016,7 @@ export const DIAGRAM_TYPE_LIST: DiagramTypeRegistration[] = [
   },
   {
     id: 'quadrant',
+    labelKey: 'newDiagram.quadrant',
     parser: quadrantParser,
     template: QUADRANT_TEMPLATE,
     // `\b` 让关键字不被 `quadrantChartX` 之类的更长词误认
@@ -983,6 +1028,7 @@ export const DIAGRAM_TYPE_LIST: DiagramTypeRegistration[] = [
   },
   {
     id: 'packet',
+    labelKey: 'newDiagram.packet',
     parser: packetParser,
     template: PACKET_TEMPLATE,
     // `packet` 与 `packet-beta` 两个关键字 mermaid 都渲染（工单定案同认）；`\b` 防止
@@ -995,6 +1041,7 @@ export const DIAGRAM_TYPE_LIST: DiagramTypeRegistration[] = [
   },
   {
     id: 'xychart',
+    labelKey: 'newDiagram.xychart',
     parser: xychartParser,
     template: XYCHART_TEMPLATE,
     // xychart 词法两个关键字都认（`xychart-beta` / `xychart`，均 case-insensitive，离线核对
@@ -1008,6 +1055,7 @@ export const DIAGRAM_TYPE_LIST: DiagramTypeRegistration[] = [
   },
   {
     id: 'radar',
+    labelKey: 'newDiagram.radar',
     parser: radarParser,
     template: RADAR_TEMPLATE,
     // `\b` 让关键字不被 `radarXxx` 之类的更长词误认；只认 `radar-beta`（mermaid 12
@@ -1020,6 +1068,7 @@ export const DIAGRAM_TYPE_LIST: DiagramTypeRegistration[] = [
   },
   {
     id: 'architecture',
+    labelKey: 'newDiagram.architecture',
     parser: architectureParser,
     template: ARCHITECTURE_TEMPLATE,
     // `\b` 让关键字不被 `architectureX` 之类的更长词误认；声明行必须是裸关键字
@@ -1032,6 +1081,7 @@ export const DIAGRAM_TYPE_LIST: DiagramTypeRegistration[] = [
   },
   {
     id: 'treemap',
+    labelKey: 'newDiagram.treemap',
     parser: treemapParser,
     template: TREEMAP_TEMPLATE,
     // `treemap` 与 `treemap-beta` 两个关键字 mermaid 都渲染（Langium 终结符
@@ -1046,6 +1096,7 @@ export const DIAGRAM_TYPE_LIST: DiagramTypeRegistration[] = [
   },
   {
     id: 'ishikawa',
+    labelKey: 'newDiagram.ishikawa',
     parser: ishikawaParser,
     template: ISHIKAWA_TEMPLATE,
     // `ishikawa` 与 `ishikawa-beta` 两个关键字 mermaid 都认（jison 词法规则 1/2 分别匹配
@@ -1059,6 +1110,7 @@ export const DIAGRAM_TYPE_LIST: DiagramTypeRegistration[] = [
   },
   {
     id: 'wardley',
+    labelKey: 'newDiagram.wardley',
     parser: wardleyParser,
     template: WARDLEY_TEMPLATE,
     // `\b` 让关键字不被 `wardleyXxx` 之类的更长词误认；mermaid 12 只有 `wardley-beta`
@@ -1072,6 +1124,7 @@ export const DIAGRAM_TYPE_LIST: DiagramTypeRegistration[] = [
   },
   {
     id: 'venn',
+    labelKey: 'newDiagram.venn',
     parser: vennParser,
     template: VENN_TEMPLATE,
     // venn 词法**只有小写 `venn-beta`**（research §8 实测：mermaid 探测器
@@ -1085,6 +1138,7 @@ export const DIAGRAM_TYPE_LIST: DiagramTypeRegistration[] = [
   },
   {
     id: 'cynefin',
+    labelKey: 'newDiagram.cynefin',
     parser: cynefinParser,
     template: CYNEFIN_TEMPLATE,
     // mermaid 12 只有 `cynefin-beta` 一个关键字（Langium 语法勘察，research §1）：
@@ -1098,6 +1152,7 @@ export const DIAGRAM_TYPE_LIST: DiagramTypeRegistration[] = [
   },
   {
     id: 'usecase',
+    labelKey: 'newDiagram.usecase',
     parser: usecaseParser,
     template: USECASE_TEMPLATE,
     // usecase 词法**只有 `usecase-beta`**（research §1 实测：mermaid 探测器
@@ -1112,6 +1167,7 @@ export const DIAGRAM_TYPE_LIST: DiagramTypeRegistration[] = [
   },
   {
     id: 'treeview',
+    labelKey: 'newDiagram.treeview',
     parser: treeviewParser,
     template: TREEVIEW_TEMPLATE,
     // 关键字只有 `treeView-beta` 一个（Langium 终结符 `TREEVIEW_KEYWORD = "treeView-beta"`，
@@ -1125,6 +1181,7 @@ export const DIAGRAM_TYPE_LIST: DiagramTypeRegistration[] = [
   },
   {
     id: 'eventmodeling',
+    labelKey: 'newDiagram.eventmodeling',
     parser: eventModelingParser,
     template: EVENT_MODELING_TEMPLATE,
     // eventmodeling 声明 = **正文首行的裸关键字 `eventmodeling`**（mermaid 探测器
@@ -1141,6 +1198,7 @@ export const DIAGRAM_TYPE_LIST: DiagramTypeRegistration[] = [
   },
   {
     id: 'agentflow',
+    labelKey: 'newDiagram.agentflow',
     parser: agentflowParser,
     template: AGENTFLOW_TEMPLATE,
     // mermaid 12 只有 `agentflow-beta` 一个关键字（research §1/§8.1）：无裸名 `agentflow`；
@@ -1156,6 +1214,7 @@ export const DIAGRAM_TYPE_LIST: DiagramTypeRegistration[] = [
   },
   {
     id: 'zenuml',
+    labelKey: 'newDiagram.zenuml',
     parser: zenumlParser,
     template: ZENUML_TEMPLATE,
     // zenuml 词法**只有小写 `zenuml`**（外部插件 `@mermaid-js/mermaid-zenuml` 的 detector
@@ -1169,6 +1228,7 @@ export const DIAGRAM_TYPE_LIST: DiagramTypeRegistration[] = [
   },
   {
     id: 'c4',
+    labelKey: 'newDiagram.c4',
     parser: c4Parser,
     template: C4_TEMPLATE,
     // more-diagrams 工单 18：mermaid c4 词法的五个关键字（research §9 实测 lexer 规则表
@@ -1181,11 +1241,26 @@ export const DIAGRAM_TYPE_LIST: DiagramTypeRegistration[] = [
     canvas: c4CanvasCapabilities,
     menu: diagramMenus.c4,
   },
-]
+] satisfies readonly AnyDiagramTypeRegistration[]
+
+/** 注册表（唯一权威）：每项已在 `satisfies` 处按自身 id 的类型校验过；
+ * 导出时放宽为 `AnyDiagramTypeRegistration[]`，让消费侧能访问可选的 `forms` 槽位。 */
+export const DIAGRAM_TYPE_LIST: readonly AnyDiagramTypeRegistration[] = REGISTRATIONS
+
+/**
+ * 穷尽性断言（self-grill-hardening 工单 03）：ProjectionTypes 声明的每个 id 都必须在
+ * DIAGRAM_TYPE_LIST 里出现。加一种图时只改 ProjectionTypes、忘了在数组里挂注册项，
+ * 这个断言立刻变编译错误（`Missing` 非 never）。**必须紧跟在 REGISTRATIONS 之后**
+ * 才拿得到它的字面量 id 联合（`satisfies` 保留字面量类型）。
+ */
+type RegisteredInList = (typeof REGISTRATIONS)[number]['id']
+type MissingDiagramType = Exclude<RegisteredDiagramTypeId, RegisteredInList>
+const _exhaustiveDiagramTypes: MissingDiagramType extends never ? true : never = true
+void _exhaustiveDiagramTypes
 
 export const DIAGRAM_TYPES = Object.fromEntries(
   DIAGRAM_TYPE_LIST.map((registration) => [registration.id, registration]),
-) as Record<RegisteredDiagramTypeId, DiagramTypeRegistration>
+) as unknown as { [K in RegisteredDiagramTypeId]: DiagramTypeRegistration<K> }
 
 /**
  * 识别当前源码的图表类型：按注册顺序遍历，返回第一个认领的图种。
@@ -1193,6 +1268,6 @@ export const DIAGRAM_TYPES = Object.fromEntries(
  * 修复原「无法识别默认 flowchart」缺陷：冷门图种（如 venn-beta）不再被 flowchart
  * 解析器误吞成空投影，改为只读降级（预览与代码面板照常，画布表单显示占位提示）。
  */
-export function detectDiagramType(source: string): DiagramTypeRegistration | null {
+export function detectDiagramType(source: string): AnyDiagramTypeRegistration | null {
   return DIAGRAM_TYPE_LIST.find((registration) => registration.detect(source)) ?? null
 }

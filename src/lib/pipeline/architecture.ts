@@ -171,7 +171,7 @@ export function isValidArchId(id: string): boolean {
 
 /** 标题合法性：非空、不含方括号与换行（ARCH_TITLE 词法的白名单化） */
 export function isValidArchTitle(title: string): boolean {
-  return title !== '' && !/[\[\]\r\n]/.test(title)
+  return title !== '' && !/[[\]\r\n]/.test(title)
 }
 
 /** 图标合法性：内置枚举五个或 `pack:icon-name` 自由串（ARCH_ICON 词法 `([\w-:]+)`） */
@@ -247,7 +247,7 @@ function parseNodeDeclLine(
 
   // title：`[...]`（ARCH_TITLE：引号串或非方括号字符）
   let titleRaw: string | null = null
-  const titleMatch = /^([ \t]*)(\[(?:"(?:[^"\\]|\\.)*"|'(?:[^'\\]|\\.)*'|[^\[\]\r\n]+)\])/.exec(rest)
+  const titleMatch = /^([ \t]*)(\[(?:"(?:[^"\\]|\\.)*"|'(?:[^'\\]|\\.)*'|[^[\]\r\n]+)\])/.exec(rest)
   if (titleMatch !== null) {
     titleRaw = titleMatch[2]
     rest = rest.slice(titleMatch[0].length)

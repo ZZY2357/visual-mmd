@@ -1,5 +1,7 @@
 # sequence 的 create 进模型，destroy 不进
 
+> **状态：accepted**
+
 `create participant` 与 `destroy` 一直落在 ADR-0005 的"不解析、原样保留"里。两者在语法上成对，
 但**实测（2026-09-29 真机）显示它们的渲染行为完全不对称**，因此处置也分开。
 

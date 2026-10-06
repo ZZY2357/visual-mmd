@@ -7,6 +7,7 @@ import {
 } from '../diagram-registry'
 import { useEditorStore } from '../../store/editor'
 import { initI18n } from '../../i18n'
+import { enDict, zhDict } from '../../i18n'
 
 /**
  * 注册表与只读降级（more-diagrams 工单 01）：
@@ -249,6 +250,18 @@ describe('注册表自洽性（开放 DiagramTypeId 的运行期穷尽性）', (
       const projection = registration.buildProjection(parsed.doc)
       expect(projection.type).toBe(registration.id)
       expect(projection).toHaveProperty(registration.id)
+    }
+  })
+
+  it('i18n 键（七件套之一）：labelKey 与 id 锁步，且 zh/en 字典都收录', () => {
+    // 类型层把 labelKey 钉死为 `newDiagram.<id>`（拼错是编译错误）；这里兜底断言
+    // 字典确实收录该键——新增图种只加注册项、忘加文案键时在此变红。
+    const zhNew = zhDict.app.newDiagram as Record<string, string>
+    const enNew = enDict.app.newDiagram as Record<string, string>
+    for (const registration of DIAGRAM_TYPE_LIST) {
+      expect(registration.labelKey, registration.id).toBe(`newDiagram.${registration.id}`)
+      expect(zhNew[registration.id], `zh 字典缺 newDiagram.${registration.id}`).toBeTypeOf('string')
+      expect(enNew[registration.id], `en 字典缺 newDiagram.${registration.id}`).toBeTypeOf('string')
     }
   })
 })

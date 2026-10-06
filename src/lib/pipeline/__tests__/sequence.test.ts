@@ -360,7 +360,7 @@ describe('create 声明进模型（工单 01，ADR-0014）', () => {
   it('create 与关键字之间的空白逐字保留，renderParticipant 原样回写', () => {
     const decls = participantElements('sequenceDiagram\n    create   participant B\n')
     expect(decls[0]?.createPrefixRaw).toBe('create   ')
-    expect(renderParticipant(decls[0] as ParticipantData, {})).toBe('create   participant B')
+    expect(renderParticipant(decls[0], {})).toBe('create   participant B')
   })
 
   it('verbatim：含 create 的源码解析→重组装逐字相同', () => {

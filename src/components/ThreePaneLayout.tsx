@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react'
-import { ActionIcon, Tooltip } from '@mantine/core'
+import { ActionIcon, SegmentedControl, Tooltip } from '@mantine/core'
 import { useTranslation } from 'react-i18next'
 import {
   CANVAS_MIN,
@@ -9,15 +9,22 @@ import {
   maxPropsPanelWidth,
   resolveCollapse,
 } from '../lib/layout/pane-layout'
+import {
+  MOBILE_DEFAULT_PANE,
+  isMobileViewport,
+  type MobilePane,
+} from '../lib/layout/mobile-layout'
 
 /**
- * 三栏可拖拽布局（工单 04；边界细节收尾于工单 12）：
+ * 三栏可拖拽布局（工单 04；边界细节收尾于工单 12；手机单栏切换于工单 15）：
  * 代码面板 | 画布 | 属性面板。
  * - 栏间分隔条可拖拽调整宽度，最小/最大宽度保护：画布永远保有
  *   CANVAS_MIN 的宽度，拖到边界即停（clampWidth）。
  * - 代码面板与属性面板均可折叠，折叠互斥（至多一个折叠，resolveCollapse）。
  * - 视口低于窄屏断点时只显示画布（窄屏只显示画布，spec 用户故事 37）；
  *   视口变化时面板宽度向下收敛，不破版。
+ * - 手机（<= MOBILE_BREAKPOINT 768，工单 15）：三栏折叠为**单栏 + 切换器**
+ *   （SegmentedControl，代码 | 画布 | 属性），各面板逐一可达；桌面行为不变。
  */
 
 const CODE_MIN = 240
@@ -56,10 +63,13 @@ export function ThreePaneLayout({ code, canvas, properties }: ThreePaneLayoutPro
   const [propsWidth, setPropsWidth] = useState(PROPS_DEFAULT)
   const [codeCollapsed, setCodeCollapsed] = useState(false)
   const [propsCollapsed, setPropsCollapsed] = useState(false)
+  const [mobilePane, setMobilePane] = useState<MobilePane>(MOBILE_DEFAULT_PANE)
   const dragRef = useRef<DragState | null>(null)
 
   // 窄屏：只显示画布。断点语义与面板宽度保护见 pane-layout.ts。
   const narrow = isNarrowViewport(windowWidth)
+  // 手机：三栏折叠为单栏 + 切换器（工单 15）。手机是窄屏的子集，优先判手机。
+  const mobile = isMobileViewport(windowWidth)
 
   // 当前约束下的宽度上限（另一面板折叠时不占用宽度）；
   // 视口收窄时向下收敛已打开的面板宽度，保证画布不小于 CANVAS_MIN。
@@ -133,6 +143,32 @@ export function ThreePaneLayout({ code, canvas, properties }: ThreePaneLayoutPro
     flexShrink: 0,
     borderRadius: 3,
     background: 'var(--mantine-color-gray-3)',
+  }
+
+  if (mobile) {
+    // 手机（工单 15）：三栏折叠为单栏 + 切换器。切换器置顶，下方渲染当前面板；
+    // 桌面/平板路径完全不变（本分支只在 <= MOBILE_BREAKPOINT 时进入）。
+    const pane = mobilePane === 'code' ? code : mobilePane === 'properties' ? properties : canvas
+    return (
+      <div style={{ display: 'flex', flexDirection: 'column', height: '100%', minHeight: 0 }}>
+        <SegmentedControl
+          fullWidth
+          size="xs"
+          value={mobilePane}
+          onChange={(value) => setMobilePane(value as MobilePane)}
+          aria-label={t('app:layout.mobileSwitcherAria')}
+          data={[
+            { value: 'code', label: t('app:layout.mobileCodeTab') },
+            { value: 'canvas', label: t('app:layout.mobileCanvasTab') },
+            { value: 'properties', label: t('app:layout.mobilePropertiesTab') },
+          ]}
+          style={{ flexShrink: 0, marginBottom: 6 }}
+        />
+        <div style={{ flex: 1, minHeight: 0, minWidth: 0, display: 'flex', flexDirection: 'column' }}>
+          {pane}
+        </div>
+      </div>
+    )
   }
 
   if (narrow) {

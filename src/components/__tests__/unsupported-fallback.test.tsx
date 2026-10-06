@@ -19,7 +19,7 @@ initI18n()
 
 const UNSUPPORTED_SOURCE = 'venn-beta\n    A o B\n'
 const SVG = '<svg><g data-id="X1"><rect width="10" height="10" /></g></svg>'
-const preview: MermaidPreview = { svg: SVG, error: null, rendering: false }
+const preview: MermaidPreview = { svg: SVG, error: null, errorNotice: null, rendering: false }
 
 describe('unsupported 只读降级（more-diagrams 工单 01）', () => {
   let host: HTMLDivElement

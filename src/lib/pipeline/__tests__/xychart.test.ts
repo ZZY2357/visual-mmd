@@ -120,9 +120,9 @@ describe('xychart 解析：verbatim identity 与声明头', () => {
   it('xychart / xychart-beta 两关键字同认（大小写不敏感）+ 方向修饰符独立词', () => {
     expect(() => parseOk('xychart\nbar [1]\n')).not.toThrow()
     expect(() => parseOk('XYCHART-BETA\nbar [1]\n')).not.toThrow()
-    const h = parseOk('xychart horizontal\nbar [1]\n').elements[0]!
+    const h = parseOk('xychart horizontal\nbar [1]\n').elements[0]
     expect(h.element).toMatchObject({ kind: 'xychart-header', keyword: 'xychart', orientation: 'horizontal', gap: ' ' })
-    expect(parseOk('xychart-beta vertical\n').elements[0]!.element).toMatchObject({
+    expect(parseOk('xychart-beta vertical\n').elements[0].element).toMatchObject({
       kind: 'xychart-header',
       keyword: 'xychart-beta',
       orientation: 'vertical',
@@ -170,9 +170,9 @@ describe('xychart 解析：verbatim identity 与声明头', () => {
 describe('xychart 解析：title 与轴两形态', () => {
   it('title 引号/裸词两形态；空标题行不成元素（逐字保留）', () => {
     const q = parseOk('xychart-beta\n    title "季度销售"\nbar [1]\n')
-    expect(q.elements[1]!.element).toMatchObject({ kind: 'xychart-title', gap: ' ', textRaw: '"季度销售"' })
+    expect(q.elements[1].element).toMatchObject({ kind: 'xychart-title', gap: ' ', textRaw: '"季度销售"' })
     const bare = parseOk('xychart-beta\ntitle Sales\nbar [1]\n')
-    expect(bare.elements[1]!.element).toMatchObject({ kind: 'xychart-title', textRaw: 'Sales' })
+    expect(bare.elements[1].element).toMatchObject({ kind: 'xychart-title', textRaw: 'Sales' })
     expect(parseOk('xychart-beta\ntitle \nbar [1]\n').elements.map((p) => p.id)).toEqual([
       'xychart-header',
       'series:1',
@@ -182,21 +182,21 @@ describe('xychart 解析：title 与轴两形态', () => {
   it('轴：数值 range 形态（带/不带标题）', () => {
     const withTitle = parseOk(TEMPLATE).elements.find((p) => p.id === 'xychart-y-axis')!
     expect(withTitle.element).toMatchObject({ axis: 'y', titleRaw: '"销售额"', sep: ' ', restRaw: '0 --> 400' })
-    const noTitle = parseOk('xychart-beta\ny-axis 0 --> 100\nbar [1]\n').elements[1]!
+    const noTitle = parseOk('xychart-beta\ny-axis 0 --> 100\nbar [1]\n').elements[1]
     expect(noTitle.element).toMatchObject({ kind: 'xychart-axis', axis: 'y', titleRaw: null, restRaw: '0 --> 100' })
   })
 
   it('轴：类别数组形态（带/不带标题）；引号类别含逗号不切分', () => {
     const noTitle = parseOk(TEMPLATE).elements.find((p) => p.id === 'xychart-x-axis')!
     expect(noTitle.element).toMatchObject({ axis: 'x', titleRaw: null, restRaw: '["一季度", "二季度", "三季度"]' })
-    const withTitle = parseOk('xychart-beta\nx-axis 季度 [a, "b, c"]\nbar [1]\n').elements[1]!
+    const withTitle = parseOk('xychart-beta\nx-axis 季度 [a, "b, c"]\nbar [1]\n').elements[1]
     expect(withTitle.element).toMatchObject({ axis: 'x', titleRaw: '季度', sep: ' ', restRaw: '[a, "b, c"]' })
   })
 
   it('轴：只有标题段的形态（无后半段）', () => {
     const doc = parseOk('xychart-beta\nx-axis 时间\ny-axis "金额"\nbar [1]\n')
-    expect(doc.elements[1]!.element).toMatchObject({ kind: 'xychart-axis', axis: 'x', titleRaw: '时间', restRaw: null })
-    expect(doc.elements[2]!.element).toMatchObject({ kind: 'xychart-axis', axis: 'y', titleRaw: '"金额"', restRaw: null })
+    expect(doc.elements[1].element).toMatchObject({ kind: 'xychart-axis', axis: 'x', titleRaw: '时间', restRaw: null })
+    expect(doc.elements[2].element).toMatchObject({ kind: 'xychart-axis', axis: 'y', titleRaw: '"金额"', restRaw: null })
   })
 
   it('畸形轴行（引号不闭合 / 数组不闭合 / range 非数值）逐字保留、不成元素', () => {
@@ -462,7 +462,7 @@ describe('xychart 投影：形态派生 + 原样标注（不静默改写）', ()
     expect(p.xAxis.categories.map((c) => c.text)).toEqual(['一季度', '二季度', '三季度'])
     expect(p.yAxis).toMatchObject({ axis: 'y', title: '销售额', form: 'range', range: { min: '0', max: '400' } })
     expect(p.series[0]).toMatchObject({ elementId: 'series:1', seriesType: 'bar', name: null, editable: true })
-    expect(p.series[0]!.values.map((v) => v.num)).toEqual([200, 350, 150])
+    expect(p.series[0].values.map((v) => v.num)).toEqual([200, 350, 150])
     expect(p.series[1]).toMatchObject({ elementId: 'series:2', seriesType: 'line', name: '均线', editable: true })
   })
 
@@ -472,18 +472,18 @@ describe('xychart 投影：形态派生 + 原样标注（不静默改写）', ()
 
   it('点标签系列：values 携带标签、num 为 null、整体 editable=false（工单定案不展开）', () => {
     const p = buildXychartProjection(parseOk('xychart-beta\nline [1 "a", 2]\n'))
-    expect(p.series[0]!.values).toEqual([
+    expect(p.series[0].values).toEqual([
       { raw: '1', num: 1, label: null },
       { raw: '"a"', num: null, label: 'a' },
       { raw: '2', num: 2, label: null },
     ])
-    expect(p.series[0]!.editable).toBe(false)
+    expect(p.series[0].editable).toBe(false)
   })
 
   it('手写非法文本（%% 截断语义）原样保留并标注 textValid/rawValid=false', () => {
     const p = buildXychartProjection(parseOk('xychart-beta\nline "a%%b" [1]\nx-axis ["a%%b"]\nbar [1]\n'))
-    expect(p.series[0]!.name).toBe('a%%b')
-    expect(p.series[0]!.nameValid).toBe(false)
+    expect(p.series[0].name).toBe('a%%b')
+    expect(p.series[0].nameValid).toBe(false)
     expect(p.xAxis.categories[0]).toMatchObject({ text: 'a%%b', rawValid: false })
   })
 
@@ -623,8 +623,8 @@ describe('annotateXychartIdentities：类名组 + 位置序反注（绝不误标
     const wrongOrder = buildXychartSvg(['bar-plot-1', 'bar-plot-1'])
     annotateXychartIdentities(wrongOrder, { series: 2, orientation: 'vertical' })
     const plots = Array.from(wrongOrder.querySelectorAll('g.plot > g'))
-    expect(plots[0]!.getAttribute('data-id')).toBeNull()
-    expect(plots[1]!.getAttribute('data-id')).toBe('series:2')
+    expect(plots[0].getAttribute('data-id')).toBeNull()
+    expect(plots[1].getAttribute('data-id')).toBe('series:2')
   })
 
   it('与通用 annotateNodeDataIds 组合：xychart 渲染器不写元素 id，通用循环不产生误注', () => {

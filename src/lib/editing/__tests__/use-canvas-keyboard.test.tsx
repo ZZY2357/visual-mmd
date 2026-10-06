@@ -84,10 +84,15 @@ function Harness(props: {
   )
 }
 
-function keyOn(target: Element, key: string, init: KeyboardEventInit = {}): boolean {
+function keyOn(target: Element, key: string, init: KeyboardEventInit & { keyCode?: number } = {}): boolean {
   const event = new KeyboardEvent('keydown', { key, bubbles: true, cancelable: true, ...init })
   target.dispatchEvent(event)
   return event.defaultPrevented
+}
+
+/** 派发 IME 组合事件（工单 06）：happy-dom 的 CompositionEvent 即 Event，冒泡到容器即可 */
+function compositionOn(target: Element, type: 'compositionstart' | 'compositionend'): void {
+  target.dispatchEvent(new CompositionEvent(type, { bubbles: true }))
 }
 
 describe('useCanvasKeyboard（工单 04 画布焦点体系）', () => {
@@ -252,6 +257,91 @@ describe('useCanvasKeyboard（工单 06 mindmap 画布键盘）', () => {
     expect(source).not.toContain('分支A')
     expect(source).not.toContain('叶子')
     expect(created).toEqual([])
+  })
+})
+
+// ---------- 工单 06：IME 组合期间画布键盘层不触发 ----------
+
+describe('useCanvasKeyboard（工单 06 IME 组合输入）', () => {
+  let host: HTMLDivElement
+  let root: ReturnType<typeof createRoot>
+
+  beforeEach(() => {
+    host = document.createElement('div')
+    document.body.appendChild(host)
+    root = createRoot(host)
+  })
+  afterEach(() => {
+    act(() => root.unmount())
+    host.remove()
+    resetEditorHistory(DEFAULT_DIAGRAM_SOURCE)
+    useEditorStore.getState().select(null)
+  })
+
+  function mountWithSelection(onNodeCreated?: (id: string) => void) {
+    resetEditorHistory(SAMPLE)
+    useEditorStore.getState().select({ kind: 'node', nodeId: 'A' })
+    const projection = flowProjectionOf(SAMPLE)
+    act(() => {
+      root.render(<Harness target={{ kind: 'flowchart', projection }} onNodeCreated={onNodeCreated} />)
+    })
+    return host.firstElementChild as HTMLDivElement
+  }
+
+  it('isComposing 的 Enter/Tab/Delete：不落码、不 preventDefault（确认候选词不是画布动作）', () => {
+    const created: string[] = []
+    const container = mountWithSelection((id) => created.push(id))
+
+    expect(keyOn(container, 'Enter', { isComposing: true })).toBe(false)
+    expect(keyOn(container, 'Tab', { isComposing: true })).toBe(false)
+    expect(keyOn(container, 'Delete', { isComposing: true })).toBe(false)
+
+    expect(useEditorStore.getState().source).toBe(SAMPLE)
+    expect(created).toEqual([])
+  })
+
+  it('keyCode 229（IME 处理中的占位码）：同样不触发', () => {
+    const container = mountWithSelection()
+
+    expect(keyOn(container, 'Enter', { keyCode: 229 })).toBe(false)
+    expect(useEditorStore.getState().source).toBe(SAMPLE)
+  })
+
+  it('compositionstart → 组合中的 Tab/Enter 不触发；compositionend 后恢复', () => {
+    const created: string[] = []
+    const container = mountWithSelection((id) => created.push(id))
+
+    compositionOn(container, 'compositionstart')
+    expect(keyOn(container, 'Tab')).toBe(false)
+    expect(keyOn(container, 'Enter')).toBe(false)
+    expect(useEditorStore.getState().source).toBe(SAMPLE)
+    expect(created).toEqual([])
+
+    compositionOn(container, 'compositionend')
+    expect(keyOn(container, 'Tab')).toBe(true)
+    expect(useEditorStore.getState().source).toContain('A --> n1')
+    expect(created).toEqual(['n1'])
+  })
+
+  it('组合期间方向键：不导航、不 preventDefault（候选词选择交给 IME）', () => {
+    const { nav, revealed } = fakeNav(FLOW_RECTS, 'flowchart')
+    resetEditorHistory(SAMPLE)
+    useEditorStore.getState().select({ kind: 'node', nodeId: 'A' })
+    const projection = flowProjectionOf(SAMPLE)
+    act(() => {
+      root.render(<Harness target={{ kind: 'flowchart', projection }} navigation={nav} />)
+    })
+    const container = host.firstElementChild as HTMLDivElement
+
+    compositionOn(container, 'compositionstart')
+    expect(keyOn(container, 'ArrowRight')).toBe(false)
+    expect(useEditorStore.getState().selection).toEqual({ kind: 'node', nodeId: 'A' })
+    expect(revealed).toEqual([])
+
+    compositionOn(container, 'compositionend')
+    expect(keyOn(container, 'ArrowRight')).toBe(true)
+    expect(useEditorStore.getState().selection).toEqual({ kind: 'node', nodeId: 'D' })
+    expect(revealed).toEqual(['D'])
   })
 })
 

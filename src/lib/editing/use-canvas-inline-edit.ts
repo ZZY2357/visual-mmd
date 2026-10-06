@@ -292,6 +292,29 @@ export function useCanvasInlineEdit({ projection, resolver, svg, containerRef, v
   // 编辑是否仍在进行（与渲染解耦的同步标记）：Enter 提交会卸载输入框，若卸载前
   // 焦点被移走而触发 onBlur，会拿着同一份旧状态二次提交，这里把它挡掉
   const editingActiveRef = useRef(false)
+  // IME 组合状态（工单 06）：输入框的 keydown/blur 由渲染方转成 commit/cancel 调用，
+  // 事件本身到不了本 hook，故在画布容器上跟踪 compositionstart/end（组合事件会从
+  // 输入框冒泡到容器）。组合期间收到的提交/取消一律忽略——Enter 只是确认候选词、
+  // Esc 只是打断 IME，都不是「结束内联编辑」。
+  const composingRef = useRef(false)
+
+  // 组合状态跟踪（工单 06）：挂在画布容器上，与输入框同宿主
+  useEffect(() => {
+    const container = containerRef.current
+    if (container === null) return
+    const onCompositionStart = () => {
+      composingRef.current = true
+    }
+    const onCompositionEnd = () => {
+      composingRef.current = false
+    }
+    container.addEventListener('compositionstart', onCompositionStart)
+    container.addEventListener('compositionend', onCompositionEnd)
+    return () => {
+      container.removeEventListener('compositionstart', onCompositionStart)
+      container.removeEventListener('compositionend', onCompositionEnd)
+    }
+  }, [containerRef])
 
   /** 进入编辑：预填文本在渲染时从投影取（新建元素落码后投影才到位） */
   const beginEdit = useCallback((target: CanvasInlineEditTarget) => {
@@ -355,23 +378,30 @@ export function useCanvasInlineEdit({ projection, resolver, svg, containerRef, v
 
   /** 回车：提交（落码改文本）并关闭；未改动/清空只关闭不落码。
    * options.restoreFocus = true（Enter 路径）→ 焦点归还容器，Tab/Enter 可连续用；
-   * 失焦提交（onBlur 路径）不传 → 不归还，否则会把用户从代码面板拽回画布。 */
+   * 失焦提交（onBlur 路径）不传 → 不归还，否则会把用户从代码面板拽回画布。
+   *
+   * IME 组合期间（工单 06）直接忽略：确认候选词的 Enter 与打断 IME 的 Esc 会经
+   * 输入框的 keydown/blur 走到这里，此时提交会把半截拼音写进源码。 */
   const commit = useCallback(
     (text: string, options?: InlineEditCloseOptions): void => {
       if (!editingActiveRef.current) return
+      if (composingRef.current) return
       const { editing: cur, projection: proj } = latestRef.current
       if (cur !== null) {
         const result = inlineEditCommitOf(cur.target, text, inlineEditTextOf(proj, cur.target))
-        if (result.action === 'commit') useEditorStore.getState().commitIntent(result.intent)
+        if (result.action === 'commit') useEditorStore.getState().commitIntent(result.intent, 'canvas')
       }
       closeEditing(options?.restoreFocus === true)
     },
     [closeEditing],
   )
 
-  /** Esc：取消（不落码），同样归还焦点（取消后仍要继续在画布上操作） */
+  /** Esc：取消（不落码），同样归还焦点（取消后仍要继续在画布上操作）。
+   * IME 组合期间（工单 06）忽略：Esc 只是打断 IME（compositionend 携带丢弃的缓冲），
+   * 不应连内联编辑一起关掉。 */
   const cancel = useCallback((): void => {
     if (!editingActiveRef.current) return
+    if (composingRef.current) return
     closeEditing(true)
   }, [closeEditing])
 

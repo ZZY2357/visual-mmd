@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import type { AnyProjection } from '../diagram-registry'
 import type { DataIdResolver } from '../canvas-selection/data-id'
 import { selectionFromEventTarget } from '../canvas-selection/data-id'
@@ -310,7 +310,11 @@ export function useCanvasContextMenu(
   const latest = useRef({ projection, resolver, onNodeCreated, newNodeText })
   latest.current = { projection, resolver, onNodeCreated, newNodeText }
 
-  const menu: MenuState | null = open.kind === 'menu' ? { target: open.target, x: open.x, y: open.y } : null
+  // 记忆化：menu 是下方多个 useCallback 的依赖，若每次渲染新建对象会让它们全部失效。
+  const menu: MenuState | null = useMemo(
+    () => (open.kind === 'menu' ? { target: open.target, x: open.x, y: open.y } : null),
+    [open],
+  )
   const styleForm: StyleFormState | null = open.kind === 'styleForm' ? { x: open.x, y: open.y } : null
   const nodeForm: NodeFormState | null = open.kind === 'nodeForm' ? open.form : null
   const linkMode: LinkModeState = open.kind === 'linkMode' ? open.link : { stage: 'idle' }
@@ -327,31 +331,50 @@ export function useCanvasContextMenu(
     if (selection !== null) select(selection)
   }, [])
 
-  /** 右键：阻止默认菜单；解析目标 → 选中联动 → 弹出菜单（无可弹项安静关闭） */
-  const onContextMenu = useCallback(
-    (e: React.MouseEvent): void => {
-      e.preventDefault()
+  /**
+   * 在给定 DOM 目标 + 视口坐标处弹出上下文菜单（工单 15）：右键（onContextMenu）与
+   * 触屏长按（use-long-press）**共用这一份**目标解析 → 选中联动 → 弹菜单逻辑，
+   * 保证两条入口产出同一份菜单项（ADR-0017 分层覆盖）。
+   * - target 为事件目标（沿 DOM 向上找 data-id）；无可弹项安静关闭（现状口径）。
+   * - clientX/clientY 是相对视口的坐标，内部换算成相对画布容器。
+   */
+  const openMenuAt = useCallback(
+    (target: EventTarget | null, clientX: number, clientY: number): void => {
       const container = containerRef.current
       const { projection: proj, resolver: r } = latest.current
       if (container === null || proj === null) return
-      const selection = selectionFromEventTarget(e.target, r)
-      const target = contextMenuTargetFromSelection(selection, proj.type)
+      const selection = selectionFromEventTarget(target, r)
+      const menuTarget = contextMenuTargetFromSelection(selection, proj.type)
       // state 状态节点的 composite 标志由投影补齐（menuTargetOfCanvas 是纯映射，不查投影）
-      if (target !== null && target.kind === 'element' && target.selection.kind === 'state' && proj.type === 'state') {
-        const stateSel = target.selection
-        target.composite = proj.state.states.find((s) => s.id === stateSel.id)?.composite ?? false
+      if (
+        menuTarget !== null &&
+        menuTarget.kind === 'element' &&
+        menuTarget.selection.kind === 'state' &&
+        proj.type === 'state'
+      ) {
+        const stateSel = menuTarget.selection
+        menuTarget.composite = proj.state.states.find((s) => s.id === stateSel.id)?.composite ?? false
       }
-      if (target === null || contextMenuItems(target).length === 0) {
+      if (menuTarget === null || contextMenuItems(menuTarget).length === 0) {
         // 无可弹项只收菜单（现状：不动已打开的表单浮层）
         setOpen((cur) => (cur.kind === 'menu' ? IDLE_OPEN : cur))
         return
       }
-      selectTarget(target)
+      selectTarget(menuTarget)
       const rect = container.getBoundingClientRect()
       // 开菜单即收起两个表单浮层（互斥浮层的 open-menu 迁移，overlay-state 裁定）
-      setOpen({ kind: 'menu', target, x: e.clientX - rect.left, y: e.clientY - rect.top })
+      setOpen({ kind: 'menu', target: menuTarget, x: clientX - rect.left, y: clientY - rect.top })
     },
     [containerRef, selectTarget],
+  )
+
+  /** 右键：阻止默认菜单；解析目标 → 选中联动 → 弹出菜单（无可弹项安静关闭） */
+  const onContextMenu = useCallback(
+    (e: React.MouseEvent): void => {
+      e.preventDefault()
+      openMenuAt(e.target, e.clientX, e.clientY)
+    },
+    [openMenuAt],
   )
 
   /** 画布单击：连线模式下消费（节点 = 推进状态机，其它 = 取消）。
@@ -372,28 +395,31 @@ export function useCanvasContextMenu(
       if (t.completedLink !== null) {
         // 两步完成：落码一条连线并选中它（state 落 add-transition、er 落 add-relation，
         // 其余落 flowchart add-edge）
+        // 画布层来源显式标记为 'canvas'（工单 09）：连线落码被挂起时来源如实为画布
         const { commitIntent, select } = useEditorStore.getState()
+        const commitCanvasIntent = (intent: Parameters<typeof commitIntent>[0]): boolean =>
+          commitIntent(intent, 'canvas')
         const { from, to } = t.completedLink
         const proj = latest.current.projection
         if (proj !== null && proj.type === 'state') {
-          if (commitIntent({ type: 'add-transition', from, to })) {
+          if (commitCanvasIntent({ type: 'add-transition', from, to })) {
             select({ kind: 'state-transition', elementId: `transition:${proj.state.transitions.length + 1}` })
           }
         } else if (proj !== null && proj.type === 'er') {
           // er 关系默认 identifying `||--|{`（验收场景的基数），落码后按位置序选中
-          if (commitIntent({ type: 'add-relation', from, to, cardLeft: '||', line: '--', cardRight: '|{' })) {
+          if (commitCanvasIntent({ type: 'add-relation', from, to, cardLeft: '||', line: '--', cardRight: '|{' })) {
             select({ kind: 'er-relation', elementId: `relation:${proj.er.relations.length + 1}` })
           }
         } else if (proj !== null && proj.type === 'architecture') {
           // architecture 边默认带箭头指向终点（工单验收场景「连到另一 service 并带箭头」），
           // 方向端口两侧必需（mermaid 词法，起点 R / 终点 L 缺省），落码后按位置序选中
-          if (commitIntent({ type: 'add-edge', from, to, fromPort: 'R', toPort: 'L', arrow: 'target' })) {
+          if (commitCanvasIntent({ type: 'add-edge', from, to, fromPort: 'R', toPort: 'L', arrow: 'target' })) {
             select({ kind: 'architecture-edge', elementId: `edge:${proj.architecture.edges.length + 1}` })
           }
         } else if (proj !== null && proj.type === 'agentflow') {
           // agentflow 加边（more-diagrams 工单 27）：默认 sequence `-->`，落码后按位置序选中。
           // elementId 口径 = `edge:{from}->{to}`（重复边 `#n`），与 parser 一致。
-          if (commitIntent({ type: 'add-edge', from, to, edgeKind: 'sequence' })) {
+          if (commitCanvasIntent({ type: 'add-edge', from, to, edgeKind: 'sequence' })) {
             const key = `edge:${from}->${to}`
             const occurrence =
               proj.agentflow.edges.filter((e) => e.from === from && e.to === to).length + 1
@@ -402,7 +428,7 @@ export function useCanvasContextMenu(
               elementId: occurrence === 1 ? key : `${key}#${occurrence}`,
             })
           }
-        } else if (commitIntent({ type: 'add-edge', from, to, lineStyle: 'solid', head: 'arrow' })) {
+        } else if (commitCanvasIntent({ type: 'add-edge', from, to, lineStyle: 'solid', head: 'arrow' })) {
           select({ kind: 'edge', from, to, occurrence: 1 })
         }
       }
@@ -441,7 +467,7 @@ export function useCanvasContextMenu(
       if (target === undefined || target.kind !== 'element' || target.selection.kind !== 'node') return
       useEditorStore
         .getState()
-        .commitIntent({ type: 'apply-class', nodeId: target.selection.nodeId, className })
+        .commitIntent({ type: 'apply-class', nodeId: target.selection.nodeId, className }, 'canvas')
       closeMenu()
     },
     [menu, closeMenu],
@@ -518,7 +544,7 @@ export function useCanvasContextMenu(
   const submitStyleForm = useCallback((name: string, color: string): boolean => {
     const intent = addClassDefIntent({ name: name.trim(), fill: color, stroke: '', dashStyle: 'solid', color: '' })
     if (intent === null) return false
-    if (!useEditorStore.getState().commitIntent(intent)) return false
+    if (!useEditorStore.getState().commitIntent(intent, 'canvas')) return false
     // commit 迁移：提交成功收起表单
     setOpen(IDLE_OPEN)
     return true
@@ -536,8 +562,9 @@ export function useCanvasContextMenu(
       const actionCtx: MenuActionContext = {
         projection: latest.current.projection,
         selection: useEditorStore.getState().selection,
-        commitIntent: (intent) => useEditorStore.getState().commitIntent(intent),
-        commitIntents: (intents) => useEditorStore.getState().commitIntents(intents),
+        // 画布层来源显式标记为 'canvas'（工单 09）：菜单动作落码被挂起时来源如实为画布
+        commitIntent: (intent) => useEditorStore.getState().commitIntent(intent, 'canvas'),
+        commitIntents: (intents) => useEditorStore.getState().commitIntents(intents, 'canvas'),
         select: (selection) => useEditorStore.getState().select(selection),
         openForm: openNodeForm,
         openStyleForm,
@@ -562,6 +589,8 @@ export function useCanvasContextMenu(
     nodeForm,
     linkMode,
     onContextMenu,
+    /** 在指定目标 + 视口坐标弹出菜单（工单 15：触屏长按与右键共用；见 openMenuAt） */
+    openMenuAt,
     onCanvasClick,
     closeMenu,
     /** 关闭当前互斥浮层（画布点击裁定的 close-float 落点） */

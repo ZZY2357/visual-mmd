@@ -604,12 +604,12 @@ export class ClassParser implements DiagramParser {
           classifyLine(line, cursor, lineNo, entries, counters, top?.kind === 'class')
           const last = entries[entries.length - 1]
           if (last !== undefined && last.span.start >= cursor) {
-            if (last.data.kind === 'class' && (last.data as ClassDeclData).openBrace) {
+            if (last.data.kind === 'class' && (last.data).openBrace) {
               blockStack.push({ lineNo, kind: 'class' })
             } else if (
               last.data.kind === 'namespace' &&
               // 单行写法 `namespace Foo { class A }` 同行即闭合，不进栈
-              (last.data as NamespaceData).tail.trimEnd().endsWith('{')
+              (last.data).tail.trimEnd().endsWith('{')
             ) {
               blockStack.push({ lineNo, kind: 'namespace' })
             }

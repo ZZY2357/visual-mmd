@@ -76,10 +76,20 @@ export function useCanvasKeyboard(
   // 事件回调里读最新值：ref 兜住
   const latest = useRef({ onNodeCreated, newNodeText, navigation, openForm })
   latest.current = { onNodeCreated, newNodeText, navigation, openForm }
+  // IME 组合状态（工单 06）：compositionstart/end 跟踪——组合期间 keydown 自带的
+  // isComposing 标记在部分浏览器可能缺失，故与事件自带标记并用（见 onKeyDown）
+  const composingRef = useRef(false)
 
   useEffect(() => {
     const container = containerRef.current
     if (target === null || container === null) return
+
+    const onCompositionStart = () => {
+      composingRef.current = true
+    }
+    const onCompositionEnd = () => {
+      composingRef.current = false
+    }
 
     /** 方位导航（工单 14）：按几何方位移动选中，只 select()、不动 DOM 焦点 */
     const navigate = (key: string, selection: Selection | null, select: (s: Selection | null) => void) => {
@@ -115,6 +125,12 @@ export function useCanvasKeyboard(
       const el = e.target
       if (el instanceof Element && el.closest(FOCUS_EXCLUDE_SELECTOR)) return
 
+      // ⓪ IME 组合中（工单 06）：Tab/Enter/Delete/方向键一律不当作画布动作。
+      //    组合期间的方向键用于候选词选择、Enter 用于确认候选词，若照常执行会误改
+      //    源码 / 移动选中。既看事件自带的 isComposing（确认候选词的那次 keydown 为
+      //    true），也看 compositionstart/end 跟踪的状态（防个别浏览器事件标记缺失）。
+      if (e.isComposing || e.keyCode === 229 || composingRef.current) return
+
       const { selection, commitIntent, commitIntents, select } = useEditorStore.getState()
 
       // ① 方向键（工单 14 §5）：修饰键按住时不导航，但**一律** preventDefault
@@ -138,8 +154,10 @@ export function useCanvasKeyboard(
         .keyHandler(wrapper)({ key: e.key, mods: { shift: e.shiftKey }, selection, newNodeText: latest.current.newNodeText })
       if (plan === null) return
       applyPlan(plan, {
-        commitIntent,
-        commitIntents,
+        // 画布层来源显式标记为 'canvas'（工单 09）：落码若被挂起，pendingWriteback.origin
+        // 记的是画布而非默认的 'form'——行为（挂起/接受/放弃）不变，仅来源标签如实。
+        commitIntent: (intent) => commitIntent(intent, 'canvas'),
+        commitIntents: (intents) => commitIntents(intents, 'canvas'),
         select,
         beginInlineEdit: (inlineTarget) => latest.current.onNodeCreated?.(inlineTarget),
         openForm: (kind) => latest.current.openForm?.(kind),
@@ -148,6 +166,12 @@ export function useCanvasKeyboard(
     }
 
     container.addEventListener('keydown', onKeyDown)
-    return () => container.removeEventListener('keydown', onKeyDown)
+    container.addEventListener('compositionstart', onCompositionStart)
+    container.addEventListener('compositionend', onCompositionEnd)
+    return () => {
+      container.removeEventListener('keydown', onKeyDown)
+      container.removeEventListener('compositionstart', onCompositionStart)
+      container.removeEventListener('compositionend', onCompositionEnd)
+    }
   }, [target, containerRef])
 }

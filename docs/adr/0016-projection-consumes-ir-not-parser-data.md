@@ -1,5 +1,7 @@
 # 投影只认 IR，不 import parser 的 `*Data`
 
+> **状态：accepted**
+
 四个投影直接消费各 parser 的 data 类型，parser 的内部表示成了投影事实上的公开
 interface：`projection/mindmap-projection.ts` 曾 import `MindmapNodeData` / `MindmapIconData`
 并靠 `part.element as MindmapNodeData` 断言取字段；`projection/class-projection.ts`

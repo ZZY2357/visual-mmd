@@ -5,7 +5,7 @@ import { buildFlowchartProjection } from '../../projection/flowchart-projection'
 function proj(source: string) {
   const res = flowchartParser.parse(source)
   if (!res.ok) return { error: res.error }
-  return buildFlowchartProjection(res.doc as never)
+  return buildFlowchartProjection(res.doc)
 }
 
 describe('pipe label with space between arrow and pipe', () => {

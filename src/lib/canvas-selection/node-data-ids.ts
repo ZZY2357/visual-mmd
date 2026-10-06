@@ -344,7 +344,7 @@ export function annotatePacketDataIds(
   if (startTexts.length !== rects.length) return
   // 先整体归属、再统一落标（两趟）：任一块归属失败 → 整体不标（绝不留下部分标注，
   // 与 er/quadrant 位置序反注的「绝不误归属」同门卫）
-  const assigned: Array<string | null> = new Array(rects.length).fill(null)
+  const assigned = new Array<string | null>(rects.length).fill(null)
   let fieldIndex = 0
   for (let i = 0; i < rects.length; i++) {
     // start 位号文本必须是十进制非负整数（Number('') = 0 会把空文本误归到 bit 0）

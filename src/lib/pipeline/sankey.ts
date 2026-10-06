@@ -160,7 +160,7 @@ function scanCsvRecords(source: string, start: number, end: number): CsvRecord[]
         contentEnd = end
         break
       }
-      const ch = source[i]!
+      const ch = source[i]
       if (inQuote) {
         if (ch === '"') {
           if (i + 1 < end && source[i + 1] === '"') {
@@ -171,7 +171,7 @@ function scanCsvRecords(source: string, start: number, end: number): CsvRecord[]
           i++
           // 闭引号后只允许 `,` / `\n` / `\r\n` / 记录结束
           if (i < end) {
-            const nc = source[i]!
+            const nc = source[i]
             if (nc !== ',' && nc !== '\n' && !(nc === '\r' && i + 1 < end && source[i + 1] === '\n')) {
               malformed = true
             }
@@ -253,7 +253,7 @@ export class SankeyParser implements DiagramParser {
       if (!seenHeader) {
         // 头之前的空行 / 纯空白行跳过；首个非空记录必须是裸关键字声明头
         if (recordText.trim() === '') continue
-        if (!record.malformed && record.fields.length === 1 && HEADER_RE.test(record.fields[0]!)) {
+        if (!record.malformed && record.fields.length === 1 && HEADER_RE.test(record.fields[0])) {
           seenHeader = true
           entries.push({
             span: { start: record.start, end: record.end },
@@ -274,9 +274,9 @@ export class SankeyParser implements DiagramParser {
         id: `link:${linkCount}`,
         data: {
           kind: 'sankey-link',
-          sourceRaw: record.fields[0]!,
-          targetRaw: record.fields[1]!,
-          valueRaw: record.fields[2]!,
+          sourceRaw: record.fields[0],
+          targetRaw: record.fields[1],
+          valueRaw: record.fields[2],
         },
       })
     }
