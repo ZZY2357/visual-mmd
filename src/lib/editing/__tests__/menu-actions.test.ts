@@ -267,14 +267,14 @@ describe('MENU_ACTIONS 穷尽性（工单 05 → 工单 01）', () => {
 })
 
 describe('createElement（工单 01：五个「创建 + 选中 + 内联命名」变体的唯一实现）', () => {
-  it('flowchart 空白：落码矩形节点、选中并进入内联命名、关菜单', () => {
+  it('flowchart 空白：落码纯文本节点（无形状、无机器 id）、选中并进入内联命名、关菜单', () => {
     const ctx = fakeCtx({ projection: flowProjectionOf(FLOW) })
 
     MENU_ACTIONS['add-node'](ctx, { kind: 'blank', diagramType: 'flowchart' })
 
-    expect(ctx.intents).toEqual([{ type: 'add-node', nodeId: 'n1', text: 'n1', shape: 'rectangle' }])
-    expect(ctx.selections).toEqual([{ kind: 'node', nodeId: 'n1' }])
-    expect(ctx.inlineEdits).toEqual([{ kind: 'flowchart', nodeId: 'n1' }])
+    expect(ctx.intents).toEqual([{ type: 'add-node', nodeId: '新节点', shape: null }])
+    expect(ctx.selections).toEqual([{ kind: 'node', nodeId: '新节点' }])
+    expect(ctx.inlineEdits).toEqual([{ kind: 'flowchart', nodeId: '新节点' }])
     expect(ctx.closed).toBe(1)
   })
 

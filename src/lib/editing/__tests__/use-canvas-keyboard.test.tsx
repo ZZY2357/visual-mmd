@@ -129,16 +129,17 @@ describe('useCanvasKeyboard（工单 04 画布焦点体系）', () => {
 
     expect(prevented).toBe(true)
     const { source } = useEditorStore.getState()
-    expect(source).toContain('A --> n1')
-    expect(created).toEqual(['n1'])
-    expect(useEditorStore.getState().selection).toEqual({ kind: 'node', nodeId: 'n1' })
+    // 新节点默认纯文本（ADR-0009 模型）：裸词占位，无形状、无机器 id
+    expect(source).toContain('A --> 新节点')
+    expect(created).toEqual(['新节点'])
+    expect(useEditorStore.getState().selection).toEqual({ kind: 'node', nodeId: '新节点' })
   })
 
-  it('画布聚焦时 Enter：无入边的根节点退化为连出（A --> n1）', () => {
+  it('画布聚焦时 Enter：无入边的根节点退化为连出（A --> 新节点）', () => {
     const container = mountWithSelection()
 
     expect(keyOn(container, 'Enter')).toBe(true)
-    expect(useEditorStore.getState().source).toContain('A --> n1')
+    expect(useEditorStore.getState().source).toContain('A --> 新节点')
   })
 
   it('焦点在容器内的输入控件上：完全不拦截，Tab 不落码', () => {
@@ -319,8 +320,8 @@ describe('useCanvasKeyboard（工单 06 IME 组合输入）', () => {
 
     compositionOn(container, 'compositionend')
     expect(keyOn(container, 'Tab')).toBe(true)
-    expect(useEditorStore.getState().source).toContain('A --> n1')
-    expect(created).toEqual(['n1'])
+    expect(useEditorStore.getState().source).toContain('A --> 新节点')
+    expect(created).toEqual(['新节点'])
   })
 
   it('组合期间方向键：不导航、不 preventDefault（候选词选择交给 IME）', () => {
@@ -805,7 +806,7 @@ describe('useCanvasKeyboard（工单 02 内联编辑提交后的焦点归还）'
   it('Tab → Enter 提交 → 焦点回容器 → 再 Tab 连续加出第二层节点', async () => {
     const container = mountFlow()
 
-    // 第一次 Tab：A --> n1，落码后进入内联命名，输入框接管焦点
+    // 第一次 Tab：A --> 新节点（纯文本占位），落码后进入内联命名，输入框接管焦点
     act(() => {
       expect(keyOn(container, 'Tab')).toBe(true)
     })
@@ -821,7 +822,8 @@ describe('useCanvasKeyboard（工单 02 内联编辑提交后的焦点归还）'
     await act(async () => {
       keyOn(input!, 'Enter')
     })
-    expect(useEditorStore.getState().source).toContain('n1[子节点]')
+    // 裸词节点改文本 = 纯文本形式保持（id 即显示文本，连线端点跟随改写）
+    expect(useEditorStore.getState().source).toContain('A --> 子节点')
 
     // 焦点已归还画布容器：提交卸载输入框不会把焦点丢在 body 上
     expect(document.activeElement).toBe(container)
@@ -832,10 +834,10 @@ describe('useCanvasKeyboard（工单 02 内联编辑提交后的焦点归还）'
       prevented = keyOnFocused('Tab')
     })
     expect(prevented).toBe(true)
-    expect(useEditorStore.getState().selection).toEqual({ kind: 'node', nodeId: 'n2' })
-    // 第二层节点挂在刚命名的 n1 下（编辑结果与键盘操作连续生效）
-    expect(useEditorStore.getState().source).toContain('n1[子节点]')
-    expect(useEditorStore.getState().source).toContain('n1 --> n2')
+    expect(useEditorStore.getState().selection).toEqual({ kind: 'node', nodeId: '新节点' })
+    // 第二层节点挂在刚命名的「子节点」下（编辑结果与键盘操作连续生效；
+    // 改名后占位「新节点」空出，占位串复用）
+    expect(useEditorStore.getState().source).toContain('子节点 --> 新节点')
   })
 
   it('失焦提交不归还焦点：焦点留在画布之外，后续 Tab 事件到不了容器', async () => {
@@ -860,7 +862,7 @@ describe('useCanvasKeyboard（工单 02 内联编辑提交后的焦点归还）'
     // 焦点没回画布：Tab 事件不经过容器监听器，不落码（bug 复现路径的钉子）
     expect(keyOnFocused('Tab')).toBe(false)
     expect(document.activeElement).toBe(outside)
-    expect(useEditorStore.getState().selection).toEqual({ kind: 'node', nodeId: 'n1' })
+    expect(useEditorStore.getState().selection).toEqual({ kind: 'node', nodeId: '新节点' })
     expect(useEditorStore.getState().source).not.toContain('n2')
     outside.remove()
   })

@@ -44,6 +44,14 @@ export function newElementName(kind: NewElementKind): string {
   return currentLanguage() === 'en' ? EN[kind] : ZH[kind]
 }
 
+/** flowchart 新建节点的占位串（= 初始 id，也是初始显示文本，ADR-0009 模型）：
+ * 默认落**纯文本节点**（裸词，id 与显示文本是同一个串），不生成 n1 这类机器 id。
+ * 裸词形式受 id 字符集约束（不能含空白），故 en 用无空格的 NewNode——
+ * 与 newElementName('node')（显示名，可含空格）是两个概念，分开放置。 */
+export function newNodePlaceholderId(): string {
+  return currentLanguage() === 'en' ? 'NewNode' : '新节点'
+}
+
 /** 图表库默认图表名 */
 export function unnamedDiagramName(): string {
   return currentLanguage() === 'en' ? 'Untitled diagram' : '未命名图表'

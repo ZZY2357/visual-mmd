@@ -8,7 +8,6 @@ import {
   applyPlan,
   isNavigationKey,
   keyToNodeAction,
-  nextNodeId,
 } from '../canvas-keyboard'
 import type { KeyPlan } from '../canvas-keyboard'
 import { flowchartKeyPlan, nodeActionIntents } from '../../pipeline/flowchart-keyboard'
@@ -54,18 +53,6 @@ describe('键位映射（工单 05）', () => {
   })
 })
 
-describe('新节点 id 推断', () => {
-  it('空图 → n1；已有 n1/n2 → n3', () => {
-    expect(nextNodeId([])).toBe('n1')
-    expect(nextNodeId(['A', 'n1', 'n2'])).toBe('n3')
-  })
-
-  it('跳过与用户节点冲突的编号', () => {
-    expect(nextNodeId(['n1', 'n3'])).toBe('n2')
-    expect(nextNodeId(['n1', 'n2', 'n3'])).toBe('n4')
-  })
-})
-
 describe('动作 → 编辑意图序列', () => {
   const projection = projectionOf(SAMPLE)
 
@@ -80,11 +67,11 @@ describe('动作 → 编辑意图序列', () => {
   it('add-child 产出 add-node + add-edge（选中 → 新节点），锚定在选中节点行后', () => {
     const plan = nodeActionIntents(projection, 'B', 'add-child')
     expect(plan).not.toBeNull()
-    expect(plan!.newNodeId).toBe('n1')
+    expect(plan!.newNodeId).toBe('新节点')
     expect(plan!.intents).toEqual([
-      { type: 'add-node', nodeId: 'n1', text: 'n1', shape: 'rectangle', afterElementId: 'node:B' },
+      { type: 'add-node', nodeId: '新节点', shape: null, afterElementId: 'node:B' },
       // 连线锚定在新节点行后：定义行在前、连线行在后（投影首次出现才取得到文本）
-      { type: 'add-edge', from: 'B', to: 'n1', afterElementId: 'node:n1' },
+      { type: 'add-edge', from: 'B', to: '新节点', afterElementId: 'node:新节点' },
     ])
   })
 
@@ -93,14 +80,14 @@ describe('动作 → 编辑意图序列', () => {
     expect(plan!.intents[1]).toEqual({
       type: 'add-edge',
       from: 'A',
-      to: 'n1',
-      afterElementId: 'node:n1',
+      to: '新节点',
+      afterElementId: 'node:新节点',
     })
   })
 
   it('无入边的根节点按 Enter 退化为添加子节点', () => {
     const plan = nodeActionIntents(projection, 'A', 'add-sibling')
-    expect(plan!.intents[1]).toEqual({ type: 'add-edge', from: 'A', to: 'n1', afterElementId: 'node:n1' })
+    expect(plan!.intents[1]).toEqual({ type: 'add-edge', from: 'A', to: '新节点', afterElementId: 'node:新节点' })
   })
 
   it('选中的节点不存在于投影 → null（不产出意图）', () => {
@@ -119,18 +106,18 @@ describe('意图经管线落码（手术式、可渲染）', () => {
       expect(result.ok).toBe(true)
       if (result.ok) source = result.source
     }
-    // 新增的两行紧跟 B 行之后（缩进跟随锚点行）
+    // 新增的两行紧跟 B 行之后（缩进跟随锚点行）；新节点默认纯文本（ADR-0009 模型）
     const lines = source.split('\n')
     const idx = lines.findIndex((l) => l.includes('B[处理]'))
-    expect(lines[idx + 1]).toBe('    n1[n1]')
-    expect(lines[idx + 2]).toBe('    B --> n1')
+    expect(lines[idx + 1]).toBe('    新节点')
+    expect(lines[idx + 2]).toBe('    B --> 新节点')
     // 原有行逐字保留（新行插在首个 B 出现行之后）
     expect(lines[0]).toBe('flowchart TD')
     expect(lines[1]).toBe('    A[开始] --> B[处理]')
     expect(lines[4]).toBe('    B --> C[结束]')
     // 新投影包含新节点与两条 B 的出边
     const after = projectionOf(source)
-    expect(after.nodes.some((n) => n.nodeId === 'n1')).toBe(true)
+    expect(after.nodes.some((n) => n.nodeId === '新节点')).toBe(true)
     expect(after.edges.filter((e) => e.from === 'B').length).toBe(2)
   })
 
@@ -143,7 +130,7 @@ describe('意图经管线落码（手术式、可渲染）', () => {
       if (result.ok) source = result.source
     }
     const after = projectionOf(source)
-    const newEdge = after.edges.find((e) => e.to === 'n1')
+    const newEdge = after.edges.find((e) => e.to === '新节点')
     expect(newEdge?.from).toBe('B') // C 的父节点是 B
   })
 
@@ -155,6 +142,94 @@ describe('意图经管线落码（手术式、可渲染）', () => {
     const after = projectionOf((result as { ok: true; source: string }).source)
     expect(after.nodes.some((n) => n.nodeId === 'B')).toBe(false)
     expect(after.edges.length).toBe(0)
+  })
+})
+
+// ---------- flowchart 默认纯文本节点（ADR-0009 对齐：默认不分离、不生成机器 id） ----------
+
+const BARE_SAMPLE = `flowchart TD
+    新节点
+    新节点 --> B[处理]
+`
+
+describe('flowchart 默认纯文本节点（ADR-0009 对齐：默认不分离、不生成机器 id）', () => {
+  it('add-child：新节点 = 纯文本占位「新节点」（避重），无形状、无机器 id', () => {
+    const plan = nodeActionIntents(projectionOf(SAMPLE), 'B', 'add-child')
+    expect(plan!.newNodeId).toBe('新节点')
+    expect(plan!.intents[0]).toEqual({
+      type: 'add-node',
+      nodeId: '新节点',
+      shape: null,
+      afterElementId: 'node:B',
+    })
+    expect(plan!.intents[1]).toEqual({
+      type: 'add-edge',
+      from: 'B',
+      to: '新节点',
+      afterElementId: 'node:新节点',
+    })
+  })
+
+  it('占位与既有节点避重：已有「新节点」→「新节点2」', () => {
+    const proj = projectionOf(BARE_SAMPLE)
+    const plan = nodeActionIntents(proj, 'B', 'add-child')
+    expect(plan!.newNodeId).toBe('新节点2')
+  })
+
+  it('add-child 落码：裸文本行 + 连线行，无方括号、无机器 id，其余逐字保留', () => {
+    const plan = nodeActionIntents(projectionOf(SAMPLE), 'B', 'add-child')!
+    let source = SAMPLE
+    for (const intent of plan.intents) {
+      const result = applyEdit(source, flowchartParser, intent)
+      expect(result.ok).toBe(true)
+      if (result.ok) source = result.source
+    }
+    const lines = source.split('\n')
+    const idx = lines.findIndex((l) => l.includes('B[处理]'))
+    expect(lines[idx + 1]).toBe('    新节点')
+    expect(lines[idx + 2]).toBe('    B --> 新节点')
+    expect(source).not.toMatch(/n\d/)
+    const after = projectionOf(source)
+    expect(after.nodes.some((n) => n.nodeId === '新节点')).toBe(true)
+  })
+
+  it('内联编辑裸节点（新文本是合法裸词）→ 所有出现处重写为同一裸词，纯文本形式保持', () => {
+    const result = applyEdit(BARE_SAMPLE, flowchartParser, {
+      type: 'set-node-text',
+      nodeId: '新节点',
+      text: '用户登录',
+    })
+    expect(result.ok).toBe(true)
+    if (!result.ok) return
+    const lines = result.source.split('\n')
+    expect(lines[1]).toBe('    用户登录')
+    expect(lines[2]).toBe('    用户登录 --> B[处理]')
+  })
+
+  it('内联编辑裸节点（新文本含空格，裸词形式不可能）→ 旧词保留为 id，方框承接文本', () => {
+    const result = applyEdit(BARE_SAMPLE, flowchartParser, {
+      type: 'set-node-text',
+      nodeId: '新节点',
+      text: '用户 登录',
+    })
+    expect(result.ok).toBe(true)
+    if (!result.ok) return
+    const lines = result.source.split('\n')
+    expect(lines[1]).toBe('    新节点[用户 登录]')
+    expect(lines[2]).toBe('    新节点 --> B[处理]')
+  })
+
+  it('属性面板改 ID（裸节点）= 显式分离：MyId[新节点]，其余出现处跟随新 id', () => {
+    const result = applyEdit(BARE_SAMPLE, flowchartParser, {
+      type: 'rename-node',
+      nodeId: '新节点',
+      newId: 'MyId',
+    })
+    expect(result.ok).toBe(true)
+    if (!result.ok) return
+    const lines = result.source.split('\n')
+    expect(lines[1]).toBe('    MyId[新节点]')
+    expect(lines[2]).toBe('    MyId --> B[处理]')
   })
 })
 
@@ -379,19 +454,19 @@ describe('键 → KeyPlan：flowchart（工单 04 键位表 + 意图映射）', 
   it('Tab → add-node + add-edge，newElementTarget 指向新节点（选中 + 内联编辑）', () => {
     expect(flowchartKeyPlan(projection, { key: 'Tab', selection: FLOW_SELECTION })).toEqual({
       intents: [
-        { type: 'add-node', nodeId: 'n1', text: 'n1', shape: 'rectangle', afterElementId: 'node:B' },
-        { type: 'add-edge', from: 'B', to: 'n1', afterElementId: 'node:n1' },
+        { type: 'add-node', nodeId: '新节点', shape: null, afterElementId: 'node:B' },
+        { type: 'add-edge', from: 'B', to: '新节点', afterElementId: 'node:新节点' },
       ],
       newElementTarget: {
-        selection: { kind: 'node', nodeId: 'n1' },
-        inlineEdit: { kind: 'flowchart', nodeId: 'n1' },
+        selection: { kind: 'node', nodeId: '新节点' },
+        inlineEdit: { kind: 'flowchart', nodeId: '新节点' },
       },
     })
   })
 
   it('Enter → 加同级（经入边推断父节点）；Delete → delete-node（无 newElementTarget、不清选中）', () => {
     const enterPlan = flowchartKeyPlan(projection, { key: 'Enter', selection: FLOW_SELECTION })
-    expect(enterPlan!.intents[1]).toMatchObject({ type: 'add-edge', from: 'A', to: 'n1' })
+    expect(enterPlan!.intents[1]).toMatchObject({ type: 'add-edge', from: 'A', to: '新节点' })
     expect(flowchartKeyPlan(projection, { key: 'Delete', selection: FLOW_SELECTION })).toEqual({
       intents: [{ type: 'delete-node', nodeId: 'B' }],
     })

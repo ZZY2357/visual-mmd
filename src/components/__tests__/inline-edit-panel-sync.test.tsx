@@ -83,8 +83,10 @@ describe('实测发现 3：内联改名后面板同步', () => {
     expect(plan).not.toBeNull()
     const { commitIntent, commitIntents, select } = useEditorStore.getState()
     applyPlan(plan!, { commitIntent, commitIntents, select })
-    // 内联编辑提交（回车）
-    expect(useEditorStore.getState().commitIntent({ type: 'set-node-text', nodeId: 'n1', text: '测试子节点' })).toBe(true)
+    // 内联编辑提交（回车）：新节点默认纯文本（ADR-0009 模型），id 即占位「新节点」，
+    // 改文本 = 裸词重命名 → 选中跟随到新 id（由内联编辑 hook / 属性面板承担，store 不自动迁移）
+    expect(useEditorStore.getState().commitIntent({ type: 'set-node-text', nodeId: '新节点', text: '测试子节点' })).toBe(true)
+    useEditorStore.getState().select({ kind: 'node', nodeId: '测试子节点' })
 
     // 面板随新源码重渲染（App 的投影派生路径）
     await render(projectionOf(useEditorStore.getState().source))

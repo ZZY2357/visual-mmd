@@ -747,8 +747,10 @@ export type FlowchartIntent =
   | { type: 'rename-node'; nodeId: string; newId: string }
   /** 换节点形状 */
   | { type: 'set-node-shape'; nodeId: string; shape: NodeShapeType }
-  /** 新增节点声明行（afterElementId 缺省时追加到文档末尾元素之后；缩进跟随锚点行） */
-  | { type: 'add-node'; nodeId: string; text?: string; shape?: NodeShapeType; afterElementId?: string }
+  /** 新增节点声明行（afterElementId 缺省时追加到文档末尾元素之后；缩进跟随锚点行）。
+   * shape: null = 纯文本节点（裸词，id 与显示文本是同一个串，ADR-0009 模型；
+   * 分离 id 与文本只在用户显式设置时发生）；缺省 = 矩形。 */
+  | { type: 'add-node'; nodeId: string; text?: string; shape?: NodeShapeType | null; afterElementId?: string }
   /** 删除节点：其全部出现与触及的连线（链中删除后两端自动合并） */
   | { type: 'delete-node'; nodeId: string }
   /** 改连线标签（occurrence 缺省 1；null/空串 = 去标签） */
@@ -1046,6 +1048,16 @@ export class FlowchartParser implements DiagramParser {
       }
       return rewrites
     }
+    // 纯文本节点（全部出现皆裸词）：显示文本即语法 id——新文本是合法裸词时保持纯文本
+    // 形式，所有出现处（含连线端点）重写为同一裸词；含空格等裸词不可能时才退回
+    // 「旧词保留为 id + 方框承接文本」的分离形式（语法必然，不是默认分离）
+    if (isValidNodeId(intent.text)) {
+      const rewrites = new Map<string, string>()
+      for (const part of occs) {
+        rewrites.set(part.id, renderNodeOcc(part.element as NodeOccData, { newId: intent.text }))
+      }
+      return rewrites
+    }
     const target = occs.find((part) => (part.element as NodeOccData).standalone) ?? occs[0]
     return new Map([[target.id, renderNodeOcc(target.element as NodeOccData, { text: intent.text, shape: 'rectangle' })]])
   }
@@ -1058,8 +1070,20 @@ export class FlowchartParser implements DiagramParser {
     const occs = this.nodeOccs(doc, intent.nodeId)
     if (occs.length === 0) return null
     const rewrites = new Map<string, string>()
+    // 纯文本节点（全部出现皆裸词）：改 ID = 用户显式引入分离——旧词保留为显示文本、
+    // 方框承接（分离必然引入形状，ADR-0009），其余出现处（连线端点）跟随新 id，
+    // 否则节点会被拆成两个。带形状的节点改 id 不触碰显示文本（逐字重写全部出现）。
+    const allBare = occs.every((part) => (part.element as NodeOccData).shapeType === null)
+    const splitTarget = allBare
+      ? (occs.find((part) => (part.element as NodeOccData).standalone) ?? occs[0])
+      : null
     for (const part of occs) {
-      rewrites.set(part.id, renderNodeOcc(part.element as NodeOccData, { newId: intent.newId }))
+      const el = part.element as NodeOccData
+      const changes =
+        part === splitTarget
+          ? { newId: intent.newId, text: el.nodeId, shape: 'rectangle' as const }
+          : { newId: intent.newId }
+      rewrites.set(part.id, renderNodeOcc(el, changes))
     }
     return rewrites
   }
@@ -1085,7 +1109,10 @@ export class FlowchartParser implements DiagramParser {
       anchor: 'line-end',
       render: (indent) =>
         indentLines(indent, [
-          buildNodeLine(intent.nodeId, intent.text ?? intent.nodeId, intent.shape ?? 'rectangle'),
+          // 纯文本节点：裸词行（id 即显示文本，无形状）；分离形式只在用户显式给 id 时出现
+          intent.shape === null
+            ? intent.nodeId
+            : buildNodeLine(intent.nodeId, intent.text ?? intent.nodeId, intent.shape ?? 'rectangle'),
         ]),
     })
   }

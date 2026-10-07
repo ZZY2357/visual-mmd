@@ -137,8 +137,12 @@ export function NodeForm({
 }) {
   const t = useTranslation().t
   const commitIntent = useCommitIntent()
-  const textDraft = useDraft(node.text ?? '', (next) => {
-    commitIntent(setNodeTextIntent(node.nodeId, next))
+  // 纯文本节点（shape: null）没有独立于 id 的文本：预填 id（与内联编辑同口径），
+  // 提交改文本 = 裸词重命名（ADR-0009 模型），改名后旧选中随 id 失效 → 跟随到新 id
+  const textDraft = useDraft(node.text ?? (node.shape === null ? node.nodeId : ''), (next) => {
+    if (commitIntent(setNodeTextIntent(node.nodeId, next)) && node.shape === null) {
+      useEditorStore.getState().select({ kind: 'node', nodeId: next })
+    }
   })
   const idDraft = useDraft(node.nodeId, (next) => {
     const intent = renameNodeIntent(node.nodeId, next)

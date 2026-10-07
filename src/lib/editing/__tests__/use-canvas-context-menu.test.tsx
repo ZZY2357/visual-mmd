@@ -450,9 +450,10 @@ describe('useCanvasContextMenu（工单 07 右键菜单）', () => {
 
     act(() => api.current!.addNode())
 
-    expect(useEditorStore.getState().source).toContain('n1[n1]')
-    expect(useEditorStore.getState().selection).toEqual({ kind: 'node', nodeId: 'n1' })
-    expect(created).toEqual(['n1'])
+    // 新节点默认纯文本（ADR-0009 模型）：裸词占位，无形状、无机器 id
+    expect(useEditorStore.getState().source).toContain('新节点\n')
+    expect(useEditorStore.getState().selection).toEqual({ kind: 'node', nodeId: '新节点' })
+    expect(created).toEqual(['新节点'])
   })
 
   it('代码面板打字中：画布菜单落码被挂起，来源标记为 canvas（工单 09）', () => {
@@ -822,7 +823,7 @@ describe('useCanvasContextMenu（工单 04 空白处按图种建元素）', () =
     expect(snapshots.at(-1)!.menu?.items).toEqual(['add-node', 'link-mode', 'add-style', 'add-subgraph'])
 
     act(() => api.current!.addNode())
-    expect(useEditorStore.getState().source).toContain('n1[n1]')
+    expect(useEditorStore.getState().source).toContain('\n    新节点\n')
   })
 })
 

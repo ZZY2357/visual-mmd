@@ -7,7 +7,7 @@ import type { ContextMenuItemId, ContextMenuTarget } from './context-menu'
 import type { CanvasInlineEditTarget } from './inline-edit'
 import type { NodeFormKind } from './use-canvas-context-menu'
 import { mindmapActionIntents, type MindmapActionPlan } from '../pipeline/mindmap-keyboard'
-import { applyPlan, nextNodeId, type KeyPlan } from './canvas-keyboard'
+import { applyPlan, type KeyPlan } from './canvas-keyboard'
 import { kanbanCardElementId, kanbanColumnElementId, nextFreeName } from '../pipeline/element-id'
 import { isValidStateId } from '../pipeline/state'
 import { isValidErName } from '../pipeline/er'
@@ -39,7 +39,7 @@ import {
   setMessageIntent,
   MESSAGE_ARROW_OPTIONS,
 } from './sequence-forms'
-import { newElementName } from '../../i18n/domain-strings.ts'
+import { newElementName, newNodePlaceholderId } from '../../i18n/domain-strings.ts'
 
 /**
  * 菜单项动作表（架构工单 05 → architecture-deepening-2 工单 01）：
@@ -108,7 +108,7 @@ function targetSelection(target: ContextMenuTarget | undefined): Selection | nul
  * 「创建 + 选中 + 进入内联命名」的唯一参数化实现（architecture-deepening-2 工单 01）。
  * 五个原变体（addNode / addClass / addParticipant / addMindmapRoot / addChildToMindmap）
  * 只是「按图种 + 目标算新元素 → 落码 → 选中 → 内联命名 → 关菜单」的同一编排放了不同参数：
- * - flowchart 空白：新节点 id（nextNodeId），矩形；
+ * - flowchart 空白：新节点纯文本占位（newNodePlaceholderId 避重），无形状、无机器 id；
  * - class 空白：默认名「新类」避重（nextFreeName，可引用名语义）；
  * - sequence 空白：默认名「新参与者」避重，不生成 alias；
  * - mindmap 空白：空文档建根（elementId 必为 mindmap-node:1），非空挂到根节点下；
@@ -122,9 +122,10 @@ export function createElement(ctx: MenuActionContext, target: ContextMenuTarget 
   // 「落码 → 选中 → 内联命名」的编排放策略只在执行器一处定义；菜单关闭在 plan 完整执行后。
   const plan: KeyPlan | null = (() => {
     if (proj.type === 'flowchart') {
-      const nodeId = nextNodeId(proj.flowchart.nodes.map((n) => n.nodeId))
+      // 新节点默认纯文本（裸词，id 与显示文本同一个串，ADR-0009 模型），占位避重，不生成机器 id
+      const nodeId = nextFreeName(newNodePlaceholderId(), proj.flowchart.nodes.map((n) => n.nodeId))
       return {
-        intents: [{ type: 'add-node', nodeId, text: nodeId, shape: 'rectangle' }],
+        intents: [{ type: 'add-node', nodeId, shape: null }],
         newElementTarget: {
           selection: { kind: 'node', nodeId },
           inlineEdit: { kind: 'flowchart', nodeId },

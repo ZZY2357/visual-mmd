@@ -1,4 +1,3 @@
-import { nextFreeName } from '../pipeline/element-id'
 import type { ClassProjection } from '../projection/class-projection'
 import type { ErProjection } from '../projection/er-projection'
 import type { FlowchartProjection } from '../projection/flowchart-projection'
@@ -38,7 +37,7 @@ import type { Rect } from './inline-edit'
  * 各图种自己的 `<id>KeyPlan` / `<id>DeleteIntent` / validity helper 已迁到
  * `src/lib/pipeline/<id>-keyboard.ts`（与该图种管线同 id 文件旁），本模块只保留：
  * 方位导航键位判定与适配对象、以及 flowchart/mindmap 共用的节点树键位表
- * （keyToNodeAction）与节点 id 生成（nextNodeId——也被右键菜单消费）。
+ * （keyToNodeAction）。
  * 键事件的语义形状（KeyPlan / KeyInput / KeyFormKind / KeyHandler / PlanExecutor）
  * 与唯一执行器 applyPlan 已迁 `src/lib/pipeline/key-plan.ts`（architecture-deepening-3
  * 工单 02，editing 与 structure-tree 两个消费方共用；本模块 re-export 保持路径不变）。
@@ -97,12 +96,9 @@ export function keyToNodeAction(key: string, mods: { shift?: boolean } = {}): No
   return null
 }
 
-/** 生成未冲突的新节点 id：n1、n2……跳过已有 id。
- * 编号口径收在 pipeline 的 nextFreeName（architecture-deepening-2 工单 04）：
- * 生成式 id 无引用语义，referential: false——从 1 起编号，不做 base 本身检查。 */
-export function nextNodeId(existingIds: Iterable<string>): string {
-  return nextFreeName('n', existingIds, { referential: false })
-}
+// 注：曾有的 nextNodeId（n1、n2……机器 id 生成）已删除——新建节点默认纯文本占位
+// （id 与显示文本同一个串，ADR-0009 模型），编号口径在 pipeline 的 nextFreeName
+// + domain-strings 的 newNodePlaceholderId（flowchart-keyboard / menu-actions 消费）。
 
 
 // 键事件的语义形状（KeyPlan / KeyInput / KeyFormKind / KeyHandler / PlanExecutor）与唯一执行器

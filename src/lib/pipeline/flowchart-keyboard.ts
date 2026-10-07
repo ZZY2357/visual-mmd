@@ -1,7 +1,9 @@
 // flowchart 画布键盘 / 删除语义（architecture-deepening-3 工单 01：自 editing/canvas-keyboard.ts 物理归位，代码块字节级搬移，逻辑零改动）
 
-import { keyToNodeAction, nextNodeId, type KeyInput, type KeyPlan, type NodeKeyAction } from '../editing/canvas-keyboard'
+import { keyToNodeAction, type KeyInput, type KeyPlan, type NodeKeyAction } from '../editing/canvas-keyboard'
 import { nodeElementId, type FlowchartIntent } from './flowchart'
+import { nextFreeName } from './element-id'
+import { newNodePlaceholderId } from '../../i18n/domain-strings.ts'
 import type { FlowchartProjection } from '../projection/flowchart-projection'
 import type { Selection } from '../projection/selection'
 
@@ -18,7 +20,8 @@ export interface NodeActionPlan {
  * - add-child：新节点 + 选中节点 → 新节点的连线，两行都插在选中节点行后
  * - add-sibling：父节点 = 第一条指向选中节点连线的起点（childOf 推断）；
  *   无入边（根节点）时退化为 add-child
- * 选中节点已不存在于投影时返回 null（不产出意图）。
+ * 新节点默认**纯文本**（裸词，id 与显示文本是同一个串，ADR-0009 模型），占位串
+ * 「新节点」避重；不生成 n1 这类机器 id。选中节点已不存在于投影时返回 null。
  */
 export function nodeActionIntents(
   projection: FlowchartProjection,
@@ -30,13 +33,13 @@ export function nodeActionIntents(
     return { intents: [{ type: 'delete-node', nodeId }], newNodeId: null }
   }
 
-  const newId = nextNodeId(projection.nodes.map((n) => n.nodeId))
+  const newId = nextFreeName(newNodePlaceholderId(), projection.nodes.map((n) => n.nodeId))
   const anchor = nodeElementId(nodeId, 1)
   const parent =
     action === 'add-child' ? nodeId : projection.edges.find((e) => e.to === nodeId)?.from ?? nodeId
   return {
     intents: [
-      { type: 'add-node', nodeId: newId, text: newId, shape: 'rectangle', afterElementId: anchor },
+      { type: 'add-node', nodeId: newId, shape: null, afterElementId: anchor },
       // 连线锚定在新节点行后：落码顺序为 选中行 → 新节点行 → 连线行，
       // 否则连线行插进新节点定义之前，投影首次出现（裸端点）取不到文本
       { type: 'add-edge', from: parent, to: newId, afterElementId: nodeElementId(newId, 1) },

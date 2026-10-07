@@ -389,7 +389,26 @@ export function useCanvasInlineEdit({ projection, resolver, svg, containerRef, v
       const { editing: cur, projection: proj } = latestRef.current
       if (cur !== null) {
         const result = inlineEditCommitOf(cur.target, text, inlineEditTextOf(proj, cur.target))
-        if (result.action === 'commit') useEditorStore.getState().commitIntent(result.intent, 'canvas')
+        if (result.action === 'commit') {
+          const ok = useEditorStore.getState().commitIntent(result.intent, 'canvas')
+          // flowchart 纯文本节点改文本 = 改语法 id（裸词重命名，ADR-0009 模型）：
+          // 旧选中随 id 失效，跟随到新 id（与属性面板「节点 ID」改名的选中迁移同口径）
+          const target = cur.target
+          const { intent } = result
+          if (
+            ok &&
+            target.kind === 'flowchart' &&
+            intent.type === 'set-node-text' &&
+            'nodeId' in intent &&
+            proj?.type === 'flowchart'
+          ) {
+            const node = proj.flowchart.nodes.find((n) => n.nodeId === target.nodeId)
+            if (node !== undefined && node.shape === null) {
+              // EditIntent 是宽松 Record（parser.ts），text 由 flowchart 提交规则保证为 string
+              useEditorStore.getState().select({ kind: 'node', nodeId: intent.text as string })
+            }
+          }
+        }
       }
       closeEditing(options?.restoreFocus === true)
     },
